@@ -1,3 +1,4 @@
+import { PinnedBar } from "@/features/messages/pins/PinnedBar";
 import * as React from "react";
 import { LogIn } from "lucide-react";
 import { AnimatePresence } from "motion/react";
@@ -616,6 +617,19 @@ export const ChannelPane = React.memo(function ChannelPane({
           }
         >
           {isHuddleTranscript ? null : header}
+          {activeChannel && currentPubkey ? (
+            <PinnedBar
+              key={activeChannel.id}
+              channel={activeChannel.id}
+              pubkey={currentPubkey}
+              onOpen={(id) => {
+                void goChannel(activeChannel.id, {
+                  messageId: id,
+                  force: true,
+                });
+              }}
+            />
+          ) : null}
           {isHuddleTranscript && huddleThreadRepliesError ? (
             <div className="px-5 pt-3">
               <ThreadRepliesErrorCard onRetry={onRetryHuddleThreadReplies} />

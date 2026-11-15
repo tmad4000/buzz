@@ -1,3 +1,4 @@
+import { setMessagePin } from "@/features/messages/pins/service";
 import {
   BellOff,
   BellRing,
@@ -175,6 +176,17 @@ function MoreActionsMenu({
             }
           }}
         >
+          {channelId && !message.pending ? (
+            <DropdownMenuItem
+              onSelect={() => {
+                void setMessagePin(channelId, message.id, true)
+                  .then(() => toast.success("Pinned to channel"))
+                  .catch((e) => toast.error(String(e)));
+              }}
+            >
+              Pin to channel
+            </DropdownMenuItem>
+          ) : null}
           {onEdit ? (
             <DropdownMenuItem
               data-testid={`edit-message-${message.id}`}

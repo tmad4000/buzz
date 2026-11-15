@@ -474,6 +474,23 @@ pub enum MessagesCmd {
         #[arg(long)]
         reply_to: Option<String>,
     },
+    /// Create or revise your pinned Now working on card (one stable message per signer/channel)
+    Now {
+        #[arg(long)]
+        channel: String,
+        #[arg(long)]
+        content: String,
+    },
+    /// Pin a message in its channel (shared; each signer owns their pins)
+    Pin {
+        #[arg(long)]
+        event: String,
+    },
+    /// Remove your pin from a message
+    Unpin {
+        #[arg(long)]
+        event: String,
+    },
     /// Edit a previously sent message
     Edit {
         /// Event ID of the message to edit (64-char hex)

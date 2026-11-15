@@ -4,7 +4,7 @@
  * Format: `buzz://message?channel=<uuid>&id=<eventId>[&thread=<rootId>]`
  */
 
-const MESSAGE_LINK_SCHEME = "buzz:";
+const MESSAGE_LINK_SCHEME = "buzz-ideaflow:";
 const MESSAGE_LINK_HOST = "message";
 
 export type MessageLinkInput = {
@@ -67,7 +67,7 @@ export function parseMessageLink(url: string): MessageLinkParseResult {
     return { ok: false, reason: "invalid-url" };
   }
 
-  if (parsed.protocol !== MESSAGE_LINK_SCHEME) {
+  if (![MESSAGE_LINK_SCHEME, "buzz:"].includes(parsed.protocol)) {
     return { ok: false, reason: "wrong-scheme" };
   }
   // `new URL("buzz://message?…")` puts "message" in `hostname`.
@@ -100,7 +100,10 @@ export function parseMessageLink(url: string): MessageLinkParseResult {
  */
 export function isMessageLink(href: string | undefined | null): boolean {
   if (!href) return false;
-  return href.startsWith("buzz://message?") || href === "buzz://message";
+  return ["buzz", "buzz-ideaflow"].some(
+    (scheme) =>
+      href.startsWith(`${scheme}://message?`) || href === `${scheme}://message`,
+  );
 }
 
 type MessageLinkRenderInput = {

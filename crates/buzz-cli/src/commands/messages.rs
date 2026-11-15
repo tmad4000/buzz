@@ -876,6 +876,121 @@ pub async fn cmd_delete_message(
     Ok(())
 }
 
+fn require_status_accepted(response: &str) -> Result<(), CliError> {
+    let response: serde_json::Value = serde_json::from_str(response)
+        .map_err(|_| CliError::Other("status write returned malformed acknowledgement".into()))?;
+    if response["accepted"].as_bool() != Some(true) {
+        return Err(CliError::Other(format!(
+            "status write rejected: {}",
+            response["message"]
+                .as_str()
+                .unwrap_or("no acceptance acknowledgement")
+        )));
+    }
+    Ok(())
+}
+
+/// An ordinary message gives official clients a readable fallback. Edits keep
+/// its stable root id; the t-tag is an interoperability hint, not a new kind.
+pub async fn cmd_now(client: &BuzzClient, channel: &str, content: &str) -> Result<(), CliError> {
+    let channel_id = parse_uuid(channel)?;
+    let text = format!("Now working on: {content}");
+    validate_content_size(&text)?;
+    let builder = nostr::EventBuilder::new(nostr::Kind::Custom(9), &text).tags([
+        nostr::Tag::parse(["h", channel]).map_err(|e| CliError::Other(e.to_string()))?,
+        nostr::Tag::parse(["t", "buzz-now"]).map_err(|e| CliError::Other(e.to_string()))?,
+    ]);
+    let candidate = client.sign_event(builder)?;
+    let raw = client.query(&serde_json::json!({"kinds":[9], "authors":[candidate.pubkey.to_hex()], "#h":[channel], "#t":["buzz-now"], "limit":500, "consistency":"strong"})).await?;
+    let mut roots: Vec<serde_json::Value> = serde_json::from_str(&raw)
+        .map_err(|e| CliError::Other(format!("invalid Now history: {e}")))?;
+    roots.sort_by_key(|e| {
+        (
+            e["created_at"].as_u64().unwrap_or(0),
+            e["id"].as_str().unwrap_or("").to_string(),
+        )
+    });
+    let created = roots.is_empty();
+    let id = if let Some(root) = roots.first() {
+        let id = root["id"]
+            .as_str()
+            .ok_or_else(|| CliError::Other("Now root has no id".into()))?;
+        let edit = buzz_sdk::build_edit(channel_id, parse_event_id(id)?, &text)
+            .map_err(|e| CliError::Other(e.to_string()))?;
+        let raw = client.query(&serde_json::json!({"kinds":[40003], "authors":[client.keys().public_key().to_hex()], "#h":[channel], "#e":[id], "limit":500, "consistency":"strong"})).await?;
+        let edits: Vec<serde_json::Value> =
+            serde_json::from_str(&raw).map_err(|e| CliError::Other(e.to_string()))?;
+        let previous = edits
+            .iter()
+            .filter_map(|e| e["created_at"].as_u64())
+            .max()
+            .unwrap_or(0);
+        let timestamp = nostr::Timestamp::from(std::cmp::max(
+            nostr::Timestamp::now().as_secs(),
+            previous + 1,
+        ));
+        let response = client
+            .submit_event(client.sign_event(edit.custom_created_at(timestamp))?)
+            .await?;
+        require_status_accepted(&response)?;
+        id.to_string()
+    } else {
+        let id = candidate.id.to_hex();
+        require_status_accepted(&client.submit_event(candidate).await?)?;
+        id
+    };
+    let raw = client.query(&serde_json::json!({"kinds":[40004], "authors":[client.keys().public_key().to_hex()], "#h":[channel], "#e":[id], "limit":1, "consistency":"strong"})).await?;
+    let pins: Vec<serde_json::Value> =
+        serde_json::from_str(&raw).map_err(|e| CliError::Other(e.to_string()))?;
+    if pins.first().and_then(|p| p["content"].as_str()) != Some("pin") {
+        let pin = buzz_sdk::build_message_pin(channel_id, parse_event_id(&id)?, true)
+            .map_err(|e| CliError::Other(e.to_string()))?;
+        let previous = pins
+            .first()
+            .and_then(|p| p["created_at"].as_u64())
+            .unwrap_or(0);
+        let timestamp = nostr::Timestamp::from(std::cmp::max(
+            nostr::Timestamp::now().as_secs(),
+            previous + 1,
+        ));
+        let response = client
+            .submit_event(client.sign_event(pin.custom_created_at(timestamp))?)
+            .await?;
+        require_status_accepted(&response)?;
+    }
+    println!("{}", serde_json::json!({"event_id":id, "created":created}));
+    Ok(())
+}
+
+/// Pin/unpin without modifying channel metadata or another author's list.
+pub async fn cmd_pin_message(
+    client: &BuzzClient,
+    event_id: &str,
+    pinned: bool,
+) -> Result<(), CliError> {
+    validate_hex64(event_id)?;
+    let channel = resolve_channel_id(client, event_id).await?;
+    let raw = client.query(&serde_json::json!({"kinds":[40004], "#h":[channel.to_string()], "#e":[event_id], "authors":[client.keys().public_key().to_hex()], "limit":500, "consistency":"strong"})).await?;
+    let history: Vec<serde_json::Value> =
+        serde_json::from_str(&raw).map_err(|e| CliError::Other(e.to_string()))?;
+    let previous = history
+        .iter()
+        .filter_map(|e| e["created_at"].as_u64())
+        .max()
+        .unwrap_or(0);
+    let timestamp = nostr::Timestamp::from(std::cmp::max(
+        nostr::Timestamp::now().as_secs(),
+        previous + 1,
+    ));
+    let builder = buzz_sdk::build_message_pin(channel, parse_event_id(event_id)?, pinned)
+        .map_err(|e| CliError::Other(format!("build pin failed: {e}")))?;
+    let resp = client
+        .submit_event(client.sign_event(builder.custom_created_at(timestamp))?)
+        .await?;
+    println!("{}", normalize_write_response(&resp));
+    Ok(())
+}
+
 /// Edit a message you previously sent.
 pub async fn cmd_edit_message(
     client: &BuzzClient,
@@ -993,6 +1108,9 @@ pub async fn dispatch(
             )
             .await
         }
+        MessagesCmd::Now { channel, content } => cmd_now(client, &channel, &content).await,
+        MessagesCmd::Pin { event } => cmd_pin_message(client, &event, true).await,
+        MessagesCmd::Unpin { event } => cmd_pin_message(client, &event, false).await,
         MessagesCmd::Edit { event, content } => cmd_edit_message(client, &event, &content).await,
         MessagesCmd::Delete {
             event,
@@ -1078,6 +1196,18 @@ pub async fn dispatch(
         MessagesCmd::Vote { event, direction } => {
             cmd_vote_on_post(client, &event, &direction).await
         }
+    }
+}
+
+#[cfg(test)]
+mod status_ack_tests {
+    use super::require_status_accepted;
+    #[test]
+    fn status_requires_positive_relay_acceptance() {
+        assert!(require_status_accepted(r#"{"accepted":true}"#).is_ok());
+        assert!(require_status_accepted(r#"{"accepted":false,"message":"denied"}"#).is_err());
+        assert!(require_status_accepted("{}").is_err());
+        assert!(require_status_accepted("not json").is_err());
     }
 }
 

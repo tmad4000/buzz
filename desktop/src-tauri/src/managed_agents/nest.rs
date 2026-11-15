@@ -61,7 +61,7 @@ const END_MARKER: &str = "<!-- END BUZZ MANAGED -->";
 const CANONICAL_SKILL_DIR: &str = ".agents/skills/buzz-cli";
 
 /// Nest directory name for production builds.
-const NEST_DIR_PROD: &str = ".buzz";
+const NEST_DIR_PROD: &str = ".buzz-ideaflow";
 
 /// Process-lifetime nest directory. Initialized once at startup via
 /// [`init_nest_dir`] before any call to [`nest_dir`].
@@ -98,11 +98,11 @@ pub(crate) fn pin_nest_dir_for_test(path: PathBuf) {
         .expect("nest dir pinned before first use");
 }
 
-/// Returns the nest root path (`~/.buzz` for prod, `~/.buzz-dev` for dev),
+/// Returns the nest root path (`~/.buzz-ideaflow` for prod, `~/.buzz-dev` for dev),
 /// or `None` if the home directory cannot be resolved.
 ///
 /// If [`init_nest_dir`] has not been called yet (e.g. in unit tests), falls
-/// back to the production path `~/.buzz`.
+/// back to the production path `~/.buzz-ideaflow`.
 pub fn nest_dir() -> Option<PathBuf> {
     match NEST_DIR.get() {
         Some(path) => path.clone(),
