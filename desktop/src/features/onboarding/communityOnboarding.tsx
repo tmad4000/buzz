@@ -9,6 +9,7 @@ const STORAGE_KEY = "buzz-community-onboarding-transaction.v1";
 
 export type CommunityOnboardingSource =
   | "first-community"
+  | "programmatic-setup"
   | "add-community"
   | "membership-recovery"
   | "deep-link-connect"

@@ -38,6 +38,7 @@ pub mod nostr_convert;
 mod observed_unread;
 mod persona_catalog;
 mod prevent_sleep;
+mod programmatic_setup;
 mod ptt_shortcut;
 mod relay;
 mod relay_admission;
@@ -599,6 +600,10 @@ pub fn run() {
             get_presence,
             get_os_idle_seconds,
             get_default_relay_url,
+            programmatic_setup::get_setup_request,
+            programmatic_setup::report_setup_status,
+            programmatic_setup::has_claude_subscription,
+            programmatic_setup::check_setup_relay_access,
             auto_connect_default_relay_enabled,
             get_legacy_workspace_storage,
             is_shared_identity,

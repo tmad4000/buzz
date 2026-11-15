@@ -19,6 +19,7 @@ pub(crate) mod config_bridge;
 pub(crate) mod custom_harnesses;
 mod definition_validation;
 mod discovery;
+pub(crate) use discovery::has_claude_subscription;
 pub(crate) mod effective_config;
 mod env_vars;
 pub(crate) mod git_bash;
