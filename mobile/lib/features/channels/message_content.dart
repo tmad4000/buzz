@@ -433,8 +433,8 @@ class MessageContent extends HookConsumerWidget {
       return _buildMedia(context, url, imeta);
     }
     final uri = Uri.tryParse(url);
-    final buzzLink = uri?.scheme == 'buzz'
-        ? parseBuzzDeepLink(uri!) ?? parseEntityDeepLink(uri)
+    final buzzLink = uri != null && isBuzzLinkScheme(uri.scheme)
+        ? parseBuzzDeepLink(uri) ?? parseEntityDeepLink(uri)
         : null;
     final isBuzzLink =
         buzzLink is ChannelDeepLink ||
@@ -520,7 +520,7 @@ class MessageContent extends HookConsumerWidget {
         // references so detail-page callers can suppress self-navigation.
         // Message and join links still need the top-level authenticated
         // dispatcher.
-        if (uri.scheme == 'buzz') {
+        if (isBuzzLinkScheme(uri.scheme)) {
           final deepLink = parseBuzzDeepLink(uri);
           if (deepLink case ChannelDeepLink(:final channelId)) {
             resolvedChannelTap(channelId);

@@ -1,0 +1,14 @@
+// Copy to mobile/ios/Flutter/AppOverrides.xcconfig in the task build checkout.
+// Profile identifiers are supplied by the release helper, per app/extension.
+BUNDLE_IDENTIFIER = app.ideaflow.buzz.mobile
+APP_DISPLAY_NAME = Buzz Ideaflow
+BUZZ_URL_SCHEME = buzz-ideaflow
+BUZZ_DEVELOPMENT_TEAM = JESMXK96LG
+BUZZ_CODE_SIGN_STYLE = Manual
+CODE_SIGN_STYLE = Manual
+CODE_SIGN_IDENTITY = Apple Distribution
+CODE_SIGN_IDENTITY[sdk=iphoneos*] = Apple Distribution
+BUZZ_APP_GROUP_IDENTIFIER = group.app.ideaflow.buzz.mobile
+BUZZ_KEYCHAIN_ACCESS_GROUP = app.ideaflow.buzz.mobile
+BUZZ_IOS_PUSH_ENVIRONMENT = production
+BUZZ_APP_ATTEST_ENVIRONMENT = production
