@@ -417,6 +417,21 @@ pub fn build_edit(
     Ok(EventBuilder::new(Kind::Custom(40003), new_content).tags(tags))
 }
 
+/// Channel-scoped pin operation. Unpin only cancels this signer's own pin.
+/// Uses Buzz's registered pin kind, never a global NIP-51 list.
+pub fn build_message_pin(
+    channel_id: Uuid,
+    target: nostr::EventId,
+    pinned: bool,
+) -> Result<EventBuilder, SdkError> {
+    Ok(
+        EventBuilder::new(Kind::Custom(40004), if pinned { "pin" } else { "unpin" }).tags(vec![
+            tag(&["h", &channel_id.to_string()])?,
+            tag(&["e", &target.to_hex()])?,
+        ]),
+    )
+}
+
 /// Optional metadata for moderator delete tombstones (kind 9005).
 #[derive(Debug, Clone, Default)]
 pub struct DeleteMessageOptions<'a> {
@@ -2528,6 +2543,20 @@ pub fn build_delete_addressable(
 mod tests {
     use super::*;
     use nostr::{EventId, Keys};
+
+    #[test]
+    fn build_message_pin_scopes_both_operations_to_channel_and_target() {
+        let channel = uuid();
+        let target = event_id();
+        for (pinned, content) in [(true, "pin"), (false, "unpin")] {
+            let event = sign(build_message_pin(channel, target, pinned).unwrap());
+            assert_eq!(event.kind, Kind::Custom(40004));
+            assert_eq!(event.content, content);
+            assert!(has_tag(&event, "h", &channel.to_string()));
+            assert!(has_tag(&event, "e", &target.to_hex()));
+            event.verify().unwrap();
+        }
+    }
 
     fn keys() -> Keys {
         Keys::generate()

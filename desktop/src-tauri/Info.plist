@@ -3,9 +3,9 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleDisplayName</key>
-    <string>Buzz</string>
+    <string>Buzz Ideaflow</string>
     <key>CFBundleName</key>
-    <string>Buzz</string>
+    <string>Buzz Ideaflow</string>
     <key>NSMicrophoneUsageDescription</key>
     <string>Buzz needs microphone access for voice huddles and voice notes.</string>
     <key>NSCameraUsageDescription</key>

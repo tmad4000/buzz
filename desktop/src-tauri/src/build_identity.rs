@@ -49,7 +49,7 @@ fn demo_config_home_for(
 pub(crate) fn deep_link_scheme() -> Cow<'static, str> {
     demo_slug()
         .map(|slug| Cow::Owned(format!("buzz-demo-{slug}")))
-        .unwrap_or(Cow::Borrowed("buzz"))
+        .unwrap_or(Cow::Borrowed("buzz-ideaflow"))
 }
 
 pub(crate) fn is_deep_link_for_build(value: &str) -> bool {
@@ -65,7 +65,7 @@ fn is_deep_link_for_scheme(value: &str, scheme: &str) -> bool {
 pub(crate) fn keyring_service() -> Cow<'static, str> {
     demo_slug()
         .map(|slug| Cow::Owned(format!("buzz-desktop-demo.{slug}")))
-        .unwrap_or(Cow::Borrowed("buzz-desktop"))
+        .unwrap_or(Cow::Borrowed("buzz-ideaflow"))
 }
 
 pub(crate) fn nest_name(is_dev: bool) -> Cow<'static, str> {
@@ -78,7 +78,7 @@ fn nest_name_for(demo_slug: Option<&str>, is_dev: bool) -> Cow<'_, str> {
     } else if is_dev {
         Cow::Borrowed(".buzz-dev")
     } else {
-        Cow::Borrowed(".buzz")
+        Cow::Borrowed(".buzz-ideaflow")
     }
 }
 
@@ -88,7 +88,7 @@ pub(crate) fn cli_name(is_dev: bool) -> String {
     } else if is_dev {
         "buzz-dev".to_string()
     } else {
-        "buzz".to_string()
+        "buzz-ideaflow".to_string()
     }
 }
 
@@ -107,10 +107,10 @@ mod tests {
     #[test]
     fn ordinary_release_defaults_remain_production_identity() {
         if demo_slug().is_none() {
-            assert_eq!(deep_link_scheme(), "buzz");
-            assert_eq!(keyring_service(), "buzz-desktop");
-            assert_eq!(nest_name(false), ".buzz");
-            assert_eq!(cli_name(false), "buzz");
+            assert_eq!(deep_link_scheme(), "buzz-ideaflow");
+            assert_eq!(keyring_service(), "buzz-ideaflow");
+            assert_eq!(nest_name(false), ".buzz-ideaflow");
+            assert_eq!(cli_name(false), "buzz-ideaflow");
         }
     }
 
@@ -170,7 +170,7 @@ mod tests {
 
     #[test]
     fn production_and_named_demo_nests_are_distinct() {
-        assert_eq!(nest_name_for(None, false), ".buzz");
+        assert_eq!(nest_name_for(None, false), ".buzz-ideaflow");
         assert_eq!(
             nest_name_for(Some("workstream-board"), false),
             ".buzz-demo-workstream-board"

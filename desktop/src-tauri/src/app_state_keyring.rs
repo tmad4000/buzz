@@ -18,7 +18,7 @@ pub(crate) fn keyring_service() -> &'static str {
             .get_or_init(|| dev_keyring_service(std::env::var("BUZZ_DEV_KEYRING_SERVICE").ok()))
             .as_str()
     } else {
-        "buzz-desktop"
+        "buzz-ideaflow"
     }
 }
 

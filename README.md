@@ -1,3 +1,28 @@
+# Buzz Ideaflow fork
+
+A small client fork of Apache-2.0 Buzz, with channel pins and one live **Now working on** message per author/channel. Base: `desktop-v0.5.28` (2026-10-09), the newest desktop release older than one month when selected on 2026-11-15. The newer v0.5.30 passed 24 hours but was intentionally excluded to retain aged lockfiles. No dependency upgrades are part of this patch.
+
+Desktop: choose **More actions → Pin to channel** on a delivered message. Pinned messages appear below the channel header; click to open their source. **Unpin** removes your pin. Another person's pin remains theirs. The bar refreshes status edits every five seconds and shows load failures.
+
+```sh
+buzz messages pin --event <message-id>
+buzz messages unpin --event <message-id>
+buzz messages now --channel <channel-uuid> --content "Implementing the importer"
+# Repeat now to edit the same message, rather than posting another message.
+```
+
+Configure your normal Buzz CLI authentication; never put private keys in scripts or command history. The supplied source does not contain an identity or relay configuration. Serialize Now writers for each signer/channel, including across machines; this command has no distributed lock. A failed pin can be repaired by repeating Now. After unpinning, another Now call pins the card again.
+
+Protocol: existing Buzz kind **40004**, tags `h` (channel) and `e` (source message), content `pin`/`unpin`; latest `(created_at descending, id ascending)` per signer/source wins. This defines unpin semantics for the registered upstream kind, which had no upstream UI. NIP-51 kind10001 is a global author list and cannot safely represent independent channel pin sets. Status uses ordinary kind9 with `t=buzz-now`, then same-author kind40003 edits referencing the stable root. Official clients can display the message/edits and ignore unsupported pins. No new relay kind, migration or relay configuration is needed. The source ID, author, timestamp and channel fit a future Stream summary without implementing a second ledger or changing Canvas/Todos.
+
+The Mac app is **Buzz Ideaflow.app**, bundle **app.ideaflow.buzz**, with its own Application Support directory, Keychain service `buzz-ideaflow`, managed-agent nest `.buzz-ideaflow`, CLI name and URL scheme `buzz-ideaflow`. Its updater endpoints are empty. Official Buzz is separate and keeps its updater. Provision the same identity locally through the established keychain workflow; do not copy databases or overwrite official keys. Build and signing must be verified on macOS.
+
+Upstream maintenance: run `scripts/ideaflow/upstream-sync.sh` weekly. It fetches release tags and reports the newest stable desktop release at least **31 days** old; it never merges or installs. Review release notes and dependency ages, branch from the current fork, merge the eligible tag, preserve the identity/isolation and pin contract, run the checks and test channel flow, then review/install separately. Never advance younger dependencies without an explicit exception. A weekly reminder is configured for Mondays at 10:00 America/Los_Angeles in the owning Paseo conversation.
+
+Validation steps: create a private test channel, send a message, pin/unpin/repin, run Now twice and confirm one root plus an edit; open an older pin outside the loaded timeline, and verify another signer cannot unpin yours. The draft PR remains draft until the repository's human-testing requirement is fulfilled. No claim of macOS UI verification is made by Linux tests.
+
+---
+
 <h1 align="center">Buzz 🐝</h1>
 
 <p align="center">
