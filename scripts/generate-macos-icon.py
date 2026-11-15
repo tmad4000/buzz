@@ -19,7 +19,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 
-from PIL import Image, ImageDraw
+from PIL import Image
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -27,19 +27,16 @@ ICONS = ROOT / "desktop/src-tauri/icons"
 
 
 def generate(output):
-    # Generated from assets/fork-icon/source.svg; do not restore upstream artwork.
-    with Image.open(ROOT / "assets/fork-icon/macos-1024.png") as source:
-        canvas = source.convert("RGBA")
-
     with tempfile.TemporaryDirectory(prefix="buzz-macos-icon-") as temporary:
         iconset = Path(temporary) / "Buzz.iconset"
         iconset.mkdir()
         for size in (16, 32, 128, 256, 512):
             for density in (1, 2):
                 suffix = "@2x" if density == 2 else ""
-                canvas.resize(
-                    (size * density, size * density), Image.Resampling.LANCZOS
-                ).save(iconset / f"icon_{size}x{size}{suffix}.png")
+                filename = f"icon_{size}x{size}{suffix}.png"
+                (iconset / filename).write_bytes(
+                    (ROOT / "assets/fork-icon/AppIcon.appiconset" / filename).read_bytes()
+                )
         subprocess.run(
             ["/usr/bin/iconutil", "-c", "icns", str(iconset), "-o", str(output)],
             check=True,
