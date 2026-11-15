@@ -6,7 +6,8 @@ Run: scripts/macos-icon.sh [--check]
 The wrapper pins uv, Python and Pillow. Verification compares the complete set
 of decoded RGBA representations, not PNG encoding or ICNS container bytes:
 Apple's system iconutil may encode the same pixels differently across macOS.
-The shared artwork and other platforms' icons are intentionally untouched.
+AppIcon PNG frames are generated from assets/fork-icon/source.svg; this wrapper
+packages those exact frames with Apple's iconutil, including the pixel-fitted 16px badge.
 """
 
 # /// script
