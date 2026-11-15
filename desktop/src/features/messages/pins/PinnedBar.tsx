@@ -73,7 +73,7 @@ export function PinnedBar({
         }
         const roots = await relayClient.fetchEvents({
           ids: ids.split(","),
-          kinds: [9, 40002],
+          kinds: [9, 40002, 40008, 45001, 45003],
           limit: 500,
           "#h": [channel],
         });
