@@ -22,18 +22,23 @@ export function unreadBranchPaths(
   return paths;
 }
 
-export function sidebarExpansion(
-  paths: ReadonlyMap<string, ReadonlySet<string>>,
-  opened: ReadonlySet<string>,
-  collapsed: ReadonlyMap<string, ReadonlySet<string>>,
-) {
-  const expanded = new Set([...opened, ...paths.keys()]);
-  for (const [id, seenUnread] of collapsed) {
-    // A manual collapse stays put until an actually new unread descendant arrives.
-    if (![...(paths.get(id) ?? [])].some((child) => !seenUnread.has(child)))
-      expanded.delete(id);
+/** A reveal is ready only when its entire ancestry reaches the thread root. */
+export function completeThreadAncestors(
+  messages: ReadonlyMap<string, TimelineMessage>,
+  root: string | null,
+  target: string,
+): ReadonlySet<string> | null {
+  if (!root) return null;
+  const parents = new Set<string>();
+  let current = messages.get(target);
+  const visited = new Set<string>();
+  while (current && current.id !== root) {
+    if (visited.has(current.id) || !current.parentId) return null;
+    visited.add(current.id);
+    parents.add(current.parentId);
+    current = messages.get(current.parentId);
   }
-  return expanded;
+  return current?.id === root ? parents : null;
 }
 
 export function sidebarReplies(
@@ -42,23 +47,6 @@ export function sidebarReplies(
   expanded: ReadonlySet<string>,
 ) {
   return buildThreadPanelData(messages, root, null, expanded).visibleReplies;
-}
-
-export function latchSidebarExpansion(
-  paths: ReadonlyMap<string, ReadonlySet<string>>,
-  opened: ReadonlySet<string>,
-  collapsed: ReadonlyMap<string, ReadonlySet<string>>,
-) {
-  const nextCollapsed = new Map(collapsed);
-  for (const [id, unread] of paths) {
-    const snapshot = nextCollapsed.get(id);
-    if (snapshot && [...unread].some((child) => !snapshot.has(child)))
-      nextCollapsed.delete(id);
-  }
-  return {
-    opened: sidebarExpansion(paths, opened, nextCollapsed),
-    collapsed: nextCollapsed,
-  };
 }
 
 const visualMessages = new WeakMap<TimelineMessage, TimelineMessage>();
