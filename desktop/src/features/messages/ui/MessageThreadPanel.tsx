@@ -1,3 +1,10 @@
+import { sidebarVisualMessage } from "@/features/messages/lib/unreadSidebar";
+import {
+  getThreadReplyIndentRem,
+  THREAD_REPLY_BODY_OFFSET_REM,
+} from "@/features/messages/lib/threadTreeLayout";
+import { useUnreadSidebarThread } from "./useUnreadSidebarThread";
+import { formatThreadSummaryLastReplyTime } from "@/features/messages/lib/dateFormatters";
 import * as React from "react";
 import { ArrowDown } from "lucide-react";
 
@@ -112,6 +119,8 @@ type MessageThreadPanelProps = ThreadPanelLayoutProps & {
   scrollTargetId: string | null;
   threadHead: TimelineMessage | null;
   threadReplies: MainTimelineEntry[];
+  allThreadMessages?: TimelineMessage[];
+  onSidebarRepliesRevealed?: (messages: TimelineMessage[]) => void;
   threadRepliesPending?: boolean;
   /** True when the thread-reply query terminally failed (all retries exhausted). */
   threadRepliesError?: boolean;
@@ -195,6 +204,8 @@ export function MessageThreadPanel({
   threadHead,
   videoReviewPresentation,
   threadReplies,
+  allThreadMessages,
+  onSidebarRepliesRevealed,
   threadRepliesPending = false,
   threadRepliesError = false,
   onRetryThreadReplies,
@@ -291,11 +302,37 @@ export function MessageThreadPanel({
         }
       : null;
 
+  const isSidebar =
+    !isHuddleTranscript &&
+    !isFocusMode &&
+    !isSinglePanelView &&
+    allThreadMessages !== undefined;
+  const sidebarMessages = React.useMemo(
+    () =>
+      allThreadMessages ?? [
+        ...(threadHead ? [threadHead] : []),
+        ...threadReplies.map((e) => e.message),
+      ],
+    [allThreadMessages, threadHead, threadReplies],
+  );
+  const sidebar = useUnreadSidebarThread({
+    enabled: isSidebar,
+    root: threadHeadId,
+    messages: sidebarMessages,
+    isUnread: isMessageUnreadById,
+    scrollTargetId,
+  });
+  const {
+    expanded: sidebarExpanded,
+    newIds,
+    toggle: toggleSidebarBranch,
+  } = sidebar;
+  const effectiveReplies = isSidebar ? sidebar.entries : threadReplies;
   const deferredThreadReplies = React.useDeferredValue(
-    threadReplies,
+    effectiveReplies,
     EMPTY_THREAD_REPLIES,
   );
-  const isRepliesPending = deferredThreadReplies !== threadReplies;
+  const isRepliesPending = deferredThreadReplies !== effectiveReplies;
   const scrollTargetIsVisibleReply = React.useMemo(
     () =>
       scrollTargetId !== null &&
@@ -306,8 +343,38 @@ export function MessageThreadPanel({
     [deferredThreadReplies, scrollTargetId, threadHeadId],
   );
   const isThreadHeadRepliesCollapsed =
-    collapsedThreadHeadId === threadHeadId && !scrollTargetIsVisibleReply;
+    (isSidebar
+      ? !sidebarExpanded.has(threadHeadId ?? "")
+      : collapsedThreadHeadId === threadHeadId) && !scrollTargetIsVisibleReply;
 
+  React.useEffect(() => {
+    if (
+      !isSidebar ||
+      isThreadHeadRepliesCollapsed ||
+      isRepliesPending ||
+      threadRepliesPending ||
+      threadRepliesError
+    )
+      return;
+    // A deferred projection is not evidence of display. Only committed rows
+    // that the reply region actually painted may advance the read markers.
+    const displayed = deferredThreadReplies
+      .filter((entry) =>
+        threadBodyRef.current?.querySelector(
+          `[data-message-id="${CSS.escape(entry.message.id)}"]`,
+        ),
+      )
+      .map((entry) => entry.message);
+    if (displayed.length) onSidebarRepliesRevealed?.(displayed);
+  }, [
+    isSidebar,
+    isThreadHeadRepliesCollapsed,
+    isRepliesPending,
+    deferredThreadReplies,
+    threadRepliesPending,
+    threadRepliesError,
+    onSidebarRepliesRevealed,
+  ]);
   React.useLayoutEffect(() => {
     if (scrollTargetIsVisibleReply && collapsedThreadHeadId === threadHeadId) {
       setCollapsedThreadHeadId(null);
@@ -349,8 +416,8 @@ export function MessageThreadPanel({
     [deferredThreadReplies],
   );
   const shouldShowThreadBranchGuides = React.useMemo(
-    () => hasNestedThreadBranches(deferredThreadReplies),
-    [deferredThreadReplies],
+    () => !isSidebar && hasNestedThreadBranches(deferredThreadReplies),
+    [deferredThreadReplies, isSidebar],
   );
   const highlightedBranch = React.useMemo(() => {
     if (!hoveredCollapseBranchId) {
@@ -440,6 +507,9 @@ export function MessageThreadPanel({
       const isContinuation =
         !isHuddleTranscript &&
         !startsUnreadSection &&
+        (!isSidebar ||
+          (previousGroupMessage?.depth === entry.message.depth &&
+            previousGroupMessage?.parentId === entry.message.parentId)) &&
         entry.summary === null &&
         hasSameMessageAuthor(previousGroupMessage, entry.message) &&
         isWithinGroupingWindow(
@@ -467,6 +537,7 @@ export function MessageThreadPanel({
     firstUnreadReplyId,
     hoveredCollapseBranchId,
     isHuddleTranscript,
+    isSidebar,
     threadHead,
   ]);
 
@@ -500,9 +571,65 @@ export function MessageThreadPanel({
     threadHead,
     onSendToChannel,
   );
+  const [pendingJump, setPendingJump] = React.useState<{
+    root: string;
+    id: string;
+  } | null>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: committed/deferred rows trigger a retry until the revealed target exists in the DOM.
+  React.useLayoutEffect(() => {
+    if (!pendingJump || pendingJump.root !== threadHeadId) return;
+    const row = threadBodyRef.current?.querySelector<HTMLElement>(
+      `[data-message-id="${CSS.escape(pendingJump.id)}"]`,
+    );
+    if (row) {
+      row.scrollIntoView({ block: "center", behavior: "smooth" });
+      setPendingJump(null);
+    }
+  }, [
+    pendingJump,
+    threadHeadId,
+    deferredThreadReplies,
+    isThreadHeadRepliesCollapsed,
+    threadRepliesPending,
+    threadRepliesError,
+  ]);
   if (!threadHead) {
     return null;
   }
+  const compactSummary = (
+    message: TimelineMessage,
+    summary: NonNullable<MainTimelineEntry["summary"]>,
+  ) => {
+    const latestAuthor = sidebar.index.descendantStatsByMessageId.get(
+      message.id,
+    )?.recentParticipantsNewestFirst[0]?.author;
+    return (
+      <button
+        type="button"
+        aria-expanded="false"
+        data-testid="sidebar-read-branch"
+        data-thread-head-id={message.id}
+        className="block h-8 truncate rounded text-left text-xs text-muted-foreground hover:bg-muted focus-visible:ring-2"
+        style={{
+          marginInlineStart: `${getThreadReplyIndentRem(Math.min(2, message.depth)) + THREAD_REPLY_BODY_OFFSET_REM}rem`,
+          maxWidth: `calc(100% - ${getThreadReplyIndentRem(Math.min(2, message.depth)) + THREAD_REPLY_BODY_OFFSET_REM}rem)`,
+        }}
+        onClick={() => toggleSidebarBranch(message)}
+      >
+        {summary.replyCount} {summary.replyCount === 1 ? "reply" : "replies"} ·
+        last {latestAuthor ?? summary.participants.at(-1)?.author ?? "reply"}{" "}
+        {summary.lastReplyAt
+          ? formatThreadSummaryLastReplyTime(summary.lastReplyAt)
+          : ""}
+      </button>
+    );
+  };
+  const firstNewId = sidebar.firstNewId;
+  const jumpToUnread = () => {
+    if (!firstNewId || !threadHeadId) return;
+    sidebar.reveal(firstNewId);
+    setPendingJump({ root: threadHeadId, id: firstNewId });
+  };
   const threadScrollRegion = (
     <AuxiliaryPanelBody
       className="overflow-y-auto overflow-x-hidden overscroll-contain pb-24"
@@ -589,6 +716,33 @@ export function MessageThreadPanel({
           </div>
         )}
 
+        {isSidebar &&
+        sidebarExpanded.has(threadHead.id) &&
+        deferredThreadReplies.length > 0 ? (
+          <button
+            type="button"
+            aria-expanded="true"
+            className="ml-4 h-7 text-xs text-muted-foreground"
+            onClick={() => toggleSidebarBranch(threadHead)}
+          >
+            Hide replies
+          </button>
+        ) : null}
+        {isSidebar && newIds.size > 0 ? (
+          <div
+            className="sticky top-0 z-20 flex items-center justify-between border-y bg-background px-4 py-2 text-xs"
+            data-testid="sidebar-new-marker"
+          >
+            <span>{newIds.size} new</span>
+            <button
+              type="button"
+              className="font-medium text-primary"
+              onClick={jumpToUnread}
+            >
+              Jump to first unread
+            </button>
+          </div>
+        ) : null}
         {showThreadHeadDivider ? (
           <div
             className={cn(THREAD_PANEL_MESSAGE_GUTTER_CLASS, "pb-3 pt-2")}
@@ -624,16 +778,20 @@ export function MessageThreadPanel({
                   className="space-y-0"
                   data-render-pending={isRepliesPending ? "true" : undefined}
                 >
-                  <MessageThreadSummaryRow
-                    depth={threadHead.depth}
-                    message={threadHead}
-                    onOpenThread={expandThreadHeadReplies}
-                    summary={visibleThreadHeadSummary}
-                    summaryIndentOffsetRem={
-                      THREAD_PANEL_SUMMARY_INDENT_OFFSET_REM
-                    }
-                    unreadCount={threadUnreadCount}
-                  />
+                  {isSidebar ? (
+                    compactSummary(threadHead, visibleThreadHeadSummary)
+                  ) : (
+                    <MessageThreadSummaryRow
+                      depth={threadHead.depth}
+                      message={threadHead}
+                      onOpenThread={expandThreadHeadReplies}
+                      summary={visibleThreadHeadSummary}
+                      summaryIndentOffsetRem={
+                        THREAD_PANEL_SUMMARY_INDENT_OFFSET_REM
+                      }
+                      unreadCount={threadUnreadCount}
+                    />
+                  )}
                 </div>
               ) : (
                 <div
@@ -668,6 +826,22 @@ export function MessageThreadPanel({
                         key={entry.message.renderKey ?? entry.message.id}
                       >
                         {showUnreadDivider ? <UnreadDivider /> : null}
+                        {isSidebar && entry.message.depth > 2 ? (
+                          <div
+                            className="min-w-0 pt-2 text-xs text-muted-foreground"
+                            style={{
+                              marginInlineStart: `${getThreadReplyIndentRem(2) + THREAD_REPLY_BODY_OFFSET_REM}rem`,
+                            }}
+                            data-testid="sidebar-reply-context"
+                          >
+                            <span className="inline-block max-w-full truncate rounded-full bg-muted px-2 py-0.5">
+                              Replying to{" "}
+                              {sidebar.index.messageById.get(
+                                entry.message.parentId ?? "",
+                              )?.author ?? "earlier reply"}
+                            </span>
+                          </div>
+                        ) : null}
                         <MessageThreadRow
                           channelId={channelId}
                           currentPubkey={currentPubkey}
@@ -699,7 +873,11 @@ export function MessageThreadPanel({
                           }
                           isContinuation={isContinuation}
                           isUnread={isMessageUnreadById?.(entry.message.id)}
-                          message={entry.message}
+                          message={
+                            isSidebar
+                              ? sidebarVisualMessage(entry.message)
+                              : entry.message
+                          }
                           onCollapseDepthGuide={handleCollapseDepthGuide}
                           onCollapseDepthGuideHoverChange={
                             handleCollapseBranchHoverChange
@@ -708,7 +886,9 @@ export function MessageThreadPanel({
                             shouldShowThreadBranchGuides &&
                             connectsToVisibleChild &&
                             !entry.summary
-                              ? onExpandReplies
+                              ? isSidebar
+                                ? toggleSidebarBranch
+                                : onExpandReplies
                               : undefined
                           }
                           onCollapseDescendantsHoverChange={
@@ -753,33 +933,56 @@ export function MessageThreadPanel({
                             entry.message.id,
                           )}
                         />
+                        {isSidebar &&
+                        sidebarExpanded.has(entry.message.id) &&
+                        sidebarMessages.some(
+                          (m) => m.parentId === entry.message.id,
+                        ) ? (
+                          <button
+                            type="button"
+                            aria-expanded="true"
+                            data-testid="sidebar-hide-branch"
+                            data-thread-head-id={entry.message.id}
+                            style={{
+                              marginInlineStart: `${getThreadReplyIndentRem(Math.min(2, entry.message.depth)) + THREAD_REPLY_BODY_OFFSET_REM}rem`,
+                            }}
+                            className="h-7 text-xs text-muted-foreground hover:text-foreground"
+                            onClick={() => toggleSidebarBranch(entry.message)}
+                          >
+                            Hide replies
+                          </button>
+                        ) : null}
                         {entry.summary ? (
-                          <MessageThreadSummaryRow
-                            collapseDepthGuideActions={
-                              collapseDepthGuideActions
-                            }
-                            depth={entry.message.depth}
-                            depthGuideDepths={
-                              shouldShowThreadBranchGuides
-                                ? continuationDepths
-                                : undefined
-                            }
-                            highlightThreadLineDepths={highlight.lineDepths}
-                            message={entry.message}
-                            onCollapseDepthGuide={handleCollapseDepthGuide}
-                            onCollapseDepthGuideHoverChange={
-                              handleCollapseBranchHoverChange
-                            }
-                            onOpenThread={onExpandReplies}
-                            summary={entry.summary}
-                            summaryIndentOffsetRem={
-                              THREAD_PANEL_SUMMARY_INDENT_OFFSET_REM
-                            }
-                            showDepthGuides={shouldShowThreadBranchGuides}
-                            unreadCount={threadReplyUnreadCounts?.get(
-                              entry.message.id,
-                            )}
-                          />
+                          isSidebar ? (
+                            compactSummary(entry.message, entry.summary)
+                          ) : (
+                            <MessageThreadSummaryRow
+                              collapseDepthGuideActions={
+                                collapseDepthGuideActions
+                              }
+                              depth={entry.message.depth}
+                              depthGuideDepths={
+                                shouldShowThreadBranchGuides
+                                  ? continuationDepths
+                                  : undefined
+                              }
+                              highlightThreadLineDepths={highlight.lineDepths}
+                              message={entry.message}
+                              onCollapseDepthGuide={handleCollapseDepthGuide}
+                              onCollapseDepthGuideHoverChange={
+                                handleCollapseBranchHoverChange
+                              }
+                              onOpenThread={onExpandReplies}
+                              summary={entry.summary}
+                              summaryIndentOffsetRem={
+                                THREAD_PANEL_SUMMARY_INDENT_OFFSET_REM
+                              }
+                              showDepthGuides={shouldShowThreadBranchGuides}
+                              unreadCount={threadReplyUnreadCounts?.get(
+                                entry.message.id,
+                              )}
+                            />
+                          )
                         ) : null}
                       </div>
                     );

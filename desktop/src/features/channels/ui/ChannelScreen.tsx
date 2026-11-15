@@ -451,6 +451,7 @@ export function ChannelScreen({
     handleMarkMessageUnread,
     isMessageUnread,
     markRevealedRepliesRead,
+    markSidebarRepliesRead,
     openThreadHeadMessage,
     threadFirstUnreadReplyId,
     threadReplyTargetMessage,
@@ -465,6 +466,7 @@ export function ChannelScreen({
     threadReplyTargetId,
     expandedThreadReplyIds,
     openThreadMessages: threadPanelData.visibleReplies,
+    openThreadAllMessages: threadPanelData.messages,
     clearChannelUnreadSource,
     getChannelReadAt,
     getMessageReadAt,
@@ -955,6 +957,7 @@ export function ChannelScreen({
                   unreadCount={unreadCount}
                   targetMessageId={mainTimelineTargetMessageId}
                   threadAllMessages={displayedThreadAllMessages}
+                  onSidebarRepliesRevealed={markSidebarRepliesRead}
                   threadHeadMessage={displayedThreadHeadMessage}
                   threadMessages={displayedThreadMessages}
                   threadMessagesPending={threadRepliesQuery.isPending}
