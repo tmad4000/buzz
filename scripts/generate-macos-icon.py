@@ -6,7 +6,8 @@ Run: scripts/macos-icon.sh [--check]
 The wrapper pins uv, Python and Pillow. Verification compares the complete set
 of decoded RGBA representations, not PNG encoding or ICNS container bytes:
 Apple's system iconutil may encode the same pixels differently across macOS.
-The shared artwork and other platforms' icons are intentionally untouched.
+AppIcon PNG frames are generated from assets/fork-icon/source.svg; this wrapper
+packages those exact frames with Apple's iconutil, including the pixel-fitted 16px badge.
 """
 
 # /// script
@@ -19,7 +20,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 
-from PIL import Image, ImageDraw
+from PIL import Image
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -27,29 +28,16 @@ ICONS = ROOT / "desktop/src-tauri/icons"
 
 
 def generate(output):
-    # An 824px tile on a 1024px canvas leaves the macOS optical inset.
-    # Work at 4x resolution to antialias the rounded edge at every icon size.
-    scale = 4
-    canvas = Image.new("RGBA", (1024 * scale, 1024 * scale))
-    with Image.open(ICONS / "buzz-source.png") as source:
-        tile = source.convert("RGBA").resize(
-            (824 * scale, 824 * scale), Image.Resampling.LANCZOS
-        )
-    mask = Image.new("L", tile.size)
-    ImageDraw.Draw(mask).rounded_rectangle(
-        (0, 0, tile.width - 1, tile.height - 1), radius=185 * scale, fill=255
-    )
-    canvas.paste(tile, (100 * scale, 100 * scale), mask)
-
     with tempfile.TemporaryDirectory(prefix="buzz-macos-icon-") as temporary:
         iconset = Path(temporary) / "Buzz.iconset"
         iconset.mkdir()
         for size in (16, 32, 128, 256, 512):
             for density in (1, 2):
                 suffix = "@2x" if density == 2 else ""
-                canvas.resize(
-                    (size * density, size * density), Image.Resampling.LANCZOS
-                ).save(iconset / f"icon_{size}x{size}{suffix}.png")
+                filename = f"icon_{size}x{size}{suffix}.png"
+                (iconset / filename).write_bytes(
+                    (ROOT / "assets/fork-icon/AppIcon.appiconset" / filename).read_bytes()
+                )
         subprocess.run(
             ["/usr/bin/iconutil", "-c", "icns", str(iconset), "-o", str(output)],
             check=True,
