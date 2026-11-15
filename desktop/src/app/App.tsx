@@ -27,6 +27,10 @@ import { huddleWindowChannelId } from "@/features/huddle/lib/huddleWindow";
 import { useAppOnboardingState } from "@/features/onboarding/hooks";
 import { useMachineOnboardingState } from "@/features/onboarding/machineOnboarding";
 import {
+  reportProgrammaticSetup,
+  useProgrammaticSetup,
+} from "@/features/onboarding/programmaticSetup";
+import {
   type FirstCommunityPage,
   useCommunityOnboarding,
   markCommunityOnboardingComplete,
@@ -515,7 +519,10 @@ function CommunityApp({
       return;
     }
     if (communities.length === 1) {
-      if (transaction.source === "first-community") {
+      if (
+        transaction.source === "first-community" ||
+        transaction.source === "programmatic-setup"
+      ) {
         setResumeFirstCommunityPage(transaction.firstCommunityPage ?? "join");
       }
       clearCommunities();
@@ -563,6 +570,11 @@ function CommunityApp({
       if (!isTransactionStillConnecting(transactionRef.current, transactionId))
         return;
 
+      if (transaction.source === "programmatic-setup") {
+        void reportProgrammaticSetup(
+          result.action === "skip" ? "connected" : "profile_required",
+        );
+      }
       if (result.action === "skip") {
         markCommunityOnboardingComplete(result.profile.pubkey, relayUrl);
         communityOnboarding.clear();
@@ -579,6 +591,7 @@ function CommunityApp({
     transaction?.stage,
     transaction?.id,
     transaction?.relayUrl,
+    transaction?.source,
   ]);
   // During "entering" the transaction stays alive as a curtain: the app mounts
   // underneath (already pointed at the Welcome channel route) while the
@@ -739,6 +752,7 @@ function MachineBootstrap({ sharedIdentity }: { sharedIdentity: boolean }) {
   // React tree, but must never race the main window for the native pending-link
   // queue or replace its dedicated transcript surface with onboarding.
   const acceptsCommunityDeepLinks = huddleWindowChannelId() === null;
+  useProgrammaticSetup(acceptsCommunityDeepLinks, completeMachineOnboarding);
   useEffect(() => {
     if (!acceptsCommunityDeepLinks) return;
 

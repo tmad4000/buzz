@@ -737,6 +737,31 @@ fn probe_auth_status(binary_path: &Path, probe_args: &[&str]) -> AuthStatus {
     }
 }
 
+pub(crate) fn has_claude_subscription() -> bool {
+    use crate::managed_agents::readiness::cli_probe;
+    let Some(path) = resolve_command("claude") else {
+        return false;
+    };
+    let mut command = std::process::Command::new(path);
+    command.args(["auth", "status"]);
+    if let Some(path) = cli_probe::augmented_path() {
+        command.env("PATH", path);
+    }
+    let Some(output) = bounded_command::output_with_timeout(command, Duration::from_secs(10))
+    else {
+        return false;
+    };
+    if !output.status.success() {
+        return false;
+    }
+    let Ok(status) = serde_json::from_slice::<serde_json::Value>(&output.stdout) else {
+        return false;
+    };
+    status["loggedIn"] == true
+        && status["authMethod"] == "claude.ai"
+        && status["apiProvider"] == "firstParty"
+}
+
 pub fn command_availability(command: &str) -> CommandAvailabilityInfo {
     let resolved_path = resolve_command(command).map(|path| path.display().to_string());
     CommandAvailabilityInfo {
