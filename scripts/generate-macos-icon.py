@@ -27,19 +27,9 @@ ICONS = ROOT / "desktop/src-tauri/icons"
 
 
 def generate(output):
-    # An 824px tile on a 1024px canvas leaves the macOS optical inset.
-    # Work at 4x resolution to antialias the rounded edge at every icon size.
-    scale = 4
-    canvas = Image.new("RGBA", (1024 * scale, 1024 * scale))
-    with Image.open(ICONS / "buzz-source.png") as source:
-        tile = source.convert("RGBA").resize(
-            (824 * scale, 824 * scale), Image.Resampling.LANCZOS
-        )
-    mask = Image.new("L", tile.size)
-    ImageDraw.Draw(mask).rounded_rectangle(
-        (0, 0, tile.width - 1, tile.height - 1), radius=185 * scale, fill=255
-    )
-    canvas.paste(tile, (100 * scale, 100 * scale), mask)
+    # Generated from assets/fork-icon/source.svg; do not restore upstream artwork.
+    with Image.open(ROOT / "assets/fork-icon/macos-1024.png") as source:
+        canvas = source.convert("RGBA")
 
     with tempfile.TemporaryDirectory(prefix="buzz-macos-icon-") as temporary:
         iconset = Path(temporary) / "Buzz.iconset"
