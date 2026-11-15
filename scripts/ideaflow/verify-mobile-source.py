@@ -2,10 +2,19 @@
 """Verify a complete source manifest against a clean exact Git checkout."""
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import subprocess
 import sys
+
+
+def source_bytes(root, name):
+    """Hash tracked symlinks as Git does, including directory fixture links."""
+    path = root / name
+    if not path.resolve().is_relative_to(root):
+        raise ValueError('Source path escapes checkout: ' + name)
+    return os.fsencode(os.readlink(path)) if path.is_symlink() else path.read_bytes()
 
 
 def verify_source(root, revision, manifest_path):
@@ -26,10 +35,9 @@ def verify_source(root, revision, manifest_path):
     if git('ls-files', '--others', '--exclude-standard'):
         raise ValueError('Untracked source must be removed before release')
     for name, expected in manifest.items():
-        path = (root / name).resolve()
-        if not path.is_relative_to(root) or not isinstance(expected, str) or not re.fullmatch(r'[0-9a-f]{64}', expected):
+        if not isinstance(expected, str) or not re.fullmatch(r'[0-9a-f]{64}', expected):
             raise ValueError('Invalid source manifest entry')
-        if hashlib.sha256(path.read_bytes()).hexdigest() != expected:
+        if hashlib.sha256(source_bytes(root, name)).hexdigest() != expected:
             raise ValueError('Source differs from manifest: ' + name)
     return {'source': revision, 'trackedFiles': len(tracked),
             'sourceManifestSHA256': hashlib.sha256(manifest_path.read_bytes()).hexdigest()}

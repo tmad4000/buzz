@@ -62,5 +62,22 @@ class SourceReceiptTests(unittest.TestCase):
         self.data['main.dart'] = '0' * 64; self.write_manifest()
         with self.assertRaises(ValueError): self.verify()
 
+    def commit_link(self, target):
+        (self.root / 'fixtures').symlink_to(target, target_is_directory=True)
+        subprocess.run(['git', '-C', str(self.root), 'add', 'fixtures'], check=True)
+        subprocess.run(['git', '-C', str(self.root), '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-q', '-s', '-m', 'Fixture link'], check=True)
+        self.revision = subprocess.check_output(['git', '-C', str(self.root), 'rev-parse', 'HEAD'], text=True).strip()
+        self.data['fixtures'] = hashlib.sha256(target.encode()).hexdigest()
+        self.write_manifest()
+
+    def test_tracked_directory_symlink_uses_link_bytes(self):
+        self.commit_link('.')
+        self.assertEqual(module.source_bytes(self.root, 'fixtures'), b'.')
+        self.assertEqual(self.verify()['trackedFiles'], 3)
+
+    def test_tracked_symlink_outside_checkout_is_rejected(self):
+        self.commit_link('..')
+        with self.assertRaises(ValueError): self.verify()
+
 
 if __name__ == '__main__': unittest.main()
