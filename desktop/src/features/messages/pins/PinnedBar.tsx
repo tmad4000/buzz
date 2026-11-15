@@ -104,16 +104,16 @@ export function PinnedBar({
                 (d.kind === 9005 || d.pubkey === root.pubkey),
             ),
         );
-        for (const root of visible) {
+        const projected = visible.map((root) => {
           const edit = edits
             .filter((e) => e.pubkey === root.pubkey && targetId(e) === root.id)
             .sort(
               (a, b) => b.created_at - a.created_at || a.id.localeCompare(b.id),
             )[0];
-          if (edit) root.content = edit.content;
-        }
+          return { ...root, content: edit?.content ?? root.content };
+        });
         if (!disposed) {
-          setMessages(visible);
+          setMessages(projected);
           setError("");
         }
       } finally {
