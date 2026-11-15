@@ -876,12 +876,26 @@ pub async fn cmd_delete_message(
     Ok(())
 }
 
+fn require_status_accepted(response: &str) -> Result<(), CliError> {
+    let response: serde_json::Value = serde_json::from_str(response)
+        .map_err(|_| CliError::Other("status write returned malformed acknowledgement".into()))?;
+    if response["accepted"].as_bool() != Some(true) {
+        return Err(CliError::Other(format!(
+            "status write rejected: {}",
+            response["message"]
+                .as_str()
+                .unwrap_or("no acceptance acknowledgement")
+        )));
+    }
+    Ok(())
+}
+
 /// An ordinary message gives official clients a readable fallback. Edits keep
 /// its stable root id; the t-tag is an interoperability hint, not a new kind.
 pub async fn cmd_now(client: &BuzzClient, channel: &str, content: &str) -> Result<(), CliError> {
     let channel_id = parse_uuid(channel)?;
-    validate_content_size(content)?;
     let text = format!("Now working on: {content}");
+    validate_content_size(&text)?;
     let builder = nostr::EventBuilder::new(nostr::Kind::Custom(9), &text).tags([
         nostr::Tag::parse(["h", channel]).map_err(|e| CliError::Other(e.to_string()))?,
         nostr::Tag::parse(["t", "buzz-now"]).map_err(|e| CliError::Other(e.to_string()))?,
@@ -915,13 +929,14 @@ pub async fn cmd_now(client: &BuzzClient, channel: &str, content: &str) -> Resul
             nostr::Timestamp::now().as_secs(),
             previous + 1,
         ));
-        client
+        let response = client
             .submit_event(client.sign_event(edit.custom_created_at(timestamp))?)
             .await?;
+        require_status_accepted(&response)?;
         id.to_string()
     } else {
         let id = candidate.id.to_hex();
-        client.submit_event(candidate).await?;
+        require_status_accepted(&client.submit_event(candidate).await?)?;
         id
     };
     let raw = client.query(&serde_json::json!({"kinds":[40004], "authors":[client.keys().public_key().to_hex()], "#h":[channel], "#e":[id], "limit":1, "consistency":"strong"})).await?;
@@ -938,9 +953,10 @@ pub async fn cmd_now(client: &BuzzClient, channel: &str, content: &str) -> Resul
             nostr::Timestamp::now().as_secs(),
             previous + 1,
         ));
-        client
+        let response = client
             .submit_event(client.sign_event(pin.custom_created_at(timestamp))?)
             .await?;
+        require_status_accepted(&response)?;
     }
     println!("{}", serde_json::json!({"event_id":id, "created":created}));
     Ok(())
@@ -1180,6 +1196,18 @@ pub async fn dispatch(
         MessagesCmd::Vote { event, direction } => {
             cmd_vote_on_post(client, &event, &direction).await
         }
+    }
+}
+
+#[cfg(test)]
+mod status_ack_tests {
+    use super::require_status_accepted;
+    #[test]
+    fn status_requires_positive_relay_acceptance() {
+        assert!(require_status_accepted(r#"{"accepted":true}"#).is_ok());
+        assert!(require_status_accepted(r#"{"accepted":false,"message":"denied"}"#).is_err());
+        assert!(require_status_accepted("{}").is_err());
+        assert!(require_status_accepted("not json").is_err());
     }
 }
 
