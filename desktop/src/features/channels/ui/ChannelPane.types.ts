@@ -1,7 +1,10 @@
 import type * as React from "react";
 import type { BotActivityAgent } from "@/features/channels/ui/BotActivityBar";
 import type { ChannelAgentSessionAgent } from "@/features/channels/ui/useChannelAgentSessions";
-import type { MessageComposerEditTarget } from "@/features/messages/ui/MessageComposer.types";
+import type {
+  MessageComposerEditTarget,
+  MessageComposerProps,
+} from "@/features/messages/ui/MessageComposer.types";
 import type { MainTimelineEntry } from "@/features/messages/lib/threadPanel";
 import type { ChannelWindowThreadSummary } from "@/features/messages/lib/channelWindowStore";
 import type { TimelineMessage } from "@/features/messages/types";
@@ -12,7 +15,7 @@ import type {
   ProfilePanelView,
 } from "@/features/profile/ui/UserProfilePanel";
 import type { ProfilePanelOpenOptions } from "@/shared/context/ProfilePanelContext";
-import type { Channel } from "@/shared/api/types";
+import type { Channel, RespondToMode } from "@/shared/api/types";
 import type { IdleAuxiliaryHeaderControls } from "./IdleAuxiliaryPanel";
 export type ChannelPaneProps = {
   activeChannel: Channel | null;
@@ -145,6 +148,8 @@ export type ChannelPaneProps = {
     mediaTags?: string[][],
     parentEventId?: string,
   ) => Promise<void>;
+  onSendInlineThreadReply: MessageComposerProps["onSend"];
+  respondToLookup?: Map<string, RespondToMode>;
   onSendThreadReply: (
     content: string,
     mentionPubkeys: string[],
@@ -185,7 +190,10 @@ export type ChannelPaneProps = {
   profilePanelView: ProfilePanelView;
   threadHeadMessage: TimelineMessage | null;
   threadAllMessages: TimelineMessage[];
-  onSidebarRepliesRevealed?: (messages: TimelineMessage[]) => void;
+  onSidebarRepliesRevealed?: (
+    messages: TimelineMessage[],
+    rootId?: string,
+  ) => void;
   threadMessages: MainTimelineEntry[];
   threadMessagesPending?: boolean;
   threadMessagesError?: boolean;

@@ -1,3 +1,4 @@
+import type { MessageComposerProps } from "@/features/messages/ui/MessageComposer.types";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -342,6 +343,32 @@ export function useChannelPaneHandlers({
     [],
   );
 
+  // Inline composers always supply captured context and never mutate side-panel selection.
+  const handleSendInlineThreadReply = React.useCallback<
+    MessageComposerProps["onSend"]
+  >(
+    async (
+      content,
+      mentionPubkeys,
+      mediaTags,
+      channelId,
+      context,
+      forceRest,
+    ) => {
+      if (!channelId || !context?.parentEventId)
+        throw new Error("Inline reply target unavailable");
+      await sendMutateRef.current({
+        content,
+        mentionPubkeys,
+        mediaTags,
+        channelId,
+        parentEventId: context.parentEventId,
+        forceRest,
+      });
+    },
+    [],
+  );
+
   const handleSendThreadReply = React.useCallback(
     async (
       content: string,
@@ -436,6 +463,7 @@ export function useChannelPaneHandlers({
     handleSendMessage,
     handleSendToChannel,
     handleSendThreadReply,
+    handleSendInlineThreadReply,
     handleSelectThreadReplyTarget,
     handleToggleReaction,
   };

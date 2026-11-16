@@ -1,6 +1,9 @@
 import * as React from "react";
 
-import type { MainTimelineEntry } from "@/features/messages/lib/threadPanel";
+import type {
+  MainTimelineEntry,
+  TimelineThreadSummary,
+} from "@/features/messages/lib/threadPanel";
 import { THREAD_REPLY_ROW_MARGIN_INLINE_REM } from "@/features/messages/lib/threadTreeLayout";
 import type { buildVideoReviewContextForMessage } from "@/features/messages/lib/videoReviewContext";
 import { canManageMessageForCurrentUser } from "@/features/messages/lib/canManageMessage";
@@ -10,6 +13,11 @@ import { cn } from "@/shared/lib/cn";
 import { MessageRow } from "./MessageRow";
 import { MessageThreadSummaryRow } from "./MessageThreadSummaryRow";
 import { SystemMessageRow } from "./SystemMessageRow";
+
+export type ThreadSummaryRenderer = (
+  message: TimelineMessage,
+  summary: TimelineThreadSummary,
+) => React.ReactNode;
 
 type ToggleReaction = (
   message: TimelineMessage,
@@ -81,6 +89,7 @@ type MessageRowItemProps = {
   onMarkRead?: (message: TimelineMessage) => void;
   onReply?: (message: TimelineMessage) => void;
   onOpenThread?: (message: TimelineMessage) => void;
+  renderThreadSummary?: ThreadSummaryRenderer;
   onToggleReaction?: ToggleReaction;
   profiles?: UserProfileLookup;
   searchActiveMessageId?: string | null;
@@ -113,6 +122,7 @@ export function MessageRowItem({
   onMarkRead,
   onReply,
   onOpenThread,
+  renderThreadSummary,
   onToggleReaction,
   profiles,
   searchActiveMessageId,
@@ -122,7 +132,17 @@ export function MessageRowItem({
   unfollowThreadById,
   videoReviewContext,
 }: MessageRowItemProps) {
-  const { message, summary } = entry;
+  const { message } = entry;
+  const summary =
+    entry.summary ??
+    (renderThreadSummary && !message.pending
+      ? {
+          threadHeadId: message.id,
+          replyCount: 0,
+          lastReplyAt: null,
+          participants: [],
+        }
+      : null);
   const canManage = canManageMessageForCurrentUser(
     message,
     currentPubkey,
@@ -137,7 +157,8 @@ export function MessageRowItem({
     return (
       <div
         className={cn(
-          "group/message relative mx-1 mb-1 flex flex-col gap-0 rounded-2xl px-0 py-1 transition-colors hover:bg-muted/50 focus-within:bg-muted/50",
+          "relative mx-1 mb-1 flex flex-col gap-0 rounded-2xl px-0 py-1 transition-colors hover:bg-muted/50 focus-within:bg-muted/50",
+          !renderThreadSummary && "group/message",
           isHighlighted &&
             "-mx-4 px-4 before:absolute before:-inset-y-1.5 before:inset-x-0 before:animate-[route-target-highlight-fade_2s_ease-out_forwards] before:bg-primary/10 before:content-[''] motion-reduce:before:animate-none sm:-mx-6 sm:px-6",
         )}
@@ -179,15 +200,19 @@ export function MessageRowItem({
           showDepthGuides={false}
           videoReviewContext={videoReviewContext}
         />
-        <MessageThreadSummaryRow
-          depth={message.depth}
-          message={message}
-          onOpenThread={onOpenThread}
-          showDepthGuides={false}
-          summary={summary}
-          summaryIndentOffsetRem={-THREAD_REPLY_ROW_MARGIN_INLINE_REM}
-          unreadCount={threadUnreadCounts?.get(message.id)}
-        />
+        {renderThreadSummary ? (
+          renderThreadSummary(message, summary)
+        ) : (
+          <MessageThreadSummaryRow
+            depth={message.depth}
+            message={message}
+            onOpenThread={onOpenThread}
+            showDepthGuides={false}
+            summary={summary}
+            summaryIndentOffsetRem={-THREAD_REPLY_ROW_MARGIN_INLINE_REM}
+            unreadCount={threadUnreadCounts?.get(message.id)}
+          />
+        )}
         {footer}
       </div>
     );

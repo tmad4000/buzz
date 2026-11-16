@@ -71,7 +71,7 @@ test("unread sidebar branches and bounded nesting", async ({ page }) => {
   );
   await page
     .locator(
-      `[data-testid="message-thread-summary"][data-thread-head-id="${root.id}"]`,
+      `[data-testid="open-thread-side-panel"][data-thread-head-id="${root.id}"]`,
     )
     .click();
   const panel = page.getByTestId("message-thread-panel");
@@ -146,7 +146,7 @@ test("unread sidebar branches and bounded nesting", async ({ page }) => {
     await expect(panel).toHaveCount(0);
     await page
       .locator(
-        `[data-testid="message-thread-summary"][data-thread-head-id="${root.id}"]`,
+        `[data-testid="open-thread-side-panel"][data-thread-head-id="${root.id}"]`,
       )
       .click();
     await expect(panel.locator(`[data-message-id="${newer.id}"]`)).toHaveCount(
@@ -187,7 +187,7 @@ test("unread sidebar branches and bounded nesting", async ({ page }) => {
       if (!(await panel.isVisible()))
         await page
           .locator(
-            `[data-testid="message-thread-summary"][data-thread-head-id="${root.id}"]`,
+            `[data-testid="open-thread-side-panel"][data-thread-head-id="${root.id}"]`,
           )
           .click();
       await expect(panel).toBeVisible();
