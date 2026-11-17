@@ -1,3 +1,4 @@
+import '../../shared/utils/relative_time.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../shared/relay/relay.dart';
@@ -233,18 +234,4 @@ class ForumThreadResponse {
 }
 
 /// Format a unix timestamp as a relative time string (e.g. "2h ago").
-String formatRelativeTime(int timestamp) {
-  final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-  final diff = now - timestamp;
-
-  if (diff < 60) return 'just now';
-  if (diff < 3600) return '${diff ~/ 60}m ago';
-  if (diff < 86400) return '${diff ~/ 3600}h ago';
-  if (diff < 604800) return '${diff ~/ 86400}d ago';
-
-  final dt = DateTime.fromMillisecondsSinceEpoch(
-    timestamp * 1000,
-    isUtc: true,
-  ).toLocal();
-  return '${dt.month}/${dt.day}/${dt.year}';
-}
+String formatRelativeTime(int timestamp) => relativeTimestamp(timestamp);

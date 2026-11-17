@@ -218,3 +218,17 @@ lib/
 - **Spacing:** `Grid` tokens for consistent spacing
 - **Linting:** `flutter_lints` + `riverpod_lint` via `custom_lint`
 - **Feature isolation:** No cross-feature imports except `shared/`
+
+### Ideaflow build provenance
+
+Use `scripts/build-ideaflow-mobile.sh ipa --release --build-name=X.Y.Z` (from the
+repository root) for native release builds. It forwards Flutter's build arguments
+and captures the matching version, shipped commit/committer time and build time
+in `assets/app-version.json` before Flutter packages it. The Settings stamp reads
+that asset; unknown or mismatched metadata shows the installed version alone.
+`just mobile-install`, `just mobile-dev` and `just mobile-build-android` also
+capture metadata. For an existing direct Flutter/Xcode release workflow, run
+`node scripts/stamp-mobile.mjs X.Y.Z` before the build, with the same build name.
+A clean source archive must come from `git archive`, which substitutes
+`.git-archive-info`; arbitrary unstamped archives use an explicit build-time
+fallback. Do not copy a previous release's asset into a new build.

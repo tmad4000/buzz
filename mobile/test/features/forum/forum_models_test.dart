@@ -250,8 +250,8 @@ void main() {
     test('returns date format for > 7 days', () {
       final ts = now() - (8 * 86400);
       final result = formatRelativeTime(ts);
-      // Should be M/D/YYYY format.
-      expect(result, matches(RegExp(r'^\d{1,2}/\d{1,2}/\d{4}$')));
+      // Relative-first convention switches to a short named month.
+      expect(result, matches(RegExp(r'^[A-Z][a-z]{2} \d{1,2}$')));
     });
   });
 }

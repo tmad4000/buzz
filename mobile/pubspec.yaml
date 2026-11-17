@@ -68,6 +68,7 @@ flutter:
   shaders:
     - shaders/onboarding_wordmark.frag
   assets:
+    - assets/app-version.json
     - assets/images/buzz-icon.png
     - assets/images/shell-gradient.png
     - assets/images/buzz-wordmark.png

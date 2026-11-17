@@ -128,22 +128,22 @@ void main() {
   group('formatThreadSummaryLastReplyTime', () {
     const now = 2_000_000;
 
-    test('uses expanded relative units', () {
+    test('uses compact relative units', () {
       expect(
         formatThreadSummaryLastReplyTime(now - 30, nowSeconds: now),
         'just now',
       );
       expect(
         formatThreadSummaryLastReplyTime(now - 60, nowSeconds: now),
-        '1 minute ago',
+        '1m ago',
       );
       expect(
         formatThreadSummaryLastReplyTime(now - 3 * 3600, nowSeconds: now),
-        '3 hours ago',
+        '3h ago',
       );
       expect(
         formatThreadSummaryLastReplyTime(now - 2 * 86400, nowSeconds: now),
-        '2 days ago',
+        '2d ago',
       );
     });
 
@@ -156,7 +156,7 @@ void main() {
           may19,
           nowSeconds: _ts(DateTime(2026, 5, 27, 12)),
         ),
-        'on May 19',
+        'May 19',
       );
       // The 1st is where an ordinal is most tempting.
       expect(
@@ -164,7 +164,7 @@ void main() {
           may1,
           nowSeconds: _ts(DateTime(2026, 5, 27, 12)),
         ),
-        'on May 1',
+        'May 1',
       );
     });
   });
