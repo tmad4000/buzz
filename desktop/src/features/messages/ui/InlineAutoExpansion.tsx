@@ -34,12 +34,11 @@ export function InlineAutoExpansionProvider({
   const community = React.useMemo(loadActiveCommunityId, []);
   const dataScope = React.useMemo(
     () =>
-      JSON.stringify([
-        community,
-        currentPubkey ?? null,
-        scope,
-        view?.viewInstanceId ?? null,
-      ]),
+      JSON.stringify(
+        view
+          ? [community, currentPubkey ?? null, scope, view.viewInstanceId]
+          : [community, currentPubkey ?? null, scope],
+      ),
     [community, currentPubkey, scope, view?.viewInstanceId],
   );
   const [registry, setRegistry] = React.useState<Map<string, Candidate>>(
