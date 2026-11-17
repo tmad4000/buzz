@@ -415,7 +415,11 @@ test("mid-history incoming preserves the partially visible first row, focus, dra
       "the first visible row is partially above the viewport",
     );
     editor.focus();
-    assert.equal(document.activeElement, editor);
+    assert.equal(
+      document.activeElement === editor,
+      true,
+      "reading interaction must retain the original editor focus",
+    );
     const range = document.createRange();
     range.setStart(editor.firstChild, 7);
     range.collapse(true);
@@ -434,7 +438,11 @@ test("mid-history incoming preserves the partially visible first row, focus, dra
     await h.resize();
     assert.equal(row.getBoundingClientRect().top, top);
     assert.equal(h.model.pins, pins);
-    assert.equal(document.activeElement, editor);
+    assert.equal(
+      document.activeElement === editor,
+      true,
+      "reading interaction must retain the original editor focus",
+    );
     assert.equal(editor.textContent, "Keep this exact draft");
     assert.equal(selection.anchorOffset, 7);
     assert.equal(selection.focusOffset, 7);
@@ -494,7 +502,11 @@ test("focused inline editor keeps its row and selection through bottom queue gro
     assert.equal(result, false);
     assert.equal(h.model.pins, pins);
     assert.ok(Math.abs(row.getBoundingClientRect().top - top) <= 1);
-    assert.equal(document.activeElement, editor);
+    assert.equal(
+      document.activeElement === editor,
+      true,
+      "reading interaction must retain the original editor focus",
+    );
     assert.equal(editor.value, "Keep inline draft");
     assert.equal(editor.selectionStart, 7);
     assert.equal(editor.selectionEnd, 7);
@@ -555,7 +567,11 @@ test("growth between the first visible row and focused inline editor preserves t
   editor.getBoundingClientRect = () => composer.getBoundingClientRect();
   try {
     const row = composer;
-    assert.equal(editor.closest("[data-message-id]"), null);
+    assert.equal(
+      editor.closest("[data-message-id]") === null,
+      true,
+      "the production inline editor must remain outside message articles",
+    );
     await act(async () => {
       editor.focus();
       editor.setSelectionRange(7, 7);
@@ -579,7 +595,11 @@ test("growth between the first visible row and focused inline editor preserves t
     assert.equal(result, false);
     assert.equal(h.model.pins, pins);
     assert.ok(Math.abs(row.getBoundingClientRect().top - top) <= 1);
-    assert.equal(document.activeElement, editor);
+    assert.equal(
+      document.activeElement === editor,
+      true,
+      "reading interaction must retain the original editor focus",
+    );
     assert.equal(editor.value, "Keep this focused inline draft");
     assert.equal(editor.selectionStart, 7);
     assert.equal(editor.selectionEnd, 7);

@@ -98,9 +98,17 @@ test("pending to accepted summary preserves the same row DOM and focused Reply",
         }),
       ),
     );
-    assert.equal(host.querySelector("article"), row);
+    assert.equal(
+      host.querySelector("article") === row,
+      true,
+      "ACK must retain the exact message row node",
+    );
     assert.equal(row.dataset.messageId, "a".repeat(64));
-    assert.equal(document.activeElement, reply);
+    assert.equal(
+      document.activeElement === reply,
+      true,
+      "ACK must retain focus on the original Reply button",
+    );
     assert.equal(mounts, 1);
   } finally {
     await act(async () => root.unmount());
