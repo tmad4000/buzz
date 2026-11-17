@@ -45,14 +45,11 @@ test("unseen summary survives channel opening and clears only on visible reply b
       pubkey: TEST_IDENTITIES.bob.pubkey,
       createdAt: tick++,
     };
-    return page.evaluate(
-      (input) =>
-        window.__BUZZ_E2E_EMIT_MOCK_MESSAGE__!({
-          ...input,
-          channelName: "general",
-        }),
-      input,
-    );
+    return page.evaluate((input) => {
+      const emit = window.__BUZZ_E2E_EMIT_MOCK_MESSAGE__;
+      if (!emit) throw new Error("Missing mock message emitter");
+      return emit({ ...input, channelName: "general" });
+    }, input);
   };
   const root = await emit("Unseen observation acceptance root");
   await emit("First answer body must actually appear", root.id);
@@ -111,7 +108,7 @@ test("unseen summary survives channel opening and clears only on visible reply b
   await expect(summary.getByTestId("thread-unread-badge")).toBeVisible();
   const panel = page.getByTestId("message-thread-panel");
   await panel
-    .getByRole("button", { name: "Collapse thread", exact: true })
+    .getByRole("button", { name: "Hide replies", exact: true })
     .first()
     .click();
   const savedCollapse = await page.evaluate(
