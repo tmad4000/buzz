@@ -1,4 +1,5 @@
 import * as React from "react";
+import { ConversationViewContext } from "@/features/conversations/ConversationViewContext";
 
 import { AUXILIARY_PANEL_SINGLE_COLUMN_BREAKPOINT_PX } from "@/shared/layout/AuxiliaryPanel";
 
@@ -87,7 +88,13 @@ export function useIsMobile() {
 }
 
 export function useIsAuxiliaryPanelOverlay() {
-  return useMediaBreakpoint(AUXILIARY_PANEL_SINGLE_COLUMN_BREAKPOINT_PX);
+  const viewportOverlay = useMediaBreakpoint(
+    AUXILIARY_PANEL_SINGLE_COLUMN_BREAKPOINT_PX,
+  );
+  const view = React.useContext(ConversationViewContext);
+  return view
+    ? (view.contentWidthPx ?? 0) < AUXILIARY_PANEL_SINGLE_COLUMN_BREAKPOINT_PX
+    : viewportOverlay;
 }
 
 export function useIsThreadPanelOverlay() {
