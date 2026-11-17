@@ -34,7 +34,9 @@ const expect = baseExpect.configure({ timeout: 30000 });
     const bBranch = tb.locator(
       `[data-testid="sidebar-read-branch"][data-thread-head-id="${"2".repeat(64)}"]`,
     );
-    await bBranch.click();
+    // Smart may already reveal this direct reply; open only a collapsed branch.
+    // The visibility assertion below still requires the sibling reply to render.
+    if (await bBranch.count()) await bBranch.click();
     await expect(tb).toContainText("Reply belonging to the design discussion");
     const sends = () =>
       page.evaluate(() =>
