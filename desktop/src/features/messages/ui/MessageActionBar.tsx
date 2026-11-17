@@ -1,3 +1,4 @@
+import { ResendToPaseoMenuItem } from "./ResendToPaseo";
 import { setMessagePin } from "@/features/messages/pins/service";
 import {
   BellOff,
@@ -187,6 +188,7 @@ function MoreActionsMenu({
               Pin to channel
             </DropdownMenuItem>
           ) : null}
+          <ResendToPaseoMenuItem channelId={channelId} message={message} />
           {onEdit ? (
             <DropdownMenuItem
               data-testid={`edit-message-${message.id}`}

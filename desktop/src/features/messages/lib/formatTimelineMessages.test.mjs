@@ -773,3 +773,38 @@ test("verified agent owner may publish a suppression edit", () => {
     true,
   );
 });
+
+test("edited metadata tracks the latest authorized revision including same-second ties", () => {
+  const original = streamMessage();
+  const early = streamEdit(original.id, "same body", {
+    id: "c".repeat(64),
+    created_at: 1700000100,
+  });
+  const late = streamEdit(original.id, "same body", {
+    id: "d".repeat(64),
+    created_at: 1700000200,
+  });
+  const forged = streamEdit(original.id, "forged", {
+    id: "f".repeat(64),
+    pubkey: PUBKEY_B,
+    created_at: 1700000300,
+  });
+  const show = (events) =>
+    formatTimelineMessages(events, null, PUBKEY_A, null)[0];
+  assert.equal(show([original]).editedAt, undefined);
+  assert.equal(show([original]).editEventId, undefined);
+  const revised = show([original, late, early, forged]);
+  assert.equal(revised.body, "same body");
+  assert.equal(revised.edited, true);
+  assert.equal(revised.editedAt, late.created_at);
+  assert.equal(revised.editEventId, late.id);
+  const tie = { ...late, id: "e".repeat(64), content: "tie winner" };
+  for (const changes of [
+    [tie, late],
+    [late, tie],
+  ]) {
+    const row = show([original, ...changes]);
+    assert.equal(row.editEventId, tie.id);
+    assert.equal(row.body, "tie winner");
+  }
+});
