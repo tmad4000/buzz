@@ -1,3 +1,4 @@
+import { ThreadDisplaySettings } from "./ThreadDisplaySettings";
 import { useMemo, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import {
@@ -418,7 +419,7 @@ const ACCENT_PICKER_TRANSITION = {
   ease: [0.23, 1, 0.32, 1] as const,
 };
 
-function ThemeSettingsCard() {
+function ThemeSettingsCard({ currentPubkey }: { currentPubkey?: string }) {
   const {
     setTheme,
     selectedThemeName,
@@ -794,6 +795,7 @@ function ThemeSettingsCard() {
           <LinkPreviewStyleSetting />
           <ThreadLayoutSetting />
         </SettingsOptionGroup>
+        <ThreadDisplaySettings currentPubkey={currentPubkey} />
       </SettingsOptionGroupList>
     </section>
   );
@@ -839,7 +841,7 @@ export function renderSettingsSection(
     case "compute":
       return <MeshComputeSettingsCard />;
     case "appearance":
-      return <ThemeSettingsCard />;
+      return <ThemeSettingsCard currentPubkey={props.currentPubkey} />;
     case "shortcuts":
       return <KeyboardShortcutsCard />;
     case "hosted-communities":

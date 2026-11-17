@@ -1,6 +1,13 @@
 import { setLocalStorageItemWithRecovery } from "@/shared/lib/localStorageQuota";
 
 export type ThreadExpansion = ReadonlyMap<string, boolean>;
+const failedSnapshots = new Map<string, ThreadExpansion>();
+export const THREAD_EXPANSION_CHANGED = "buzz-thread-expansion-changed";
+export type ThreadExpansionChange = {
+  key: string;
+  branches: ThreadExpansion;
+  persisted: boolean;
+};
 
 /** Namespace thread preferences by community, identity, channel and root. */
 export function threadExpansionKey(
@@ -33,6 +40,8 @@ export function resolveThreadExpansion(
 /** Read only validated branch IDs and booleans; unavailable storage is harmless. */
 export function loadThreadExpansion(key: string | null): ThreadExpansion {
   if (!key) return new Map();
+  const failed = failedSnapshots.get(key);
+  if (failed) return failed;
   try {
     const raw = window.localStorage.getItem(key);
     if (!raw) return new Map();
@@ -55,5 +64,18 @@ export function loadThreadExpansion(key: string | null): ThreadExpansion {
 
 /** One atomic snapshot; quota recovery reports failures without losing the view. */
 export function saveThreadExpansion(key: string, branches: ThreadExpansion) {
-  return setLocalStorageItemWithRecovery(key, JSON.stringify([...branches]));
+  const persisted = setLocalStorageItemWithRecovery(
+    key,
+    JSON.stringify([...branches]),
+  );
+  if (persisted) failedSnapshots.delete(key);
+  else failedSnapshots.set(key, new Map(branches));
+  // Same-document surfaces share manual choices even if storage is unavailable.
+  if (typeof window.dispatchEvent === "function" && window.CustomEvent)
+    window.dispatchEvent(
+      new window.CustomEvent<ThreadExpansionChange>(THREAD_EXPANSION_CHANGED, {
+        detail: { key, branches, persisted },
+      }),
+    );
+  return persisted;
 }

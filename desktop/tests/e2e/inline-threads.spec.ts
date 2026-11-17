@@ -31,6 +31,14 @@ test("inline replies, scoped sends, saved expansion and side panel coexist", asy
   };
   await page.goto("/");
   await ready();
+  // Exercise the explicit-collapse flow independently of Smart defaults.
+  await page.keyboard.press("ControlOrMeta+,");
+  await page.getByTestId("settings-nav-appearance").click();
+  await page.getByTestId("thread-display-channels-collapsed").click();
+  await page.getByTestId("thread-display-replies-expanded").click();
+  await page.getByTestId("settings-back-to-app").click();
+  await page.getByTestId("channel-random").click();
+  await ready();
   let tick = Math.floor(Date.now() / 1000) + 30;
   const fixtures: {
     content: string;
@@ -232,14 +240,16 @@ test("large inline threads reveal bounded batches", async ({ page }) => {
   const inline = page.locator(
     `[data-testid="inline-thread"][data-thread-head-id="${rootId}"]`,
   );
-  await expect(inline.getByTestId("message-row")).toHaveCount(50);
+  await expect(inline.getByTestId("message-row")).toHaveCount(8);
   await expect(
     inline.getByText("Engineering reply 54", { exact: true }),
   ).toHaveCount(0);
-  await inline
-    .getByRole("button", { name: "Show 5 more replies", exact: true })
-    .click();
-  await expect(inline.getByTestId("message-row")).toHaveCount(55);
+  for (const expected of [28, 48, 55]) {
+    await inline
+      .getByRole("button", { name: /^(More replies|Show \d+ more replies)$/ })
+      .click();
+    await expect(inline.getByTestId("message-row")).toHaveCount(expected);
+  }
   await expect(
     inline.getByText("Engineering reply 54", { exact: true }),
   ).toBeVisible();

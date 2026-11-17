@@ -1,3 +1,4 @@
+import { ChevronDown, ChevronRight } from "lucide-react";
 import * as React from "react";
 
 import type {
@@ -247,6 +248,24 @@ export function MessageThreadSummaryRow({
         data-thread-head-id={message.id}
         data-testid="message-thread-summary"
         onClick={() => onOpenThread(message)}
+        onKeyDown={(event) => {
+          if (
+            expanded === undefined ||
+            event.altKey ||
+            event.metaKey ||
+            event.ctrlKey ||
+            event.shiftKey
+          )
+            return;
+          if (
+            (event.key === "ArrowRight" && !expanded) ||
+            (event.key === "ArrowLeft" && expanded)
+          ) {
+            event.preventDefault();
+            event.stopPropagation();
+            onOpenThread(message);
+          }
+        }}
         style={{
           marginLeft: hoverLeft,
           maxWidth: `calc(100% - ${hoverLeft})`,
@@ -263,6 +282,13 @@ export function MessageThreadSummaryRow({
             right: 0,
           }}
         />
+        {expanded !== undefined ? (
+          expanded ? (
+            <ChevronDown className="relative z-10 size-3" aria-hidden />
+          ) : (
+            <ChevronRight className="relative z-10 size-3" aria-hidden />
+          )
+        ) : null}
         <div className="relative z-10 flex shrink-0 items-center">
           {summary.participants.map((participant, index) => (
             <ParticipantAvatar

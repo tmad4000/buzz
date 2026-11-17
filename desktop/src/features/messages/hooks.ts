@@ -488,6 +488,7 @@ export function useSendMessageMutation(
       content: string;
       mentionPubkeys?: string[];
       parentEventId?: string | null;
+      threadHeadId?: string | null;
       mediaTags?: string[][];
       forceRest?: boolean;
       sentFromThreadRootId?: string | null;
@@ -502,6 +503,7 @@ export function useSendMessageMutation(
       content,
       mentionPubkeys,
       parentEventId,
+      threadHeadId: capturedThreadHeadId,
       mediaTags,
       forceRest,
       sentFromThreadRootId,
@@ -582,12 +584,14 @@ export function useSendMessageMutation(
             queryKey: ["thread-replies", effectiveChannel.id],
           })
           .flatMap(([, events]) => (events ? [events] : []));
-        const suppliedRootEventId = parentEventId
-          ? resolveCachedReplyRootId(parentEventId, [
-              cachedMessages,
-              ...threadCaches,
-            ])
-          : null;
+        const suppliedRootEventId =
+          capturedThreadHeadId ??
+          (parentEventId
+            ? resolveCachedReplyRootId(parentEventId, [
+                cachedMessages,
+                ...threadCaches,
+              ])
+            : null);
         const result = await sendChannelMessage(
           effectiveChannel.id,
           content,
