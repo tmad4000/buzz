@@ -14,6 +14,8 @@ type FocusThreadDrawerProps = {
   children: React.ReactNode;
   /** Prevent a covered drawer from handling Escape before its overlay. */
   escapeEnabled?: boolean;
+  /** Scoped views keep this wrapper mounted across docked/full-leaf/focus layouts. */
+  enabled?: boolean;
   /** Accessible name for the drawer. Channel threads leave the default. */
   label?: string;
   hasActiveEdit?: boolean;
@@ -188,24 +190,34 @@ export function FocusThreadDrawer({
   channelName,
   children,
   escapeEnabled = true,
+  enabled: enabledProp,
   label = "Thread",
   hasActiveEdit = false,
   onClose,
   restoreFocusTarget,
 }: FocusThreadDrawerProps) {
+  const enabled = enabledProp ?? true;
+  const persistent = enabledProp !== undefined;
   const prefersReducedMotion = useReducedMotion();
   const { active, canHandle, canRestoreFocus } = useConversationControlScope();
   const threadViewMode = useThreadViewMode();
   const latestThreadViewMode = React.useRef(threadViewMode);
   latestThreadViewMode.current = threadViewMode;
   const travelPx = prefersReducedMotion ? 0 : THREAD_FOCUS_DRAWER_TRAVEL_PX;
+  const drawerAnimation = React.useMemo(
+    () =>
+      persistent && enabled
+        ? { opacity: [0, 1], x: [travelPx, 0] }
+        : { opacity: 1, x: 0 },
+    [enabled, persistent, travelPx],
+  );
   const drawerRef = React.useRef<HTMLDivElement>(null);
   const overlayRef = React.useRef<HTMLDivElement>(null);
   const previousFocusRef = React.useRef<HTMLElement | null>(null);
   const viewportRightInsetPx = useViewportRightInsetPx(overlayRef);
 
   React.useEffect(() => {
-    if (!escapeEnabled || !active) return;
+    if (!enabled || !escapeEnabled || !active) return;
 
     function handleEscape(event: KeyboardEvent) {
       if (event.key !== "Escape" || !canHandle()) return;
@@ -226,9 +238,10 @@ export function FocusThreadDrawer({
     return () => {
       window.removeEventListener("keydown", handleEscape, { capture: true });
     };
-  }, [active, canHandle, escapeEnabled, hasActiveEdit, onClose]);
+  }, [active, canHandle, enabled, escapeEnabled, hasActiveEdit, onClose]);
 
   React.useLayoutEffect(() => {
+    if (!enabled) return;
     previousFocusRef.current =
       document.activeElement instanceof HTMLElement
         ? document.activeElement
@@ -254,17 +267,22 @@ export function FocusThreadDrawer({
         }
       });
     };
-  }, [canHandle, canRestoreFocus, restoreFocusTarget]);
+  }, [canHandle, canRestoreFocus, enabled, restoreFocusTarget]);
 
   return (
     <div
-      className="absolute inset-0 z-41"
-      data-testid="focus-thread-drawer-overlay"
+      className={enabled ? "absolute inset-0 z-41" : "contents"}
+      data-testid={enabled ? "focus-thread-drawer-overlay" : undefined}
       ref={overlayRef}
-      style={{ right: viewportRightInsetPx }}
+      style={
+        enabled ? { right: viewportRightInsetPx } : { display: "contents" }
+      }
     >
       <motion.button
         animate={{ opacity: 1 }}
+        hidden={!enabled}
+        aria-hidden={!enabled || undefined}
+        style={enabled ? undefined : { display: "none" }}
         aria-label={`Back to #${channelName}`}
         className={cn(
           "absolute inset-0 cursor-pointer transition-colors duration-150",
@@ -272,14 +290,18 @@ export function FocusThreadDrawer({
           FOCUS_SCRIM_HOVER_CLASS,
         )}
         data-testid="focus-thread-drawer-scrim"
-        exit={{
-          opacity: 0,
-          transition: prefersReducedMotion
-            ? REDUCED_MOTION_TRANSITION
-            : { duration: SCRIM_EXIT_SECONDS, ease: "linear" },
-        }}
-        initial={{ opacity: 0 }}
-        onClick={onClose}
+        exit={
+          enabled
+            ? {
+                opacity: 0,
+                transition: prefersReducedMotion
+                  ? REDUCED_MOTION_TRANSITION
+                  : { duration: SCRIM_EXIT_SECONDS, ease: "linear" },
+              }
+            : undefined
+        }
+        initial={persistent ? false : { opacity: 0 }}
+        onClick={enabled ? onClose : undefined}
         transition={
           prefersReducedMotion
             ? REDUCED_MOTION_TRANSITION
@@ -289,7 +311,7 @@ export function FocusThreadDrawer({
       />
 
       <motion.div
-        animate={{ opacity: 1, x: 0 }}
+        animate={drawerAnimation}
         className={cn(
           // Left corners only, at the app content surface's own `rounded-2xl`:
           // the drawer is flush to that surface's right edge, so it is *clipped*
@@ -297,27 +319,44 @@ export function FocusThreadDrawer({
           // share a radius — a smaller one here would put two radii on one
           // element. `shadow-panel-left` draws the left edge and its corners;
           // see the token for why a `border-l` cannot.
-          "absolute inset-y-0 right-0 flex flex-col overflow-hidden rounded-l-2xl bg-background shadow-panel-left outline-hidden",
+          enabled
+            ? "absolute inset-y-0 right-0 flex flex-col overflow-hidden rounded-l-2xl bg-background shadow-panel-left outline-hidden"
+            : "contents",
         )}
-        aria-label={label}
-        data-testid="focus-thread-drawer"
+        aria-label={enabled ? label : undefined}
+        data-testid={enabled ? "focus-thread-drawer" : undefined}
         ref={drawerRef}
-        role="complementary"
-        tabIndex={-1}
-        exit={{
-          opacity: 0,
-          transition: prefersReducedMotion
-            ? REDUCED_MOTION_TRANSITION
-            : EXIT_TRANSITION,
-          x: travelPx,
-        }}
-        initial={{ opacity: 0, x: travelPx }}
-        style={{ left: THREAD_FOCUS_SLIVER_WIDTH_PX }}
+        role={enabled ? "complementary" : undefined}
+        tabIndex={enabled ? -1 : undefined}
+        exit={
+          enabled
+            ? {
+                opacity: 0,
+                transition: prefersReducedMotion
+                  ? REDUCED_MOTION_TRANSITION
+                  : EXIT_TRANSITION,
+                x: travelPx,
+              }
+            : undefined
+        }
+        initial={persistent ? false : { opacity: 0, x: travelPx }}
+        style={
+          enabled
+            ? { left: THREAD_FOCUS_SLIVER_WIDTH_PX }
+            : { display: "contents" }
+        }
         transition={
           prefersReducedMotion ? REDUCED_MOTION_TRANSITION : ENTER_TRANSITION
         }
       >
-        <div className="flex min-h-0 flex-1 flex-col">{children}</div>
+        <div
+          className={cn(
+            enabled ? "flex min-h-0 flex-1 flex-col" : "contents",
+            enabled && persistent && "min-w-0",
+          )}
+        >
+          {children}
+        </div>
       </motion.div>
     </div>
   );

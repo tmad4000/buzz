@@ -1,4 +1,5 @@
 import * as React from "react";
+import { ConversationViewContext } from "@/features/conversations/ConversationViewContext";
 
 import { FocusThreadDrawer } from "@/features/channels/ui/FocusThreadDrawer";
 import { usePresenceCoverage } from "@/features/channels/ui/useFocusDrawerPresence";
@@ -20,6 +21,7 @@ export const ThreadPanelSurface = React.forwardRef<
   { channelName, children, covered, hasActiveEdit, isFocusDrawer, onClose },
   ref,
 ) {
+  const scoped = React.useContext(ConversationViewContext) !== null;
   return (
     <div
       aria-hidden={covered ? true : undefined}
@@ -28,7 +30,17 @@ export const ThreadPanelSurface = React.forwardRef<
       inert={covered ? true : undefined}
       ref={ref}
     >
-      {isFocusDrawer ? (
+      {scoped ? (
+        <FocusThreadDrawer
+          enabled={isFocusDrawer}
+          channelName={channelName}
+          escapeEnabled={!covered}
+          hasActiveEdit={hasActiveEdit}
+          onClose={onClose}
+        >
+          {children}
+        </FocusThreadDrawer>
+      ) : isFocusDrawer ? (
         <FocusThreadDrawer
           channelName={channelName}
           escapeEnabled={!covered}

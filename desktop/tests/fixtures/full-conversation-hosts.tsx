@@ -135,6 +135,11 @@ function PerViewShell({
 }
 const layoutFixture = new URLSearchParams(location.search).has("layout");
 function LayoutBody() {
+  const [focusRequest, setFocusRequest] = React.useState<{
+    viewId: string;
+    sequence: number;
+  }>();
+  const focusSequence = React.useRef(0);
   const [layout, setLayout] = React.useState(() => {
     const view = {
       ...createConversationView(channel?.id ?? "missing"),
@@ -142,6 +147,7 @@ function LayoutBody() {
       panelState: { thread: rootA },
     };
     const initial = createSingleLayout(view, (kind) => `${kind}-a`);
+    if (new URLSearchParams(location.search).has("single")) return initial;
     return focusPane(
       splitPane(
         initial,
@@ -162,15 +168,42 @@ function LayoutBody() {
   return (
     <ConversationLayoutSurface
       layout={layout}
+      focusRequest={focusRequest}
       labelForView={(view) => `General ${view.id}`}
       onFocusPane={(id) => setLayout((current) => focusPane(current, id))}
       onResize={(id, sizes) =>
         setLayout((current) => resizeGroup(current, id, sizes))
       }
       canRestore={lastSplit.current !== null}
-      onCommand={(paneId, command) =>
+      onCommand={(paneId, command) => {
+        if (command === "splitRight" || command === "splitBottom") {
+          const pane = listPanes(layout.root).find(
+            (value) => value.id === paneId,
+          );
+          if (!pane) return;
+          const source = layout.views[pane.viewInstanceId];
+          const view = createConversationView(
+            source.channelId,
+            undefined,
+            source,
+          );
+          setLayout((current) =>
+            splitPane(
+              current,
+              paneId,
+              view,
+              command === "splitRight" ? "horizontal" : "vertical",
+            ),
+          );
+          setFocusRequest({
+            viewId: view.id,
+            sequence: ++focusSequence.current,
+          });
+          return;
+        }
         setLayout((current) => {
           const panes = listPanes(current.root);
+
           if (command === "swap" && panes.length === 2)
             return swapPanes(current, panes[0].id, panes[1].id);
           if (
@@ -195,8 +228,8 @@ function LayoutBody() {
           if (command === "restore" && lastSplit.current)
             return lastSplit.current;
           return current;
-        })
-      }
+        });
+      }}
       renderPane={({ view, pane, focused, visible, headerEndActions }) => (
         <PerViewShell id={view.id}>
           <ConversationViewHost

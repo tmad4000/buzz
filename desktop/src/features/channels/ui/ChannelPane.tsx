@@ -1,4 +1,5 @@
 import { InlineChannelThread } from "./InlineChannelThread";
+import { ConversationViewContext } from "@/features/conversations/ConversationViewContext";
 import type { ThreadSummaryRenderer } from "@/features/messages/ui/TimelineMessageRow";
 import { PinnedBar } from "@/features/messages/pins/PinnedBar";
 import * as React from "react";
@@ -194,6 +195,7 @@ export const ChannelPane = React.memo(function ChannelPane({
   threadFirstUnreadReplyId,
   typingPubkeys,
 }: ChannelPaneProps) {
+  const conversationView = React.useContext(ConversationViewContext);
   const timelineScrollRef = React.useRef<HTMLDivElement>(null);
   const messageTimelineRef = React.useRef<MessageTimelineHandle>(null);
   const composerWrapperRef = React.useRef<HTMLDivElement>(null);
@@ -575,7 +577,27 @@ export const ChannelPane = React.memo(function ChannelPane({
       onClose={onCloseThread}
       ref={threadSurface.ref}
     >
-      {useFocusThreadDrawer ? panel : wrapAux(panel, "message-thread-panel")}
+      {conversationView ? (
+        <RightAuxiliaryPane
+          canResetWidth={canResetThreadPanelWidth}
+          onResetWidth={onResetThreadPanelWidth}
+          onResizeStart={onThreadPanelResizeStart}
+          widthPx={threadPanelWidthPx}
+          fillAvailable={!useSplitAuxiliaryPane || useFocusThreadDrawer}
+          detached={!useSplitAuxiliaryPane || useFocusThreadDrawer}
+          testId={
+            useSplitAuxiliaryPane && !useFocusThreadDrawer
+              ? "message-thread-panel"
+              : undefined
+          }
+        >
+          {panel}
+        </RightAuxiliaryPane>
+      ) : useFocusThreadDrawer ? (
+        panel
+      ) : (
+        wrapAux(panel, "message-thread-panel")
+      )}
     </ThreadPanelSurface>
   );
   const wrapIdlePanel = (panel: React.ReactNode) =>
@@ -614,7 +636,10 @@ export const ChannelPane = React.memo(function ChannelPane({
   const threadHeaderLeading = isSinglePanelView ? (
     paneHeaderEndActions
   ) : useSplitAuxiliaryPane ? (
-    <ThreadViewModeToggle onChange={changeThreadViewMode} />
+    <>
+      {useFocusThreadDrawer ? paneHeaderEndActions : null}
+      <ThreadViewModeToggle onChange={changeThreadViewMode} />
+    </>
   ) : undefined;
   const threadLayoutProps = {
     ...getThreadPanelLayout({
@@ -623,7 +648,9 @@ export const ChannelPane = React.memo(function ChannelPane({
       isSinglePanelView,
       useSplitAuxiliaryPane,
     }),
-    ...(isSinglePanelView && paneHeaderEndActions && paneConversationTitle
+    ...(conversationView &&
+    (isSinglePanelView || useFocusThreadDrawer) &&
+    paneConversationTitle
       ? { headerTitle: `${paneConversationTitle} · Thread` }
       : {}),
   };
