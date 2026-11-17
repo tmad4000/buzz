@@ -1,6 +1,74 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import fs from "node:fs";
 import { installMockBridge, TEST_IDENTITIES } from "../helpers/bridge";
+
+async function published(page: Page) {
+  return page.evaluate(() =>
+    (window.__BUZZ_E2E_COMMAND_PAYLOADS__ ?? [])
+      .filter((call) => call.command === "publish_queued_message")
+      .map(
+        (call) =>
+          (
+            call.payload as {
+              event: { id: string; content: string; tags: string[][] };
+            }
+          ).event,
+      ),
+  );
+}
+function threadTags(event: { tags: string[][] }) {
+  return event.tags.filter((tag) => tag[0] === "e");
+}
+async function failNextAdmission(page: Page) {
+  await page.evaluate(() => {
+    const original = IDBDatabase.prototype.transaction;
+    const probe = {
+      count: 0,
+      restore() {
+        if (IDBDatabase.prototype.transaction === wrapped)
+          IDBDatabase.prototype.transaction = original;
+      },
+    };
+    const wrapped: IDBDatabase["transaction"] = function (
+      this: IDBDatabase,
+      ...args
+    ) {
+      const [names, mode] = args;
+      if (
+        this.name === "buzz-message-outbox-v1" &&
+        mode === "readwrite" &&
+        Array.isArray(names) &&
+        names.length === 2 &&
+        [...names].sort().join(",") === "messages,metadata"
+      ) {
+        probe.count++;
+        IDBDatabase.prototype.transaction = original;
+        throw new Error("Routing test: durable storage unavailable");
+      }
+      return Reflect.apply(original, this, args);
+    };
+    IDBDatabase.prototype.transaction = wrapped;
+    (
+      window as Window & { __routingAdmission?: typeof probe }
+    ).__routingAdmission = probe;
+  });
+  return {
+    count: () =>
+      page.evaluate(
+        () =>
+          (window as Window & { __routingAdmission?: { count: number } })
+            .__routingAdmission?.count,
+      ),
+    restore: () =>
+      page.evaluate(() => {
+        const current = window as Window & {
+          __routingAdmission?: { restore(): void };
+        };
+        current.__routingAdmission?.restore();
+        delete current.__routingAdmission;
+      }),
+  };
+}
 
 test("explicit keyboard routing, cancel and new-message fallback preserve inline/side state", async ({
   page,
@@ -78,23 +146,8 @@ test("explicit keyboard routing, cancel and new-message fallback preserve inline
     .getByTestId("message-composer")
     .filter({ has: page.getByTestId("send-to-thread") });
   const editor = main.getByTestId("message-input");
-  const count = () =>
-    page.evaluate(
-      () =>
-        (window.__BUZZ_E2E_COMMAND_PAYLOADS__ ?? []).filter(
-          (x) => x.command === "send_channel_message",
-        ).length,
-    );
-  const lastSend = () =>
-    page.evaluate(
-      () =>
-        [...(window.__BUZZ_E2E_COMMAND_PAYLOADS__ ?? [])]
-          .reverse()
-          .find((x) => x.command === "send_channel_message")?.payload as {
-          parentEventId?: string;
-          content: string;
-        },
-    );
+  const count = async () => (await published(page)).length;
+  const lastSend = async () => (await published(page)).at(-1)!;
   await expect(main.getByTestId("send-to-thread")).toBeDisabled();
   await editor.fill("Signed release rollback checklist");
   const before = await count();
@@ -140,7 +193,9 @@ test("explicit keyboard routing, cancel and new-message fallback preserve inline
     await page.evaluate(() => window.__BUZZ_E2E_HOLD_OUTBOX_PUBLISH__?.(false)),
   ).toBe(1);
   await expect.poll(count).toBe(before + 1);
-  await expect.poll(async () => (await lastSend()).parentEventId).toBe(root);
+  await expect
+    .poll(async () => threadTags(await lastSend()))
+    .toEqual([["e", root, "", "reply"]]);
   await expect(editor).toBeEmpty();
   await expect(side).toContainText("Lunch with the team");
   await expect(page.getByTestId("routed-send-notice")).toContainText(
@@ -175,8 +230,10 @@ test("explicit keyboard routing, cancel and new-message fallback preserve inline
       (node) => node.closest('[data-testid="inline-thread"]') === null,
     ),
   ).toBe(true);
-  // Plain roots use the existing WebSocket publisher; only the reply used REST.
-  expect(await count()).toBe(before + 1);
+  await expect.poll(count).toBe(before + 2);
+  const sent = (await published(page)).slice(before);
+  expect(threadTags(sent[0])).toEqual([["e", root, "", "reply"]]);
+  expect(threadTags(sent[1])).toEqual([]);
 });
 
 test("channel navigation dismisses picker and uses only destination channel's roots", async ({
@@ -256,12 +313,10 @@ test("channel navigation dismisses picker and uses only destination channel's ro
   ).toBe(0);
 });
 
-test("DM routing stays scoped and failed publish keeps draft for explicit retry", async ({
+test("DM routing stays scoped and failed durable admission keeps draft for explicit retry", async ({
   page,
 }) => {
-  await installMockBridge(page, {
-    sendMessageErrors: ["Routing test: offline"],
-  });
+  await installMockBridge(page);
   await page.goto("/");
   await page.getByTestId("channel-alice-tyler").click();
   await expect
@@ -292,52 +347,60 @@ test("DM routing stays scoped and failed publish keeps draft for explicit retry"
     .getByTestId("message-composer")
     .filter({ has: page.getByTestId("send-to-thread") });
   const editor = main.getByTestId("message-input");
-  await editor.fill("Private invoice review follow-up");
-  await main.getByTestId("send-to-thread").click();
-  const menu = page.getByRole("menu", { name: "Thread destinations" });
-  await expect(menu.getByRole("menuitem").first()).toContainText(
-    "Private invoice review",
-  );
-  await expect(menu).not.toContainText("Welcome to #general");
-  await menu.getByRole("menuitem").first().click();
-  await expect(
-    page.getByText("Routing test: offline", { exact: false }),
-  ).toBeVisible();
-  await expect(editor).toContainText("Private invoice review follow-up");
-  // The persistent failure toast can cover the pointer target; exercise the
-  // ordinary keyboard retry path without bypassing hit testing or gates.
-  await main.getByTestId("send-to-thread").focus();
-  await main.getByTestId("send-to-thread").press("Enter");
-  await expect(menu.getByRole("menuitem").first()).toContainText(
-    "Private invoice review",
-  );
-  const shots =
-    process.env.BUZZ_THREAD_ROUTING_SCREENSHOTS ??
-    "test-results/send-to-thread";
-  fs.mkdirSync(shots, { recursive: true });
-  await page.setViewportSize({ width: 1000, height: 800 });
-  await page.screenshot({ path: `${shots}/dm-retry-picker.png` });
-  await page.evaluate(() => window.__BUZZ_E2E_HOLD_OUTBOX_PUBLISH__?.(true));
-  await menu.getByRole("menuitem").first().click();
-  await expect
-    .poll(() =>
-      page.evaluate(() => window.__BUZZ_E2E_HELD_OUTBOX_PUBLISHES__?.()),
-    )
-    .toBe(1);
-  await expect(editor).toBeEmpty();
-  expect(
-    await page.evaluate(() => window.__BUZZ_E2E_HOLD_OUTBOX_PUBLISH__?.(false)),
-  ).toBe(1);
-  await expect
-    .poll(() =>
-      page.evaluate(() => {
-        const sends = (window.__BUZZ_E2E_COMMAND_PAYLOADS__ ?? []).filter(
-          (x) => x.command === "send_channel_message",
-        );
-        return sends.map(
-          (x) => (x.payload as { parentEventId?: string }).parentEventId,
-        );
+  const admission = await failNextAdmission(page);
+  try {
+    await editor.fill("Private invoice review follow-up");
+    await main.getByTestId("send-to-thread").click();
+    const menu = page.getByRole("menu", { name: "Thread destinations" });
+    await expect(menu.getByRole("menuitem").first()).toContainText(
+      "Private invoice review",
+    );
+    await expect(menu).not.toContainText("Welcome to #general");
+    await menu.getByRole("menuitem").first().click();
+    await expect(
+      page.getByText("Routing test: durable storage unavailable", {
+        exact: false,
       }),
-    )
-    .toEqual([root, root]);
+    ).toBeVisible();
+    await expect(editor).toContainText("Private invoice review follow-up");
+    expect(await admission.count()).toBe(1);
+    expect(await published(page)).toEqual([]);
+    await expect(page.getByTestId("routed-send-notice")).toHaveCount(0);
+    await expect(
+      page.getByRole("article", { name: "Queued message" }),
+    ).toHaveCount(0);
+    // The persistent failure toast can cover the pointer target; exercise the
+    // ordinary keyboard retry path without bypassing hit testing or gates.
+    await main.getByTestId("send-to-thread").focus();
+    await main.getByTestId("send-to-thread").press("Enter");
+    await expect(menu.getByRole("menuitem").first()).toContainText(
+      "Private invoice review",
+    );
+    const shots =
+      process.env.BUZZ_THREAD_ROUTING_SCREENSHOTS ??
+      "test-results/send-to-thread";
+    fs.mkdirSync(shots, { recursive: true });
+    await page.setViewportSize({ width: 1000, height: 800 });
+    await page.screenshot({ path: `${shots}/dm-retry-picker.png` });
+    await page.evaluate(() => window.__BUZZ_E2E_HOLD_OUTBOX_PUBLISH__?.(true));
+    await menu.getByRole("menuitem").first().click();
+    await expect
+      .poll(() =>
+        page.evaluate(() => window.__BUZZ_E2E_HELD_OUTBOX_PUBLISHES__?.()),
+      )
+      .toBe(1);
+    await expect(editor).toBeEmpty();
+    expect(
+      await page.evaluate(() =>
+        window.__BUZZ_E2E_HOLD_OUTBOX_PUBLISH__?.(false),
+      ),
+    ).toBe(1);
+    await expect.poll(async () => (await published(page)).length).toBe(1);
+    const [sent] = await published(page);
+    expect(threadTags(sent)).toEqual([["e", root, "", "reply"]]);
+    expect(sent.content).toBe("Private invoice review follow-up");
+    expect(await admission.count()).toBe(1);
+  } finally {
+    await admission.restore();
+  }
 });
