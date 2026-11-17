@@ -101,6 +101,8 @@ test("held durable inline publish preserves queue height, anchor and real nested
     const target = inline.locator(`[data-message-id="${child}"]`);
     const composer = inline.getByTestId("message-composer");
     await expect(composer).toHaveJSProperty("tagName", "FORM");
+    const composerFooter = composer.locator("xpath=ancestor::footer[1]");
+    await expect(composerFooter).toHaveCount(1);
     await expect(composer).toHaveAttribute("data-compact", "true");
     const nestedToggle = inline.locator(
       `[data-testid="inline-branch-toggle"][data-thread-head-id="${child}"]`,
@@ -121,7 +123,9 @@ test("held durable inline publish preserves queue height, anchor and real nested
     if (!beforeInline) throw new Error("Missing inline layout box");
     const height = beforeInline.height;
     const composerBefore = await composer.boundingBox();
-    if (!composerBefore) throw new Error("Missing compact composer form box");
+    const footerBefore = await composerFooter.boundingBox();
+    if (!composerBefore || !footerBefore)
+      throw new Error("Missing compact composer form or owning footer box");
     const timeline = page.getByTestId("message-timeline");
     const estimates = Number(
       await timeline.getAttribute("data-virtua-estimate-call-count"),
@@ -171,10 +175,14 @@ test("held durable inline publish preserves queue height, anchor and real nested
     }, queueId);
     const afterInline = await inline.boundingBox();
     const composerAfter = await composer.boundingBox();
-    if (!afterInline || !composerAfter)
-      throw new Error("Inline or composer form disappeared during click");
+    const footerAfter = await composerFooter.boundingBox();
+    if (!afterInline || !composerAfter || !footerAfter)
+      throw new Error(
+        "Inline, composer form or owning footer disappeared during click",
+      );
     const inlineDelta = afterInline.height - height;
     const composerDelta = composerAfter.height - composerBefore.height;
+    const footerDelta = footerAfter.height - footerBefore.height;
     const rowIdsAfter = await inline
       .locator('[data-testid="message-row"][data-message-id]')
       .evaluateAll((rows) =>
@@ -192,8 +200,11 @@ test("held durable inline publish preserves queue height, anchor and real nested
         progressBefore,
         composerBefore,
         composerAfter,
+        footerBefore,
+        footerAfter,
         inlineDelta,
         composerDelta,
+        footerDelta,
         rowIdsBefore,
         rowIdsAfter,
         samples,
@@ -217,11 +228,12 @@ test("held durable inline publish preserves queue height, anchor and real nested
       expect(sample.status).toBe(statusBefore.trim());
       expect(sample.progress).toEqual(progressBefore);
     }
-    // Reply intentionally expands only the compact composer (banner + toolbar).
-    // The existing nested branch is already open, so no disclosure growth is allowed.
+    // The banner is a sibling before the form, inside this same owning footer.
+    // Only that footer may grow; the existing nested branch stays unchanged.
     expect(rowIdsAfter).toEqual(rowIdsBefore);
     expect(composerDelta).toBeGreaterThan(0);
-    expect(Math.abs(inlineDelta - composerDelta)).toBeLessThanOrEqual(2);
+    expect(footerDelta).toBeGreaterThan(0);
+    expect(Math.abs(inlineDelta - footerDelta)).toBeLessThanOrEqual(2);
     expect(
       Math.abs(samples[samples.length - 1].top - before.y),
     ).toBeLessThanOrEqual(1);
