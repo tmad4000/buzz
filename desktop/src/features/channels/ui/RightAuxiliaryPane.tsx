@@ -1,4 +1,9 @@
-import type * as React from "react";
+import * as React from "react";
+import { ConversationViewContext } from "@/features/conversations/ConversationViewContext";
+import {
+  CONVERSATION_CHAT_RESERVE_PX,
+  CONVERSATION_THREAD_MIN_WIDTH_PX,
+} from "@/shared/layout/conversationThreadLayout";
 
 import { AUXILIARY_PANEL_MIN_WIDTH_PX } from "@/shared/layout/AuxiliaryPanel";
 import { cn } from "@/shared/lib/cn";
@@ -28,6 +33,7 @@ export function RightAuxiliaryPane({
   testId,
   widthPx,
 }: RightAuxiliaryPaneProps) {
+  const view = React.useContext(ConversationViewContext);
   return (
     <aside
       className={cn(
@@ -44,9 +50,10 @@ export function RightAuxiliaryPane({
       data-testid={testId}
       style={{
         maxWidth: constrainToAvailableSpace
-          ? `calc(100% - ${AUXILIARY_PANEL_MIN_WIDTH_PX}px)`
+          ? `calc(100% - ${view ? CONVERSATION_CHAT_RESERVE_PX : AUXILIARY_PANEL_MIN_WIDTH_PX}px)`
           : undefined,
         width: widthPx,
+        minWidth: view ? CONVERSATION_THREAD_MIN_WIDTH_PX : undefined,
       }}
     >
       <button

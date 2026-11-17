@@ -89,13 +89,54 @@ test("thread overlay derives from leaf content width and retains legacy viewport
       ]),
     );
   try {
-    await render(599);
+    await render(759);
     assert.equal(modes.pane, true);
     assert.equal(modes.legacy, window.innerWidth < 600);
-    await render(600);
+    await render(760);
     assert.equal(modes.pane, false);
   } finally {
     await act(() => root.unmount());
     window.matchMedia = originalMatchMedia;
+  }
+});
+
+test("scoped preferred width clamps to 320 minimum and reserves chat400 plus gutter without overwriting preference during projection", async () => {
+  const api = {};
+  let available = 1000;
+  const writes = [];
+  function Probe({ id }) {
+    api[id] = useThreadPanelWidth(available);
+    return null;
+  }
+  const root = createRoot(document.createElement("div"));
+  const render = () =>
+    act(() =>
+      root.render(
+        [900, 300].map((width, index) =>
+          React.createElement(
+            ThreadPanelWidthScopeProvider,
+            {
+              key: index,
+              initialWidthPx: width,
+              onChange: (value) => writes.push(value),
+            },
+            React.createElement(Probe, { id: index }),
+          ),
+        ),
+      ),
+    );
+  try {
+    await render();
+    assert.equal(api[0].widthPx, 592);
+    assert.equal(api[1].widthPx, 320);
+    available = 760;
+    await render();
+    assert.equal(api[0].widthPx, 352);
+    available = 1600;
+    await render();
+    assert.equal(api[0].widthPx, 900);
+    assert.deepEqual(writes, []);
+  } finally {
+    await act(() => root.unmount());
   }
 });
