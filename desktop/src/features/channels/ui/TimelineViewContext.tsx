@@ -1,7 +1,22 @@
 import * as React from "react";
 import type { TimelineMessage } from "@/features/messages/types";
 
-export type ChannelViewMode = "threads" | "timeline";
+/** Stable setting identities include the reserved activity mode for the follow-up. */
+export type ChannelOrderMode = "threads" | "activity" | "timeline";
+export type ChannelViewMode = Exclude<ChannelOrderMode, "activity">;
+const CHANNEL_ORDER_OPTIONS: readonly {
+  value: ChannelOrderMode;
+  label: string;
+  available: boolean;
+}[] = [
+  { value: "threads", label: "Threads by post time", available: true },
+  {
+    value: "activity",
+    label: "Threads by latest activity (coming soon)",
+    available: false,
+  },
+  { value: "timeline", label: "Timeline", available: true },
+];
 export const timelinePreferenceKey = (scope: string, channelId: string) =>
   `buzz.channelView.v1:${encodeURIComponent(scope)}:${channelId}`;
 
@@ -47,24 +62,26 @@ export const TimelineViewContext = React.createContext<TimelineView>({
 });
 export const useTimelineView = () => React.useContext(TimelineViewContext);
 
-export function ChannelViewToggle() {
+/** One order setting; activity ordering waits for stable live-movement anchoring. */
+export function ChannelOrderSetting() {
   const { mode, changeMode } = useTimelineView();
   return (
-    <fieldset
-      aria-label="Channel view"
-      className="flex shrink-0 rounded-lg border border-border bg-muted/40 p-0.5"
-    >
-      {(["threads", "timeline"] as const).map((value) => (
-        <button
-          key={value}
-          type="button"
-          aria-pressed={mode === value}
-          onClick={() => changeMode(value)}
-          className={`rounded-md px-2.5 py-1 text-xs font-medium focus-visible:outline-2 focus-visible:outline-primary ${mode === value ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
-        >
-          {value === "threads" ? "Threads" : "Timeline"}
-        </button>
-      ))}
-    </fieldset>
+    <label className="flex shrink-0 items-center gap-2 rounded-lg border border-border bg-background px-2.5 py-1 text-xs">
+      <span className="text-muted-foreground">Order</span>
+      <select
+        aria-label="Order"
+        value={mode}
+        onChange={(event) =>
+          changeMode(event.target.value === "timeline" ? "timeline" : "threads")
+        }
+        className="min-w-0 max-w-48 bg-transparent font-medium text-foreground focus-visible:outline-2 focus-visible:outline-primary"
+      >
+        {CHANNEL_ORDER_OPTIONS.map(({ value, label, available }) => (
+          <option key={value} value={value} disabled={!available}>
+            {label}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }

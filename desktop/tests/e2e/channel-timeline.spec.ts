@@ -48,13 +48,23 @@ test("Timeline flattens replies chronologically, receives live events, sends top
   }, TEST_IDENTITIES.bob.pubkey);
   await page.getByTestId("channel-general").click();
   const timeline = page.getByTestId("message-timeline");
-  const mode = (label: string) =>
-    page
-      .getByRole("group", { name: "Channel view" })
-      .getByRole("button", { name: label, exact: true });
-  await expect(mode("Threads")).toHaveAttribute("aria-pressed", "true");
-  await mode("Timeline").click();
-  await expect(mode("Timeline")).toHaveAttribute("aria-pressed", "true");
+  const order = page.getByRole("combobox", { name: "Order", exact: true });
+  await expect(order).toHaveValue("threads");
+  await expect(
+    order.getByRole("option", {
+      name: "Threads by latest activity (coming soon)",
+      exact: true,
+    }),
+  ).toHaveJSProperty("disabled", true);
+  await expect(
+    timeline.getByText("Timeline root topic", { exact: true }),
+  ).toBeVisible();
+  await page.screenshot({
+    path: testInfo.outputPath("threads-post-time.png"),
+    fullPage: true,
+  });
+  await order.selectOption("timeline");
+  await expect(order).toHaveValue("timeline");
   await expect(
     timeline.getByText("Timeline nested reply", { exact: true }),
   ).toBeVisible();
@@ -149,7 +159,7 @@ test("Timeline flattens replies chronologically, receives live events, sends top
   await timeline
     .getByRole("button", { name: /↳ in reply to bob: Timeline first reply/i })
     .click();
-  await expect(mode("Threads")).toHaveAttribute("aria-pressed", "true");
+  await expect(order).toHaveValue("threads");
   const panel = page.getByTestId("message-thread-panel");
   await expect(panel).toContainText("Timeline root topic");
   await expect(page.getByTestId("channel-management-sheet")).toHaveCount(0);
@@ -183,14 +193,14 @@ test("Timeline flattens replies chronologically, receives live events, sends top
       }, ids.nested),
     )
     .toBe(true);
-  await mode("Timeline").click();
+  await order.selectOption("timeline");
   await page.getByTestId("channel-random").click();
-  await expect(mode("Threads")).toHaveAttribute("aria-pressed", "true");
+  await expect(order).toHaveValue("threads");
   await page.getByTestId("channel-general").click();
-  await expect(mode("Timeline")).toHaveAttribute("aria-pressed", "true");
+  await expect(order).toHaveValue("timeline");
   await page.reload();
   await page.getByTestId("channel-general").click();
-  await expect(mode("Timeline")).toHaveAttribute("aria-pressed", "true");
+  await expect(order).toHaveValue("timeline");
 });
 
 test("Timeline pages reply subtrees with bounded reads, keeps partial history honest, and retries failures", async ({
@@ -261,9 +271,8 @@ test("Timeline pages reply subtrees with bounded reads, keeps partial history ho
   }, TEST_IDENTITIES.bob.pubkey);
   await page.getByTestId("channel-general").click();
   await page
-    .getByRole("group", { name: "Channel view" })
-    .getByRole("button", { name: "Timeline", exact: true })
-    .click();
+    .getByRole("combobox", { name: "Order", exact: true })
+    .selectOption("timeline");
   await expect(
     page.getByRole("status").filter({ hasText: "Loading older replies" }),
   ).toBeVisible();
