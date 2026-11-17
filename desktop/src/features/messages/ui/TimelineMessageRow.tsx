@@ -182,6 +182,7 @@ export function MessageRowItem({
         )}
       >
         <MessageRow
+          key={message.renderKey ?? message.id}
           channelId={channelId}
           highlighted={false}
           hoverBackground={false}
@@ -247,6 +248,7 @@ export function MessageRowItem({
     >
       <TimelineReplyChip message={message} />
       <MessageRow
+        key={message.renderKey ?? message.id}
         channelId={channelId}
         highlighted={message.id === highlightedMessageId || isSearchActive}
         huddleMemberPubkeys={huddleMemberPubkeys}
