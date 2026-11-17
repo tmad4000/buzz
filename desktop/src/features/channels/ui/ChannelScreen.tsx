@@ -892,10 +892,10 @@ export function ChannelScreen({
                   paneHeaderEndActions={pageHeaderActions}
                   paneConversationTitle={activeChannelTitle}
                   {...{ hasOlderMessages, historyExhausted }}
-                  idleAuxiliaryHeaderActions={pageOpen ? undefined : idleAuxiliaryHeaderActions}
+                  idleAuxiliaryHeaderActions={pageOpen ? { actions: headerEndActions } : idleAuxiliaryHeaderActions}
                   idleAuxiliaryOverridesThread={pageOpen || idleAuxiliaryOverridesThread}
                   idleAuxiliaryPanel={pageOpen ? pagePanel : idleAuxiliaryPanel}
-                  idleAuxiliaryTitle={pageOpen ? "Page" : idleAuxiliaryTitle}
+                  idleAuxiliaryTitle={pageOpen ? `Page · ${activeChannelTitle}` : idleAuxiliaryTitle}
                   {...{ onAddFiles }}
                   onAddAgent={handleOpenAddBot}
                   onBrowseChannels={openBrowseChannels}

@@ -1,5 +1,7 @@
 import { usePageAuthors } from "./usePageAuthors";
 import * as React from "react";
+import { toast } from "sonner";
+import { useConversationLeaveGuard } from "@/features/conversations/ConversationViewGuards";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { relayClient } from "@/shared/api/relayClient";
 import type { RelayEvent } from "@/shared/api/types";
@@ -34,6 +36,15 @@ export function ChannelPage({
   const [saving, setSaving] = React.useState(false);
   const [external, setExternal] = React.useState<string | null>(null);
   const [tick, setTick] = React.useState(0);
+  useConversationLeaveGuard(() => {
+    if (draft !== null || saving) {
+      toast.info(
+        "Save or cancel your Page edit before leaving this conversation.",
+      );
+      return false;
+    }
+    return true;
+  });
   const frame = React.useRef<HTMLIFrameElement>(null);
   const generation = React.useRef(0);
   const channelGeneration = React.useRef(0);

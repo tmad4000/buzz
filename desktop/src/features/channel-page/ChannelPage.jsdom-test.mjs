@@ -119,11 +119,34 @@ test("production Page merges live edits over late history, isolates scope, sandb
     },
   };
   const { ChannelPage } = await import("./ChannelPage.tsx");
+  const { ConversationViewGuards, ConversationViewGuardsContext } =
+    await import("@/features/conversations/ConversationViewGuards");
+  const { ConversationViewContext } = await import(
+    "@/features/conversations/ConversationViewContext"
+  );
+  const guards = new ConversationViewGuards();
   const root = createRoot(document.getElementById("root"));
   const render = async (channel) =>
     act(async () => {
       root.render(
-        React.createElement(ChannelPage, { channelId: channel, canEdit: true }),
+        React.createElement(
+          ConversationViewGuardsContext.Provider,
+          { value: guards },
+          React.createElement(
+            ConversationViewContext.Provider,
+            {
+              value: {
+                viewInstanceId: "page-host",
+                focused: true,
+                visible: true,
+              },
+            },
+            React.createElement(ChannelPage, {
+              channelId: channel,
+              canEdit: true,
+            }),
+          ),
+        ),
       );
       await new Promise((r) => setTimeout(r, 10));
     });
@@ -154,8 +177,24 @@ test("production Page merges live edits over late history, isolates scope, sandb
         .find((b) => b.textContent === text)
         .click(),
     );
+  assert.equal(guards.allow("page-host"), true);
   await click("Edit HTML");
+  assert.equal(
+    guards.allow("page-host"),
+    false,
+    "active Page editor guards its owning view",
+  );
+  assert.equal(
+    guards.allow("other-view"),
+    true,
+    "sibling views remain independent",
+  );
   await click("Save Page");
+  assert.equal(
+    guards.allow("page-host"),
+    true,
+    "successful save releases Page guard",
+  );
   assert.equal(published.kind, 40004);
   assert.deepEqual(published.tags, [
     ["h", "b"],
@@ -220,6 +259,7 @@ test("production Page merges live edits over late history, isolates scope, sandb
     "removed-author head is hidden without deleting the draft",
   );
   await act(async () => root.unmount());
+  assert.equal(guards.allow("page-host"), true, "unmount releases Page guard");
   dom.window.close();
   delete globalThis.pageRelay;
 });
