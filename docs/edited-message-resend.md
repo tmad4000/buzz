@@ -23,7 +23,8 @@ Root and listener owners075fe138/06bcf007 agreed:
   channel membership and routing. It forwards that named revision, even if a newer
   one exists, annotating “a newer edit exists”; it never substitutes later text.
 - Listener dedupes `(original,edit)` and acknowledges the trigger with its own
-  kind7 `👀`, referencing the trigger ID with `e` and the same channel with `h`,
+  kind7 `👀`, referencing the trigger ID with exactly one `e`; standard reactions may omit `h`.
+  If present, exactly one `h` must match the known trigger channel,
   only after root submission is accepted or this revision is known forwarded.
   Uncertain/failed forwarding never produces that acknowledgement.
 
@@ -36,7 +37,8 @@ ordinary reaction-toggle path and never clears/retargets a composer draft.
 
 Relay acceptance alone remains **Pending**. **Sent to Paseo** requires an actual
 canonical Paseo acknowledgement read back from the authenticated relay or its live
-subscription. Wrong sender/channel/trigger/emoji cannot acknowledge the request.
+subscription. Wrong sender/channel/trigger/emoji or duplicate h/e references cannot acknowledge the request.
+An e-only acknowledgement inherits scope only from the exact known h-bound trigger.
 Receipts are scoped by community, actor, channel, original and edit; later edits
 have separate requests. Transport failure offers an explicit retry and does not
 claim delivery. Client receipt state is local to the running app; server dedupe

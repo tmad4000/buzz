@@ -144,7 +144,16 @@ test("edited label exposes edit time; explicit resend stays Pending until Paseo 
     next,
   ]);
   await expect(row.getByTestId("paseo-resend-status")).toHaveText("Pending");
-  await emit(page, "a7".repeat(32), "👀", PASEO, 7, [["e", second.id]]);
+  await page.evaluate(
+    ({ channel, paseo, target }) =>
+      window.__BUZZ_E2E_EMIT_MOCK_REACTION__?.({
+        channelId: channel,
+        pubkey: paseo,
+        targetId: target,
+        content: "👀",
+      }),
+    { channel: CHANNEL, paseo: PASEO, target: second.id },
+  );
   await expect(row.getByTestId("paseo-resend-status")).toHaveText(
     "Sent to Paseo",
   );

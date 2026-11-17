@@ -3,10 +3,12 @@ import { registerHooks } from "node:module";
 import test from "node:test";
 import React, { act } from "react";
 import { createRoot } from "react-dom/client";
+let filters = [];
 let callbacks = [];
 let history = [];
 globalThis.resendTestRelay = {
   subscribeLive: async (_f, cb) => {
+    filters.push(_f);
     callbacks.push(cb);
     return () => {};
   },
@@ -136,4 +138,26 @@ test("explicit retry restarts acknowledgement readback after a failed observatio
   assert.equal(latest.phase, "sent");
   await app.close();
   history = [];
+});
+
+test("standard e-only Paseo acknowledgement is subscribed and accepted via its known trigger", async () => {
+  localStorage.setItem("buzz-active-community-id", "one");
+  callbacks = [];
+  history = [];
+  filters = [];
+  const key = receiptKey("one", actor, "channel", "eonly-msg", "eonly-edit");
+  setResendReceipt(key, {
+    event: { id: "eonly-trigger", tags: [["h", "channel"]] },
+    phase: "pending",
+  });
+  const app = mount();
+  await app.render("eonly-msg", "eonly-edit");
+  assert.equal(filters.length, 1);
+  assert.equal(filters[0]["#h"], undefined);
+  assert.deepEqual(filters[0]["#e"], ["eonly-trigger"]);
+  await act(async () =>
+    callbacks[0](ack("eonly-trigger", { tags: [["e", "eonly-trigger"]] })),
+  );
+  assert.equal(latest.phase, "sent");
+  await app.close();
 });

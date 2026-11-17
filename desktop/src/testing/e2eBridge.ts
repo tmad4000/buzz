@@ -1314,6 +1314,14 @@ declare global {
       pubkey: string;
       status: PresenceStatus;
     }) => void;
+    /** Standard SDK reactions may have no channel h tag. */
+    __BUZZ_E2E_EMIT_MOCK_REACTION__?: (input: {
+      channelId: string;
+      pubkey: string;
+      targetId: string;
+      content: string;
+      extraTags?: string[][];
+    }) => RelayEvent;
     __BUZZ_E2E_EMIT_MOCK_MESSAGE__?: (input: {
       channelName: string;
       channelId?: string;
@@ -11641,6 +11649,23 @@ export function maybeInstallE2eTauriMocks() {
     refreshMockHuddleMembership(config);
     persistMockHuddle();
     await emitMockHuddleState();
+  };
+  window.__BUZZ_E2E_EMIT_MOCK_REACTION__ = ({
+    channelId,
+    pubkey,
+    targetId,
+    content,
+    extraTags = [],
+  }) => {
+    const event = createMockEvent(
+      7,
+      content,
+      [["e", targetId], ...extraTags],
+      pubkey,
+    );
+    recordMockMessage(channelId, event);
+    emitMockGlobalEvent(event);
+    return event;
   };
   window.__BUZZ_E2E_EMIT_MOCK_MESSAGE__ = ({
     channelName,

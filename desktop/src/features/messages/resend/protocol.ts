@@ -70,7 +70,8 @@ export function isPaseoAcknowledgement(
     event.kind === 7 &&
     event.pubkey.toLowerCase() === PASEO_PUBKEY &&
     event.content === "👀" &&
-    oneTag(event, "h", channel) &&
+    (event.tags.filter((t) => t[0] === "h").length === 0 ||
+      oneTag(event, "h", channel)) &&
     oneTag(event, "e", trigger)
   );
 }

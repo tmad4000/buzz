@@ -91,7 +91,7 @@ test("wire trigger binds original + exact named edit and has exactly the agreed 
     receiptKey("b", actor, "channel", id, edit),
   );
 });
-test("only canonical Paseo eyes on exact trigger in exact channel acknowledge", () => {
+test("canonical Paseo eyes bind exact trigger, allow absent h and reject conflicting/duplicate references", () => {
   const ack = {
     kind: 7,
     pubkey: PASEO_PUBKEY,
@@ -102,11 +102,14 @@ test("only canonical Paseo eyes on exact trigger in exact channel acknowledge", 
     ],
   };
   assert.equal(isPaseoAcknowledgement(ack, "channel", id), true);
+  assert.equal(
+    isPaseoAcknowledgement({ ...ack, tags: [["e", id]] }, "channel", id),
+    true,
+  );
   for (const e of [
     { ...ack, pubkey: actor },
     { ...ack, content: "🔁" },
     { ...ack, kind: 40003 },
-    { ...ack, tags: [["e", id]] },
     {
       ...ack,
       tags: [
@@ -122,6 +125,15 @@ test("only canonical Paseo eyes on exact trigger in exact channel acknowledge", 
       ],
     },
     { ...ack, tags: [...ack.tags, ["e", edit]] },
+    { ...ack, tags: [...ack.tags, ["h", "channel"]] },
+    { ...ack, tags: [...ack.tags, ["h", "other"]] },
+    {
+      ...ack,
+      tags: [
+        ["e", id],
+        ["e", id],
+      ],
+    },
   ])
     assert.equal(isPaseoAcknowledgement(e, "channel", id), false);
 });

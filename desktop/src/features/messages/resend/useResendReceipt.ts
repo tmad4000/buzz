@@ -48,7 +48,6 @@ export function useResendReceipt(
     const filter = {
       kinds: [7],
       authors: [PASEO_PUBKEY],
-      "#h": [channel],
       "#e": [triggerId],
       limit: 20,
     };
