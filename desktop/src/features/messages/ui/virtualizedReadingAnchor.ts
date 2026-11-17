@@ -84,7 +84,9 @@ export function preferredVirtualizedReadingRow(
   const viewport = scroller.getBoundingClientRect();
   const visibleRow = (node: Node | null): HTMLElement | null => {
     const element = node instanceof HTMLElement ? node : node?.parentElement;
-    const row = element?.closest<HTMLElement>("[data-message-id]");
+    const row = element?.closest<HTMLElement>(
+      "[data-message-id], [data-outbox-id], [data-testid='message-input'], input, textarea",
+    );
     if (!row || !scroller.contains(row)) return null;
     const rect = row.getBoundingClientRect();
     return rect.bottom > viewport.top && rect.top < viewport.bottom
@@ -109,26 +111,20 @@ export function preferredVirtualizedReadingRow(
     )
   )
     return null;
-  const targetId = active.closest<HTMLElement>("[data-composer-target-id]")
-    ?.dataset.composerTargetId;
-  if (targetId) {
-    const target = [
-      ...scroller.querySelectorAll<HTMLElement>("[data-message-id]"),
-    ].find(
-      (row) =>
-        row.dataset.messageId === targetId ||
-        row.dataset.messageRenderKey === targetId,
-    );
-    const targetRow = target ? visibleRow(target) : null;
-    if (targetRow) return targetRow;
-  }
-  const enclosingRow = visibleRow(active);
-  if (enclosingRow) return enclosingRow;
-  // In production the inline composer is a sibling of its reply rows. If its
-  // captured target is offscreen, preserve the active editor itself rather
-  // than an unrelated first row; this keeps the caret's viewport position.
+  // The focused editor is a sibling of its message articles in production.
+  // Its transport reply target can be a different, stationary visible row;
+  // anchoring that target would still let the editor/caret drift.
   const editorRect = active.getBoundingClientRect();
-  return editorRect.bottom > viewport.top && editorRect.top < viewport.bottom
-    ? active
-    : null;
+  if (editorRect.bottom > viewport.top && editorRect.top < viewport.bottom)
+    return active;
+  const composer = active.closest<HTMLElement>(
+    "[data-testid='message-composer']",
+  );
+  if (composer) {
+    const rect = composer.getBoundingClientRect();
+    if (rect.bottom > viewport.top && rect.top < viewport.bottom)
+      return composer;
+  }
+  // Compatibility for a focused inline control inside an actual message row.
+  return visibleRow(active.parentElement);
 }
