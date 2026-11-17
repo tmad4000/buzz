@@ -98,7 +98,7 @@ export function ChannelPage({
     setError("");
     try {
       validatePage(draft);
-      const event = await setPage(channelId, draft);
+      const event = await setPage(channelId, draft, head?.created_at);
       if (generation.current === version) {
         setHead((old) => pageHead(old ? [old, event] : [event], channelId));
         setDraft(null);

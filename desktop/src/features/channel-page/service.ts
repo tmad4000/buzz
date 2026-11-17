@@ -7,14 +7,22 @@ export const pageFilter = (channel: string) => ({
   "#d": [PAGE_SLOT],
   limit: 1,
 });
-export async function setPage(channel: string, html: string) {
+export async function setPage(
+  channel: string,
+  html: string,
+  afterCreatedAt = 0,
+) {
   validatePage(html);
   const head = pageHead(
     await relayClient.fetchEvents(pageFilter(channel)),
     channel,
   );
   const now = Math.floor(Date.now() / 1000);
-  const createdAt = Math.max(now, (head?.created_at ?? 0) + 1);
+  const createdAt = Math.max(
+    now,
+    (head?.created_at ?? 0) + 1,
+    afterCreatedAt + 1,
+  );
   if (createdAt > now + 300)
     throw new Error("Page head is too far in the future");
   const event = await signRelayEvent({

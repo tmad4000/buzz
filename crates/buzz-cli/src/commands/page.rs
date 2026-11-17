@@ -78,7 +78,7 @@ mod tests {
     #[tokio::test]
     async fn set_reads_shared_head_then_publishes_file_with_monotonic_timestamp() {
         let captured = Arc::new(Mutex::new(Vec::<serde_json::Value>::new()));
-        let now = Timestamp::now().as_secs();
+        let now = Timestamp::now().as_secs() + 60;
         let app = Router::new()
             .route(
                 "/query",
