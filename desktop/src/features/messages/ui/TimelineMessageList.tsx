@@ -40,7 +40,9 @@ import { useVirtualizedBottomSettle } from "./useVirtualizedBottomSettle";
 export type TimelineVirtualizerApi = {
   cancelBottomIntent: () => void;
   scrollToBottom: (behavior?: ScrollBehavior) => void;
-  settleAtBottom: () => void;
+  settleAtBottom: () => boolean;
+  preserveReadingPosition: () => boolean;
+  isBottomPinned: () => boolean;
   scrollToMessage: (
     messageId: string,
     options?: { behavior?: ScrollBehavior },
@@ -508,8 +510,18 @@ function VirtualizedTimelineRows({
     (version: number) => version + 1,
     0,
   );
-  const { cancel: cancelBottomSettle, settle: settleAtBottom } =
-    useVirtualizedBottomSettle(hostRef, listRef, itemsLengthRef);
+  const {
+    cancel: cancelBottomSettle,
+    settle: jumpToBottom,
+    settleAfterLayout: settleAtBottom,
+    preserveReadingPosition,
+    isBottomPinned,
+  } = useVirtualizedBottomSettle(
+    hostRef,
+    listRef,
+    itemsLengthRef,
+    onAtBottomStateChange,
+  );
   const { arm: armUpwardMomentum } = useUpwardPaginationWheel(
     hostRef,
     cancelBottomSettle,
@@ -656,9 +668,9 @@ function VirtualizedTimelineRows({
     }
     if (!hasInitialPositionedRef.current && items.length > 0) {
       hasInitialPositionedRef.current = true;
-      settleAtBottom();
+      jumpToBottom();
     }
-  }, [isPrepend, items.length, keys, settleAtBottom]);
+  }, [isPrepend, items.length, keys, jumpToBottom]);
 
   const messageItemIndexById = React.useMemo(() => {
     const byId = new Map<string, number>();
@@ -695,9 +707,11 @@ function VirtualizedTimelineRows({
     const api: TimelineVirtualizerApi = {
       cancelBottomIntent: cancelBottomSettle,
       scrollToBottom() {
-        settleAtBottom();
+        jumpToBottom();
       },
       settleAtBottom,
+      preserveReadingPosition,
+      isBottomPinned,
       scrollToMessage(messageId) {
         cancelBottomSettle();
         const index = messageItemIndexByIdRef.current.get(messageId);
@@ -708,7 +722,14 @@ function VirtualizedTimelineRows({
     };
     onVirtualizerApiChange(api);
     return () => onVirtualizerApiChange(null);
-  }, [cancelBottomSettle, onVirtualizerApiChange, settleAtBottom]);
+  }, [
+    cancelBottomSettle,
+    onVirtualizerApiChange,
+    jumpToBottom,
+    settleAtBottom,
+    preserveReadingPosition,
+    isBottomPinned,
+  ]);
 
   React.useLayoutEffect(() => {
     const host = hostRef.current;
