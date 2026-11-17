@@ -437,57 +437,101 @@ test("incoming replies above and below a scrolled reader preserve anchor, focuse
     contentType: "application/json",
   });
   expect(orderBeforePosition.order).toEqual(expectedOrder);
+  type SetupSample = {
+    frame: number;
+    top: number;
+    scrollTop: number;
+    scrollHeight: number;
+    clientHeight: number;
+    estimateCalls: number;
+  };
   const setupSamples: {
     phase: string;
-    samples: {
-      top: number;
-      scrollTop: number;
-      scrollHeight: number;
-      clientHeight: number;
-    }[];
+    stable: boolean;
+    reason: string;
+    samples: SetupSample[];
   }[] = [];
   const waitForStableLayout = async (phase: string) => {
-    await expect
-      .poll(
-        async () => {
-          const samples = await timeline.evaluate(
-            async (container, anchorId) => {
-              const samples = [];
-              for (let frame = 0; frame < 4; frame++) {
-                await new Promise<void>((resolve) =>
-                  requestAnimationFrame(() => resolve()),
-                );
-                const row = container.querySelector<HTMLElement>(
-                  `[data-testid="message-row"][data-message-id="${anchorId}"]`,
-                );
-                if (!row) return [];
-                samples.push({
-                  top: row.getBoundingClientRect().top,
-                  scrollTop: container.scrollTop,
-                  scrollHeight: container.scrollHeight,
-                  clientHeight: container.clientHeight,
-                });
-              }
-              return samples;
+    const result = await timeline.evaluate(async (container, anchorId) => {
+      const samples: SetupSample[] = [];
+      const deadline = performance.now() + 5000;
+      // A finite frame and wall-clock bound prevents setup from hiding churn.
+      for (let frame = 0; frame < 48; frame++) {
+        const arrived = await new Promise<boolean>((resolve) => {
+          let handle = 0;
+          const timer = window.setTimeout(
+            () => {
+              cancelAnimationFrame(handle);
+              resolve(false);
             },
-            ids.anchor,
+            Math.max(1, deadline - performance.now()),
           );
-          setupSamples.push({ phase, samples });
-          return (
-            samples.length === 4 &&
-            (
-              ["top", "scrollTop", "scrollHeight", "clientHeight"] as const
-            ).every(
-              (key) =>
-                Math.max(...samples.map((sample) => sample[key])) -
-                  Math.min(...samples.map((sample) => sample[key])) <=
-                1,
-            )
-          );
-        },
-        { message: `Reader fixture layout must settle during ${phase}` },
-      )
-      .toBe(true);
+          handle = requestAnimationFrame(() => {
+            window.clearTimeout(timer);
+            resolve(true);
+          });
+        });
+        if (!arrived)
+          return { stable: false, reason: "RAF wall cap reached", samples };
+        const row = container.querySelector<HTMLElement>(
+          `[data-testid="message-row"][data-message-id="${anchorId}"]`,
+        );
+        if (!row)
+          return {
+            stable: false,
+            reason: "anchor left mounted window",
+            samples,
+          };
+        const estimateCalls = Number(container.dataset.virtuaEstimateCallCount);
+        if (!Number.isFinite(estimateCalls))
+          return {
+            stable: false,
+            reason: "missing Virtua estimate counter",
+            samples,
+          };
+        samples.push({
+          frame,
+          top: row.getBoundingClientRect().top,
+          scrollTop: container.scrollTop,
+          scrollHeight: container.scrollHeight,
+          clientHeight: container.clientHeight,
+          estimateCalls,
+        });
+        const recent = samples.slice(-4);
+        if (
+          recent.length === 4 &&
+          (["top", "scrollTop", "scrollHeight", "clientHeight"] as const).every(
+            (key) =>
+              Math.max(...recent.map((sample) => sample[key])) -
+                Math.min(...recent.map((sample) => sample[key])) <=
+              1,
+          ) &&
+          recent.every(
+            (sample) => sample.estimateCalls === recent[0].estimateCalls,
+          )
+        ) {
+          return {
+            stable: true,
+            reason: "four consecutive stable RAF samples",
+            samples,
+          };
+        }
+      }
+      return {
+        stable: false,
+        reason: "did not settle within 48 RAF samples",
+        samples,
+      };
+    }, ids.anchor);
+    setupSamples.push({ phase, ...result });
+    await info.attach(`incoming-setup-${phase}`, {
+      body: JSON.stringify(result),
+      contentType: "application/json",
+    });
+    expect(result.stable, `Reader fixture ${phase}: ${result.reason}`).toBe(
+      true,
+    );
+    return result;
   };
   await waitForStableLayout("seeded");
   // Establish real upward reading intent before the one setup placement, so
@@ -502,7 +546,19 @@ test("incoming replies above and below a scrolled reader preserve anchor, focuse
       ),
     )
     .toBeGreaterThan(32);
-  await waitForStableLayout("reader-wheel");
+  const retiredIntent = await waitForStableLayout("reader-wheel");
+  const retiredWindow = retiredIntent.samples.slice(-4);
+  expect(retiredWindow).toHaveLength(4);
+  // Bottom intent is private. Observable proof: native wheel, away from the
+  // floor, with no scroll movement or estimate churn over the settle window.
+  expect(
+    Math.max(...retiredWindow.map((sample) => sample.scrollTop)) -
+      Math.min(...retiredWindow.map((sample) => sample.scrollTop)),
+  ).toBeLessThanOrEqual(1);
+  const retired = retiredWindow[retiredWindow.length - 1];
+  expect(
+    retired.scrollHeight - retired.scrollTop - retired.clientHeight,
+  ).toBeGreaterThan(32);
   await anchor.evaluate((element) => {
     const scroller = element.closest('[data-testid="message-timeline"]');
     if (!(scroller instanceof HTMLElement))
