@@ -44,7 +44,7 @@ import {
   useHomeFeedNotifications,
   useHomeFeedNotificationState,
 } from "@/features/notifications/hooks";
-import { PreventSleepProvider } from "@/features/agents/usePreventSleep";
+import { AppShellScopeProviders } from "@/app/AppShellScopeProviders";
 import { requestOpenCreateAgent } from "@/features/agents/openCreateAgentEvent";
 import { useAgentsDataRefresh } from "@/features/agents/lib/useAgentsDataRefresh";
 import { useManagedAgentRuntimeReconciliation } from "@/features/agents/useManagedAgentRuntimeReconciliation";
@@ -712,7 +712,11 @@ export function AppShell() {
     selectedView,
   });
   return (
-    <PreventSleepProvider>
+    <AppShellScopeProviders
+      pubkey={identityQuery.data?.pubkey}
+      relayUrl={communitiesHook.activeCommunity?.relayUrl}
+      channels={channels}
+    >
       {!isHuddleRoom ? (
         <AppShellTrayMenu
           channels={channels}
@@ -1011,6 +1015,6 @@ export function AppShell() {
           </AppHuddleShell>
         </AppShellProvider>
       </ChannelNavigationProvider>
-    </PreventSleepProvider>
+    </AppShellScopeProviders>
   );
 }

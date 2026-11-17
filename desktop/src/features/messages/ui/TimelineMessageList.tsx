@@ -1,3 +1,9 @@
+import { useArchive } from "../archive/ArchiveProvider";
+import {
+  ArchiveEntry,
+  ArchiveRunProvider,
+  buildArchiveRuns,
+} from "../archive/ArchiveRun";
 import type { ThreadSummaryRenderer } from "./TimelineMessageRow";
 import * as React from "react";
 import { VList } from "virtua";
@@ -126,7 +132,7 @@ type TimelineMessageListProps = {
   onVirtualizerScrollerChange?: (element: HTMLDivElement | null) => void;
 };
 
-export const TimelineMessageList = React.memo(function TimelineMessageList({
+const TimelineMessageListContent = React.memo(function TimelineMessageList({
   channelId,
   channelName,
   channelType,
@@ -179,6 +185,23 @@ export const TimelineMessageList = React.memo(function TimelineMessageList({
       mainEntries ??
       buildMainTimelineEntries(messages, undefined, threadSummaries, profiles),
     [mainEntries, messages, profiles, threadSummaries],
+  );
+  const archive = useArchive();
+  const archiveRuns = React.useMemo(
+    () =>
+      buildArchiveRuns(entries, (entry) =>
+        Boolean(
+          channelId &&
+            !entry.message.pending &&
+            !archive.showArchived(channelId) &&
+            archive.isArchived(
+              channelId,
+              entry.message.id,
+              entry.message.rootId,
+            ),
+        ),
+      ),
+    [entries, channelId, archive],
   );
   // Contexts are memoized per message id so MessageRow/Markdown memo
   // comparisons hold across unrelated timeline re-renders (typing
@@ -246,8 +269,8 @@ export const TimelineMessageList = React.memo(function TimelineMessageList({
               ownerProfiles={ownerProfiles}
             />
           );
-        case "message":
-          return (
+        case "message": {
+          const row = (
             <MessageRowItem
               channelId={channelId}
               currentPubkey={currentPubkey}
@@ -295,9 +318,19 @@ export const TimelineMessageList = React.memo(function TimelineMessageList({
               )}
             />
           );
+          return (
+            <ArchiveEntry
+              run={archiveRuns.get(item.entry.message.id)}
+              id={item.entry.message.id}
+            >
+              {row}
+            </ArchiveEntry>
+          );
+        }
       }
     },
     [
+      archiveRuns,
       channelId,
       channelType,
       alwaysShowMessageIdentity,
@@ -835,3 +868,13 @@ function VirtualizedTimelineRows({
     </div>
   );
 }
+
+export const TimelineMessageList = React.memo(function TimelineMessageList(
+  props: TimelineMessageListProps,
+) {
+  return (
+    <ArchiveRunProvider key={props.channelId}>
+      <TimelineMessageListContent {...props} />
+    </ArchiveRunProvider>
+  );
+});

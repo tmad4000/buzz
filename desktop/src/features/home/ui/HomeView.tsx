@@ -702,6 +702,8 @@ export function HomeView({
 
           {showListPane ? (
             <InboxListPane
+              availableChannelIds={availableChannelIds}
+              onOpenArchived={onOpenContext}
               activeReminderEventIds={activeReminderEventIds}
               agentPubkeys={inboxAgentPubkeys}
               activeDraftCount={activeDraftCount}

@@ -1,3 +1,7 @@
+import {
+  ArchiveMenuItems,
+  ArchiveHoverAction,
+} from "../archive/ArchiveActions";
 import { setMessagePin } from "@/features/messages/pins/service";
 import {
   BellOff,
@@ -176,6 +180,7 @@ function MoreActionsMenu({
             }
           }}
         >
+          <ArchiveMenuItems channelId={channelId} message={message} />
           {channelId && !message.pending ? (
             <DropdownMenuItem
               onSelect={() => {
@@ -646,6 +651,7 @@ export const MessageActionBar = React.memo(function MessageActionBar({
             </Tooltip>
           ) : null}
 
+          <ArchiveHoverAction channelId={channelId} message={message} />
           {hasMoreMenuActions ? (
             <MoreActionsMenu
               channelId={channelId}

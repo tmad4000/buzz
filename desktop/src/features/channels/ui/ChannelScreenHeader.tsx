@@ -1,3 +1,4 @@
+import { ArchiveChannelToggle } from "@/features/messages/archive/ArchiveActions";
 import { LogIn, SquareTerminal } from "lucide-react";
 import type * as React from "react";
 
@@ -62,7 +63,7 @@ export function ChannelScreenHeader({
   activeDmPresenceStatus,
   chromeWrapperRef,
   currentPubkey,
-  headerEndActions,
+  headerEndActions: suppliedHeaderEndActions,
   isAddBotOpen,
   isJoining = false,
   onAddBotOpenChange,
@@ -72,6 +73,14 @@ export function ChannelScreenHeader({
   onManageChannel,
   onToggleMembers,
 }: ChannelScreenHeaderProps) {
+  const headerEndActions = (
+    <>
+      {activeChannel ? (
+        <ArchiveChannelToggle channelId={activeChannel.id} />
+      ) : null}
+      {suppliedHeaderEndActions}
+    </>
+  );
   const isGroupDm =
     activeChannel?.channelType === "dm" &&
     activeDmHeaderParticipants.length > 1;

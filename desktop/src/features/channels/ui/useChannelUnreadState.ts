@@ -1,3 +1,4 @@
+import { useArchive } from "@/features/messages/archive/ArchiveProvider";
 import * as React from "react";
 import { useConversationReadAdmission } from "@/features/conversations/ConversationViewContext";
 
@@ -79,6 +80,15 @@ export function useChannelUnreadState({
   readStateVersion,
 }: UseChannelUnreadStateOptions) {
   const { canRead } = useConversationReadAdmission();
+  const archive = useArchive();
+  const isArchived = React.useCallback(
+    (message: TimelineMessage) =>
+      Boolean(
+        activeChannelId &&
+          archive.isArchived(activeChannelId, message.id, message.rootId),
+      ),
+    [archive, activeChannelId],
+  );
   // Capture the read frontier as it stood the instant this channel was opened,
   // BEFORE the mark-read effect (in ChannelScreen) advances it to latest.
   // Written during render (not in an effect) so the value is read prior to any
@@ -161,8 +171,11 @@ export function useChannelUnreadState({
     [readMessages],
   );
   const repliesByRootId = React.useMemo(
-    () => buildRepliesByRootId(readMessages),
-    [readMessages],
+    () =>
+      buildRepliesByRootId(
+        readMessages.filter((message) => !isArchived(message)),
+      ),
+    [readMessages, isArchived],
   );
   const getFirstReplyIdForMessage = React.useCallback(
     (messageId: string) => directReplyIdsByParentId.get(messageId)?.[0] ?? null,
@@ -213,8 +226,9 @@ export function useChannelUnreadState({
   const { firstUnreadMessageId, unreadCount } = React.useMemo(
     () =>
       computeChannelUnreadMarker(
-        timelineMessages.filter((message) =>
-          isConversationalUnreadKind(message.kind),
+        timelineMessages.filter(
+          (message) =>
+            isConversationalUnreadKind(message.kind) && !isArchived(message),
         ),
         openFrontierSeconds,
         isActiveChannelForcedUnread || isActiveWelcomeInitialUnreadSuppressed,
@@ -225,6 +239,7 @@ export function useChannelUnreadState({
       isActiveChannelForcedUnread,
       isActiveWelcomeInitialUnreadSuppressed,
       openFrontierSeconds,
+      isArchived,
       timelineMessages,
     ],
   );
