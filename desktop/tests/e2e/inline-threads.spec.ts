@@ -309,7 +309,6 @@ test("incoming replies above and below a scrolled reader preserve anchor, focuse
   });
   await timeline.hover();
   await page.mouse.wheel(0, -20);
-  const viewport = await timeline.boundingBox();
   const aboveInline = timeline.locator(
     `[data-testid="inline-thread"][data-thread-head-id="${ids.above}"]`,
   );
@@ -318,12 +317,22 @@ test("incoming replies above and below a scrolled reader preserve anchor, focuse
   );
   await expect(aboveInline).toContainText("Existing above reply");
   await expect(belowInline).toContainText("Existing below reply");
-  const aboveBox = await aboveInline.boundingBox();
-  const belowBox = await belowInline.boundingBox();
-  if (!viewport || !aboveBox || !belowBox)
-    throw new Error("Missing above/below reading geometry");
-  expect(aboveBox.y + aboveBox.height).toBeLessThanOrEqual(viewport.y);
-  expect(belowBox.y).toBeGreaterThanOrEqual(viewport.y + viewport.height);
+  const assertOffscreenBaseline = async () => {
+    const viewport = await timeline.boundingBox();
+    const aboveBox = await aboveInline.boundingBox();
+    const belowBox = await belowInline.boundingBox();
+    if (!viewport || !aboveBox || !belowBox)
+      throw new Error("Missing above/below reading geometry");
+    expect(aboveBox.y + aboveBox.height).toBeLessThanOrEqual(viewport.y);
+    expect(belowBox.y).toBeGreaterThanOrEqual(viewport.y + viewport.height);
+    const bottomGap = await timeline.evaluate(
+      (element) =>
+        element.scrollHeight - element.scrollTop - element.clientHeight,
+    );
+    expect(bottomGap).toBeGreaterThan(32);
+    return { viewport, aboveBox, belowBox, bottomGap };
+  };
+  await assertOffscreenBaseline();
   const main = page
     .getByTestId("message-composer")
     .filter({ has: page.getByTestId("send-to-thread") });
@@ -343,18 +352,18 @@ test("incoming replies above and below a scrolled reader preserve anchor, focuse
     selection?.removeAllRanges();
     selection?.addRange(range);
   });
+  const baselineBoxes = await assertOffscreenBaseline();
   const readingAnchor = await timeline.evaluate((container) => {
-    const top = container.getBoundingClientRect().top;
+    const viewport = container.getBoundingClientRect();
     const rows = [
       ...container.querySelectorAll<HTMLElement>(
         '[data-testid="message-row"][data-message-id]',
       ),
     ]
-      .filter(
-        (row) =>
-          row.getBoundingClientRect().top >= top &&
-          row.getBoundingClientRect().bottom > top,
-      )
+      .filter((row) => {
+        const rect = row.getBoundingClientRect();
+        return rect.bottom > viewport.top && rect.top < viewport.bottom;
+      })
       .sort(
         (a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top,
       );
@@ -389,6 +398,7 @@ test("incoming replies above and below a scrolled reader preserve anchor, focuse
   expect(before.collapsed).toBe(true);
   const snapshots = [];
   for (const [index, parent] of [ids.above, ids.below, ids.closed].entries()) {
+    const arrivalBoxes = await assertOffscreenBaseline();
     const beforeArrival = await capture();
     await page.evaluate(
       ({ parent, index, pubkey }) =>
@@ -418,7 +428,7 @@ test("incoming replies above and below a scrolled reader preserve anchor, focuse
           ),
       );
       const current = await capture();
-      snapshots.push({ parent, ...current });
+      snapshots.push({ parent, arrivalBoxes, ...current });
       expect(Math.abs(current.top - before.top)).toBeLessThanOrEqual(1);
       if (parent !== ids.above) {
         expect(
@@ -443,7 +453,7 @@ test("incoming replies above and below a scrolled reader preserve anchor, focuse
     ),
   ).toHaveCount(0);
   await info.attach("incoming-reader-anchor-and-selection", {
-    body: JSON.stringify({ before, snapshots }),
+    body: JSON.stringify({ before, baselineBoxes, readingAnchor, snapshots }),
     contentType: "application/json",
   });
 });
