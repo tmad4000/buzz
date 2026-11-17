@@ -17,6 +17,23 @@ test("explicit keyboard routing, cancel and new-message fallback preserve inline
       ),
     )
     .toBe(true);
+  // This routing regression exercises an explicitly opened inline thread.
+  // Select the personal collapsed default instead of assuming the pre-Smart default.
+  await page.keyboard.press("ControlOrMeta+,");
+  await page.getByTestId("settings-nav-appearance").click();
+  await page.getByTestId("thread-display-channels-collapsed").click();
+  await page.getByTestId("settings-back-to-app").click();
+  await page.getByTestId("channel-random").click();
+  await page.getByTestId("channel-general").click();
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        window.__BUZZ_E2E_HAS_MOCK_LIVE_SUBSCRIPTION__?.({
+          channelName: "general",
+        }),
+      ),
+    )
+    .toBe(true);
   const root = "d1".repeat(32),
     other = "d2".repeat(32);
   await page.evaluate(

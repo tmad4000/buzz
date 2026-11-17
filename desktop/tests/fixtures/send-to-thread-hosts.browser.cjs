@@ -34,7 +34,9 @@ const expect = baseExpect.configure({ timeout: 30000 });
     const bBranch = tb.locator(
       `[data-testid="sidebar-read-branch"][data-thread-head-id="${"2".repeat(64)}"]`,
     );
-    await bBranch.click();
+    // Smart may already reveal this direct reply; open only a collapsed branch.
+    // The visibility assertion below still requires the sibling reply to render.
+    if (await bBranch.count()) await bBranch.click();
     await expect(tb).toContainText("Reply belonging to the design discussion");
     const sends = () =>
       page.evaluate(() =>
@@ -84,12 +86,29 @@ const expect = baseExpect.configure({ timeout: 30000 });
     await page.keyboard.press("Escape");
     await expect(menu).toHaveCount(0);
     assert.equal((await sends()).length, 0, "Escape cannot send");
+    // Capture the lock transition before clicking: a sibling focus round-trip
+    // can outlast the mocked publish, so current state alone is timing-dependent.
+    await mainA.evaluate((form) => {
+      window.hostRoutingLockStates = [];
+      window.hostRoutingLockObserver = new MutationObserver(() => {
+        window.hostRoutingLockStates.push(
+          form.getAttribute("data-submit-locked"),
+        );
+      });
+      window.hostRoutingLockObserver.observe(form, {
+        attributes: true,
+        attributeFilter: ["data-submit-locked"],
+      });
+    });
     await mainA.getByTestId("send-to-thread").click();
     await menu.locator(`[data-thread-destination="${"1".repeat(64)}"]`).click();
     await tb.getByTestId("message-input").focus();
-    await expect(mainA).toHaveAttribute("data-submit-locked", "true");
+    await expect
+      .poll(() => page.evaluate(() => window.hostRoutingLockStates))
+      .toContain("true");
     await expect(mainA.getByTestId("message-input")).toBeEmpty();
     await expect(mainA).toHaveAttribute("data-submit-locked", "false");
+    await page.evaluate(() => window.hostRoutingLockObserver.disconnect());
     assert.equal((await sends()).length, 1);
     const first = (await sends())[0];
     assert.equal(first.parentEventId, "1".repeat(64));
@@ -184,11 +203,26 @@ const expect = baseExpect.configure({ timeout: 30000 });
       name: "routing-receipt.pdf",
     });
     await expect(mainB).toContainText("routing-receipt.pdf");
+    const inactiveTakeover = a
+      .locator("[data-draft-preview]")
+      .filter({ hasText: "Shared draft survives picker takeover" })
+      .getByRole("button", { name: "Take over", exact: true });
+    await inactiveTakeover.evaluate((button) => {
+      window.hostTakeoverDisabledStates = [];
+      window.hostTakeoverObserver = new MutationObserver(() => {
+        window.hostTakeoverDisabledStates.push(button.disabled);
+      });
+      window.hostTakeoverObserver.observe(button, {
+        attributes: true,
+        attributeFilter: ["disabled"],
+      });
+    });
     await mainB.getByTestId("send-to-thread").click();
     await menu.locator(`[data-thread-destination="${"1".repeat(64)}"]`).click();
-    await expect(
-      a.getByRole("button", { name: "Take over", exact: true }),
-    ).toBeDisabled();
+    await expect
+      .poll(() => page.evaluate(() => window.hostTakeoverDisabledStates))
+      .toContain(true);
+    await page.evaluate(() => window.hostTakeoverObserver.disconnect());
     await expect(
       page.getByText("routing integration offline", { exact: false }),
     ).toBeVisible();
@@ -197,7 +231,10 @@ const expect = baseExpect.configure({ timeout: 30000 });
     );
     await expect(mainB).toContainText("routing-receipt.pdf");
     await expect(
-      a.getByRole("button", { name: "Take over", exact: true }),
+      a
+        .locator("[data-draft-preview]")
+        .filter({ hasText: "Shared draft survives picker takeover" })
+        .getByRole("button", { name: "Take over", exact: true }),
     ).toBeEnabled();
     assert.equal(
       (await sends()).length,
