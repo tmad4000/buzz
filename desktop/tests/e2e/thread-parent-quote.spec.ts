@@ -76,9 +76,24 @@ test("native parent quote survives folds and jumps to the highlighted parent in 
   await expect(parent).toHaveClass(/route-target-highlight-fade/);
   const panelChip = panel.getByTestId("thread-parent-quote");
   await expect(panelChip).toHaveCount(1);
+  await panel.locator(`[data-message-id="${ids.child}"]`).hover();
+  await panel.getByTestId(`reply-message-${ids.child}`).click();
+  const editor = panel.getByTestId("message-input");
+  await editor.fill("Keep the newer sidebar draft and its child target");
+  await expect(panel.getByTestId("reply-target")).toContainText(
+    "A flat child with native reply context",
+  );
+  const routeBeforeJump = page.url();
   await panelChip.focus();
   await page.keyboard.press("Enter");
   await expect(parent).toBeInViewport();
   await expect(parent).toHaveClass(/route-target-highlight-fade/);
   await expect(panel.getByTestId("sidebar-reply-context")).toHaveCount(0);
+  await expect(editor).toHaveText(
+    "Keep the newer sidebar draft and its child target",
+  );
+  await expect(panel.getByTestId("reply-target")).toContainText(
+    "A flat child with native reply context",
+  );
+  expect(page.url()).toBe(routeBeforeJump);
 });

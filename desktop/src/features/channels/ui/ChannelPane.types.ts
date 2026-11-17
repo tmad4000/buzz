@@ -106,6 +106,8 @@ export type ChannelPaneProps = {
   onCloseThread: () => void;
   /** Snapshot current auxiliary pane through its existing history owner. */
   onOpenSentReply?: (root: TimelineMessage, messageId: string) => void;
+  /** Explicit non-toggle navigation through this pane's guarded owner. */
+  onJumpToThreadMessage?: (rootId: string, messageId: string) => void;
   onCapturePanelReturn?: () => (() => boolean) | undefined;
   onDelete?: (message: TimelineMessage) => void;
   onEdit?: (message: TimelineMessage) => void;

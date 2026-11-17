@@ -6,10 +6,12 @@ export function ThreadParentQuoteChip({
   channelId,
   message,
   messages,
+  onJumpToThreadMessage,
 }: {
   channelId: string;
   message: TimelineMessage;
   messages: ReadonlyMap<string, TimelineMessage>;
+  onJumpToThreadMessage?: (rootId: string, messageId: string) => void;
 }) {
   const { goChannel } = useAppNavigation();
   const quote = threadParentQuote(message, messages, channelId);
@@ -24,6 +26,10 @@ export function ThreadParentQuoteChip({
         title={`Jump to parent: ${quote.excerpt}`}
         aria-label={`Jump to parent: ${quote.excerpt}`}
         onClick={() => {
+          if (onJumpToThreadMessage) {
+            onJumpToThreadMessage(quote.rootId, quote.parentId);
+            return;
+          }
           void goChannel(channelId, {
             messageId: quote.parentId,
             threadRootId: quote.rootId,

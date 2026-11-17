@@ -41,6 +41,7 @@ export type InlineChannelThreadProps = {
   disabled: boolean;
   isSending: boolean;
   onOpenThread: (message: TimelineMessage) => void;
+  onJumpToThreadMessage?: (rootId: string, messageId: string) => void;
   onSend: MessageComposerProps["onSend"];
   onToggleReaction?: (
     message: TimelineMessage,
@@ -244,6 +245,7 @@ function InlineThreadContent({
   disabled,
   isSending,
   onSend,
+  onJumpToThreadMessage,
   onToggleReaction,
   onRepliesRevealed,
   storageKey,
@@ -337,6 +339,7 @@ function InlineThreadContent({
               <span className="sr-only">Reply depth {message.depth}</span>
               <MessageThreadRow
                 parentMessages={thread.index.messageById}
+                onJumpToThreadMessage={onJumpToThreadMessage}
                 channelId={channel.id}
                 actionBarPlacement="inside"
                 currentPubkey={currentPubkey}
