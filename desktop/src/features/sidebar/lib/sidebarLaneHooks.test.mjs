@@ -31,7 +31,7 @@ async function harness() {
   const rtl = await import("@testing-library/react");
   const { relayClient } = await import("@/shared/api/relayClient");
   mock.method(relayClient, "fetchEvents", async (filter) => {
-    if (fx.onFetch) return fx.onFetch();
+    if (fx.onFetch) return fx.onFetch(filter);
     const head = fx.heads[filter["#d"][0]];
     if (fx.gate) {
       fx.gated = (fx.gated ?? 0) + 1; // a fetch entered the gated preflight
@@ -72,7 +72,11 @@ async function harness() {
       }
       if (cmd === "nip44_encrypt_to_self")
         return Promise.resolve(fx.holdCrypto).then(() => args.plaintext);
-      if (cmd === "nip44_decrypt_from_self") return args.ciphertext;
+      if (cmd === "nip44_decrypt_from_self") {
+        if (args.ciphertext === "unreadable")
+          throw new Error("Unreadable stars");
+        return args.ciphertext;
+      }
       if (cmd === "sign_event")
         return JSON.stringify({
           ...ev(args.tags[0][1], JSON.parse(args.content), args.createdAt),
@@ -814,6 +818,108 @@ for (const overflow of [false, true]) {
     }
     assert.equal(latest.sections.sections[0].name, "Pin");
     assert.equal(latest.sections.assignments.one, "pin");
+    cleanup();
+  });
+}
+
+for (const failure of ["fetch", "decrypt", "unsafe-absence"]) {
+  test(`Pin conversion holds on ${failure}, then preserves remote-only favorites after Retry`, async () => {
+    const { render, fireEvent, act, advance, cleanup } = await harness();
+    const React = await import("react");
+    const { useChannelStars } = await import("./useChannelStars.ts");
+    const { useChannelSections } = await import("./useChannelSections.ts");
+    const { PinConversionBanner } = await import(
+      "../ui/PinConversionBanner.tsx"
+    );
+    const { SidebarStarProvider } = await import("../ui/SidebarStars.tsx");
+    const { storageKey } = await import("./channelSectionsStorage.ts");
+    const remote = ev(
+      "channel-stars",
+      {
+        version: 1,
+        channels: { remoteOnly: { starred: true, updatedAt: 100 } },
+      },
+      100,
+    );
+    let failing = true;
+    fx.onFetch = async (filter) => {
+      if (filter["#d"][0] !== "channel-stars") return [];
+      if (!failing) return [remote];
+      if (failure === "fetch") throw new Error("preflight timeout");
+      if (failure === "decrypt") return [{ ...remote, content: "unreadable" }];
+      return [];
+    };
+    if (failure === "unsafe-absence")
+      window.localStorage.setItem(
+        `buzz-sync-watermark.v1:channel-stars:${PK}:${encodeURIComponent(RELAY)}`,
+        "100",
+      );
+    window.localStorage.setItem(
+      storageKey(PK, RELAY),
+      JSON.stringify({
+        version: 1,
+        sections: [{ id: "pin", name: "Pin", order: 0 }],
+        assignments: { converted: "pin" },
+      }),
+    );
+    let latest;
+    function Fixture() {
+      const sections = useChannelSections(PK, RELAY);
+      const stars = useChannelStars(PK, RELAY);
+      latest = sections;
+      return React.createElement(
+        SidebarStarProvider,
+        {
+          value: {
+            ids: stars.starredChannelIds,
+            star: stars.starChannel,
+            unstar: stars.unstarChannel,
+          },
+        },
+        React.createElement(PinConversionBanner, {
+          sections: sections.sections,
+          assignments: sections.assignments,
+          handled: sections.pinConversionHandled,
+          pending: sections.pendingPinConversions,
+          onConvert: sections.requestPinConversion,
+          onHandled: sections.dismissPinConversion,
+        }),
+      );
+    }
+    const view = render(React.createElement(Fixture));
+    await advance(1000);
+    await act(async () => {
+      fireEvent.click(
+        view.getByRole("button", {
+          name: "Convert Pin → Starred",
+          exact: true,
+        }),
+      );
+      for (let i = 0; i < 10; i++) await new Promise(setImmediate);
+    });
+    await advance(3000);
+    assert.equal(
+      fx.published.filter((e) => e.tags[0][1] === "channel-stars").length,
+      0,
+    );
+    assert.deepEqual(latest.pendingPinConversions.pin, ["converted"]);
+    assert.equal(latest.pinConversionHandled.pin, undefined);
+    assert.ok(view.getByRole("alert").textContent.includes("synchronization"));
+    failing = false;
+    await act(async () => {
+      fireEvent.click(
+        view.getByRole("button", { name: "Retry conversion", exact: true }),
+      );
+      for (let i = 0; i < 10; i++) await new Promise(setImmediate);
+    });
+    await advance(3000);
+    assert.equal(latest.pendingPinConversions.pin, undefined);
+    assert.equal(latest.pinConversionHandled.pin, true);
+    const published = JSON.parse(fx.heads["channel-stars"].content).channels;
+    assert.equal(published.remoteOnly.starred, true);
+    assert.equal(published.converted.starred, true);
+    assert.equal(latest.sections[0].name, "Pin");
+    assert.equal(latest.assignments.converted, "pin");
     cleanup();
   });
 }
