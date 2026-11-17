@@ -79,6 +79,7 @@ test("inline send uses captured channel/parent without mutating the side panel",
         channelId: "channel-a",
         parentEventId: "inline-parent",
         threadHeadId: "inline-root",
+        outbox: undefined,
         forceRest: true,
       },
     ]);
@@ -103,6 +104,64 @@ test("inline send uses captured channel/parent without mutating the side panel",
     );
     assert.equal(mutations[2].parentEventId, undefined);
     assert.deepEqual(panelWrites, []);
+    mutations.length = 0;
+    let accept;
+    const held = new Promise((resolve) => {
+      accept = resolve;
+    });
+    const origin = {
+      viewInstanceId: "captured-sidebar",
+      threadRootId: "side-a",
+    };
+    const outbox = {
+      attachments: [],
+      onQueued: () => {},
+      localSendOrigin: origin,
+    };
+    await act(() =>
+      root.render(
+        React.createElement(Harness, {
+          value: {
+            ...args,
+            sendMessageMutation: {
+              mutateAsync: async (input) => {
+                mutations.push(input);
+                await held;
+                return { id: "accepted-durable" };
+              },
+            },
+          },
+        }),
+      ),
+    );
+    let sending;
+    await act(async () => {
+      sending = latest.handleSendThreadReply(
+        "durable nested",
+        [],
+        undefined,
+        "channel-a",
+        { parentEventId: "side-a-child", threadHeadId: "side-a" },
+        true,
+        outbox,
+      );
+    });
+    assert.equal(mutations.length, 1);
+    assert.equal(mutations[0].outbox, outbox);
+    assert.deepEqual(
+      panelWrites,
+      [],
+      "durable admission, not pre-storage handler state, owns the reveal",
+    );
+    await act(async () => {
+      accept();
+      await sending;
+    });
+    assert.deepEqual(
+      panelWrites,
+      [],
+      "late ACK cannot override a later manual fold or selected target",
+    );
   } finally {
     await act(() => root.unmount());
     container.remove();

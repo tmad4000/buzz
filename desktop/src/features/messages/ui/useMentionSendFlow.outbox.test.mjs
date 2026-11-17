@@ -19,6 +19,10 @@ test("bound agent and files enter durable queue offline without preflight RPCs",
   s.options.mentions.revalidateMentionPubkeys = async () => {
     throw new Error("offline preflight must be deferred");
   };
+  const origin = {
+    viewInstanceId: "origin-view:capture",
+    threadRootId: "display-root",
+  };
   const delivered = deferred();
   let queued;
   s.options.onSendRef.current = async (...args) => {
@@ -30,6 +34,11 @@ test("bound agent and files enter durable queue offline without preflight RPCs",
   await s.act(async () => {
     await s.result.current.sendMessageWithMentionFlow({
       capturedChannelId: "general",
+      capturedThreadContext: {
+        parentEventId: "nested-parent",
+        threadHeadId: "canonical-root",
+        localSendOrigin: origin,
+      },
       trimmed: TEXT,
       pendingImeta: [],
       queuedAttachments: [],
@@ -39,6 +48,11 @@ test("bound agent and files enter durable queue offline without preflight RPCs",
   });
   assert.ok(queued);
   assert.deepEqual(queued.scope, s.options.outboxScope);
+  assert.deepEqual(
+    queued.localSendOrigin,
+    origin,
+    "captured display-view origin must survive mention awaits into durable submission",
+  );
   assert.ok(queued.agentPubkeys.includes(KEY));
   assert.equal(s.options.contentRef.current, "");
   assert.equal(s.events("error").length, 0);
