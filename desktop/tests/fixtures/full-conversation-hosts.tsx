@@ -63,8 +63,10 @@ const harnessWindow = window as typeof window & {
   requestPaneClose?: (paneId: string) => boolean;
   requestPaneNavigate?: (viewId: string, channelId: string) => boolean;
   dragEvents?: Record<string, unknown>[];
+  pageRegistrarEvents?: string[];
 };
 harnessWindow.hostReads = [];
+harnessWindow.pageRegistrarEvents = [];
 const community = {
   id: "split-host-test",
   name: "Split host test",
@@ -399,6 +401,10 @@ function LayoutBody() {
                       ) ?? null,
                     currentIdentity: identity,
                     headerEndActions,
+                    registerPageLeaveGuard: (guard) => {
+                      harnessWindow.pageRegistrarEvents?.push(view.id);
+                      return guards?.register(view.id, guard) ?? noop;
+                    },
                     autoSendDraftKey: channel?.id ?? null,
                     onCloseForumPost: noop,
                     onSelectForumPost: noop,
