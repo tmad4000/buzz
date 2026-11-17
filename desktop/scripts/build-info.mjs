@@ -2,8 +2,9 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-/** Capture the source revision once per build; never infer a date at runtime. */
-export function buildInfo(root, version) {
+/** Capture source provenance once per build. Explicit manifest inputs must be
+ * verified by the packager and override git/archive discovery as a pair. */
+export function buildInfo(root, version, provenance = process.env) {
   const config = JSON.parse(
     readFileSync(path.join(root, "desktop/src-tauri/tauri.conf.json"), "utf8"),
   );
@@ -11,6 +12,33 @@ export function buildInfo(root, version) {
   let commit = "";
   let commitTime = "";
   let event = "build";
+  const suppliedCommit = provenance.BUZZ_SOURCE_COMMIT;
+  const suppliedTime = provenance.BUZZ_SOURCE_COMMIT_TIME;
+  if (suppliedCommit !== undefined || suppliedTime !== undefined) {
+    if (
+      typeof suppliedCommit !== "string" ||
+      !/^[a-f0-9]{40}$/.test(suppliedCommit) ||
+      typeof suppliedTime !== "string" ||
+      !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(
+        suppliedTime,
+      ) ||
+      !Number.isFinite(Date.parse(suppliedTime)) ||
+      new Date(`${suppliedTime.slice(0, 10)}T00:00:00Z`)
+        .toISOString()
+        .slice(0, 10) !== suppliedTime.slice(0, 10)
+    ) {
+      throw new Error(
+        "BUZZ_SOURCE_COMMIT and BUZZ_SOURCE_COMMIT_TIME must be a complete verified SHA/ISO-time pair",
+      );
+    }
+    return {
+      version: version ?? config.version,
+      commit: suppliedCommit,
+      commitTime: suppliedTime,
+      buildTime,
+      event: "commit",
+    };
+  }
   try {
     const git = (...args) =>
       execFileSync("git", args, {
