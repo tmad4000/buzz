@@ -28,6 +28,23 @@ int categoryPriority(String category) {
   };
 }
 
+/// Combine sources before conversation grouping. Exact event identity wins;
+/// explicit addressed/action categories keep their existing priority.
+List<FeedItem> mergeInboxSources(
+  Iterable<FeedItem> primary,
+  Iterable<FeedItem> threads,
+) {
+  final byId = <String, FeedItem>{};
+  for (final item in [...primary, ...threads]) {
+    final previous = byId[item.id];
+    if (previous == null ||
+        categoryPriority(item.category) < categoryPriority(previous.category)) {
+      byId[item.id] = item;
+    }
+  }
+  return List.unmodifiable(byId.values);
+}
+
 /// A thread reply that is not broadcast — desktop's `isThreadReply`.
 bool isThreadReply(List<List<String>> tags) {
   return threadReferenceOf(tags).parentId != null && !isBroadcastReply(tags);

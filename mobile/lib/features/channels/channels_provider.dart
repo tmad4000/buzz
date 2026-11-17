@@ -27,6 +27,7 @@ part 'channel_directory.dart';
 part 'channel_push_cache.dart';
 part 'channel_member_snapshots.dart';
 part 'channels_provider_lifecycle.dart';
+part 'thread_interest_snapshot.dart';
 
 const _channelTypeOrder = {'stream': 0, 'forum': 1, 'dm': 2};
 const _unreadCatchUpLimit = 1000;
@@ -137,6 +138,7 @@ class ChannelsNotifier extends AsyncNotifier<List<Channel>> {
   Future<List<Channel>> build() async {
     final relayBaseUrl = ref.watch(relayConfigProvider).baseUrl;
     final pubkey = ref.watch(myPubkeyProvider)?.toLowerCase();
+    if (pubkey != null) _loadThreadInterestStores(pubkey);
     if (_memberSnapshotRelayBaseUrl != relayBaseUrl ||
         _memberSnapshotPubkey != pubkey) {
       // A cached snapshot is usable only within its relay and identity.
@@ -802,6 +804,11 @@ class ChannelsNotifier extends AsyncNotifier<List<Channel>> {
     final id = ref.rootId ?? event.id;
     if (!target.add(id)) return;
     _writeThreadInterestStores(pubkey);
+    // Self-only catch-up need not change unread/channel rows. Publish interest
+    // changes explicitly without making consumers watch channel timestamps.
+    // Container invalidation publishes to a dependent read-only projection;
+    // Ref.invalidate would assert a reverse provider dependency in Riverpod.
+    _lifecycleRef.container.invalidate(channelThreadInterestProvider);
   }
 
   void _writeThreadInterestStores(String pubkey) {
