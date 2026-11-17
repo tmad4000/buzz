@@ -184,6 +184,270 @@ test("held durable inline publish preserves queue height, anchor and real nested
   }
 });
 
+test("incoming replies above and below a scrolled reader preserve anchor, focused draft and exact caret", async ({
+  page,
+}, info) => {
+  await installMockBridge(page);
+  await page.goto("/");
+  await page.getByTestId("channel-general").click();
+  await waitForMockChannelHeadReady(
+    page,
+    "general",
+    "9a1657ac-f7aa-5db0-b632-d8bbeb6dfb50",
+  );
+  await page.keyboard.press("ControlOrMeta+,");
+  await page.getByTestId("settings-nav-appearance").click();
+  await page.getByTestId("thread-display-channels-smart").click();
+  await page.getByTestId("thread-display-replies-expanded").click();
+  await page.getByTestId("settings-back-to-app").click();
+  await page.getByTestId("channel-random").click();
+  await page.getByTestId("channel-general").click();
+  await waitForMockChannelHeadReady(
+    page,
+    "general",
+    "9a1657ac-f7aa-5db0-b632-d8bbeb6dfb50",
+  );
+  const ids = {
+    closed: "e1".repeat(32),
+    above: "e2".repeat(32),
+    anchor: "e3".repeat(32),
+    below: "e4".repeat(32),
+  };
+  await page.evaluate(
+    ({ ids, pubkey }) => {
+      const emit = window.__BUZZ_E2E_EMIT_MOCK_MESSAGE__;
+      if (!emit) throw new Error("Missing mock emitter");
+      const createdAt = Math.floor(Date.now() / 1000) + 30;
+      emit({
+        id: ids.closed,
+        content: "Quiet thread above reader",
+        pubkey,
+        createdAt,
+        channelName: "general",
+      });
+      emit({
+        id: ids.above,
+        content: "Expanded above reader",
+        pubkey,
+        createdAt: createdAt + 1,
+        channelName: "general",
+      });
+      emit({
+        id: "e5".repeat(32),
+        parentEventId: ids.above,
+        content: "Existing above reply",
+        pubkey,
+        createdAt: createdAt + 2,
+        channelName: "general",
+      });
+      for (let index = 0; index < 3; index++) {
+        emit({
+          id: (8800 + index).toString(16).padStart(64, "0"),
+          content: `Earlier spacer row ${index}`,
+          pubkey,
+          createdAt: createdAt + 3 + index,
+          channelName: "general",
+        });
+      }
+      emit({
+        id: ids.anchor,
+        content: "Reader anchor message",
+        pubkey,
+        createdAt: createdAt + 6,
+        channelName: "general",
+      });
+      for (let index = 0; index < 18; index++)
+        emit({
+          id: (9000 + index).toString(16).padStart(64, "0"),
+          content: `Middle reading row ${index}`,
+          pubkey,
+          createdAt: createdAt + 7 + index,
+          channelName: "general",
+        });
+      emit({
+        id: ids.below,
+        content: "Expanded below reader",
+        pubkey,
+        createdAt: createdAt + 25,
+        channelName: "general",
+      });
+      emit({
+        id: "e6".repeat(32),
+        parentEventId: ids.below,
+        content: "Existing below reply",
+        pubkey,
+        createdAt: createdAt + 26,
+        channelName: "general",
+      });
+      for (let index = 0; index < 17; index++)
+        emit({
+          id: (10000 + index).toString(16).padStart(64, "0"),
+          content: `Later reading row ${index}`,
+          pubkey,
+          createdAt: createdAt + 27 + index,
+          channelName: "general",
+        });
+    },
+    { ids, pubkey: TEST_IDENTITIES.bob.pubkey },
+  );
+  const timeline = page.getByTestId("message-timeline");
+  await timeline.evaluate((element) => {
+    element.scrollTop = 0;
+  });
+  const anchor = timeline.locator(
+    `[data-testid="message-row"][data-message-id="${ids.anchor}"]`,
+  );
+  await expect(anchor).toHaveCount(1);
+  await anchor.evaluate((element) => {
+    const scroller = element.closest('[data-testid="message-timeline"]');
+    if (!(scroller instanceof HTMLElement))
+      throw new Error("Missing scroll owner");
+    scroller.scrollTop +=
+      element.getBoundingClientRect().top -
+      scroller.getBoundingClientRect().top -
+      120;
+  });
+  await timeline.hover();
+  await page.mouse.wheel(0, -20);
+  const viewport = await timeline.boundingBox();
+  const aboveInline = timeline.locator(
+    `[data-testid="inline-thread"][data-thread-head-id="${ids.above}"]`,
+  );
+  const belowInline = timeline.locator(
+    `[data-testid="inline-thread"][data-thread-head-id="${ids.below}"]`,
+  );
+  await expect(aboveInline).toContainText("Existing above reply");
+  await expect(belowInline).toContainText("Existing below reply");
+  const aboveBox = await aboveInline.boundingBox();
+  const belowBox = await belowInline.boundingBox();
+  if (!viewport || !aboveBox || !belowBox)
+    throw new Error("Missing above/below reading geometry");
+  expect(aboveBox.y + aboveBox.height).toBeLessThanOrEqual(viewport.y);
+  expect(belowBox.y).toBeGreaterThanOrEqual(viewport.y + viewport.height);
+  const main = page
+    .getByTestId("message-composer")
+    .filter({ has: page.getByTestId("send-to-thread") });
+  const editor = main.getByTestId("message-input");
+  const draft = "Keep this exact draft and middle caret";
+  await editor.fill(draft);
+  await editor.evaluate((element) => {
+    element.focus();
+    const node = document
+      .createTreeWalker(element, NodeFilter.SHOW_TEXT)
+      .nextNode();
+    if (!node) throw new Error("Missing authored text node");
+    const range = document.createRange();
+    range.setStart(node, 7);
+    range.collapse(true);
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+  });
+  const readingAnchor = await timeline.evaluate((container) => {
+    const top = container.getBoundingClientRect().top;
+    const rows = [
+      ...container.querySelectorAll<HTMLElement>(
+        '[data-testid="message-row"][data-message-id]',
+      ),
+    ]
+      .filter(
+        (row) =>
+          row.getBoundingClientRect().top >= top &&
+          row.getBoundingClientRect().bottom > top,
+      )
+      .sort(
+        (a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top,
+      );
+    return rows[0]?.dataset.messageId;
+  });
+  if (!readingAnchor) throw new Error("Missing first visible reading anchor");
+  const capture = () =>
+    editor.evaluate((element, anchorId) => {
+      const row = document.querySelector(
+        `[data-testid="message-row"][data-message-id="${anchorId}"]`,
+      );
+      const scroller = row?.closest('[data-testid="message-timeline"]');
+      if (!(row instanceof HTMLElement) || !(scroller instanceof HTMLElement))
+        throw new Error("Reading anchor left the mounted window");
+      const selection = window.getSelection();
+      return {
+        top: row.getBoundingClientRect().top,
+        scrollTop: scroller.scrollTop,
+        focused: document.activeElement === element,
+        text: element.textContent,
+        anchorText: selection?.anchorNode?.textContent,
+        anchorOffset: selection?.anchorOffset,
+        focusText: selection?.focusNode?.textContent,
+        focusOffset: selection?.focusOffset,
+        collapsed: selection?.isCollapsed,
+      };
+    }, readingAnchor);
+  const before = await capture();
+  expect(before.focused).toBe(true);
+  expect(before.text).toBe(draft);
+  expect(before.anchorOffset).toBe(7);
+  expect(before.collapsed).toBe(true);
+  const snapshots = [];
+  for (const [index, parent] of [ids.above, ids.below, ids.closed].entries()) {
+    const beforeArrival = await capture();
+    await page.evaluate(
+      ({ parent, index, pubkey }) =>
+        window.__BUZZ_E2E_EMIT_MOCK_MESSAGE__?.({
+          id: (11000 + index).toString(16).padStart(64, "0"),
+          parentEventId: parent,
+          content: `Incoming scoped reply ${index}`,
+          pubkey,
+          createdAt: Math.floor(Date.now() / 1000) + 100 + index,
+          channelName: "general",
+        }),
+      { parent, index, pubkey: TEST_IDENTITIES.bob.pubkey },
+    );
+    const summary = timeline.locator(
+      `[data-testid="message-thread-summary"][data-thread-head-id="${parent}"]`,
+    );
+    await expect(summary).toHaveAttribute("data-unseen", "true");
+    await expect(summary).toContainText(
+      parent === ids.closed ? "1 reply" : "2 replies",
+    );
+    // Check visual anchoring, not raw scrollTop: height growth above may require exact compensation.
+    for (let frame = 0; frame < 12; frame++) {
+      await page.evaluate(
+        () =>
+          new Promise<void>((resolve) =>
+            requestAnimationFrame(() => resolve()),
+          ),
+      );
+      const current = await capture();
+      snapshots.push({ parent, ...current });
+      expect(Math.abs(current.top - before.top)).toBeLessThanOrEqual(1);
+      if (parent !== ids.above) {
+        expect(
+          Math.abs(current.scrollTop - beforeArrival.scrollTop),
+        ).toBeLessThanOrEqual(1);
+      }
+      expect({
+        ...current,
+        top: before.top,
+        scrollTop: before.scrollTop,
+      }).toEqual(before);
+    }
+  }
+  const closedSummary = timeline.locator(
+    `[data-testid="message-thread-summary"][data-thread-head-id="${ids.closed}"]`,
+  );
+  await expect(closedSummary).toHaveAttribute("aria-expanded", "false");
+  await expect(closedSummary).toContainText("1 new");
+  await expect(
+    timeline.locator(
+      `[data-testid="inline-thread"][data-thread-head-id="${ids.closed}"]`,
+    ),
+  ).toHaveCount(0);
+  await info.attach("incoming-reader-anchor-and-selection", {
+    body: JSON.stringify({ before, snapshots }),
+    contentType: "application/json",
+  });
+});
+
 test("inline replies, scoped sends, saved expansion and side panel coexist", async ({
   page,
 }) => {
