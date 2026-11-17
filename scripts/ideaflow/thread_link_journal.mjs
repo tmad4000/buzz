@@ -6,7 +6,7 @@ import { isHex, ensure, fail } from "./thread_link_common.mjs";
 import { privateBytes } from "./thread_link_transport.mjs";
 
 function privateDirectory(directory, create = false) {
-  if (create) fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
+  if (create) durablePrivateDirectories(directory);
   const stat = fs.lstatSync(directory);
   ensure(
     stat.isDirectory() &&
@@ -27,6 +27,39 @@ function syncDirectory(directory) {
     fs.fsyncSync(fd);
   } finally {
     fs.closeSync(fd);
+  }
+}
+
+// Persist every newly created directory entry before any journal callback can run.
+function durablePrivateDirectories(directory) {
+  const missing = [];
+  let anchor = path.resolve(directory);
+  for (;;) {
+    try {
+      const stat = fs.lstatSync(anchor);
+      ensure(
+        stat.isDirectory() &&
+          !stat.isSymbolicLink() &&
+          fs.realpathSync(anchor) === anchor,
+        "journal-directory-policy",
+      );
+      break;
+    } catch (error) {
+      if (error?.code !== "ENOENT") throw error;
+      missing.push(anchor);
+      const parent = path.dirname(anchor);
+      ensure(parent !== anchor, "journal-directory-policy");
+      anchor = parent;
+    }
+  }
+  if (missing.length === 0) privateDirectory(anchor);
+  // A previous mkdir may have succeeded just before its parent fsync failed.
+  // Retry must persist that existing anchor too, rather than assume durability.
+  syncDirectory(path.dirname(anchor));
+  for (const created of missing.reverse()) {
+    fs.mkdirSync(created, { mode: 0o700 });
+    privateDirectory(created);
+    syncDirectory(path.dirname(created));
   }
 }
 

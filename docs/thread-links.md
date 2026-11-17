@@ -173,7 +173,10 @@ facts and always reports `uiVerified: false`; publisher success proves no UI wor
 
 The private journal lives at `~/.local/state/buzz-thread-links/PLAN_SHA256`.
 Its directory is 0700 and journal files are 0600. A global writer lock serializes
-plans. Before any POST, an atomically renamed, file-and-directory-fsynced journal
+plans. Each missing journal directory/ancestor is created one level at a time,
+with its containing parent fsynced before proceeding; a sync failure prevents
+the callback/submission, and retry re-syncs an existing anchor left by failure.
+Before any POST, an atomically renamed, file-and-directory-fsynced journal
 contains the exact reviewed plan bytes and **all** exact signed annotation bytes
 and IDs. A second durable marker records the particular attempt before POST.
 Original message bodies are never journaled. Preserve this journal after errors.

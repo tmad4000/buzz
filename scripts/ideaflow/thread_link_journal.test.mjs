@@ -290,3 +290,148 @@ test("an uncertain journal cannot adopt newly signed bytes even when its old ID 
   );
   assert.equal(setup.submissions.length, 1);
 });
+
+// Observe the actual filesystem boundary used by journalStore, not an injected store.
+test("fresh journal ancestors are durably linked before callback and POST", async (t) => {
+  const setup = world();
+  const current = await snapshot(setup.client, setup.channel);
+  const plan = buildPlan(
+    setup.client,
+    current,
+    [
+      {
+        operation: "link",
+        childEventId: setup.child.id,
+        parentEventId: setup.root.id,
+      },
+    ],
+    FINGERPRINT,
+  );
+  const bytes = planBytes(plan),
+    digest = hash(bytes);
+  const base = temporary(t),
+    root = path.join(base, "new-local", "new-state", "thread-links");
+  const events = [];
+  const mkdir = fs.mkdirSync,
+    fsync = fs.fsyncSync;
+  t.mock.method(fs, "mkdirSync", (name, options) => {
+    const result = mkdir(name, options);
+    events.push({ kind: "mkdir", name: path.resolve(name) });
+    return result;
+  });
+  t.mock.method(fs, "fsyncSync", (fd) => {
+    const name = fs.readlinkSync(`/proc/self/fd/${fd}`);
+    fsync(fd);
+    if (fs.fstatSync(fd).isDirectory()) events.push({ kind: "sync", name });
+  });
+  const expected = [
+    path.join(base, "new-local"),
+    path.join(base, "new-local", "new-state"),
+    root,
+    path.join(root, digest),
+  ];
+  const check = () => {
+    for (const name of expected) {
+      const created = events.findIndex(
+        (event) => event.kind === "mkdir" && event.name === name,
+      );
+      assert.ok(created >= 0, `missing mkdir for ${name}`);
+      const nextMkdir = events.findIndex(
+        (event, index) => index > created && event.kind === "mkdir",
+      );
+      const synced = events.findIndex(
+        (event, index) =>
+          index > created &&
+          event.kind === "sync" &&
+          event.name === path.dirname(name),
+      );
+      assert.ok(
+        synced > created && (nextMkdir < 0 || synced < nextMkdir),
+        `parent was not fsynced immediately after mkdir for ${name}`,
+      );
+    }
+  };
+  const actual = journalStore(root);
+  const store = {
+    ...actual,
+    lock: (id, callback) =>
+      actual.lock(id, (locked) => {
+        check();
+        return callback(locked);
+      }),
+  };
+  setup.hooks.beforePost = check;
+  const result = await applyPlan({
+    client: setup.client,
+    store,
+    bytes,
+    expectedDigest: digest,
+    fingerprint: () => FINGERPRINT,
+  });
+  assert.equal(result.operations[0].state, "verified");
+  assert.equal(setup.submissions.length, 1);
+});
+
+test("directory parent fsync failure prevents callback and POST; retry persists the existing anchor", async (t) => {
+  const setup = world();
+  const current = await snapshot(setup.client, setup.channel);
+  const plan = buildPlan(
+    setup.client,
+    current,
+    [
+      {
+        operation: "link",
+        childEventId: setup.child.id,
+        parentEventId: setup.root.id,
+      },
+    ],
+    FINGERPRINT,
+  );
+  const bytes = planBytes(plan),
+    digest = hash(bytes);
+  const base = temporary(t),
+    root = path.join(base, "new-local", "new-state", "thread-links");
+  const fsync = fs.fsyncSync;
+  let inject = true,
+    callbacks = 0,
+    recoveredAnchor = false;
+  t.mock.method(fs, "fsyncSync", (fd) => {
+    const directory = fs.readlinkSync(`/proc/self/fd/${fd}`);
+    if (directory === path.dirname(root) && fs.existsSync(root)) {
+      if (inject) {
+        const error = new Error("synthetic parent fsync failure");
+        error.code = "EIO";
+        throw error;
+      }
+      recoveredAnchor = true;
+    }
+    return fsync(fd);
+  });
+  const actual = journalStore(root);
+  const store = {
+    ...actual,
+    lock: (id, callback) =>
+      actual.lock(id, (locked) => {
+        callbacks++;
+        assert.equal(recoveredAnchor, true);
+        return callback(locked);
+      }),
+  };
+  const invoke = () =>
+    applyPlan({
+      client: setup.client,
+      store,
+      bytes,
+      expectedDigest: digest,
+      fingerprint: () => FINGERPRINT,
+    });
+  await assert.rejects(invoke(), (error) => error.code === "EIO");
+  assert.equal(callbacks, 0);
+  assert.equal(setup.submissions.length, 0);
+  assert.equal(fs.existsSync(root), true);
+  inject = false;
+  const result = await invoke();
+  assert.equal(callbacks, 1);
+  assert.equal(result.operations[0].state, "verified");
+  assert.equal(setup.submissions.length, 1);
+});
