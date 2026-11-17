@@ -8,6 +8,10 @@ import { useTerminalContext } from "@/app/useTerminalContext";
 import { AppShellProvider } from "@/app/AppShellContext";
 import { AppShellOverlays, TerminalBootstrap } from "@/app/AppShellOverlays";
 import { AppShellChannelSurface } from "@/app/AppShellChannelSurface";
+import {
+  AppConversationWorkspace,
+  type AppConversationNavigation,
+} from "@/app/AppConversationWorkspace";
 import { AppHuddleShell } from "@/app/AppHuddleShell";
 import { AppTopChrome } from "@/app/AppTopChrome";
 import {
@@ -142,6 +146,9 @@ export function AppShell() {
   const [isCreateChannelOpen, setIsCreateChannelOpen] = React.useState(false);
   const [isSendFeedbackOpen, setIsSendFeedbackOpen] = React.useState(false);
   const mainInsetRef = React.useRef<HTMLElement>(null);
+  const workspaceNavigationRef = React.useRef<AppConversationNavigation | null>(
+    null,
+  );
   const location = useLocation();
   const queryClient = useQueryClient();
   useManagedAgentRuntimeReconciliation(communitiesHook.communities); // sync storage snapshot
@@ -337,8 +344,31 @@ export function AppShell() {
   ]);
   const [terminalContextOverride, setTerminalContextOverride] =
     React.useState<TerminalContextOverride | null>(null);
+  const workspaceScope = JSON.stringify([
+    communitiesHook.activeCommunity?.id,
+    communitiesHook.activeCommunity?.relayUrl,
+    identityQuery.data?.pubkey,
+    communitiesHook.reinitKey,
+  ]);
+  const [workspaceFocus, setWorkspaceFocus] = React.useState<{
+    scope: string;
+    channelId: string | null;
+  } | null>(null);
+  const handleWorkspaceFocus = React.useCallback(
+    (channelId: string | null) =>
+      setWorkspaceFocus((previous) =>
+        previous?.scope === workspaceScope && previous.channelId === channelId
+          ? previous
+          : { scope: workspaceScope, channelId },
+      ),
+    [workspaceScope],
+  );
+  const focusedChannelId =
+    selectedView === "channel" && workspaceFocus?.scope === workspaceScope
+      ? (workspaceFocus.channelId ?? selectedChannelId)
+      : selectedChannelId;
   const { activeChannel, terminalContext } = useTerminalContext({
-    channelId: selectedChannelId,
+    channelId: focusedChannelId,
     channels,
     locationSearch: location.search,
     pubkey: identityQuery.data?.pubkey,
@@ -846,138 +876,178 @@ export function AppShell() {
                         />
                       </React.Suspense>
                     </div>
-                  ) : (
-                    <div className="relative flex min-h-0 flex-1 overflow-visible">
-                      {!isHuddleRoom ? (
-                        <AppSidebar
-                          activeCommunity={communitiesHook.activeCommunity}
-                          channels={sidebarChannels}
-                          currentPubkey={identityQuery.data?.pubkey}
-                          errorMessage={channelsErrorMessage}
-                          fallbackDisplayName={identityQuery.data?.displayName}
-                          homeBadgeCount={homeBadgeCount + dueReminderBadge}
-                          addCommunityPrefill={addCommunityDialog.prefill}
-                          isAddCommunityOpen={addCommunityDialog.open}
-                          relayConnectionCard={relayConnectionCard}
-                          isCreatingChannel={createChannelMutation.isPending}
-                          isCreatingForum={createForumMutation.isPending}
-                          isLoading={channelsQuery.isLoading}
-                          isCreateChannelOpen={isCreateChannelOpen}
-                          isHuddleCompanionOpen={isHuddleCompanionOpen}
-                          isPresencePending={presenceSession.isPending}
-                          onAddCommunity={(community) => {
-                            const id = communitiesHook.addCommunity({
-                              ...community,
-                              pubkey:
-                                community.pubkey ?? identityQuery.data?.pubkey,
+                  ) : null}
+                  <div
+                    className="relative flex min-h-0 flex-1 overflow-visible"
+                    style={
+                      settingsOpen
+                        ? {
+                            position: "absolute",
+                            inset: 0,
+                            visibility: "hidden",
+                            pointerEvents: "none",
+                          }
+                        : undefined
+                    }
+                    aria-hidden={settingsOpen || undefined}
+                    inert={settingsOpen ? true : undefined}
+                  >
+                    {!isHuddleRoom ? (
+                      <AppSidebar
+                        activeCommunity={communitiesHook.activeCommunity}
+                        channels={sidebarChannels}
+                        currentPubkey={identityQuery.data?.pubkey}
+                        errorMessage={channelsErrorMessage}
+                        fallbackDisplayName={identityQuery.data?.displayName}
+                        homeBadgeCount={homeBadgeCount + dueReminderBadge}
+                        addCommunityPrefill={addCommunityDialog.prefill}
+                        isAddCommunityOpen={addCommunityDialog.open}
+                        relayConnectionCard={relayConnectionCard}
+                        isCreatingChannel={createChannelMutation.isPending}
+                        isCreatingForum={createForumMutation.isPending}
+                        isLoading={channelsQuery.isLoading}
+                        isCreateChannelOpen={isCreateChannelOpen}
+                        isHuddleCompanionOpen={isHuddleCompanionOpen}
+                        isPresencePending={presenceSession.isPending}
+                        onAddCommunity={(community) => {
+                          const id = communitiesHook.addCommunity({
+                            ...community,
+                            pubkey:
+                              community.pubkey ?? identityQuery.data?.pubkey,
+                          });
+                          handleSwitchCommunity(id);
+                        }}
+                        onAddCommunityOpenChange={
+                          addCommunityDialog.onOpenChange
+                        }
+                        onNewMessage={goNewMessage}
+                        onBackgroundClick={requestFocusedThreadClose}
+                        onCreateChannelOpenChange={setIsCreateChannelOpen}
+                        onOpenAddCommunity={addCommunityDialog.openDialog}
+                        onSendFeedback={() => setIsSendFeedbackOpen(true)}
+                        onUpdateCommunity={communitiesHook.updateCommunity}
+                        onLeaveCommunity={handleLeaveCommunity}
+                        onRemoveCommunityFromDevice={removeFromDevice}
+                        onSwitchCommunity={handleSwitchCommunity}
+                        onCreateAgent={() => requestOpenCreateAgent()}
+                        selfPresenceStatus={presenceSession.currentStatus}
+                        communities={communitiesHook.communities}
+                        onCreateChannel={handleCreateChannel}
+                        onCreateForum={handleCreateForum}
+                        onHideDm={handleHideDm}
+                        onHuddleEnded={handleHuddleEnded}
+                        onMarkAllChannelsRead={markAllChannelsRead}
+                        onMarkChannelRead={markChannelRead}
+                        onMarkChannelUnread={markChannelUnread}
+                        onBrowseChannels={handleOpenBrowseChannels}
+                        onOpenDm={async ({ pubkeys }) => {
+                          const directMessage =
+                            await openDmMutation.mutateAsync({
+                              pubkeys,
                             });
-                            handleSwitchCommunity(id);
-                          }}
-                          onAddCommunityOpenChange={
-                            addCommunityDialog.onOpenChange
-                          }
-                          onNewMessage={goNewMessage}
-                          onBackgroundClick={requestFocusedThreadClose}
-                          onCreateChannelOpenChange={setIsCreateChannelOpen}
-                          onOpenAddCommunity={addCommunityDialog.openDialog}
-                          onSendFeedback={() => setIsSendFeedbackOpen(true)}
-                          onUpdateCommunity={communitiesHook.updateCommunity}
-                          onLeaveCommunity={handleLeaveCommunity}
-                          onRemoveCommunityFromDevice={removeFromDevice}
-                          onSwitchCommunity={handleSwitchCommunity}
-                          onCreateAgent={() => requestOpenCreateAgent()}
-                          selfPresenceStatus={presenceSession.currentStatus}
-                          communities={communitiesHook.communities}
-                          onCreateChannel={handleCreateChannel}
-                          onCreateForum={handleCreateForum}
-                          onHideDm={handleHideDm}
-                          onHuddleEnded={handleHuddleEnded}
-                          onMarkAllChannelsRead={markAllChannelsRead}
-                          onMarkChannelRead={markChannelRead}
-                          onMarkChannelUnread={markChannelUnread}
-                          onBrowseChannels={handleOpenBrowseChannels}
-                          onOpenDm={async ({ pubkeys }) => {
-                            const directMessage =
-                              await openDmMutation.mutateAsync({
-                                pubkeys,
-                              });
-                            await goChannel(directMessage.id);
-                          }}
-                          onSelectAgents={() => void goAgents()}
-                          onSelectChannel={handleSidebarChannelSelect}
-                          onOpenSearchResult={handleOpenSearchResult}
-                          searchChannels={channels}
-                          searchFocusRequests={[
-                            searchFocusRequest,
-                            scopeSearchFocusRequest,
-                          ]}
-                          onSelectHome={() => void goHome()}
-                          onSelectProjects={() => void goProjects()}
-                          onSelectPulse={() => void goPulse()}
-                          onSelectSettings={handleOpenSettings}
-                          onSelectWorkflows={() => void goWorkflows()}
-                          onSetPresenceStatus={(status) =>
-                            presenceSession.setStatus(status)
-                          }
-                          onSetUserStatus={setUserStatusMutation.mutate}
-                          onClearUserStatus={() =>
-                            setUserStatusMutation.mutate({
-                              text: "",
-                              emoji: "",
-                            })
-                          }
-                          profile={profileQuery.data}
-                          projectsOverviewActive={
-                            location.pathname === "/projects"
-                          }
-                          selfUserStatus={
-                            deferredPubkey
-                              ? (visibleUserStatus(
-                                  selfStatusQuery.data?.[
-                                    deferredPubkey.toLowerCase()
-                                  ],
-                                ) ?? undefined)
-                              : undefined
-                          }
-                          selectedChannelId={selectedChannelId}
-                          selectedView={selectedView}
-                          unreadChannelIds={unreadChannelIds}
-                          {...{ highPriorityUnreadChannelIds }}
-                          previewActivityChannelIds={unreadThreadChannelIds}
-                          unreadChannelCounts={unreadChannelCounts}
-                          mutedChannelIds={mutedChannelIds}
-                          onMuteChannel={muteChannel}
-                          onUnmuteChannel={unmuteChannel}
-                          starredChannelIds={starredChannelIds}
-                          onStarChannel={starChannel}
-                          onUnstarChannel={unstarChannel}
-                        />
-                      ) : null}
-                      <TerminalContextOverrideProvider
-                        onChange={setTerminalContextOverride}
+                          await goChannel(directMessage.id);
+                        }}
+                        onSelectAgents={() => void goAgents()}
+                        onSelectChannel={(channelId) => {
+                          if (
+                            !workspaceNavigationRef.current?.selectChannel(
+                              channelId,
+                            )
+                          )
+                            handleSidebarChannelSelect(channelId);
+                        }}
+                        onOpenSearchResult={handleOpenSearchResult}
+                        searchChannels={channels}
+                        searchFocusRequests={[
+                          searchFocusRequest,
+                          scopeSearchFocusRequest,
+                        ]}
+                        onSelectHome={() => void goHome()}
+                        onSelectProjects={() => void goProjects()}
+                        onSelectPulse={() => void goPulse()}
+                        onSelectSettings={handleOpenSettings}
+                        onSelectWorkflows={() => void goWorkflows()}
+                        onSetPresenceStatus={(status) =>
+                          presenceSession.setStatus(status)
+                        }
+                        onSetUserStatus={setUserStatusMutation.mutate}
+                        onClearUserStatus={() =>
+                          setUserStatusMutation.mutate({
+                            text: "",
+                            emoji: "",
+                          })
+                        }
+                        profile={profileQuery.data}
+                        projectsOverviewActive={
+                          location.pathname === "/projects"
+                        }
+                        selfUserStatus={
+                          deferredPubkey
+                            ? (visibleUserStatus(
+                                selfStatusQuery.data?.[
+                                  deferredPubkey.toLowerCase()
+                                ],
+                              ) ?? undefined)
+                            : undefined
+                        }
+                        selectedChannelId={focusedChannelId}
+                        selectedView={selectedView}
+                        unreadChannelIds={unreadChannelIds}
+                        {...{ highPriorityUnreadChannelIds }}
+                        previewActivityChannelIds={unreadThreadChannelIds}
+                        unreadChannelCounts={unreadChannelCounts}
+                        mutedChannelIds={mutedChannelIds}
+                        onMuteChannel={muteChannel}
+                        onUnmuteChannel={unmuteChannel}
+                        starredChannelIds={starredChannelIds}
+                        onStarChannel={starChannel}
+                        onUnstarChannel={unstarChannel}
+                      />
+                    ) : null}
+                    <TerminalContextOverrideProvider
+                      onChange={setTerminalContextOverride}
+                    >
+                      <AppShellChannelSurface
+                        hasCommunityRail={hasCommunityRail}
+                        isHuddleRoom={isHuddleRoom}
+                        isHuddleRoomStarting={isHuddleRoomStarting}
+                        mainInsetRef={mainInsetRef}
+                        terminal={
+                          <TerminalBootstrap {...effectiveTerminalContext} />
+                        }
                       >
-                        <AppShellChannelSurface
-                          hasCommunityRail={hasCommunityRail}
-                          isHuddleRoom={isHuddleRoom}
-                          isHuddleRoomStarting={isHuddleRoomStarting}
-                          mainInsetRef={mainInsetRef}
-                          terminal={
-                            <TerminalBootstrap {...effectiveTerminalContext} />
+                        <AppConversationWorkspace
+                          community={communitiesHook.activeCommunity ?? null}
+                          scopeEpoch={communitiesHook.reinitKey}
+                          pubkey={identityQuery.data?.pubkey ?? null}
+                          channels={channels}
+                          membershipReady={
+                            identityQuery.isSuccess &&
+                            channelsQuery.dataUpdatedAt > 0
                           }
+                          excludedChannelIds={huddleBackingChannelIds}
+                          selectedChannelId={selectedChannelId}
+                          channelSurfaceActive={
+                            !settingsOpen &&
+                            !isHuddleRoom &&
+                            selectedView === "channel"
+                          }
+                          onFocusedChannelChange={handleWorkspaceFocus}
+                          navigationRef={workspaceNavigationRef}
                         >
-                          <Outlet />
-                        </AppShellChannelSurface>
-                      </TerminalContextOverrideProvider>
-                      {!isHuddleRoom ? (
-                        <RelayConnectionOverlay
-                          card={relayConnectionCard}
-                          errorMessage={channelsErrorMessage}
-                          hasCommunityRail={hasCommunityRail}
-                          isHuddleDrawerOpen={isHuddleDrawerOpen}
-                        />
-                      ) : null}
-                    </div>
-                  )}
+                          {settingsOpen ? null : <Outlet />}
+                        </AppConversationWorkspace>
+                      </AppShellChannelSurface>
+                    </TerminalContextOverrideProvider>
+                    {!isHuddleRoom ? (
+                      <RelayConnectionOverlay
+                        card={relayConnectionCard}
+                        errorMessage={channelsErrorMessage}
+                        hasCommunityRail={hasCommunityRail}
+                        isHuddleDrawerOpen={isHuddleDrawerOpen}
+                      />
+                    ) : null}
+                  </div>
                   <RequestedAgentCreateDialogs />
                   <AgentManagementDialogs />
                   <AppShellOverlays
