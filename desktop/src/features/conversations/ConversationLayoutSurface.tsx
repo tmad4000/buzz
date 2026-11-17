@@ -108,6 +108,7 @@ export function ConversationLayoutSurface({
     if (
       !host ||
       host.hidden ||
+      host.closest('[hidden], [inert], [aria-hidden="true"]') !== null ||
       host.dataset.layoutFocused !== "true" ||
       document.visibilityState !== "visible" ||
       !document.hasFocus()

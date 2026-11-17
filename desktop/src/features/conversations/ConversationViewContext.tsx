@@ -4,6 +4,8 @@ export type ConversationViewAdmission = {
   viewInstanceId: string;
   focused: boolean;
   visible: boolean;
+  /** Workspace-level activity; independent of which sibling currently has focus. */
+  interactive?: boolean;
   rootRef?: React.RefObject<HTMLElement | null>;
   contentWidthPx?: number;
 };
