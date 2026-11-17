@@ -244,6 +244,11 @@ test("explicit keyboard routing, cancel and new-message fallback preserve inline
   expect(
     await page.evaluate(() => window.__BUZZ_E2E_HOLD_OUTBOX_PUBLISH__?.(false)),
   ).toBe(1);
+  await expect.poll(count).toBe(before + 2);
+  const acceptedAnnouncement = (await published(page)).slice(before)[1];
+  await expect(
+    announcement.locator("xpath=ancestor::*[@data-message-id][1]"),
+  ).toHaveAttribute("data-message-id", acceptedAnnouncement.id);
   await expect(queuedAnnouncement).toHaveCount(0);
   await expect(announcement).toHaveCount(1);
   await expect(announcement).toBeVisible();
