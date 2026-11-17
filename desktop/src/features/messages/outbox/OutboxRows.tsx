@@ -22,22 +22,24 @@ function PendingMessage({ row }: { row: OutboxRecord }) {
   const percentage = Math.round(fraction * 100);
   return (
     <article
-      className="rounded-xl border bg-muted/30 px-3 py-2 text-sm"
+      className={`flex shrink-0 flex-col rounded-xl border bg-muted/30 px-3 py-2 text-sm ${editing ? "min-h-32" : "h-32 overflow-hidden"}`}
       aria-label="Queued message"
       data-outbox-id={row.id}
     >
       {editing ? (
         <OutboxEditor row={row} onClose={() => setEditing(false)} />
       ) : (
-        <p className="whitespace-pre-wrap break-words">{row.message.content}</p>
+        <p className="min-h-0 flex-1 overflow-y-auto whitespace-pre-wrap break-words">
+          {row.message.content}
+        </p>
       )}
       {row.attachments.length > 0 ? (
-        <p className="mt-1 text-xs text-muted-foreground">
+        <p className="mt-1 shrink-0 truncate text-xs text-muted-foreground">
           {row.attachments.map((attachment) => attachment.name).join(", ")}
         </p>
       ) : null}
       <div
-        className="mt-1 flex items-center gap-2 text-xs text-muted-foreground"
+        className="mt-1 flex h-5 shrink-0 items-center gap-2 text-xs text-muted-foreground"
         role="status"
       >
         {row.state === "sending" && row.attachments.length > 0 ? (
@@ -73,7 +75,7 @@ function PendingMessage({ row }: { row: OutboxRecord }) {
             />
           </svg>
         ) : null}
-        <span>
+        <span className="shrink-0 whitespace-nowrap">
           {row.accepted
             ? "Sent · Agent start pending"
             : row.state === "editing"
@@ -90,41 +92,43 @@ function PendingMessage({ row }: { row: OutboxRecord }) {
           </span>
         ) : null}
       </div>
-      {row.state !== "sending" && !editing ? (
-        <div className="mt-2 flex gap-3 text-xs">
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => void run(() => retryOutbox(row.id))}
-          >
-            Retry
-          </button>
-          <button
-            type="button"
-            disabled={busy || row.deliveryUncertain || row.accepted}
-            title={
-              row.deliveryUncertain
-                ? "Retry to confirm delivery before editing"
-                : undefined
-            }
-            onClick={() =>
-              void run(async () => {
-                await prepareOutboxEditor(row.id);
-                setEditing(true);
-              })
-            }
-          >
-            Edit
-          </button>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => void run(() => deleteOutbox(row.id))}
-          >
-            Delete
-          </button>
-        </div>
-      ) : null}
+      <div className="mt-2 flex h-6 shrink-0 gap-3 text-xs">
+        {row.state !== "sending" && !editing ? (
+          <>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void run(() => retryOutbox(row.id))}
+            >
+              Retry
+            </button>
+            <button
+              type="button"
+              disabled={busy || row.deliveryUncertain || row.accepted}
+              title={
+                row.deliveryUncertain
+                  ? "Retry to confirm delivery before editing"
+                  : undefined
+              }
+              onClick={() =>
+                void run(async () => {
+                  await prepareOutboxEditor(row.id);
+                  setEditing(true);
+                })
+              }
+            >
+              Edit
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void run(() => deleteOutbox(row.id))}
+            >
+              Delete
+            </button>
+          </>
+        ) : null}
+      </div>
     </article>
   );
 }

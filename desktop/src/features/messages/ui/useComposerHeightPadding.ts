@@ -58,14 +58,8 @@ export function useComposerHeightPadding(
     const isNearBottom = (): boolean => {
       const target = getScrollElement();
       const threshold = 32;
-      const trailingClearance =
-        mode === "css-variable" ? (lastPadding ?? 0) : 0;
       return (
-        target.scrollHeight -
-          target.scrollTop -
-          target.clientHeight -
-          trailingClearance <
-        threshold
+        target.scrollHeight - target.scrollTop - target.clientHeight < threshold
       );
     };
 
@@ -94,7 +88,11 @@ export function useComposerHeightPadding(
       lastPadding = padding;
 
       if (wasAtBottom && previousPadding !== padding) {
-        if (settleAtBottomRef.current?.()) {
+        if (settleAtBottomRef.current) {
+          // The semantic owner may deliberately preserve a reading position.
+          // A false result is not permission for the physical fallback to
+          // override it (the virtual list already includes its bottom spacer).
+          settleAtBottomRef.current();
           return;
         }
         if (
