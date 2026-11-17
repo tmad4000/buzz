@@ -1,5 +1,5 @@
 type RouteView = { id: string; channelId: string };
-type RouteIntent =
+export type ConversationRouteIntent =
   | { kind: "sidebar" }
   | { kind: "external"; channelId: string }
   | { kind: "history"; viewInstanceId: string | null };
@@ -17,7 +17,7 @@ export function selectConversationRouteTarget({
   visibleViewIds: ReadonlySet<string>;
   /** Most recently focused first; IDs retired from the layout are ignored. */
   recentViewIds: readonly string[];
-  intent: RouteIntent;
+  intent: ConversationRouteIntent;
 }): string | null {
   const live = new Map(views.map((view) => [view.id, view]));
   const active = live.has(focusedViewId) ? focusedViewId : null;
