@@ -118,3 +118,33 @@ export function updateExplicitExpansion(
   entries.set(key, [...branches]);
   return copyExplicitExpansion({ ...next, entries: [...entries] });
 }
+
+/** Snapshot keys omit view identity; change notifications retain it for sibling isolation. */
+export function canonicalExplicitExpansionKey(
+  key: string,
+  viewId: string,
+): string | null {
+  if (key.length > 2048 || !viewId.length || viewId.length > 256) return null;
+  const inline = key.endsWith(":inline");
+  const raw = inline ? key.slice(0, -7) : key;
+  const prefix = "buzz-thread-expansion.v2:";
+  if (!raw.startsWith(prefix)) return null;
+  try {
+    const tuple: unknown = JSON.parse(raw.slice(prefix.length));
+    if (
+      !Array.isArray(tuple) ||
+      tuple.length !== 5 ||
+      tuple[4] !== viewId ||
+      !tuple
+        .slice(0, 2)
+        .every((value) => value === null || typeof value === "string") ||
+      !tuple
+        .slice(2)
+        .every((value) => typeof value === "string" && value.length > 0)
+    )
+      return null;
+    return `buzz-thread-expansion.v1:${JSON.stringify(tuple.slice(0, 4))}${inline ? ":inline" : ""}`;
+  } catch {
+    return null;
+  }
+}

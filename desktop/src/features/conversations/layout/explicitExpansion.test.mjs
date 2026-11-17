@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   copyExplicitExpansion,
+  canonicalExplicitExpansionKey,
   seedExplicitExpansion,
   explicitBranches,
   updateExplicitExpansion,
@@ -111,4 +112,26 @@ test("snapshot rejects automatic/command state, duplicate keys and unbounded inp
     assert.equal(isExplicitExpansionSnapshot(source), false);
     assert.throws(() => copyExplicitExpansion(source), RangeError);
   }
+});
+
+test("canonical snapshot keys copy across views but scoped event keys reject siblings", () => {
+  const a =
+    'buzz-thread-expansion.v2:["community","identity","channel","root","a"]';
+  const b =
+    'buzz-thread-expansion.v2:["community","identity","channel","root","b"]';
+  const expected =
+    'buzz-thread-expansion.v1:["community","identity","channel","root"]';
+  assert.equal(canonicalExplicitExpansionKey(a, "a"), expected);
+  assert.equal(canonicalExplicitExpansionKey(b, "b"), expected);
+  assert.equal(
+    canonicalExplicitExpansionKey(`${a}:inline`, "a"),
+    `${expected}:inline`,
+  );
+  for (const key of [
+    b,
+    expected,
+    "invalid",
+    'buzz-thread-expansion.v2:[0,1,2,3,"a"]',
+  ])
+    assert.equal(canonicalExplicitExpansionKey(key, "a"), null);
 });

@@ -1,3 +1,5 @@
+import { ThreadExpansionScopeProvider } from "@/features/messages/ui/ThreadExpansionScope";
+import type { ExplicitExpansionSnapshot } from "./layout/explicitExpansion";
 import {
   ChannelModeScopeProvider,
   type ChannelViewMode,
@@ -27,6 +29,9 @@ export type ConversationViewHostProps = {
   label: string;
   initialPanelState?: HistorySearchValues;
   presentationVisitKey?: string;
+  initialExplicitExpansion?: ExplicitExpansionSnapshot;
+  seedLegacyExpansions?: boolean;
+  onExplicitExpansionChange?: (snapshot: ExplicitExpansionSnapshot) => boolean;
   initialTimelineMode?: ChannelViewMode;
   onTimelineModeChange?: (mode: ChannelViewMode) => void;
   initialThreadViewMode?: ThreadViewMode;
@@ -46,6 +51,9 @@ export function ConversationViewHost({
   label,
   initialPanelState,
   presentationVisitKey,
+  initialExplicitExpansion,
+  seedLegacyExpansions,
+  onExplicitExpansionChange,
   initialTimelineMode,
   onTimelineModeChange,
   initialThreadViewMode,
@@ -107,7 +115,16 @@ export function ConversationViewHost({
                   initialMode={initialTimelineMode}
                   onChange={onTimelineModeChange}
                 >
-                  <ChannelScreen {...channel} />
+                  <ThreadExpansionScopeProvider
+                    viewId={viewInstanceId}
+                    channelId={channel.activeChannel?.id ?? null}
+                    currentPubkey={channel.currentIdentity?.pubkey}
+                    initialSnapshot={initialExplicitExpansion}
+                    seedLegacy={seedLegacyExpansions}
+                    onChange={onExplicitExpansionChange}
+                  >
+                    <ChannelScreen {...channel} />
+                  </ThreadExpansionScopeProvider>
                 </ChannelModeScopeProvider>
               </HistorySearchScopeProvider>
             </ThreadPanelWidthScopeProvider>

@@ -31,6 +31,7 @@ export const conversationViewSchema = z
     id: identifier,
     channelId: identifier,
     panelState: z.object(panelShape).strict(),
+    legacyExpansionOwner: z.boolean().optional(),
     explicitExpansion: z
       .custom<ExplicitExpansionSnapshot>(isExplicitExpansionSnapshot)
       .optional(),
@@ -110,6 +111,12 @@ export function validateLayout(
   const parsed = schema.safeParse(input);
   if (!parsed.success) return null;
   const layout = parsed.data;
+  if (
+    Object.values(layout.views).filter(
+      (view) => view.legacyExpansionOwner === true,
+    ).length > 1
+  )
+    return null;
   const ids = new Set<string>();
   let valid = true;
   const normalize = (current: LayoutNode): LayoutNode => {

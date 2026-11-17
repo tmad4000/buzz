@@ -8,6 +8,9 @@ export function bindVisitPreferences(
   view: ConversationView,
 ): Pick<
   ConversationViewHostProps,
+  | "initialExplicitExpansion"
+  | "seedLegacyExpansions"
+  | "onExplicitExpansionChange"
   | "initialTimelineMode"
   | "onTimelineModeChange"
   | "presentationVisitKey"
@@ -18,6 +21,10 @@ export function bindVisitPreferences(
 > {
   const visit = controller.visitToken(view.id);
   return {
+    initialExplicitExpansion: view.explicitExpansion,
+    seedLegacyExpansions: view.legacyExpansionOwner === true,
+    onExplicitExpansionChange: (explicitExpansion) =>
+      controller.update(view.id, view.channelId, visit, { explicitExpansion }),
     presentationVisitKey: JSON.stringify([view.id, view.channelId, visit]),
     initialTimelineMode: view.preferences?.timelineMode,
     onTimelineModeChange: (timelineMode) => {

@@ -1,3 +1,4 @@
+import { useThreadExpansionStorage } from "./ThreadExpansionScope";
 import { ConversationViewContext } from "@/features/conversations/ConversationViewContext";
 import * as React from "react";
 import {
@@ -18,7 +19,6 @@ import {
 import {
   loadThreadExpansion,
   resolveThreadExpansion,
-  saveThreadExpansion,
   threadExpansionKey,
   type ThreadExpansion,
   type ThreadExpansionChange,
@@ -35,9 +35,13 @@ type State = {
   newIds: Set<string>;
   reveal: Reveal;
 };
-const empty = (key: string | null, mode?: ThreadDisplayMode): State => ({
+const empty = (
+  key: string | null,
+  mode?: ThreadDisplayMode,
+  load = loadThreadExpansion,
+): State => ({
   key,
-  branches: loadThreadExpansion(key),
+  branches: load(key),
   automatic: new Map(),
   mode,
   newIds: new Set(),
@@ -73,6 +77,7 @@ export function useUnreadSidebarThread({
   // Community switches remount AppReady; don't migrate storage per row render.
   const community = React.useMemo(loadActiveCommunityId, []);
   const viewScope = React.useContext(ConversationViewContext);
+  const storage = useThreadExpansionStorage();
   const key = enabled
     ? threadExpansionKey(
         community,
@@ -83,11 +88,11 @@ export function useUnreadSidebarThread({
       )
     : null;
   const [saved, setSaved] = React.useState<State>(() =>
-    empty(key, initialMode),
+    empty(key, initialMode, storage.load),
   );
   const state = React.useMemo(
-    () => (saved.key === key ? saved : empty(key, initialMode)),
-    [saved, key, initialMode],
+    () => (saved.key === key ? saved : empty(key, initialMode, storage.load)),
+    [saved, key, initialMode, storage],
   );
   const index = React.useMemo(
     () => indexOverride ?? buildThreadPanelIndex(messages),
@@ -226,8 +231,8 @@ export function useUnreadSidebarThread({
       return;
     setSaved(view);
     if (state.branches !== view.branches)
-      setPreferenceError(!saveThreadExpansion(key, view.branches));
-  }, [enabled, key, saved.key, state, view]);
+      setPreferenceError(!storage.save(key, view.branches));
+  }, [enabled, key, saved.key, state, view, storage]);
   const expanded = new Set(
     [...new Map([...automatic, ...branches])]
       .filter(([, open]) => open)
@@ -266,8 +271,7 @@ export function useUnreadSidebarThread({
     const updated = { ...current, branches: next, reveal };
     live.current = updated;
     // Persist in the interaction, before navigation or an immediate app close.
-    if (current.key)
-      setPreferenceError(!saveThreadExpansion(current.key, next));
+    if (current.key) setPreferenceError(!storage.save(current.key, next));
     setSaved(updated);
   };
   const setExpanded = (id: string, open: boolean) => {

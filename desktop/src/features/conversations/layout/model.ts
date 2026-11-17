@@ -37,6 +37,7 @@ export type ConversationView = {
   panelState: PanelState;
   preferences?: ViewPreferences;
   explicitExpansion?: ExplicitExpansionSnapshot;
+  legacyExpansionOwner?: boolean;
   timelineAnchor: ScrollAnchor | null;
   threadAnchor: ScrollAnchor | null;
 };
@@ -81,6 +82,7 @@ export function createConversationView(
   return {
     id: ids("view"),
     channelId,
+    legacyExpansionOwner: false,
     panelState: copyPanelState(seed?.panelState ?? {}),
     ...(seed?.explicitExpansion
       ? { explicitExpansion: copyExplicitExpansion(seed.explicitExpansion) }
@@ -332,6 +334,9 @@ export function navigateView(
   const next: ConversationView = {
     id: viewId,
     channelId,
+    ...(layout.views[viewId].legacyExpansionOwner === undefined
+      ? {}
+      : { legacyExpansionOwner: layout.views[viewId].legacyExpansionOwner }),
     panelState: copyPanelState(presentation?.panelState ?? {}),
     ...(presentation?.explicitExpansion
       ? {
