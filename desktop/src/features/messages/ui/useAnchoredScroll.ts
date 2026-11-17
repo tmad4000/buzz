@@ -54,7 +54,9 @@ type UseAnchoredScrollOptions = {
   ) => boolean;
   /** Imperative virtualizer-owned bottom jump, used only when virtualizer mode is active. */
   virtualScrollToBottom?: (behavior?: ScrollBehavior) => void;
-  virtualSettleAtBottom?: () => void;
+  virtualSettleAtBottom?: () => boolean;
+  virtualPreserveReadingPosition?: () => boolean;
+  virtualIsBottomPinned?: () => boolean;
   /** When active, the virtualizer owns prepend compensation and bottom-state synchronization. */
   virtualizerOwnsPrependAnchoring?: boolean;
   /** Bumps when a virtualized range changes, so pending target/search retries can re-check newly mounted DOM. */
@@ -164,6 +166,8 @@ export function useAnchoredScroll({
   virtualScrollToMessage,
   virtualScrollToBottom,
   virtualSettleAtBottom,
+  virtualPreserveReadingPosition,
+  virtualIsBottomPinned,
   virtualizerOwnsPrependAnchoring = false,
   virtualizerRenderVersion = 0,
 }: UseAnchoredScrollOptions): UseAnchoredScrollResult {
@@ -283,12 +287,12 @@ export function useAnchoredScroll({
   const repinPinnedCenter = React.useCallback(() => {
     const anchor = anchorRef.current;
     const container = scrollContainerRef.current;
-    if (anchor.kind !== "pinned-center" || !container) return;
+    if (anchor.kind !== "pinned-center" || !container) return false;
 
     const row = container.querySelector<HTMLElement>(
       `[data-message-id="${CSS.escape(anchor.messageId)}"]`,
     );
-    if (!row) return;
+    if (!row) return false;
 
     const currentContentTop =
       row.getBoundingClientRect().top +
@@ -298,10 +302,11 @@ export function useAnchoredScroll({
       contentTop: anchor.contentTop,
       currentContentTop,
     });
-    if (drift === null) return;
+    if (drift === null) return true;
 
     anchor.contentTop = currentContentTop;
     writePinnedCenterScroll(container, () => container.scrollBy(0, drift));
+    return true;
   }, [scrollContainerRef, writePinnedCenterScroll]);
 
   const releasePinnedCenter = React.useCallback(() => {
@@ -390,29 +395,43 @@ export function useAnchoredScroll({
     const container = scrollContainerRef.current;
     if (!container) return false;
     if (anchorRef.current.kind === "pinned-center") {
-      repinPinnedCenter();
+      const settled = repinPinnedCenter();
       const atBottom = isAtBottomNow(container);
       setIsAtBottom((previous) =>
         previous === atBottom ? previous : atBottom,
       );
       if (atBottom) setNewMessageCount(0);
       schedulePinnedTargetSettle(anchorRef.current.messageId);
-      return true;
+      return settled;
     }
-    if (!isAtBottomNow(container)) return false;
+    if (virtualizerOwnsPrependAnchoring && virtualPreserveReadingPosition?.())
+      return false;
+    if (
+      !isAtBottomNow(container) &&
+      !(virtualizerOwnsPrependAnchoring && virtualIsBottomPinned?.())
+    )
+      return false;
+
+    if (virtualizerOwnsPrependAnchoring) {
+      // A semantic owner cannot report success without invoking the active
+      // virtualizer. Its reading guard may refuse to move a hovered row.
+      if (virtualSettleAtBottom?.() !== true) return false;
+    } else {
+      container.scrollTo({ top: container.scrollHeight, behavior: "auto" });
+    }
 
     anchorRef.current = { kind: "at-bottom" };
     setIsAtBottom(true);
     setNewMessageCount(0);
-    if (!virtualizerOwnsPrependAnchoring) {
-      container.scrollTo({ top: container.scrollHeight, behavior: "auto" });
-    }
     return true;
   }, [
     repinPinnedCenter,
     schedulePinnedTargetSettle,
     scrollContainerRef,
     virtualizerOwnsPrependAnchoring,
+    virtualSettleAtBottom,
+    virtualPreserveReadingPosition,
+    virtualIsBottomPinned,
   ]);
 
   const highlightMessage = React.useCallback((messageId: string) => {
@@ -697,6 +716,24 @@ export function useAnchoredScroll({
       return;
     }
 
+    if (
+      anchor.kind !== "pinned-center" &&
+      virtualizerOwnsPrependAnchoring &&
+      virtualPreserveReadingPosition?.()
+    ) {
+      anchorRef.current = computeAnchor(container, false);
+      virtualizerAtBottomRef.current = false;
+      setIsAtBottom(false);
+      if (messagesArrived > 0 && !isPrepend) {
+        setNewMessageCount((current) => current + messagesArrived);
+      }
+      prevLastMessageIdRef.current = lastMessage?.id;
+      prevFirstMessageIdRef.current = firstMessage?.id;
+      prevMessageCountRef.current = messages.length;
+      prevMessagesRef.current = messages;
+      return;
+    }
+
     if (anchor.kind === "pinned-center") {
       repinPinnedCenter();
     } else if (anchor.kind === "at-bottom") {
@@ -773,6 +810,7 @@ export function useAnchoredScroll({
     targetMessageId,
     virtualScrollToBottom,
     virtualSettleAtBottom,
+    virtualPreserveReadingPosition,
     virtualizerOwnsPrependAnchoring,
   ]);
 
@@ -950,14 +988,27 @@ export function useAnchoredScroll({
   const onVirtualizerAtBottomStateChange = React.useCallback(
     (atBottom: boolean) => {
       if (!virtualizerOwnsPrependAnchoring) return;
-      virtualizerAtBottomRef.current = atBottom;
-      if (atBottom) {
+      const reading = virtualPreserveReadingPosition?.() ?? false;
+      const idleBottom =
+        atBottom && !reading && virtualIsBottomPinned?.() !== false;
+      virtualizerAtBottomRef.current = idleBottom;
+      if (idleBottom) {
         anchorRef.current = { kind: "at-bottom" };
         setNewMessageCount(0);
+      } else if (
+        anchorRef.current.kind === "at-bottom" &&
+        scrollContainerRef.current
+      ) {
+        anchorRef.current = computeAnchor(scrollContainerRef.current, false);
       }
-      setIsAtBottom(atBottom);
+      setIsAtBottom(idleBottom);
     },
-    [virtualizerOwnsPrependAnchoring],
+    [
+      scrollContainerRef,
+      virtualizerOwnsPrependAnchoring,
+      virtualPreserveReadingPosition,
+      virtualIsBottomPinned,
+    ],
   );
 
   return {

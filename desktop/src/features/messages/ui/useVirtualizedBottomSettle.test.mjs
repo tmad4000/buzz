@@ -32,6 +32,10 @@ class ElementShim extends EventTargetShim {
     this.tagName = "DIV";
     this.nodeType = 1;
     this.namespaceURI = "http://www.w3.org/1999/xhtml";
+    this.dataset = {};
+    this.scrollTop = 0;
+    this.scrollHeight = 0;
+    this.clientHeight = 0;
   }
   get ownerDocument() {
     return globalThis.document;
@@ -55,6 +59,12 @@ class ElementShim extends EventTargetShim {
   }
   closest() {
     return null;
+  }
+  getBoundingClientRect() {
+    return { top: 0, bottom: this.clientHeight, height: this.clientHeight };
+  }
+  querySelectorAll() {
+    return [];
   }
   contains(target) {
     return this === target || this.firstElementChild?.contains(target) === true;
@@ -217,6 +227,8 @@ test("hovering a message retires scheduled bottom pin before its Reply action mo
   );
   observer.callback();
   const rowBody = new ElementShim();
+  content.firstElementChild = rowBody;
+  rowBody.dataset.messageId = "child";
   rowBody.closest = (selector) =>
     selector === "[data-message-id]" ? rowBody : null;
   scroller.dispatchEvent({ type: "pointermove", target: rowBody });
