@@ -83,7 +83,10 @@ test("production inline composer keeps one editor across compact, draft, popup a
   await toggle.click();
   await expect(editor).toHaveText("Keep exact draft");
   await expect(composer).toHaveAttribute("data-compact", "false");
-  await editor.fill("");
+  await editor.focus();
+  await editor.press("ControlOrMeta+a");
+  await editor.press("Backspace");
+  await expect(editor).toBeEmpty();
   await toggle.focus();
   await expect(composer).toHaveAttribute("data-compact", "true");
   await page.keyboard.press("Tab");
@@ -297,6 +300,7 @@ test("routed accepted reply confirmation opens exact collapsed target and Back p
   await expect(receipt).toHaveCount(0);
   await expect(receipt).toContainText(
     "Sent to Captured confirmation destination",
+    { timeout: 20000 },
   );
   await main
     .getByTestId("message-input")

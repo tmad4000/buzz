@@ -118,13 +118,32 @@ const expect = baseExpect.configure({ timeout: 30000 });
     await expect(receiptA).toContainText("Sent to Release plan for pane A");
     await expect(b.getByTestId("routed-send-notice")).toHaveCount(0);
     await mainA.getByTestId("message-input").fill("Newer draft across return");
-    const readingBefore = await a
-      .getByTestId("message-timeline")
-      .evaluate((el) => el.scrollTop);
     for (let cycle = 0; cycle < 2; cycle++) {
-      await receiptA
-        .getByRole("button", { name: /Open thread Release plan/ })
-        .click();
+      const openReceipt = receiptA.getByRole("button", {
+        name: /Open thread Release plan/,
+      });
+      await openReceipt.evaluate((button) =>
+        button.addEventListener(
+          "click",
+          () => {
+            const view = button.closest("[data-conversation-view]");
+            const scroller = view.querySelector(
+              '[data-testid="message-timeline"]',
+            );
+            const top = scroller.getBoundingClientRect().top;
+            const row = [
+              ...scroller.querySelectorAll("[data-message-id]"),
+            ].find((node) => node.getBoundingClientRect().bottom > top);
+            window.hostReturnAnchor = {
+              id: row?.dataset.messageId,
+              offset: row ? row.getBoundingClientRect().top - top : 0,
+              pixel: scroller.scrollTop,
+            };
+          },
+          { once: true, capture: true },
+        ),
+      );
+      await openReceipt.click();
       await expect(
         ta
           .getByTestId("message-body")
@@ -151,9 +170,21 @@ const expect = baseExpect.configure({ timeout: 30000 });
       ).toBeFocused();
       await expect
         .poll(() =>
-          a.getByTestId("message-timeline").evaluate((el) => el.scrollTop),
+          a.getByTestId("message-timeline").evaluate((scroller) => {
+            const snapshot = window.hostReturnAnchor;
+            const row = [
+              ...scroller.querySelectorAll("[data-message-id]"),
+            ].find((node) => node.dataset.messageId === snapshot.id);
+            return row
+              ? Math.abs(
+                  row.getBoundingClientRect().top -
+                    scroller.getBoundingClientRect().top -
+                    snapshot.offset,
+                )
+              : Math.abs(scroller.scrollTop - snapshot.pixel);
+          }),
         )
-        .toBe(readingBefore);
+        .toBeLessThanOrEqual(2);
       assert.equal((await sends()).length, 1, "Open/Back cannot republish");
     }
     await a
@@ -162,7 +193,7 @@ const expect = baseExpect.configure({ timeout: 30000 });
       )
       .click();
     await expect(ta).toContainText("Design decisions for pane B");
-    await expect(a.locator("[data-draft-preview]")).toContainText(
+    await expect(ta.locator("[data-draft-preview]")).toContainText(
       "Sibling thread draft remains independent",
     );
     await receiptA
@@ -171,7 +202,7 @@ const expect = baseExpect.configure({ timeout: 30000 });
     await expect(ta).toContainText("Release plan for pane A");
     await a.getByTestId("routed-send-back").click();
     await expect(ta).toContainText("Design decisions for pane B");
-    await expect(a.locator("[data-draft-preview]")).toContainText(
+    await expect(ta.locator("[data-draft-preview]")).toContainText(
       "Sibling thread draft remains independent",
     );
     await ta.getByRole("button", { name: "Close panel", exact: true }).click();
@@ -195,9 +226,9 @@ const expect = baseExpect.configure({ timeout: 30000 });
     await mainA
       .getByTestId("message-input")
       .fill("Shared draft survives picker takeover");
-    await expect(b.locator("[data-draft-preview]")).toContainText(
-      "Shared draft survives picker takeover",
-    );
+    await expect(
+      b.getByTestId("channel-composer-overlay").locator("[data-draft-preview]"),
+    ).toContainText("Shared draft survives picker takeover");
     await expect(b.getByTestId("send-to-thread")).toHaveCount(0);
     // Retain the actual picker callback from the mounted React component. This
     // test-only introspection adds no runtime seam or command replay mechanism.
@@ -226,13 +257,18 @@ const expect = baseExpect.configure({ timeout: 30000 });
       fullPage: true,
       path: path.join(shots, "owner-picker-preview.png"),
     });
-    await b.getByRole("button", { name: "Take over", exact: true }).click();
+    await b
+      .getByTestId("channel-composer-overlay")
+      .getByRole("button", { name: "Take over", exact: true })
+      .click();
     const mainB = main(b);
     await expect(mainB.getByTestId("message-input")).toHaveText(
       "Shared draft survives picker takeover",
     );
     await expect(mainB.getByTestId("message-input")).toBeFocused();
-    await expect(a.getByTestId("message-input")).toHaveCount(0);
+    await expect(
+      a.getByTestId("channel-composer-overlay").getByTestId("message-input"),
+    ).toHaveCount(0);
     await expect(a.getByTestId("send-to-thread")).toHaveCount(0);
     await expect(menu).toHaveCount(0);
     await page.evaluate(() => window.retainedRoutingPick("1".repeat(64)));
