@@ -22,16 +22,70 @@ const source = ts.createSourceFile(
   ts.ScriptKind.TSX,
 );
 let binding;
+let anchoredCall;
 function visit(node) {
   if (
     ts.isCallExpression(node) &&
     node.expression.getText(source) === "React.useImperativeHandle"
   )
     binding = node.getText(source);
+  if (
+    ts.isCallExpression(node) &&
+    node.expression.getText(source) === "useAnchoredScroll"
+  )
+    anchoredCall = node.getText(source);
   ts.forEachChild(node, visit);
 }
 visit(source);
 assert.ok(binding);
+assert.ok(anchoredCall);
+// Execute the production adapter too: hand-constructing hook options could let
+// a dropped virtualSettleAtBottom or reading guard pass this regression.
+const useTimelineAnchoredScroll = new Function(
+  "useAnchoredScroll",
+  "channelId",
+  "contentRef",
+  "showTimelineSkeleton",
+  "renderedMessages",
+  "onTargetReached",
+  "activeScrollContainerRef",
+  "splitThreadPanelOpen",
+  "targetMessageId",
+  "timelineVirtualizerApi",
+  "useTimelineVirtualizer",
+  "virtualizerRenderVersion",
+  `return ${ts.transpile(anchoredCall, { target: ts.ScriptTarget.ES2022, alwaysStrict: false }).trim().replace(/;$/, "")}`,
+);
+const listSource = ts.createSourceFile(
+  "TimelineMessageList.tsx",
+  readFileSync(new URL("./TimelineMessageList.tsx", import.meta.url), "utf8"),
+  ts.ScriptTarget.Latest,
+  true,
+  ts.ScriptKind.TSX,
+);
+let listApi;
+function visitList(node) {
+  if (
+    ts.isVariableDeclaration(node) &&
+    node.name.getText(listSource) === "api" &&
+    node.initializer &&
+    node.type?.getText(listSource) === "TimelineVirtualizerApi"
+  )
+    listApi = node.initializer.getText(listSource);
+  ts.forEachChild(node, visitList);
+}
+visitList(listSource);
+assert.ok(listApi);
+const createListApi = new Function(
+  "cancelBottomSettle",
+  "jumpToBottom",
+  "settleAtBottom",
+  "preserveReadingPosition",
+  "isBottomPinned",
+  "messageItemIndexByIdRef",
+  "listRef",
+  `return ${ts.transpile(`(${listApi})`, { target: ts.ScriptTarget.ES2022, alwaysStrict: false }).trim().replace(/;$/, "")}`,
+);
 const useTimelineHandle = new Function(
   "React",
   "ref",
@@ -147,9 +201,13 @@ async function mount({ targetMessageId } = {}) {
       get scrollOffset() {
         return model.top;
       },
-      scrollToIndex() {
-        model.pins++;
-        scroller.scrollTop = model.height - model.viewport;
+      scrollToIndex(index, options) {
+        if (options?.align === "center") {
+          scroller.scrollTop = index * 40 - (model.viewport - 40) / 2;
+        } else {
+          model.pins++;
+          scroller.scrollTop = model.height - model.viewport;
+        }
       },
     },
   };
@@ -161,21 +219,20 @@ async function mount({ targetMessageId } = {}) {
       (atBottom) =>
         anchoredRef.current?.onVirtualizerAtBottomStateChange(atBottom),
     );
+    const messageItemIndexByIdRef = React.useRef(
+      new Map(rows.map((row, index) => [row.dataset.messageId, index])),
+    );
     const api = React.useMemo(
-      () => ({
-        cancelBottomIntent: ownership.cancel,
-        scrollToBottom: ownership.settle,
-        settleAtBottom: ownership.settleAfterLayout,
-        preserveReadingPosition: ownership.preserveReadingPosition,
-        isBottomPinned: ownership.isBottomPinned,
-        scrollToMessage(id) {
-          ownership.cancel();
-          const index = rows.findIndex((row) => row.dataset.messageId === id);
-          if (index < 0) return false;
-          scroller.scrollTop = index * 40 - (model.viewport - 40) / 2;
-          return true;
-        },
-      }),
+      () =>
+        createListApi(
+          ownership.cancel,
+          ownership.settle,
+          ownership.settleAfterLayout,
+          ownership.preserveReadingPosition,
+          ownership.isBottomPinned,
+          messageItemIndexByIdRef,
+          listRef,
+        ),
       [
         ownership.cancel,
         ownership.settle,
@@ -185,23 +242,20 @@ async function mount({ targetMessageId } = {}) {
       ],
     );
     apiRef.current = api;
-    const anchored = useAnchoredScroll({
-      scrollContainerRef: scrollRef,
-      contentRef: { current: null },
-      channelId: "channel",
-      isLoading: false,
+    const anchored = useTimelineAnchoredScroll(
+      useAnchoredScroll,
+      "channel",
+      { current: null },
+      false,
       messages,
+      undefined,
+      scrollRef,
+      false,
       targetMessageId,
-      highlightTargetMessage: false,
-      pinTargetCentered: !!targetMessageId,
-      virtualCancelBottomIntent: api.cancelBottomIntent,
-      virtualScrollToBottom: api.scrollToBottom,
-      virtualSettleAtBottom: api.settleAtBottom,
-      virtualPreserveReadingPosition: api.preserveReadingPosition,
-      virtualIsBottomPinned: api.isBottomPinned,
-      virtualScrollToMessage: api.scrollToMessage,
-      virtualizerOwnsPrependAnchoring: true,
-    });
+      api,
+      true,
+      0,
+    );
     anchoredRef.current = anchored;
     useTimelineHandle(
       React,
@@ -219,13 +273,18 @@ async function mount({ targetMessageId } = {}) {
   const root = createRoot(document.createElement("div"));
   let messages = rows.map((row) => ({ id: row.dataset.messageId }));
   const flushFrames = async () => {
-    for (let pass = 0; pass < 5 && frames.size; pass++) {
+    for (let pass = 0; pass < 12 && frames.size; pass++) {
       const current = [...frames.values()];
       frames.clear();
       await act(async () => {
         for (const callback of current) callback(0);
       });
     }
+    assert.equal(
+      frames.size,
+      0,
+      "layout settlement must quiesce within 12 animation frames",
+    );
   };
   await act(async () =>
     root.render(React.createElement(Harness, { messages })),
@@ -269,28 +328,30 @@ async function mount({ targetMessageId } = {}) {
   };
 }
 
-test("MessageTimeline public layout settlement invokes the active virtualizer at idle bottom", async () => {
-  const h = await mount();
-  try {
-    const pins = h.model.pins;
-    h.model.height += 128;
-    let result;
-    await act(async () => {
-      result = h.timelineRef.current.settleAtBottom();
-    });
-    assert.equal(result, true);
-    assert.equal(h.model.pins, pins + 1);
-    assert.equal(h.model.top, h.model.height - h.model.viewport);
-    await h.resize();
-    assert.equal(
-      h.model.pins,
-      pins + 1,
-      "settled resize cannot start another pin loop",
-    );
-  } finally {
-    await h.close();
-  }
-});
+for (const growth of [16, 128]) {
+  test(`MessageTimeline public layout settlement physically settles ${growth}px idle bottom growth`, async () => {
+    const h = await mount();
+    try {
+      const pins = h.model.pins;
+      h.model.height += growth;
+      let result;
+      await act(async () => {
+        result = h.timelineRef.current.settleAtBottom();
+      });
+      assert.equal(result, true);
+      assert.equal(h.model.pins, pins + 1);
+      assert.equal(h.model.top, h.model.height - h.model.viewport);
+      await h.resize();
+      assert.equal(
+        h.model.pins,
+        pins + 1,
+        "settled resize cannot start another pin loop",
+      );
+    } finally {
+      await h.close();
+    }
+  });
+}
 
 test("hover owns its row through queued growth; leave re-arms only at the physical bottom", async () => {
   const h = await mount();
@@ -311,8 +372,11 @@ test("hover owns its row through queued growth; leave re-arms only at the physic
     assert.equal(h.model.pins, pins);
     let clicks = 0;
     row.querySelector("button").addEventListener("click", () => clicks++);
+    await h.event(row.querySelector("button"), "pointerdown");
     row.querySelector("button").click();
     assert.equal(clicks, 1);
+    assert.ok(Math.abs(row.getBoundingClientRect().top - top) <= 1);
+    assert.equal(h.model.pins, pins);
     await h.event(h.scroller, "pointerleave");
     assert.equal(
       h.apiRef.current.isBottomPinned(),
@@ -400,6 +464,72 @@ test("selected-message navigation preserves its reading position without a botto
     assert.equal(row.getBoundingClientRect().top, top);
     assert.equal(h.model.pins, pins);
   } finally {
+    await h.close();
+  }
+});
+
+test("focused inline editor keeps its row and selection through bottom queue growth", async () => {
+  const h = await mount();
+  const inline = document.createElement("div");
+  inline.dataset.testid = "inline-thread";
+  const editor = document.createElement("textarea");
+  editor.value = "Keep inline draft";
+  inline.append(editor);
+  h.rows[32].append(inline);
+  try {
+    const row = h.rows[32];
+    await act(async () => {
+      editor.focus();
+      editor.setSelectionRange(7, 7);
+    });
+    await h.event(editor, "focusin");
+    const top = row.getBoundingClientRect().top;
+    const pins = h.model.pins;
+    h.model.height += 128;
+    await h.resize();
+    let result;
+    await act(async () => {
+      result = h.timelineRef.current.settleAtBottom();
+    });
+    assert.equal(result, false);
+    assert.equal(h.model.pins, pins);
+    assert.ok(Math.abs(row.getBoundingClientRect().top - top) <= 1);
+    assert.equal(document.activeElement, editor);
+    assert.equal(editor.value, "Keep inline draft");
+    assert.equal(editor.selectionStart, 7);
+    assert.equal(editor.selectionEnd, 7);
+  } finally {
+    await h.close();
+  }
+});
+
+test("selected message text owns its row through queued geometry growth", async () => {
+  const h = await mount();
+  const selection = document.getSelection();
+  try {
+    const row = h.rows[32];
+    const range = document.createRange();
+    range.setStart(row.querySelector("button").firstChild, 0);
+    range.setEnd(row.querySelector("button").firstChild, 2);
+    selection.removeAllRanges();
+    selection.addRange(range);
+    await h.event(document, "selectionchange");
+    const top = row.getBoundingClientRect().top;
+    const pins = h.model.pins;
+    h.model.shiftFrom = 32;
+    h.model.shift = 64;
+    h.model.height += 128;
+    await h.resize();
+    let result;
+    await act(async () => {
+      result = h.timelineRef.current.settleAtBottom();
+    });
+    assert.equal(result, false);
+    assert.equal(h.model.pins, pins);
+    assert.ok(Math.abs(row.getBoundingClientRect().top - top) <= 1);
+    assert.equal(selection.toString(), "Re");
+  } finally {
+    selection.removeAllRanges();
     await h.close();
   }
 });
