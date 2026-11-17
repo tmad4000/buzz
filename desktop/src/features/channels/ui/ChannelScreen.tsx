@@ -656,6 +656,31 @@ export function ChannelScreen({
     setThreadScrollTargetId,
   });
   useNavigationGuard(React.useCallback(() => requirePageEditResolution() && requireThreadEditResolution(), [requirePageEditResolution, requireThreadEditResolution]));
+  const handleJumpToThreadMessage = React.useCallback(
+    (rootId: string, messageId: string) => {
+      if (!requirePageEditResolution() || !requireThreadEditResolution()) return;
+      if (pageOpen) closePage();
+      setOpenAgentSessionPubkey(null);
+      setProfilePanelPubkey(null);
+      setChannelManagementOpen(false);
+      setOptimisticOpenThreadHeadId(rootId);
+      setOpenThreadHeadId(rootId);
+      // A parent jump within this thread leaves the newer draft's target alone.
+      if (effectiveOpenThreadHeadId !== rootId) setThreadReplyTargetId(rootId);
+      setThreadScrollTargetId(messageId);
+    },
+    [
+      requirePageEditResolution,
+      requireThreadEditResolution,
+      pageOpen,
+      closePage,
+      effectiveOpenThreadHeadId,
+      setOpenAgentSessionPubkey,
+      setProfilePanelPubkey,
+      setChannelManagementOpen,
+      setOpenThreadHeadId,
+    ],
+  );
   const mainTimelineTargetMessageId = useChannelRouteTarget({
     activeChannel,
     activeChannelId,
@@ -1003,6 +1028,7 @@ export function ChannelScreen({
                       return true;
                     };
                   }}
+                  onJumpToThreadMessage={handleJumpToThreadMessage}
                   onOpenSentReply={(root, messageId) => {
                     if (!requireThreadEditResolution()) return;
                     setOpenAgentSessionPubkey(null);
