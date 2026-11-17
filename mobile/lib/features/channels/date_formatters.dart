@@ -82,8 +82,7 @@ bool isSameDay(int a, int b) {
 /// "2d ago", or a short date for older timestamps.
 String relativeTime(int unixSeconds) => relativeTimestamp(unixSeconds);
 
-/// Returns desktop-parity thread activity copy such as "just now",
-/// "3 hours ago", or "on May 19".
+/// Returns desktop-parity relative thread activity, e.g. "3h ago" or "May 19".
 String formatThreadSummaryLastReplyTime(
   int unixSeconds, {
   @visibleForTesting int? nowSeconds,

@@ -129,6 +129,7 @@ class SettingsPage extends HookConsumerWidget {
             ),
             ListTile(
               title: const Text('Send feedback'),
+              subtitle: const Text('Feedback is public'),
               trailing: const _RowChevron(),
               onTap: () async {
                 var opened = false;
