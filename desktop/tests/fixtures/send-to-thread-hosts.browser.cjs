@@ -155,14 +155,24 @@ const expect = baseExpect.configure({ timeout: 30000 });
         .toBe(readingBefore);
       assert.equal((await sends()).length, 1, "Open/Back cannot republish");
     }
-    await a.locator(`[data-testid="open-thread-side-panel"][data-thread-head-id="${"2".repeat(64)}"]`).click();
+    await a
+      .locator(
+        `[data-testid="open-thread-side-panel"][data-thread-head-id="${"2".repeat(64)}"]`,
+      )
+      .click();
     await expect(ta).toContainText("Design decisions for pane B");
-    await ta.getByTestId("message-input").fill("A prior panel draft survives return");
-    await receiptA.getByRole("button", { name: /Open thread Release plan/ }).click();
+    await ta
+      .getByTestId("message-input")
+      .fill("A prior panel draft survives return");
+    await receiptA
+      .getByRole("button", { name: /Open thread Release plan/ })
+      .click();
     await expect(ta).toContainText("Release plan for pane A");
     await a.getByTestId("routed-send-back").click();
     await expect(ta).toContainText("Design decisions for pane B");
-    await expect(ta.getByTestId("message-input")).toHaveText("A prior panel draft survives return");
+    await expect(ta.getByTestId("message-input")).toHaveText(
+      "A prior panel draft survives return",
+    );
     await ta.getByRole("button", { name: "Close panel", exact: true }).click();
     await expect(tb).toContainText("Design decisions for pane B");
     await expect(tb.getByTestId("message-input")).toHaveText(
