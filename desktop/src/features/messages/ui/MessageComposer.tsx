@@ -904,7 +904,6 @@ function MessageComposerImpl({
     !ownershipLocked &&
     !replyTarget &&
     !isEmojiPickerOpen &&
-    !isFormattingOpen &&
     !linkEditor.isCardOpen &&
     !linkEditor.isDialogOpen &&
     !isAutocompleteOpenRef.current;

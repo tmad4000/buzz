@@ -60,6 +60,13 @@ test("production inline composer keeps one editor across compact, draft, popup a
   await page.mouse.move(4, 4);
   await expect(composer).toHaveAttribute("data-compact", "true");
   await editor.focus();
+  await thread
+    .getByRole("button", { name: "Toggle formatting", exact: true })
+    .first()
+    .click();
+  await toggle.focus();
+  await expect(composer).toHaveAttribute("data-compact", "true");
+  await editor.focus();
   await page.keyboard.type("Keep exact draft");
   await toggle.focus();
   await expect(composer).toHaveAttribute("data-compact", "false");

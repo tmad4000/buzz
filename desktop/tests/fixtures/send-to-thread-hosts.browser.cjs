@@ -20,6 +20,7 @@ const expect = baseExpect.configure({ timeout: 30000 });
     const page = await browser.newPage({
       viewport: { width: 1900, height: 1000 },
     });
+    page.setDefaultNavigationTimeout(90000);
     const errors = [];
     page.on("pageerror", (e) => errors.push(e.message));
     await page.goto(
