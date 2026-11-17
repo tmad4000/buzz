@@ -10,16 +10,42 @@ test("local expiry warns, marks only Paseo working cards, and recovers", async (
   await page.goto("/");
   await expect(page.getByTestId("channel-general")).toBeVisible();
   await page.getByTestId("channel-general").click();
+  // The owner-kind helper checks #p archive filters, not presence authors.
+  // Inspect the existing IPC journal without weakening the author-scoped gate.
   await expect
     .poll(() =>
-      page.evaluate(
-        (pk) =>
-          window.__BUZZ_E2E_HAS_MOCK_OWNER_KIND_SUBSCRIPTION__?.({
-            ownerPubkey: pk,
-            kind: 20001,
-          }) ?? false,
-        PK,
-      ),
+      page.evaluate((pk) => {
+        const active =
+          window.__BUZZ_E2E_HAS_MOCK_GLOBAL_KIND_SUBSCRIPTION__?.(20001) ??
+          false;
+        return (
+          active &&
+          (window.__BUZZ_E2E_COMMAND_PAYLOADS__ ?? []).some(
+            ({ command, payload }) => {
+              if (command !== "plugin:websocket|send") return false;
+              const data = (payload as { message?: { data?: unknown } } | null)
+                ?.message?.data;
+              if (typeof data !== "string") return false;
+              try {
+                const frame = JSON.parse(data);
+                return (
+                  Array.isArray(frame) &&
+                  frame[0] === "REQ" &&
+                  frame
+                    .slice(2)
+                    .some(
+                      (filter: { kinds?: number[]; authors?: string[] }) =>
+                        filter.kinds?.includes(20001) &&
+                        filter.authors?.includes(pk),
+                    )
+                );
+              } catch {
+                return false;
+              }
+            },
+          )
+        );
+      }, PK),
     )
     .toBe(true);
   await page.evaluate((pk) => {
