@@ -9,10 +9,26 @@ export function threadReplySeenKey(rootId: string, replyId: string): string {
 }
 
 /** Only this reply's observed body is positive evidence; progress frontiers are not. */
-export function resolveThreadReplySeenAt(
+export function resolveThreadReplyObservedAt(
   rootId: string,
   replyId: string,
   own: (key: string) => number | null,
 ): number | null {
   return own(threadReplySeenKey(rootId, replyId));
+}
+
+/** Legacy thread progress; never use this to authorize body folding or seen badges. */
+export function resolveThreadReplySeenAt(
+  rootId: string,
+  replyId: string,
+  own: (key: string) => number | null,
+): number | null {
+  const exact = resolveThreadReplyObservedAt(rootId, replyId, own);
+  const frontier = own(threadSeenKey(rootId));
+  const before = frontier === null ? null : frontier - 1;
+  return exact === null
+    ? before
+    : before === null
+      ? exact
+      : Math.max(exact, before);
 }

@@ -111,7 +111,7 @@ export function ChannelScreen({
     getChannelReadAt,
     getMessageReadAt,
     markMessageRead,
-    getThreadReplySeenAt,
+    getThreadReplyObservedAt,
     markThreadReplySeen,
     registerContextParents,
     openBrowseChannels,
@@ -475,7 +475,7 @@ export function ChannelScreen({
   const unseenEvidenceMessages = React.useMemo(() => [...timelineMessages, ...unseenEvidence.messages], [timelineMessages, unseenEvidence.messages]);
   const { unseenReplies, threadUnseenCounts, markVisibleReplies } = useUnseenThreadReplies({
     timelineMessages: unseenEvidenceMessages, panelMessages: threadPanelData.messages, currentPubkey,
-    getSeenAt: getThreadReplySeenAt, markSeen: markThreadReplySeen,
+    getSeenAt: getThreadReplyObservedAt, markSeen: markThreadReplySeen,
     markRead: markSidebarRepliesRead, readStateVersion,
   });
   const editTargetMessage = React.useMemo(

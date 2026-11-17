@@ -303,7 +303,7 @@ export function MessageThreadPanel({
     currentPubkey,
     `${channelId}:${threadHeadId}`,
   );
-  const { getThreadReplySeenAt, threadReplySeenReady } = useAppShell();
+  const { getThreadReplyObservedAt, threadReplySeenReady } = useAppShell();
   const opening = useSidebarOpening({
     enabled: useOpeningDefaults,
     scope: `${channelId}:${currentPubkey}:${threadHeadId}`,
@@ -313,7 +313,7 @@ export function MessageThreadPanel({
     ready: threadReplySeenReady,
     complete:
       threadRepliesComplete && !threadRepliesPending && !threadRepliesError,
-    seenAt: getThreadReplySeenAt,
+    seenAt: getThreadReplyObservedAt,
     explicitTarget: scrollTargetId,
   });
   const runRegionId = React.useId();

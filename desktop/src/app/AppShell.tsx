@@ -431,6 +431,7 @@ export function AppShell() {
 
   const {
     getThreadReplySeenAt,
+    getThreadReplyObservedAt,
     markThreadReplySeen,
     getThreadReadAt,
     markThreadRead,
@@ -740,6 +741,7 @@ export function AppShell() {
             },
             getChannelReadAt,
             getThreadReplySeenAt,
+            getThreadReplyObservedAt,
             threadReplySeenReady,
             markThreadReplySeen,
             getThreadReadAt,

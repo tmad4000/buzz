@@ -62,3 +62,9 @@ open. Receive another reply under a collapsed thread: the marker should return.
 Repeat on a second updated desktop/web client signed into the same account after
 sync. Test unsaved edits before using the header: edit resolution must be honored.
 Linux browser verification does not establish native Apple behavior.
+
+AppShell exposes `getThreadReplyObservedAt(root, reply)` for exact observed-body
+markers; badge projection and sidebar folding compare it with reply creation time.
+The legacy `getThreadReplySeenAt` frontier getter remains progress-only and must
+never authorize those states. `threadReplySeenReady` comes from the same existing
+read manager's hydration flag; it gates folding and initial end positioning.

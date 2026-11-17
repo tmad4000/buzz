@@ -202,7 +202,7 @@ test("explicit positioning completes the visit and pending target identity survi
 });
 
 test("older never-observed reply below a seen frontier remains unfolded and unseen", async () => {
-  const { resolveThreadReplySeenAt, threadSeenKey, threadReplySeenKey } =
+  const { resolveThreadReplyObservedAt, threadSeenKey, threadReplySeenKey } =
     await import("../../channels/readState/threadReplySeen.ts");
   const markers = new Map([
     [threadSeenKey("root"), 200],
@@ -210,7 +210,7 @@ test("older never-observed reply below a seen frontier remains unfolded and unse
     [threadReplySeenKey("root", "stale"), 90],
   ]);
   const seenAt = (root, id) =>
-    resolveThreadReplySeenAt(root, id, (key) => markers.get(key) ?? null);
+    resolveThreadReplyObservedAt(root, id, (key) => markers.get(key) ?? null);
   const app = mount();
   await app.render({
     messages: [

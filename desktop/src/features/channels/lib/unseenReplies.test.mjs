@@ -46,7 +46,7 @@ test("projection uses the retained canonical-root marker without a second age fi
 });
 
 test("unseen badges share exact observation evidence with sidebar folding", async () => {
-  const { resolveThreadReplySeenAt, threadSeenKey, threadReplySeenKey } =
+  const { resolveThreadReplyObservedAt, threadSeenKey, threadReplySeenKey } =
     await import("../readState/threadReplySeen.ts");
   const markers = new Map([
     [threadSeenKey("root"), 200],
@@ -54,7 +54,7 @@ test("unseen badges share exact observation evidence with sidebar folding", asyn
     [threadReplySeenKey("root", "stale"), 90],
   ]);
   const seenAt = (root, id) =>
-    resolveThreadReplySeenAt(root, id, (key) => markers.get(key) ?? null);
+    resolveThreadReplyObservedAt(root, id, (key) => markers.get(key) ?? null);
   const result = unseenRepliesByRoot(
     [
       reply("older", { createdAt: 100 }),
