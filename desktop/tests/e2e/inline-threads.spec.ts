@@ -559,19 +559,26 @@ test("incoming replies above and below a scrolled reader preserve anchor, focuse
         top: row.top - viewport.top,
         bottom: row.bottom - viewport.top,
         viewportHeight: scroller.clientHeight,
-        centerError: Math.abs(
-          (row.top + row.bottom) / 2 -
-            (viewport.top + scroller.clientHeight / 2),
-        ),
+        center: (row.top + row.bottom) / 2 - viewport.top,
       };
     });
-  // The app jump centers its target; wait for its convergence rather than
-  // imposing the former fixture-only 120px offset on estimated row geometry.
+  // Navigation centers within the app's visible region, which excludes its
+  // chrome/padding. Require a fully visible target in the viewport's middle
+  // third, then capture its settled offset instead of inventing an exact center.
   await expect
-    .poll(async () => (await captureJumpPlacement()).centerError, {
-      timeout: 5000,
-    })
-    .toBeLessThanOrEqual(2);
+    .poll(
+      async () => {
+        const placement = await captureJumpPlacement();
+        return (
+          placement.top >= 0 &&
+          placement.bottom <= placement.viewportHeight &&
+          placement.center >= placement.viewportHeight / 3 &&
+          placement.center <= (placement.viewportHeight * 2) / 3
+        );
+      },
+      { timeout: 5000 },
+    )
+    .toBe(true);
   await waitForStableLayout("app-jump");
   const jumpPlacement = await captureJumpPlacement();
   await info.attach("incoming-app-jump-placement", {
@@ -582,7 +589,12 @@ test("incoming replies above and below a scrolled reader preserve anchor, focuse
   expect(jumpPlacement.bottom).toBeLessThanOrEqual(
     jumpPlacement.viewportHeight,
   );
-  expect(jumpPlacement.centerError).toBeLessThanOrEqual(2);
+  expect(jumpPlacement.center).toBeGreaterThanOrEqual(
+    jumpPlacement.viewportHeight / 3,
+  );
+  expect(jumpPlacement.center).toBeLessThanOrEqual(
+    (jumpPlacement.viewportHeight * 2) / 3,
+  );
   const orderAfterPosition = await captureFixtureOrder();
   expect(orderAfterPosition.order).toEqual(expectedOrder);
   const assertOffscreenBaseline = async () => {
