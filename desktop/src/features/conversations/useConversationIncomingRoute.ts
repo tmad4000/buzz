@@ -4,8 +4,10 @@ import {
   conversationHistoryViewId,
   conversationPanelStateFromSearch,
   sameConversationPanelRoute,
+  conversationProjectionId,
 } from "./routeProjection";
 import type { ConversationWorkspaceSession } from "./useConversationWorkspace";
+import { projectionEchoesFor } from "./projectionEchoes";
 
 export type IncomingConversationRoute = {
   /** Router entry key plus canonical href; must change for a distinct route action. */
@@ -70,7 +72,17 @@ export function useConversationIncomingRoute({
       view &&
       historyViewId === view.id &&
       view.channelId === route.channelId &&
-      sameConversationPanelRoute(view.panelState, route.search)
+      sameConversationPanelRoute(view.panelState, route.search) &&
+      projectionEchoesFor(controller).consume(
+        conversationProjectionId(route.state),
+        (route.state as { __TSR_key?: string } | null)?.__TSR_key,
+        {
+          scopeKey: session.scopeKey,
+          viewId: view.id,
+          channelId: route.channelId,
+          panelState: route.search,
+        },
+      )
     ) {
       onAdmitted?.(view.id, route, { projectionEcho: true });
       return;
