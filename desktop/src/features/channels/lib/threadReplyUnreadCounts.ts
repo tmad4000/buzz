@@ -32,6 +32,7 @@ export function computeThreadReplyUnreadCounts(params: {
   expandedReplyIds: ReadonlySet<string>;
   getReadAt: (messageId: string) => number | null;
   currentPubkey?: string;
+  isExcluded?: (message: TimelineMessage) => boolean;
   isForcedUnread?: (messageId: string) => boolean;
 }): Map<string, number> {
   const {
@@ -42,13 +43,14 @@ export function computeThreadReplyUnreadCounts(params: {
     getReadAt,
     currentPubkey,
     isForcedUnread = () => false,
+    isExcluded = () => false,
   } = params;
 
   const subtree = new Set(subtreeReplyIds);
   const unreadReplyIds = new Set(
     timelineMessages
       .filter((message) => {
-        if (!subtree.has(message.id)) return false;
+        if (!subtree.has(message.id) || isExcluded(message)) return false;
         if (currentPubkey && message.pubkey === currentPubkey) return false;
         if (isForcedUnread(message.id)) return true;
         const readAt = getReadAt(message.id);

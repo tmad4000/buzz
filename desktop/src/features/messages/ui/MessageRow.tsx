@@ -1,3 +1,4 @@
+import { ArchiveRowActions } from "../archive/ArchiveActions";
 import * as React from "react";
 import { AlertTriangle } from "lucide-react";
 import {
@@ -68,7 +69,7 @@ export type ThreadDepthGuideAction = {
   label: string;
   message: TimelineMessage;
 };
-export const MessageRow = React.memo(
+const MessageRowContent = React.memo(
   function MessageRow({
     channelId = null,
     currentPubkey,
@@ -1002,4 +1003,13 @@ export const MessageRow = React.memo(
     prev.videoReviewContext === next.videoReviewContext,
 );
 
-MessageRow.displayName = "MessageRow";
+MessageRowContent.displayName = "MessageRow";
+export const MessageRow = React.memo(function MessageRow(
+  props: React.ComponentProps<typeof MessageRowContent>,
+) {
+  return (
+    <ArchiveRowActions channelId={props.channelId} message={props.message}>
+      <MessageRowContent {...props} />
+    </ArchiveRowActions>
+  );
+});

@@ -1,3 +1,5 @@
+import { ArchivedPanel } from "@/features/messages/archive/ArchivedPanel";
+import { useArchive } from "@/features/messages/archive/ArchiveProvider";
 import {
   AlertCircle,
   Bell,
@@ -211,6 +213,12 @@ function PersonalItemRow({
 }
 
 type InboxListPaneProps = {
+  availableChannelIds?: ReadonlySet<string>;
+  onOpenArchived?: (
+    channelId: string,
+    messageId: string,
+    rootId?: string | null,
+  ) => void;
   activeReminderEventIds?: ReadonlySet<string>;
   agentPubkeys?: ReadonlySet<string>;
   activeDraftCount: number;
@@ -241,6 +249,8 @@ type InboxListPaneProps = {
 };
 
 export function InboxListPane({
+  availableChannelIds,
+  onOpenArchived,
   activeReminderEventIds,
   agentPubkeys,
   activeDraftCount,
@@ -269,6 +279,8 @@ export function InboxListPane({
   selectedReminderId,
   unreadOnly,
 }: InboxListPaneProps) {
+  const archive = useArchive();
+  const [showArchive, setShowArchive] = React.useState(false);
   const isReminders = filter === "reminders";
   const isDrafts = filter === "drafts";
   const isMixedInboxView = filter === "all";
@@ -614,6 +626,7 @@ export function InboxListPane({
                 <PopoverTrigger asChild>
                   <button
                     aria-label="Inbox options"
+                    disabled={showArchive}
                     className={cn(INBOX_HEADER_ICON_BUTTON_CLASS, "-mr-4")}
                     data-testid="inbox-options-trigger"
                     type="button"
@@ -660,12 +673,25 @@ export function InboxListPane({
                 </PopoverContent>
               </Popover>
             </div>
-            <div className="order-1 flex shrink-0 items-center justify-start">
+            <div className="order-1 flex shrink-0 items-center justify-start gap-2">
+              {archive.enabled && onOpenArchived ? (
+                <button
+                  type="button"
+                  aria-pressed={showArchive}
+                  className="rounded px-2 py-1 text-sm font-medium hover:bg-muted/50"
+                  onClick={() => setShowArchive((value) => !value)}
+                >
+                  Archived
+                </button>
+              ) : null}
               <InboxFilterMenu
                 activeDraftCount={activeDraftCount}
                 dueReminderCount={dueReminderCount}
                 filter={filter}
-                onFilterChange={onFilterChange}
+                onFilterChange={(value) => {
+                  setShowArchive(false);
+                  onFilterChange(value);
+                }}
                 reminderCount={reminders.length}
               />
             </div>
@@ -673,7 +699,12 @@ export function InboxListPane({
         </div>
       </TopChromeInsetHeader>
 
-      {isReminders ? (
+      {showArchive && availableChannelIds && onOpenArchived ? (
+        <ArchivedPanel
+          availableChannelIds={availableChannelIds}
+          onOpen={onOpenArchived}
+        />
+      ) : isReminders ? (
         <div
           className="-mt-13 flex min-h-0 flex-1 flex-col overflow-hidden pt-13"
           data-testid="home-inbox-reminders"
