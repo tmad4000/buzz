@@ -22,6 +22,8 @@ export type ThreadLinkScope = {
   communityUrl: string;
   channelId: string;
   relaySelfPubkey?: string | null;
+  /** Captured from the current channel roster by the mounted runtime loader. */
+  jacobIsChannelMember?: boolean;
 };
 
 /** Verified annotation metadata; original message bodies are never copied here. */
@@ -142,7 +144,7 @@ export function threadMessageAuthor(
   });
 }
 
-/** Parse the exact author-only v1 wire convention; no delegated grants in v1. */
+/** Parse the v1 envelope; the projector applies the explicit organizer policy. */
 export function parseThreadLink(
   value: unknown,
   scope: ThreadLinkScope,

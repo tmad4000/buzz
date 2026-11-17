@@ -1,16 +1,14 @@
 # Thread organization annotations (v1 foundation)
 
-This is a protocol/parser/projector foundation. It is **not connected to the
-desktop UI or a CLI publisher**. No messages have been moved, no relay or
-database changes are included, and the commands below are a proposed contract,
-not installed commands. Follow-up work must exercise the actual client and an
-isolated relay before using it on a real conversation.
+This describes the protocol/parser/projector foundation. The desktop integration
+and its runtime verification are documented in [thread-links-ui.md](thread-links-ui.md).
+The author-only CLI publisher is a separate change. Reading annotations never
+rewrites originals or automatically publishes a migration.
 
 The original seven signed Nostr fields stay unchanged. An author may publish a
 separate signed annotation describing a presentation parent for their own
 message. A fork can render that overlay while official clients keep the native
-thread and see an honest short annotation receipt. Kind9 subtype acceptance on
-the deployed relay is unverified. Unknown event kinds are rejected by the
+thread and see an honest short annotation receipt. Unknown event kinds are rejected by the
 current relay, so this convention uses an ordinary channel message.
 
 ## Wire contract
@@ -40,10 +38,15 @@ it does not always promote the child to top-level. `buzz-thread-previous` is
 child. Content is descriptive; the signed tags carry the operation. Do not
 duplicate original message bodies in receipts, plans, logs or metadata exports.
 
-The signer must equal the child's effective author. Effective attribution is
-recognized only through the existing verified active-relay author resolver;
-arbitrary `p` tags are not authority. V1 has no delegation or curator bypass.
-Cross-author proposed moves remain proposals, even if the signer is an admin.
+The signer must equal the child's effective author, or be Jacob's exact trusted
+organizer key while Jacob owns or is in that channel. The desktop checks the
+current channel roster, including owner-role members, before granting that
+specific override; all other cross-author signers are rejected, including
+admins and owners. The exact key and scope fences are documented in
+[the UI signer policy](thread-links-ui.md#signer-policy). Effective attribution
+still uses the existing verified active-relay author resolver; arbitrary `p`
+tags confer no authority. The author-only CLI remains conservative; no generic
+delegation or role-based organizer grant is introduced.
 No annotations may be used as message parents or children.
 
 ## Pure projection contract

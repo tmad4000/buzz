@@ -2,6 +2,21 @@
 
 The stream/DM channel screen reads `buzz-thread-link-v1` kind9 annotations using the protocol in [thread-links.md](thread-links.md). Forum posts and huddle transcripts use their existing views.
 
+## Signer policy
+
+An annotation is honored only when its verified signer is the child message's
+author (self-organization), or Jacob's exact trusted key
+`3eb6491e9fecd5e2c0221f76b79685a1478b591bf90ea155f5352ebe12672e1f`
+and Jacob is in the current channel roster, including the owner role. Being
+another member, admin or owner grants no cross-author organization authority.
+The runtime reads the current roster with read-your-writes semantics before
+each snapshot; scope changes/aborts discard late results. Membership/access
+hints invalidate the snapshot. The worker still verifies original and
+annotation signatures before applying this policy. Unavailable membership or
+incomplete history fails closed to original positions. The original author-only
+CLI remains conservative; this client trust policy does not change signed
+originals, native ancestry or the frozen worklog producer.
+
 The UI loads the channel's annotation history before applying any organization. It resolves exact referenced originals and their native ancestors, then unions every affected canonical subthread. This matters when a previously top-level message C is displayed below A: replies whose native root remains C must still appear below A. The signed originals and tags are unchanged. Raw export and the send mutation continue using native ancestry; a presentation root is never passed to the relay as a native root. Reaction follow bookkeeping and send-to-channel provenance also retain the original native root; the UI never labels A's subject as C's native subject.
 
 The channel timeline, inline branches and independent thread panel receive a separate presentation projection. Opening a moved subroot shows its own descendants. Affected roots use counts derived from the verified union, rather than substituting the native relay summary for a projected total. Loading errors, incomplete history and resource limits retain original positions and show an explicit notice. Invalid, unauthorized or conflicting annotations remain ordinary visible messages, with receipt details available in the channel notice. Valid selected controls are represented by audit badges instead of new task messages.

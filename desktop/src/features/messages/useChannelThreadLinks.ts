@@ -2,6 +2,7 @@ import * as React from "react";
 import { relayClient } from "@/shared/api/relayClient";
 import { getThreadReplies, signRelayEvent } from "@/shared/api/tauri";
 import { getChannelMembers } from "@/shared/api/tauriChannels";
+import { captureThreadOrganizerScope } from "./lib/threadLinkOrganizer";
 import {
   isThreadLinkCandidate,
   type ThreadLinkAnnotation,
@@ -35,8 +36,14 @@ export type ThreadLinkRuntime = {
   revoke: typeof relayClient.subscribeToChannelAccessRevocations;
 };
 const runtime: ThreadLinkRuntime = {
-  load: (scope, signal, current) =>
-    loadThreadLinkSnapshot(scope, {
+  load: async (scope, signal, current) => {
+    const organizerScope = await captureThreadOrganizerScope(
+      scope,
+      getChannelMembers,
+      current,
+      signal,
+    );
+    return loadThreadLinkSnapshot(organizerScope, {
       fetch: (filter) => relayClient.fetchEvents(filter),
       replies: (root, channel, cursor) =>
         getThreadReplies(root, channel, {
@@ -55,7 +62,8 @@ const runtime: ThreadLinkRuntime = {
           signal,
         ),
       isCurrent: current,
-    }),
+    });
+  },
   subscribe: (channel, callback) =>
     relayClient.subscribeToChannelLive(channel, callback),
   reconnect: (callback) => relayClient.subscribeToReconnects(callback),
@@ -190,7 +198,8 @@ export function useChannelThreadLinks(
     void api
       .subscribe(scope.channelId, (event) => {
         if (!current()) return;
-        if (isThreadLinkCandidate(event)) invalidate();
+        if (isThreadLinkCandidate(event) || [39000, 39002].includes(event.kind))
+          invalidate();
         else if (hasLinks && event.kind !== 39005) {
           // Coalesce streaming bursts; no cryptography runs in the UI thread.
           dirty = true;

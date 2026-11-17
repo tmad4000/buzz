@@ -1,4 +1,5 @@
 import { getThreadReference } from "@/features/messages/lib/threading";
+import { threadLinkSignerAllowed } from "./threadLinkOrganizer";
 import {
   isThreadLinkCandidate,
   parseThreadLink,
@@ -236,7 +237,13 @@ export function projectThreadLinks(input: {
       );
       continue;
     }
-    if (annotation.authorPubkey !== node.author) {
+    if (
+      !threadLinkSignerAllowed(
+        annotation.authorPubkey,
+        node.author,
+        input.scope,
+      )
+    ) {
       decide("rejected", "not-child-author");
       continue;
     }
