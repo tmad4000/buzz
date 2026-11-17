@@ -223,12 +223,28 @@ test("explicit keyboard routing, cancel and new-message fallback preserve inline
   await main.getByTestId("send-to-thread").click();
   await expect(menu.getByRole("menuitem").first()).toBeFocused();
   await page.keyboard.press("End");
+  await page.evaluate(() => window.__BUZZ_E2E_HOLD_OUTBOX_PUBLISH__?.(true));
   await page.keyboard.press("Enter");
+  await expect
+    .poll(() =>
+      page.evaluate(() => window.__BUZZ_E2E_HELD_OUTBOX_PUBLISHES__?.()),
+    )
+    .toBe(1);
   await expect(editor).toBeEmpty();
+  const queuedAnnouncement = main
+    .getByRole("article", { name: "Queued message" })
+    .filter({ hasText: "A separate announcement" });
+  await expect(queuedAnnouncement).toBeVisible();
   const announcement = page
     .getByTestId("message-timeline")
     .getByTestId("message-body")
     .filter({ hasText: /^A separate announcement$/ });
+  await expect(announcement).toHaveCount(1);
+  await expect(announcement).toBeVisible();
+  expect(
+    await page.evaluate(() => window.__BUZZ_E2E_HOLD_OUTBOX_PUBLISH__?.(false)),
+  ).toBe(1);
+  await expect(queuedAnnouncement).toHaveCount(0);
   await expect(announcement).toHaveCount(1);
   await expect(announcement).toBeVisible();
   expect(
