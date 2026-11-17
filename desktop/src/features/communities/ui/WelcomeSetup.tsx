@@ -119,7 +119,7 @@ export function WelcomeSetup({
 
   return (
     <div
-      className="buzz-onboarding-neutral-theme buzz-startup-shell flex h-dvh flex-col items-center justify-center overflow-y-auto bg-background px-4 pb-36 pt-[106px] text-foreground"
+      className="buzz-onboarding-neutral-theme buzz-startup-shell relative flex h-dvh flex-col items-center justify-center overflow-y-auto bg-background px-4 pb-36 pt-[106px] text-foreground"
       data-system-color-scheme={systemColorScheme}
       data-testid="welcome-setup"
     >
@@ -328,7 +328,7 @@ export function WelcomeSetup({
           ) : null}
         </div>
       </OnboardingFooterProvider>
-      <footer className="relative z-20 shrink-0 px-4 pb-3">
+      <footer className="absolute bottom-3 right-4 z-20 max-w-[calc(100%-128px)]">
         <AppStamp />
       </footer>
     </div>
