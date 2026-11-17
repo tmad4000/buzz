@@ -339,7 +339,8 @@ test("incoming replies above and below a scrolled reader preserve anchor, focuse
         createdAt: createdAt + 2,
         channelName: "general",
       });
-      for (let index = 0; index < 3; index++) {
+      // Leave a full reading gap above the app-centered navigation target.
+      for (let index = 0; index < 10; index++) {
         emit({
           id: (8800 + index).toString(16).padStart(64, "0"),
           content: `Earlier spacer row ${index}`,
@@ -352,7 +353,7 @@ test("incoming replies above and below a scrolled reader preserve anchor, focuse
         id: ids.anchor,
         content: "Reader anchor message",
         pubkey,
-        createdAt: createdAt + 6,
+        createdAt: createdAt + 13,
         channelName: "general",
       });
       for (let index = 0; index < 18; index++)
@@ -360,14 +361,14 @@ test("incoming replies above and below a scrolled reader preserve anchor, focuse
           id: (9000 + index).toString(16).padStart(64, "0"),
           content: `Middle reading row ${index}`,
           pubkey,
-          createdAt: createdAt + 7 + index,
+          createdAt: createdAt + 14 + index,
           channelName: "general",
         });
       emit({
         id: ids.below,
         content: "Expanded below reader",
         pubkey,
-        createdAt: createdAt + 25,
+        createdAt: createdAt + 32,
         channelName: "general",
       });
       emit({
@@ -375,7 +376,7 @@ test("incoming replies above and below a scrolled reader preserve anchor, focuse
         parentEventId: ids.below,
         content: "Existing below reply",
         pubkey,
-        createdAt: createdAt + 26,
+        createdAt: createdAt + 33,
         channelName: "general",
       });
       for (let index = 0; index < 17; index++)
@@ -383,7 +384,7 @@ test("incoming replies above and below a scrolled reader preserve anchor, focuse
           id: (10000 + index).toString(16).padStart(64, "0"),
           content: `Later reading row ${index}`,
           pubkey,
-          createdAt: createdAt + 27 + index,
+          createdAt: createdAt + 34 + index,
           channelName: "general",
         });
     },
@@ -534,52 +535,59 @@ test("incoming replies above and below a scrolled reader preserve anchor, focuse
     return result;
   };
   await waitForStableLayout("seeded");
-  // Establish real upward reading intent before the one setup placement, so
-  // initial virtualizer floor settling cannot override it afterward.
-  await timeline.hover();
-  await page.mouse.wheel(0, -160);
+  // Use the same hash-route message navigation exercised by scroll-history:
+  // targetMessageId realizes the virtual row and cancels bottom intent through
+  // scrollToMessageImperative. No direct scroll writes or private hook reset.
+  await page.evaluate((messageId) => {
+    const hash = window.location.hash.replace(/^#/, "") || "/";
+    const [path, query = ""] = hash.split("?");
+    const params = new URLSearchParams(query);
+    params.set("messageId", messageId);
+    window.history.pushState(
+      {},
+      "",
+      `${window.location.pathname}#${path}?${params.toString()}`,
+    );
+    window.dispatchEvent(new HashChangeEvent("hashchange"));
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  }, ids.anchor);
+  const captureJumpPlacement = () =>
+    anchor.evaluate((element) => {
+      const scroller = element.closest('[data-testid="message-timeline"]');
+      if (!(scroller instanceof HTMLElement))
+        throw new Error("Missing scroll owner");
+      const row = element.getBoundingClientRect();
+      const viewport = scroller.getBoundingClientRect();
+      return {
+        top: row.top - viewport.top,
+        bottom: row.bottom - viewport.top,
+        viewportHeight: scroller.clientHeight,
+        centerError: Math.abs(
+          (row.top + row.bottom) / 2 -
+            (viewport.top + scroller.clientHeight / 2),
+        ),
+      };
+    });
+  // The app jump centers its target; wait for its convergence rather than
+  // imposing the former fixture-only 120px offset on estimated row geometry.
   await expect
-    .poll(() =>
-      timeline.evaluate(
-        (element) =>
-          element.scrollHeight - element.scrollTop - element.clientHeight,
-      ),
-    )
-    .toBeGreaterThan(32);
-  const retiredIntent = await waitForStableLayout("reader-wheel");
-  const retiredWindow = retiredIntent.samples.slice(-4);
-  expect(retiredWindow).toHaveLength(4);
-  // Bottom intent is private. Observable proof: native wheel, away from the
-  // floor, with no scroll movement or estimate churn over the settle window.
-  expect(
-    Math.max(...retiredWindow.map((sample) => sample.scrollTop)) -
-      Math.min(...retiredWindow.map((sample) => sample.scrollTop)),
-  ).toBeLessThanOrEqual(1);
-  const retired = retiredWindow[retiredWindow.length - 1];
-  expect(
-    retired.scrollHeight - retired.scrollTop - retired.clientHeight,
-  ).toBeGreaterThan(32);
-  await anchor.evaluate((element) => {
-    const scroller = element.closest('[data-testid="message-timeline"]');
-    if (!(scroller instanceof HTMLElement))
-      throw new Error("Missing scroll owner");
-    scroller.scrollTop +=
-      element.getBoundingClientRect().top -
-      scroller.getBoundingClientRect().top -
-      120;
+    .poll(async () => (await captureJumpPlacement()).centerError, {
+      timeout: 5000,
+    })
+    .toBeLessThanOrEqual(2);
+  await waitForStableLayout("app-jump");
+  const jumpPlacement = await captureJumpPlacement();
+  await info.attach("incoming-app-jump-placement", {
+    body: JSON.stringify(jumpPlacement),
+    contentType: "application/json",
   });
-  await waitForStableLayout("positioned");
+  expect(jumpPlacement.top).toBeGreaterThanOrEqual(0);
+  expect(jumpPlacement.bottom).toBeLessThanOrEqual(
+    jumpPlacement.viewportHeight,
+  );
+  expect(jumpPlacement.centerError).toBeLessThanOrEqual(2);
   const orderAfterPosition = await captureFixtureOrder();
   expect(orderAfterPosition.order).toEqual(expectedOrder);
-  const positionedOffset = await anchor.evaluate((element) => {
-    const scroller = element.closest('[data-testid="message-timeline"]');
-    if (!(scroller instanceof HTMLElement))
-      throw new Error("Missing scroll owner");
-    return (
-      element.getBoundingClientRect().top - scroller.getBoundingClientRect().top
-    );
-  });
-  expect(Math.abs(positionedOffset - 120)).toBeLessThanOrEqual(1);
   const assertOffscreenBaseline = async () => {
     const viewport = await timeline.boundingBox();
     const aboveBox = await aboveInline.boundingBox();
