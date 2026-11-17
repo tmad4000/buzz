@@ -56,6 +56,7 @@ import {
   MessageMetaSegments,
 } from "./MessageHeader";
 import { MessageTimestamp } from "./MessageTimestamp";
+import { ThreadOrganizationBadge } from "./ThreadOrganization";
 import { SentFromThreadLine } from "./SentFromThreadLine";
 import { WaveMessageAttachment } from "./WaveMessageAttachment";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
@@ -635,6 +636,7 @@ export const MessageRow = React.memo(
       <div className="flex shrink-0 items-baseline gap-2 text-xs">
         <MessageTimestamp createdAt={message.createdAt} />
         {statusMetadataNode}
+        <ThreadOrganizationBadge message={message} />
       </div>
     );
 
@@ -647,9 +649,11 @@ export const MessageRow = React.memo(
       ) : null;
 
     const continuationMetadataNode =
-      isDisplayedAsContinuation && statusMetadataNode ? (
+      isDisplayedAsContinuation &&
+      (statusMetadataNode || message.threadOrganization) ? (
         <div className="mt-0.5 flex items-baseline gap-2 text-xs">
           {statusMetadataNode}
+          <ThreadOrganizationBadge message={message} />
         </div>
       ) : null;
 
@@ -953,6 +957,8 @@ export const MessageRow = React.memo(
     // old `time` prop was the same value pre-formatted; this row reads neither).
     prev.message.createdAt === next.message.createdAt &&
     prev.message.depth === next.message.depth &&
+    JSON.stringify(prev.message.threadOrganization) ===
+      JSON.stringify(next.message.threadOrganization) &&
     prev.message.kind === next.message.kind &&
     prev.message.pending === next.message.pending &&
     prev.message.edited === next.message.edited &&

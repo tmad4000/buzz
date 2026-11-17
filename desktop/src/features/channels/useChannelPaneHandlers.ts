@@ -10,6 +10,7 @@ import type {
 } from "@/features/messages/hooks";
 import { resolveThreadReplyTarget } from "@/features/messages/hooks";
 import { getSendToChannelSemantics } from "@/features/messages/lib/sendToChannelSemantics";
+import { canonicalThreadRootId } from "@/features/messages/lib/applyThreadLinkPresentation";
 import { summarizeThreadRoot } from "@/features/messages/lib/sentFromThread";
 import type { TimelineMessage } from "@/features/messages/types";
 import type { UserProfileLookup } from "@/features/profile/lib/identity";
@@ -335,13 +336,19 @@ export function useChannelPaneHandlers({
         message,
         profilesRef.current,
       );
+      const canonicalRoot = canonicalThreadRootId(message);
       await sendMutateRef.current({
         channelId,
         content: message.body,
         mediaTags: semanticTags,
         mentionPubkeys,
-        sentFromThreadRootExcerpt: summarizeThreadRoot(threadRoot.body),
-        sentFromThreadRootId: threadRoot.id,
+        sentFromThreadRootExcerpt:
+          canonicalRoot === threadRoot.id
+            ? summarizeThreadRoot(threadRoot.body)
+            : canonicalRoot === message.id
+              ? summarizeThreadRoot(message.body)
+              : null,
+        sentFromThreadRootId: canonicalRoot,
       });
     },
     [],
@@ -444,7 +451,7 @@ export function useChannelPaneHandlers({
 
   const handleToggleReaction = React.useCallback(
     async (
-      message: Pick<TimelineMessage, "id" | "rootId">,
+      message: Pick<TimelineMessage, "id" | "rootId" | "canonicalRootId">,
       emoji: string,
       remove: boolean,
     ) => {
@@ -454,7 +461,7 @@ export function useChannelPaneHandlers({
         remove,
       });
       if (!remove) {
-        recordThreadInteraction(message.rootId ?? message.id);
+        recordThreadInteraction(canonicalThreadRootId(message));
       }
     },
     [recordThreadInteraction],

@@ -41,6 +41,10 @@ export type TimelineMessage = {
   body: string;
   parentId?: string | null;
   rootId?: string | null;
+  /** Canonical transport ancestry when rootId/parentId are a presentation view. */
+  canonicalParentId?: string | null;
+  canonicalRootId?: string | null;
+  threadOrganization?: import("./lib/applyThreadLinkPresentation").ThreadOrganization;
   depth: number;
   accent?: boolean;
   pending?: boolean;

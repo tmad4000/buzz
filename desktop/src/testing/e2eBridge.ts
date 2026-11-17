@@ -1314,6 +1314,11 @@ declare global {
       pubkey: string;
       status: PresenceStatus;
     }) => void;
+    /** Test-only signed fixture ingress/replacement; never contacts a relay. */
+    __BUZZ_E2E_ACCEPT_MOCK_EVENT__?: (input: {
+      channelName: string;
+      event: RelayEvent;
+    }) => void;
     __BUZZ_E2E_EMIT_MOCK_MESSAGE__?: (input: {
       channelName: string;
       content: string;
@@ -11674,6 +11679,21 @@ export function maybeInstallE2eTauriMocks() {
     refreshMockHuddleMembership(config);
     persistMockHuddle();
     await emitMockHuddleState();
+  };
+  window.__BUZZ_E2E_ACCEPT_MOCK_EVENT__ = ({ channelName, event }) => {
+    const channel = mockChannels.find(
+      (candidate) => candidate.name === channelName,
+    );
+    if (
+      !channel ||
+      !event.tags.some((tag) => tag[0] === "h" && tag[1] === channel.id)
+    )
+      throw new Error("Signed mock fixture is outside its channel");
+    const history = getMockMessageStore(channel.id);
+    const index = history.findIndex((existing) => existing.id === event.id);
+    if (index >= 0) history[index] = event;
+    else recordMockMessage(channel.id, event);
+    emitMockLiveEvent(channel.id, event);
   };
   window.__BUZZ_E2E_EMIT_MOCK_MESSAGE__ = ({
     channelName,

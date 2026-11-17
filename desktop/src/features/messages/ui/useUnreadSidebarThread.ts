@@ -34,6 +34,7 @@ type Reveal = {
 
 type State = {
   key: string | null;
+  seed: string;
   branches: ThreadExpansion;
   automatic: ThreadExpansion;
   mode?: ThreadDisplayMode;
@@ -42,11 +43,13 @@ type State = {
 };
 const empty = (
   key: string | null,
+  seed: string,
+  branches = loadThreadExpansion(key),
   mode?: ThreadDisplayMode,
-  visitOnly = false,
 ): State => ({
   key,
-  branches: visitOnly ? new Map() : loadThreadExpansion(key),
+  seed,
+  branches,
   automatic: new Map(),
   mode,
   newIds: new Set(),
@@ -88,13 +91,58 @@ export function useUnreadSidebarThread({
   const key = enabled
     ? threadExpansionKey(community, currentPubkey, channelId, root)
     : null;
+  // Manual branch choices follow the original event ID across organization.
+  // Keep the original per-root snapshots as well, so unlink is reversible.
+  const choicesKey = key
+    ? `buzz-thread-manual-expansion.v1:${JSON.stringify([community, currentPubkey ?? null, channelId])}`
+    : null;
+  const canonicalRoots = [
+    ...new Set(
+      messages
+        .map(
+          (message) =>
+            message.canonicalRootId ??
+            (message.threadOrganization ? message.id : null),
+        )
+        .filter((id): id is string => !!id && id !== root),
+    ),
+  ].sort();
+  const seed = JSON.stringify([key, canonicalRoots, visitOnly]);
+  const seedBranches = (base: ThreadExpansion) => {
+    if (visitOnly) return base;
+    const merged = new Map(base);
+    const native = new Map(
+      canonicalRoots.map((nativeRoot) => [
+        nativeRoot,
+        loadThreadExpansion(
+          threadExpansionKey(community, currentPubkey, channelId, nativeRoot),
+        ),
+      ]),
+    );
+    for (const message of messages) {
+      const nativeRoot =
+        message.canonicalRootId ??
+        (message.threadOrganization ? message.id : null);
+      const choice = nativeRoot
+        ? native.get(nativeRoot)?.get(message.id)
+        : undefined;
+      if (choice !== undefined) merged.set(message.id, choice);
+    }
+    for (const [id, choice] of loadThreadExpansion(choicesKey))
+      merged.set(id, choice);
+    return merged;
+  };
   const [saved, setSaved] = React.useState<State>(() =>
-    empty(key, initialMode, visitOnly),
+    empty(key, seed, seedBranches(visitOnly ? new Map() : loadThreadExpansion(key)), initialMode),
   );
-  const state = React.useMemo(
-    () => (saved.key === key ? saved : empty(key, initialMode, visitOnly)),
-    [saved, key, initialMode, visitOnly],
-  );
+  // Seed only on a committed scope/union change; re-rendering may not undo a
+  // fresh explicit toggle or reset the stable unread/reveal snapshot.
+  const state =
+    saved.key === key && saved.seed === seed
+      ? saved
+      : saved.key === key
+        ? { ...saved, seed, branches: seedBranches(saved.branches) }
+        : empty(key, seed, seedBranches(visitOnly ? new Map() : loadThreadExpansion(key)), initialMode);
   const index = React.useMemo(
     () => indexOverride ?? buildThreadPanelIndex(messages),
     [messages, indexOverride],
@@ -260,13 +308,14 @@ export function useUnreadSidebarThread({
   const view = React.useMemo(
     () => ({
       key,
+      seed,
       branches,
       automatic,
       mode: state.mode,
       newIds: stableNewIds,
       reveal,
     }),
-    [key, branches, automatic, state.mode, stableNewIds, reveal],
+    [key, seed, branches, automatic, state.mode, stableNewIds, reveal],
   );
   const withoutRevealedBranches = React.useCallback(
     (
@@ -341,6 +390,7 @@ export function useUnreadSidebarThread({
     if (!enabled || !key || live.current !== view) return;
     if (
       saved.key === key &&
+      saved.seed === seed &&
       state.branches === view.branches &&
       state.automatic === view.automatic &&
       state.newIds === view.newIds &&
@@ -350,7 +400,7 @@ export function useUnreadSidebarThread({
     setSaved(view);
     if (!visitOnly && state.branches !== view.branches)
       setPreferenceError(!saveThreadExpansion(key, view.branches));
-  }, [enabled, key, saved.key, state, view, visitOnly]);
+  }, [enabled, key, seed, saved.key, saved.seed, state, view, visitOnly]);
   const expanded = new Set(
     [...new Map([...automatic, ...branches])]
       .filter(([, open]) => open)
@@ -396,31 +446,43 @@ export function useUnreadSidebarThread({
     .sort(
       (a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id),
     )[0]?.id;
-  const commit = (next: ThreadExpansion, reveal: Reveal) => {
+  const commit = (
+    next: ThreadExpansion,
+    reveal: Reveal,
+    manualPersisted = true,
+  ) => {
     const current = live.current;
     if (current.key !== key) return;
     const updated = { ...current, branches: next, reveal };
     live.current = updated;
     // Persist in the interaction, before navigation or an immediate app close.
     if (current.key && !visitOnly && current.branches !== next)
-      setPreferenceError(!saveThreadExpansion(current.key, next));
+      setPreferenceError(
+        !saveThreadExpansion(current.key, next) || !manualPersisted,
+      );
     setSaved(updated);
   };
   const setExpanded = (id: string, open: boolean) => {
+    if (live.current.key !== key) return;
     const next = new Map(live.current.branches);
     next.set(id, open);
-    commit(
-      next,
-      withoutRevealedBranches(live.current.reveal, new Set([id]), true),
-    );
-  };
-  const toggle = (message: TimelineMessage) => {
-    const next = new Map(live.current.branches);
-    next.set(message.id, !expanded.has(message.id));
+    let manualPersisted = true;
+    if (choicesKey && !visitOnly) {
+      const manual = new Map(loadThreadExpansion(choicesKey));
+      manual.set(id, open);
+      manualPersisted = saveThreadExpansion(choicesKey, manual);
+    }
     // The user's toggle also cancels any older pending automatic reveal.
     commit(
       next,
-      withoutRevealedBranches(live.current.reveal, new Set([message.id]), true),
+      withoutRevealedBranches(live.current.reveal, new Set([id]), true),
+      manualPersisted,
+    );
+  };
+  const toggle = (message: TimelineMessage) => {
+    setExpanded(
+      message.id,
+      !(live.current.branches.get(message.id) ?? expanded.has(message.id)),
     );
   };
   const revealMessage = (id: string) => {
