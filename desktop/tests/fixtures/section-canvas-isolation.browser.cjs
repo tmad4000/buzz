@@ -141,6 +141,12 @@ if (!origin) throw new Error("Set BUZZ_HOST_FIXTURE_ORIGIN");
       "DM canvas replacement cannot change section membership",
     );
     if (process.env.BUZZ_SECTION_SCREENSHOTS) {
+      await expect(
+        page.getByTestId("sidebar-channel-drag-overlay"),
+      ).toHaveCount(0);
+      await expect(page.getByTestId("conversation-drop-preview")).toHaveCount(
+        0,
+      );
       fs.mkdirSync(process.env.BUZZ_SECTION_SCREENSHOTS, { recursive: true });
       await page.screenshot({
         path: path.join(
