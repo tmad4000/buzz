@@ -909,3 +909,22 @@ test("rememberPublishedId_evictsOldestBeyondCap", () => {
 
   mgr.destroy();
 });
+
+test("reply observation keys cannot exhaust the permanent channel budget", () => {
+  const channelEntries = [["channel", 200]];
+  const threadMsgEntries = Array.from({ length: 1800 }, (_, i) => [
+    `msg:seen:v1:${"a".repeat(64)}:${i.toString(16).padStart(64, "0")}`,
+    100,
+  ]);
+  const result = splitContextsIntoBudgetedSlots({
+    channelEntries,
+    threadMsgEntries,
+    clientId: "test",
+    initialSlotCount: 1,
+    maxSlots: 8,
+    maxBytes: 32768,
+    slotIdGenerator: () => "extra",
+  });
+  assert.ok(result);
+  assert.equal(result.slots[0].channel, 200);
+});

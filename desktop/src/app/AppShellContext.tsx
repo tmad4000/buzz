@@ -38,6 +38,12 @@ type AppShellContextValue = {
   // read. Uses `msg:<id>` context keys folded through the active channel by the
   // parent resolver (LP4 v3 per-message badge model).
   getMessageReadAt: (messageId: string) => number | null;
+  getThreadReplySeenAt: (rootId: string, replyId: string) => number | null;
+  markThreadReplySeen: (
+    rootId: string,
+    replyId: string,
+    timestamp: number,
+  ) => void;
   // Read frontier for a channel-activity item, scoped to that item's own
   // message and channel rather than the currently mounted channel resolver.
   getChannelActivityItemReadAt: (
@@ -92,6 +98,8 @@ const AppShellContext = React.createContext<AppShellContextValue>({
   getThreadReadAt: () => null,
   markThreadRead: () => {},
   getMessageReadAt: () => null,
+  getThreadReplySeenAt: () => null,
+  markThreadReplySeen: () => {},
   getChannelActivityItemReadAt: () => null,
   markMessageRead: () => {},
   readStateVersion: 0,

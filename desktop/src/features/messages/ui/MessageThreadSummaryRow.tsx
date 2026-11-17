@@ -241,10 +241,11 @@ export function MessageThreadSummaryRow({
       ) : null}
 
       <button
-        aria-label={summaryAriaLabel}
+        aria-label={`${summaryAriaLabel}${unreadCount ? `, ${unreadCount} new unseen replies` : ""}`}
         aria-expanded={expanded}
         aria-controls={controlsId}
-        className="group relative isolate inline-flex h-[1.875rem] w-fit max-w-full cursor-pointer items-center gap-1.5 rounded-full py-0 pr-3 text-left text-xs font-medium text-muted-foreground transition-[color,opacity] hover:text-foreground hover:opacity-90 focus-visible:outline-hidden"
+        className="group relative isolate inline-flex h-[1.875rem] w-fit max-w-full cursor-pointer items-center gap-1.5 rounded-full py-0 pr-3 text-left text-xs font-medium text-muted-foreground data-[unseen=true]:font-semibold data-[unseen=true]:text-primary transition-[color,opacity] hover:text-foreground hover:opacity-90 focus-visible:outline-hidden"
+        data-unseen={Boolean(unreadCount)}
         data-thread-head-id={message.id}
         data-testid="message-thread-summary"
         onClick={() => onOpenThread(message)}
@@ -304,12 +305,24 @@ export function MessageThreadSummaryRow({
         </div>
         <div className="relative z-10 min-w-0">
           <div>
-            <span className="font-medium transition-colors group-hover:text-foreground">
+            <span
+              className={cn(
+                "transition-colors group-hover:text-foreground",
+                unreadCount ? "font-semibold" : "font-medium",
+              )}
+            >
               {summary.replyCount} {replyLabel}
             </span>
             {unreadCount != null && unreadCount > 0 ? (
-              <span className="ml-1" data-testid="thread-unread-badge">
-                ({unreadCount} new)
+              <span
+                className="ml-1 inline-flex items-center gap-1 font-semibold text-primary"
+                data-testid="thread-unread-badge"
+              >
+                <span
+                  aria-hidden="true"
+                  className="size-1.5 rounded-full bg-primary"
+                />
+                {unreadCount} new
               </span>
             ) : null}
             {summary.lastReplyAt ? (
