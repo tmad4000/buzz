@@ -362,3 +362,43 @@ test("thread archive completing after channel membership revocation cannot commi
   assert.equal(api.canArchive("c"), false);
   assert.equal(api.records.has("t:r"), false);
 });
+
+test("archive observer adapter excludes archived bodies, fences captured callbacks and re-arms after unarchive", async () => {
+  const { useArchiveVisibilityGate } = await import(
+    "./useArchiveVisibilityGate.ts"
+  );
+  const items = [{ ...root, id: "q", parentId: "r", rootId: "r" }];
+  let gate;
+  function GateProbe() {
+    gate = useArchiveVisibilityGate(items, "same-view-visit");
+    return null;
+  }
+  mount(h(GateProbe));
+  await waitFor(() => assert.equal(api.ready, true));
+  assert.deepEqual(
+    gate.messages.map((message) => message.id),
+    ["q"],
+  );
+  const captured = gate.filterVisible,
+    initialScope = gate.scope;
+  await React.act(async () => api.toggle("c", items[0]));
+  assert.deepEqual(gate.messages, []);
+  assert.deepEqual(
+    captured(items),
+    [],
+    "old queued callback reads current archive authority",
+  );
+  assert.notEqual(gate.scope, initialScope);
+  const archivedScope = gate.scope;
+  await React.act(async () => api.toggle("c", items[0]));
+  assert.deepEqual(
+    gate.messages.map((message) => message.id),
+    ["q"],
+  );
+  assert.notEqual(
+    gate.scope,
+    archivedScope,
+    "scope epoch resets the existing observer's sent-ID set, so a previously excluded body can be observed after unarchive",
+  );
+  assert.deepEqual(cmds, [], "adapter itself never writes read or seen state");
+});

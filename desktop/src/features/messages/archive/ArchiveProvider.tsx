@@ -1,3 +1,4 @@
+import { excludeArchivedReplies } from "./unseen";
 import * as React from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -27,6 +28,10 @@ export type ArchiveApi = {
   ready: boolean;
   revision: number;
   records: ReadonlyMap<string, ArchiveTarget>;
+  filterUnarchived: (
+    messages: TimelineMessage[],
+    rootId?: string,
+  ) => TimelineMessage[];
   isArchived: (
     channelId: string,
     id: string,
@@ -45,6 +50,7 @@ const ArchiveContext = React.createContext<ArchiveApi>({
   ...empty,
   ready: true, // Isolated consumers without the AppShell provider retain existing behavior.
   enabled: false,
+  filterUnarchived: (messages) => messages,
   canArchive: () => false,
   isArchived: () => false,
   showArchived: () => false,
@@ -232,6 +238,12 @@ export function ArchiveProvider({
       ready: snapshot.ready,
       revision: snapshot.revision,
       records: snapshot.records,
+      filterUnarchived: (messages, rootId) => {
+        const live = current?.get();
+        return live?.ready
+          ? excludeArchivedReplies(messages, live.records, rootId)
+          : [];
+      },
       isArchived: (channelId, id, rootId) =>
         current?.isArchived(channelId, id, rootId) ?? false,
       showArchived: (channelId) => current?.showArchived(channelId) ?? false,

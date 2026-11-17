@@ -46,15 +46,29 @@ to `unseenRepliesByRoot` in place of the raw concatenated array; add
 `archive.records` to that memo's dependency list. This suppresses archived
 messages and all replies of archived threads for header/summary unseen counts.
 Unarchive restores their original literal-observation status. Preserve the
-existing committed-body observer, active-view admission and seen writer exactly.
+existing committed-body observer, active-view admission and seen writer for
+nonarchived bodies. Archived bodies must never reach markRead/markSeen.
 Do not treat archive, fetching, mounting, Show, or expansion as observation.
 
 The older base's ordinary unread projection is already filtered. This adapter
 must also be applied if the integrating owner replaces that projection with PR28.
 The archive adapter consumes PR28's exact `getThreadReplyObservedAt`/readiness contract;
 legacy `getThreadReplySeenAt` frontier progress is not positive body evidence.
-Archive/exclusion never calls markSeen or markRead; only admitted body observation
-may write observation markers.
+Archive/exclusion never calls markSeen or markRead. In `markVisibleReplies`, use
+`archive.filterUnarchived(messages,rootId)` before markRead/markSeen and add that
+function to callback dependencies. It reads the current engine state, so an old
+queued observer callback cannot acknowledge a newly archived body. It admits
+nothing until archive hydration is ready. Nonarchived body admission is unchanged.
+
+The existing `useVisibleThreadReplies` must also use the optional
+`useArchiveVisibilityGate(messages,scope,rootId)` adapter from
+`@/features/messages/archive/useArchiveVisibilityGate`: observe `gate.messages`,
+include `gate.scope` in the existing view-local observer scope, and recheck
+`gate.filterVisible([message],rootId)` **before** adding an ID to `sent`.
+The scope epoch re-arms the same observer after unarchive/readiness changes;
+otherwise its old sent-ID cache could permanently consume an excluded body.
+Do not add a second observer or change persisted canonical keys. “Show archived”
+is only presentation: archived bodies remain excluded from acknowledgements.
 
 ## Timeline and sections
 
