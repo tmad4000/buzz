@@ -1,3 +1,5 @@
+import 'outbox/message_outbox.dart';
+import 'outbox/outbox_provider.dart';
 import 'dart:async';
 import 'dart:math' as math;
 
@@ -118,6 +120,13 @@ class ThreadDetailPage extends HookConsumerWidget {
       return session.registerVisibleChannel(channelId);
     }, [channelId]);
     final sendMessage = ref.read(sendMessageProvider);
+    final durableOutbox = ref.watch(messageOutboxProvider.future);
+    final queueConfig = ref.watch(relayConfigProvider);
+    final queueAuthor = SignedEventRelay(
+      session: ref.read(relaySessionProvider.notifier),
+      nsec: queueConfig.nsec,
+    ).pubkey;
+
     final localSendAnimations = ref.watch(
       localMessageSendAnimationProvider(channelId),
     );
@@ -946,6 +955,38 @@ class ThreadDetailPage extends HookConsumerWidget {
                         threadHeadId: threadHead.id,
                         rootId: effectiveRootId,
                         onFocusRequested: followThreadTailFromComposer,
+                        onQueue:
+                            (
+                              text,
+                              mentions, {
+                              mediaTags = const [],
+                              attachments = const <OutboxAttachment>[],
+                              mentionKeys = const <String, String>{},
+                            }) async {
+                              final author = queueAuthor;
+                              if (author == null) {
+                                throw StateError('No signing identity');
+                              }
+                              final destination = channel;
+                              if (destination == null) {
+                                throw StateError(
+                                  'Channel metadata is not ready',
+                                );
+                              }
+                              final message = outboxMessage(
+                                config: queueConfig,
+                                author: author,
+                                channel: destination,
+                                text: text,
+                                mentions: mentions,
+                                mediaTags: mediaTags,
+                                mentionKeys: mentionKeys,
+                                parentId: threadHead.id,
+                                rootId: effectiveRootId,
+                              );
+                              final outbox = await durableOutbox;
+                              await outbox.enqueue(message, attachments);
+                            },
                         onSend:
                             (
                               content,

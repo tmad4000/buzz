@@ -1,3 +1,5 @@
+import 'outbox/message_outbox.dart';
+import 'outbox/outbox_provider.dart';
 import 'dart:async';
 import 'dart:math' show cos, max, min, pi;
 import 'dart:ui' show ImageFilter, lerpDouble;
@@ -272,6 +274,13 @@ class ChannelDetailPage extends HookConsumerWidget {
     final composerFocusNode = useFocusNode();
     final restoreComposerFocus = useRef<VoidCallback?>(null);
     final sendMessage = ref.read(sendMessageProvider);
+    final durableOutbox = ref.watch(messageOutboxProvider.future);
+    final queueConfig = ref.watch(relayConfigProvider);
+    final queueAuthor = SignedEventRelay(
+      session: ref.read(relaySessionProvider.notifier),
+      nsec: queueConfig.nsec,
+    ).pubkey;
+
     final detailsAsync = ref.watch(channelDetailsProvider(channel.id));
     final channelsAsync = ref.watch(channelsProvider);
     final messagesState = ref.watch(channelMessagesProvider(channel.id));
@@ -840,6 +849,30 @@ class ChannelDetailPage extends HookConsumerWidget {
                         channelName: resolvedChannel.isDm
                             ? ''
                             : resolvedChannel.name,
+                        onQueue:
+                            (
+                              text,
+                              mentions, {
+                              mediaTags = const [],
+                              attachments = const <OutboxAttachment>[],
+                              mentionKeys = const <String, String>{},
+                            }) async {
+                              final author = queueAuthor;
+                              if (author == null) {
+                                throw StateError('No signing identity');
+                              }
+                              final message = outboxMessage(
+                                config: queueConfig,
+                                author: author,
+                                channel: resolvedChannel,
+                                text: text,
+                                mentions: mentions,
+                                mediaTags: mediaTags,
+                                mentionKeys: mentionKeys,
+                              );
+                              final outbox = await durableOutbox;
+                              await outbox.enqueue(message, attachments);
+                            },
                         onSend:
                             (
                               content,

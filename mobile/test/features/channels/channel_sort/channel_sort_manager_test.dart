@@ -1,3 +1,4 @@
+import '../../../support/submission_only_relay.dart';
 import 'dart:async';
 import 'dart:convert';
 
@@ -302,7 +303,9 @@ class _SubmittedEvent {
   const _SubmittedEvent(this.content, this.tags, this.createdAt);
 }
 
-class _RecordingSignedEventRelay implements SignedEventRelay {
+class _RecordingSignedEventRelay
+    with SubmissionOnlyRelay
+    implements SignedEventRelay {
   final submitted = Completer<_SubmittedEvent>();
   int submitCount = 0;
 

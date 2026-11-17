@@ -11,8 +11,9 @@ List<MentionCandidate> _resolveComposerMentions(
   String text,
   Map<String, MentionCandidate> selected,
   List<MentionCandidate> members,
-  List<MentionCandidate> restoredCandidates,
-) {
+  List<MentionCandidate> restoredCandidates, {
+  bool deferValidation = false,
+}) {
   // A broken record cannot fall back to a same-name roster entry.
   if (selected.values.any((c) => c.pubkey.isEmpty)) {
     throw const FormatException(
@@ -42,12 +43,16 @@ List<MentionCandidate> _resolveComposerMentions(
       final current = restoredCandidates
           .where((c) => c.pubkey == entry.key)
           .firstOrNull;
-      if (selected.requiresRevalidation && current == null) {
+      if (selected.requiresRevalidation &&
+          current == null &&
+          !deferValidation) {
         throw const FormatException(
           'Saved mention is no longer available. Select it again from the picker.',
         );
       }
-      winners[entry.key] = selected.requiresRevalidation ? current! : selected;
+      winners[entry.key] = selected.requiresRevalidation
+          ? (current ?? selected)
+          : selected;
     }
   }
   return winners.values.toList();

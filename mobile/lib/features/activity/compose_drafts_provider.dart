@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:uuid/uuid.dart';
 
 import 'package:flutter/foundation.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -27,6 +28,7 @@ class ComposeDraft {
   /// An empty key/value is a malformed-record tombstone; send must refuse it.
   final Map<String, String> mentionKeys;
   final int updatedAt; // unix seconds
+  final String revision;
 
   const ComposeDraft({
     required this.key,
@@ -35,6 +37,7 @@ class ComposeDraft {
     required this.text,
     required this.updatedAt,
     this.mentionKeys = const {},
+    this.revision = '',
   });
 
   Map<String, dynamic> toJson() => {
@@ -44,6 +47,7 @@ class ComposeDraft {
     'text': text,
     'mention_keys': mentionKeys,
     'updated_at': updatedAt,
+    'revision': revision,
   };
 
   static ComposeDraft? fromJson(Object? raw) {
@@ -82,6 +86,7 @@ class ComposeDraft {
       mentionKeys: Map.unmodifiable(mentionKeys),
       text: text,
       updatedAt: updatedAt is int ? updatedAt : 0,
+      revision: raw['revision'] is String ? raw['revision'] as String : '',
     );
   }
 }
@@ -154,6 +159,7 @@ class ComposeDraftsNotifier extends Notifier<List<ComposeDraft>> {
       text: text,
       mentionKeys: Map.unmodifiable(mentionKeys),
       updatedAt: DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      revision: const Uuid().v4(),
     );
     final next = [draft, ...state.where((d) => d.key != key)];
     _persist(next.length > _maxDrafts ? next.sublist(0, _maxDrafts) : next);
@@ -167,6 +173,62 @@ class ComposeDraftsNotifier extends Notifier<List<ComposeDraft>> {
   /// Read text and selected identities from the same persisted snapshot.
   ComposeDraft? draftFor(String key) =>
       state.where((d) => d.key == key).firstOrNull;
+
+  /// Capture a narrow retirement receipt that remains safe after navigation or
+  /// an account switch. A newer draft in this exact scope always wins.
+  Future<void> Function() captureRetirement(
+    String key,
+    String text,
+    Map<String, String> mentionKeys,
+  ) {
+    final scopeKey = _prefsKey;
+    final prefs = ref.read(savedPrefsProvider);
+    var source = draftFor(key);
+    if (source == null ||
+        source.text != text ||
+        !mapEquals(source.mentionKeys, mentionKeys)) {
+      return () async {};
+    }
+    if (source.revision.isEmpty) {
+      source = ComposeDraft(
+        key: source.key,
+        channelId: source.channelId,
+        threadHeadId: source.threadHeadId,
+        text: source.text,
+        mentionKeys: source.mentionKeys,
+        updatedAt: source.updatedAt,
+        revision: const Uuid().v4(),
+      );
+      _persist([
+        for (final draft in state)
+          if (draft.key == key) source else draft,
+      ]);
+    }
+    final revision = source.revision;
+    return () async {
+      final raw = prefs.getString(scopeKey);
+      if (raw == null) return;
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return;
+      final drafts = decoded
+          .map(ComposeDraft.fromJson)
+          .whereType<ComposeDraft>()
+          .toList();
+      final captured = drafts.where((draft) => draft.key == key).firstOrNull;
+      if (captured?.revision != revision ||
+          captured?.text != text ||
+          !mapEquals(captured?.mentionKeys, mentionKeys)) {
+        return;
+      }
+      final next = drafts.where((draft) => draft.key != key).toList();
+      final write = prefs.setString(
+        scopeKey,
+        jsonEncode([for (final draft in next) draft.toJson()]),
+      );
+      if (ref.mounted && _prefsKey == scopeKey) state = List.unmodifiable(next);
+      await write;
+    };
+  }
 
   String? textFor(String key) => draftFor(key)?.text;
 
