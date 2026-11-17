@@ -51,6 +51,95 @@ const panes = (controller) => listPanes(controller.getSnapshot().layout.root);
 const split = (controller) =>
   controller.open(panes(controller)[0].id, "chat", "horizontal", bounds, 1440);
 
+test("returning to a chat restores only that view's latest presentation", () => {
+  const { controller } = setup();
+  const a = panes(controller)[0].viewInstanceId;
+  const update = (view, channel, patch) =>
+    controller.update(view, channel, controller.visitToken(view), patch);
+  update(a, "chat", {
+    panelState: { thread: "root-a" },
+    timelineAnchor: { messageId: "message-a", offset: 42 },
+  });
+  split(controller);
+  const b = panes(controller)[1].viewInstanceId;
+  update(b, "chat", { panelState: { thread: "root-b" } });
+  controller.navigate(a, "dm");
+  update(a, "dm", { panelState: { thread: "dm-root" } });
+  controller.navigate(a, "chat");
+  let views = controller.getSnapshot().layout.views;
+  assert.equal(views[a].panelState.thread, "root-a");
+  assert.deepEqual(views[a].timelineAnchor, {
+    messageId: "message-a",
+    offset: 42,
+  });
+  assert.equal(views[b].panelState.thread, "root-b");
+  controller.navigate(b, "dm");
+  controller.navigate(b, "chat");
+  views = controller.getSnapshot().layout.views;
+  assert.equal(views[b].panelState.thread, "root-b");
+  controller.navigate(a, "dm");
+  assert.equal(
+    controller.getSnapshot().layout.views[a].panelState.thread,
+    "dm-root",
+  );
+  controller.dispose();
+});
+
+test("visit recency keeps twenty chats including the active one and never changes on veto", () => {
+  let allowed = true;
+  const { controller } = setup({
+    canOpen: () => true,
+    canLeave: () => allowed,
+  });
+  const id = panes(controller)[0].viewInstanceId;
+  const remember = (channel) => {
+    controller.navigate(id, channel);
+    controller.update(id, channel, controller.visitToken(id), {
+      panelState: { thread: `root-${channel}` },
+    });
+  };
+  for (let index = 0; index < 20; index++) remember(`chat-${index}`);
+  allowed = false;
+  const before = controller.getSnapshot();
+  assert.equal(controller.navigate(id, "denied"), false);
+  assert.equal(controller.getSnapshot(), before);
+  allowed = true;
+  controller.navigate(id, "chat-0");
+  assert.equal(
+    controller.getSnapshot().layout.views[id].panelState.thread,
+    "root-chat-0",
+  );
+  remember("chat-20");
+  controller.navigate(id, "chat-0");
+  assert.equal(
+    controller.getSnapshot().layout.views[id].panelState.thread,
+    "root-chat-0",
+  );
+  controller.navigate(id, "chat-1");
+  assert.deepEqual(controller.getSnapshot().layout.views[id].panelState, {});
+  controller.dispose();
+});
+
+test("explicit route presentation overrides remembered state and cannot alias caller objects", () => {
+  const { controller } = setup();
+  const id = panes(controller)[0].viewInstanceId;
+  const presentation = {
+    panelState: { thread: "explicit", autoSend: "never" },
+    timelineAnchor: { messageId: "target", offset: 7 },
+    threadAnchor: null,
+  };
+  controller.navigate(id, "dm", presentation);
+  presentation.panelState.thread = "changed";
+  presentation.timelineAnchor.offset = 999;
+  controller.navigate(id, "chat");
+  controller.navigate(id, "dm");
+  const view = controller.getSnapshot().layout.views[id];
+  assert.equal(view.panelState.thread, "explicit");
+  assert.equal(view.panelState.autoSend, undefined);
+  assert.equal(view.timelineAnchor.offset, 7);
+  controller.dispose();
+});
+
 test("authorized admission precedes storage reads; saved inaccessible chats remain placeholders", () => {
   let reads = 0;
   assert.throws(() =>

@@ -17,6 +17,7 @@ import {
   type SplitAxis,
 } from "./model";
 import { canSplit, type Size } from "./geometry";
+import { ConversationVisitCache } from "./visitCache";
 import {
   restoreLayout,
   saveLayout,
@@ -45,7 +46,7 @@ type Options = {
   saveDelayMs?: number;
 };
 
-/** One authorized workspace lifetime. Resource caches/drafts and compact projection live elsewhere. */
+/** One authorized workspace lifetime. Canonical resources/drafts and compact projection live elsewhere. */
 export class ConversationLayoutController {
   private snapshot: LayoutControllerSnapshot;
   private savedSplit: ConversationLayout | null = null;
@@ -55,6 +56,7 @@ export class ConversationLayoutController {
   private dirty = false;
   private revision = 0;
   private visits = new Map<string, number>();
+  private presentations = new ConversationVisitCache();
   private ids: CreateId;
   private options: Options;
 
@@ -110,6 +112,7 @@ export class ConversationLayoutController {
     for (const id of this.visits.keys()) {
       if (!retained.has(id)) this.visits.delete(id);
     }
+    this.presentations.retain(retained);
     this.dirty = true;
     if (deferSave) {
       if (this.timer !== null) clearTimeout(this.timer);
@@ -178,17 +181,21 @@ export class ConversationLayoutController {
       !this.current()
     )
       return false;
+    // Only admitted navigation may change recency or evict another remembered chat.
+    this.presentations.remember(outgoing);
+    const restored =
+      presentation ?? this.presentations.recall(viewId, channelId);
     // Fence A -> B -> A callbacks, which a channel-ID-only comparison cannot distinguish.
     this.visits.set(viewId, (this.visits.get(viewId) ?? 0) + 1);
     const pane = listPanes(layout.root).find(
       (candidate) => candidate.viewInstanceId === viewId,
     );
-    return this.change(
-      focusPane(
-        navigateView(layout, viewId, channelId, presentation),
-        pane?.id ?? layout.focusedPaneId,
-      ),
+    const next = focusPane(
+      navigateView(layout, viewId, channelId, restored),
+      pane?.id ?? layout.focusedPaneId,
     );
+    this.presentations.remember(next.views[viewId]);
+    return this.change(next);
   }
   /** Capture at render time; use for delayed panel/anchor persistence callbacks. */
   visitToken(viewId: string) {
