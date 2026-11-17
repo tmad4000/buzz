@@ -304,7 +304,7 @@ export function useChannelPaneHandlers({
       mentionPubkeys: string[],
       mediaTags?: string[][],
       channelId?: string | null,
-      _threadContext?: {
+      threadContext?: {
         parentEventId: string | null;
         threadHeadId: string | null;
       } | null,
@@ -315,8 +315,10 @@ export function useChannelPaneHandlers({
         mentionPubkeys,
         mediaTags,
         channelId: channelId ?? undefined,
+        parentEventId: threadContext?.parentEventId ?? undefined,
         forceRest,
       });
+      if (threadContext?.parentEventId) toast.success("Sent to thread");
     },
     [],
   );

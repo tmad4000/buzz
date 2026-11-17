@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useConversationReadAdmission } from "@/features/conversations/ConversationViewContext";
 
 import { useAppShell } from "@/app/AppShellContext";
 import { isThreadReply } from "@/features/messages/lib/threading";
@@ -22,11 +23,12 @@ export function useChannelOpenReadState(
   isChannelMember: boolean | undefined,
   activeReadAt: string | null,
 ) {
+  const { canRead } = useConversationReadAdmission();
   const { feedItemState, locallyUnreadFeedItems, markChannelRead } =
     useAppShell();
 
   React.useEffect(() => {
-    if (!activeChannelId || isChannelMember === false) return;
+    if (!canRead() || !activeChannelId || isChannelMember === false) return;
     for (const itemId of getTopLevelInboxUnreadOverrideIds(
       locallyUnreadFeedItems,
       activeChannelId,
@@ -35,6 +37,7 @@ export function useChannelOpenReadState(
     }
     markChannelRead(activeChannelId, activeReadAt, { topLevelOnly: true });
   }, [
+    canRead,
     activeChannelId,
     activeReadAt,
     feedItemState.undoUnread,

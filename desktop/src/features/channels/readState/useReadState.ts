@@ -1,14 +1,12 @@
 import * as React from "react";
-import {
-  ReadStateManager,
-  type ContextParentResolver,
-} from "@/features/channels/readState/readStateManager";
+import { ReadStateManager } from "@/features/channels/readState/readStateManager";
+import { ContextParentRegistry } from "./contextParentRegistry";
 import type { RelayClient } from "@/shared/api/relayClientSession";
 
 const noopGetTimestamp = () => null;
 const noopMarkRead = () => {};
 const noopDrainAdvances = (): ReadonlySet<string> => new Set<string>();
-const noopSetResolver = () => {};
+const noopRegisterParents = () => () => {};
 
 /**
  * React hook that creates and manages a ReadStateManager instance.
@@ -26,6 +24,11 @@ export function useReadState(
     string | null
   >(null);
   const managerRef = React.useRef<ReadStateManager | null>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: discard the graph on identity/relay changes.
+  const parents = React.useMemo(
+    () => new ContextParentRegistry(),
+    [pubkey, relayClient],
+  );
 
   // Create/destroy manager when pubkey becomes available/changes
   React.useEffect(() => {
@@ -34,6 +37,7 @@ export function useReadState(
 
     let isCancelled = false;
     const manager = new ReadStateManager(pubkey, relayClient);
+    manager.setContextParentResolver(parents.resolve);
     managerRef.current = manager;
 
     const unsubscribe = manager.subscribe(() => {
@@ -52,7 +56,7 @@ export function useReadState(
       manager.destroy();
       managerRef.current = null;
     };
-  }, [pubkey, relayClient]);
+  }, [pubkey, relayClient, parents]);
 
   const getEffectiveTimestamp = React.useCallback(
     (contextId: string): number | null => {
@@ -86,11 +90,19 @@ export function useReadState(
     return managerRef.current?.drainSyncedAdvances() ?? new Set<string>();
   }, []);
 
-  const setContextParentResolver = React.useCallback(
-    (resolver: ContextParentResolver | null): void => {
-      managerRef.current?.setContextParentResolver(resolver);
+  const registerContextParents = React.useCallback(
+    (entries: ReadonlyMap<string, string>) => {
+      const release = parents.register(entries);
+      if (entries.size) forceUpdate();
+      let released = false;
+      return () => {
+        if (released) return;
+        released = true;
+        release();
+        if (entries.size) forceUpdate();
+      };
     },
-    [],
+    [parents],
   );
 
   const isReady = Boolean(
@@ -104,7 +116,7 @@ export function useReadState(
       markContextRead: noopMarkRead,
       seedContextRead: noopMarkRead,
       drainSyncedAdvances: noopDrainAdvances,
-      setContextParentResolver: noopSetResolver,
+      registerContextParents: noopRegisterParents,
       readStateVersion: 0,
       getOwnTimestamp: noopGetTimestamp,
     };
@@ -116,7 +128,7 @@ export function useReadState(
     markContextRead,
     seedContextRead,
     drainSyncedAdvances,
-    setContextParentResolver,
+    registerContextParents,
     readStateVersion,
     getOwnTimestamp,
   };

@@ -113,6 +113,8 @@ export type MessageComposerProps = {
   /** Render the app-wide upload queue above this composer dock. */
   showBackgroundUploadProgress?: boolean;
   toolbarExtraActions?: ReactNode;
+  /** Loaded roots from this pane only; enables explicit routing beside Send. */
+  threadRoutingEntries?: readonly import("../lib/threadPanel").MainTimelineEntry[];
   typingParentEventId?: string | null;
   typingRootEventId?: string | null;
 };
