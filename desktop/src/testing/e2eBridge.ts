@@ -4500,12 +4500,15 @@ function assertExpectedRelayScope(
   }
 }
 
-/** Same ws(s) normalization the app applies to community relay URLs. */
+/** HTTP publication and WebSocket sessions share one captured relay scope. */
 function normalizeMockRelayUrl(url: string): string {
-  if (!url.startsWith("ws://") && !url.startsWith("wss://")) {
-    return `wss://${url}`;
-  }
-  return url;
+  const normalized = url
+    .trim()
+    .replace(/^http:/, "ws:")
+    .replace(/^https:/, "wss:");
+  return (
+    /^wss?:\/\//.test(normalized) ? normalized : `wss://${normalized}`
+  ).replace(/\/+$/, "");
 }
 
 /**
