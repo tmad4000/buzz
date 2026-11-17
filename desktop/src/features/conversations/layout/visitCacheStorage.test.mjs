@@ -108,3 +108,28 @@ test("retiring views removes only their presentation and unchanged saves do not 
   assert.equal(saveVisitCache(storage, scope, cache), true);
   assert.equal(writes, 1);
 });
+
+
+test("view preferences survive cache reload independently and never alias duplicates", () => {
+  const cache = new ConversationVisitCache();
+  const preferences = {timelineMode:"timeline",threadMode:"focus",preferredThreadWidth:640};
+  cache.remember({...chat("same", "a"), preferences});
+  cache.remember({...chat("same", "b"), preferences:{timelineMode:"threads",threadMode:"split",preferredThreadWidth:400}});
+  preferences.preferredThreadWidth = 999;
+  const restored = new ConversationVisitCache();
+  assert.equal(restored.restore(cache.serialize()), true);
+  const a = restored.recall("a", "same");
+  assert.equal(a.preferences.preferredThreadWidth, 640);
+  assert.equal(restored.recall("b", "same").preferences.timelineMode, "threads");
+  a.preferences.timelineMode = "threads";
+  assert.equal(restored.recall("a", "same").preferences.timelineMode, "timeline");
+});
+
+test("old visits remain valid but invalid or command-bearing preferences are rejected", () => {
+  assert.ok(parseVisitCache(serialize([chat("same")])));
+  for (const preferences of [
+    {timelineMode:"activity"}, {threadMode:"overlay"},
+    {preferredThreadWidth:319}, {preferredThreadWidth:4097},
+    {preferredThreadWidth:null}, {autoSend:"send"},
+  ]) assert.equal(parseVisitCache(serialize([{...chat("same"), preferences}])), null);
+});

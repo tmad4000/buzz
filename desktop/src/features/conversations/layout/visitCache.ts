@@ -1,4 +1,4 @@
-import { copyPanelState, type ConversationView } from "./model";
+import { copyPanelState, copyViewPreferences, type ConversationView } from "./model";
 import { z } from "zod";
 import { conversationViewSchema, MAX_LAYOUT_BYTES } from "./schema";
 
@@ -42,12 +42,13 @@ export function parseVisitCache(raw: string) {
 }
 export type VisitPresentation = Pick<
   ConversationView,
-  "panelState" | "timelineAnchor" | "threadAnchor"
+  "panelState" | "timelineAnchor" | "threadAnchor" | "preferences"
 >;
 
 function copy(presentation: VisitPresentation): VisitPresentation {
   return {
     panelState: copyPanelState(presentation.panelState),
+    ...(presentation.preferences ? { preferences: copyViewPreferences(presentation.preferences) } : {}),
     timelineAnchor: presentation.timelineAnchor
       ? { ...presentation.timelineAnchor }
       : null,
