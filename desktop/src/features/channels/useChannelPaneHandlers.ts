@@ -403,6 +403,7 @@ export function useChannelPaneHandlers({
       const { parentEventId, threadHeadId: activeThreadHeadId } = target;
 
       if (
+        !outbox &&
         activeThreadHeadId &&
         parentEventId !== activeThreadHeadId &&
         !expandedThreadReplyIdsRef.current.has(parentEventId)
@@ -428,7 +429,7 @@ export function useChannelPaneHandlers({
       // Only update thread UI state if the user is still viewing the same
       // thread. If they navigated away during the async send, don't disrupt
       // the thread they are currently viewing.
-      if (openThreadHeadIdRef.current === activeThreadHeadId) {
+      if (!outbox && openThreadHeadIdRef.current === activeThreadHeadId) {
         setThreadReplyTargetId(activeThreadHeadId);
         if (activeThreadHeadId && parentEventId !== activeThreadHeadId) {
           setThreadScrollTargetId(sentMessage.id);

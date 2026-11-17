@@ -442,6 +442,7 @@ function InlineThreadContent({
         onCaptureSendContext={() => ({
           parentEventId: replyTarget?.id ?? root.id,
           threadHeadId: canonicalRoot,
+          localSendOrigin: thread.captureOwnSendOrigin(),
         })}
         onSend={async (...args) => {
           await onSend(...args);

@@ -1,3 +1,7 @@
+import {
+  useLocalOwnSendIntent,
+  isDurableOutboxRow,
+} from "./useLocalOwnSendIntent";
 import * as React from "react";
 import {
   initialBranchChoice,
@@ -112,9 +116,11 @@ export function useUnreadSidebarThread({
       m.pubkey?.toLowerCase() === currentPubkey.toLowerCase() &&
       m.id !== root,
   );
+  const localOwnSend = useLocalOwnSendIntent(key, root, own, index.messageById);
   const freshOwn = own.filter(
     (m) =>
       m.pending === true &&
+      !isDurableOutboxRow(m) &&
       !authoredVisit.current.seen.has(m.renderKey ?? m.id),
   );
   const freshPaths = new Set<string>();
@@ -138,7 +144,7 @@ export function useUnreadSidebarThread({
     (authoredVisit.current.key === key
       ? authoredVisit.current.latestOwnKey
       : undefined);
-  const ownSendTargetId = own.find(
+  const legacyOwnSendTargetId = own.find(
     (m) => (m.renderKey ?? m.id) === latestOwnKey,
   )?.id;
   React.useLayoutEffect(() => {
@@ -254,6 +260,11 @@ export function useUnreadSidebarThread({
     };
   };
   ({ branches, reveal } = fulfillReveal(branches, reveal));
+  if (localOwnSend.paths.size)
+    reveal = {
+      ...reveal,
+      ancestors: new Set([...(reveal.ancestors ?? []), ...localOwnSend.paths]),
+    };
   const newIds = new Set([...state.newIds, ...unread]);
   const stableNewIds =
     newIds.size === state.newIds.size ? state.newIds : newIds;
@@ -316,6 +327,9 @@ export function useUnreadSidebarThread({
         current.branches === change.branches
       )
         return;
+      for (const [id, open] of change.branches)
+        if (current.branches.get(id) !== open)
+          localOwnSend.noteManual(id, open);
       const updated = {
         ...current,
         branches: change.branches,
@@ -336,7 +350,13 @@ export function useUnreadSidebarThread({
     };
     window.addEventListener(THREAD_EXPANSION_CHANGED, changed);
     return () => window.removeEventListener(THREAD_EXPANSION_CHANGED, changed);
-  }, [enabled, key, visitOnly, withoutRevealedBranches]);
+  }, [
+    enabled,
+    key,
+    visitOnly,
+    withoutRevealedBranches,
+    localOwnSend.noteManual,
+  ]);
   React.useLayoutEffect(() => {
     if (!enabled || !key || live.current !== view) return;
     if (
@@ -407,6 +427,7 @@ export function useUnreadSidebarThread({
     setSaved(updated);
   };
   const setExpanded = (id: string, open: boolean) => {
+    localOwnSend.noteManual(id, open);
     const next = new Map(live.current.branches);
     next.set(id, open);
     commit(
@@ -416,7 +437,9 @@ export function useUnreadSidebarThread({
   };
   const toggle = (message: TimelineMessage) => {
     const next = new Map(live.current.branches);
-    next.set(message.id, !expanded.has(message.id));
+    const open = !expanded.has(message.id);
+    localOwnSend.noteManual(message.id, open);
+    next.set(message.id, open);
     // The user's toggle also cancels any older pending automatic reveal.
     commit(
       next,
@@ -434,7 +457,8 @@ export function useUnreadSidebarThread({
     commit(next.branches, next.reveal);
   };
   return {
-    ownSendTargetId,
+    ownSendTargetId: localOwnSend.targetId ?? legacyOwnSendTargetId,
+    captureOwnSendOrigin: localOwnSend.captureOrigin,
     entries,
     expanded,
     newIds: new Set([...view.newIds].filter((id) => index.messageById.has(id))),
