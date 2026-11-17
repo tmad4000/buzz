@@ -1,4 +1,6 @@
 // biome-ignore-all format: line-count ratchet requires compact forwarding in this legacy component
+import { ConversationViewContext } from "@/features/conversations/ConversationViewContext";
+import { CONVERSATION_THREAD_DOCK_WIDTH_PX } from "@/shared/layout/conversationThreadLayout";
 import * as React from "react";
 import { buildContextParents } from "@/features/channels/readState/contextParentRegistry";
 import { useQueryClient } from "@tanstack/react-query";
@@ -98,6 +100,7 @@ export function ChannelScreen({
   targetMessageEvents, targetMessageId,
   ...searchTarget
 }: ChannelScreenProps) {
+  const conversationView = React.useContext(ConversationViewContext);
   const queryClient = useQueryClient();
   const { goHome } = useAppNavigation();
   const { activeCommunity } = useCommunities();
@@ -683,9 +686,9 @@ export function ChannelScreen({
   const shouldShowThreadSkeleton = Boolean(
     effectiveOpenThreadHeadId && activeChannel && !displayedThreadHeadMessage,
   );
-  const isNarrowPanelViewport =
-    channelContentWidthPx > 0 &&
-    channelContentWidthPx < AUXILIARY_PANEL_SINGLE_COLUMN_BREAKPOINT_PX;
+  const isNarrowPanelViewport = conversationView
+    ? channelContentWidthPx < CONVERSATION_THREAD_DOCK_WIDTH_PX
+    : channelContentWidthPx > 0 && channelContentWidthPx < AUXILIARY_PANEL_SINGLE_COLUMN_BREAKPOINT_PX;
   const isSinglePanelView =
     isNarrowPanelViewport &&
     activeChannel?.channelType !== "forum" &&
@@ -845,6 +848,8 @@ export function ChannelScreen({
                   canResetThreadPanelWidth={canResetThreadPanelWidth}
                   fetchOlder={fetchOlder}
                   header={channelHeader}
+                  paneHeaderEndActions={headerEndActions}
+                  paneConversationTitle={activeChannelTitle}
                   {...{ idleAuxiliaryHeaderActions, idleAuxiliaryOverridesThread, idleAuxiliaryPanel, idleAuxiliaryTitle, hasOlderMessages, historyExhausted }}
                   {...{ onAddFiles }}
                   onAddAgent={handleOpenAddBot}

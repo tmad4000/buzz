@@ -1,6 +1,8 @@
 // Test fixture only: real ChannelScreen/ChannelPane/composer hooks over the
 // existing mock IPC bridge. No relay, native build or production account.
 import * as React from "react";
+import { ConversationDragCoordinator } from "@/features/conversations/ConversationDragCoordinator";
+import { FixtureDragSidebar } from "./shared-drag-sidebar";
 import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
@@ -10,6 +12,17 @@ import {
   RouterProvider,
 } from "@tanstack/react-router";
 import { AppShellProvider, useAppShell } from "@/app/AppShellContext";
+import { useMarkAsReadShortcuts } from "@/app/useMarkAsReadShortcuts";
+import { ConversationLayoutSurface } from "@/features/conversations/ConversationLayoutSurface";
+import {
+  createConversationView,
+  createSingleLayout,
+  splitPane,
+  focusPane,
+  listPanes,
+} from "@/features/conversations/layout/model";
+import { ConversationLayoutController } from "@/features/conversations/layout/controller";
+import { layoutStorageKey } from "@/features/conversations/layout/storage";
 import { ConversationViewHost } from "@/features/conversations/ConversationViewHost";
 import { ConversationDraftEditorsProvider } from "@/features/conversations/ConversationDraftEditors";
 import { HuddleProvider } from "@/features/huddle/HuddleContext";
@@ -36,6 +49,8 @@ const harnessWindow = window as typeof window & {
   hostReads: { view: string; kind: string; id: string }[];
   hostEffective: (messageId: string) => number | null;
   hostChannelRead: () => number | null;
+  layoutSnapshot?: () => ConversationLayout;
+  dragEvents?: Record<string, unknown>[];
 };
 harnessWindow.hostReads = [];
 const community = {
@@ -68,7 +83,8 @@ window.__BUZZ_E2E__ = {
 const { maybeInstallE2eTauriMocks } = await import("@/testing/e2eBridge");
 maybeInstallE2eTauriMocks();
 const identity: Identity = await getIdentity();
-const channel: Channel | undefined = (await getChannels(null)).channels?.find(
+const fixtureChannels = (await getChannels(null)).channels ?? [];
+const channel: Channel | undefined = fixtureChannels.find(
   (value) => value.name === "general",
 );
 if (!channel) throw new Error("Missing synthetic general channel");
@@ -137,7 +153,256 @@ function PerViewShell({
   );
   return <AppShellProvider value={value}>{children}</AppShellProvider>;
 }
+const layoutFixture = new URLSearchParams(location.search).has("layout");
+const dragFixture = new URLSearchParams(location.search).has("drag");
+harnessWindow.dragEvents = [];
+function FixtureDragScope({ children }: { children: React.ReactNode }) {
+  const [generation, setGeneration] = React.useState(0);
+  return (
+    <ConversationDragCoordinator scopeKey={`fixture-${generation}`}>
+      <div className="flex h-full min-h-0 min-w-0 flex-col">
+        {dragFixture && (
+          <button
+            type="button"
+            className="sr-only"
+            data-testid="change-drag-scope"
+            onClick={() => setGeneration((value) => value + 1)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                setGeneration((value) => value + 1);
+              }
+            }}
+          >
+            Change drag scope
+          </button>
+        )}
+        {children}
+      </div>
+    </ConversationDragCoordinator>
+  );
+}
+function LayoutBody() {
+  const [focusRequest, setFocusRequest] = React.useState<{
+    viewId: string;
+    sequence: number;
+  }>();
+  const focusSequence = React.useRef(0);
+  const [controller] = React.useState(() => {
+    const scope = {
+      communityId: "fixture",
+      identityPubkey: identity.pubkey,
+      windowSlot: "main",
+    };
+    const entries = new Map<string, string>();
+    const makeController = (layout: ReturnType<typeof createSingleLayout>) => {
+      entries.set(layoutStorageKey(scope), JSON.stringify(layout));
+      return new ConversationLayoutController({
+        scope,
+        storage: {
+          getItem: (key) => entries.get(key) ?? null,
+          setItem: (key, value) => {
+            entries.set(key, value);
+          },
+        },
+        initialChannelId: channel?.id ?? "missing",
+        isCurrentScope: () => true,
+        canOpen: (id) =>
+          fixtureChannels.some(
+            (value) =>
+              value.id === id &&
+              (value.channelType === "stream" || value.channelType === "dm"),
+          ),
+        canLeave: () => true,
+      });
+    };
+    const view = {
+      ...createConversationView(channel?.id ?? "missing"),
+      id: "a",
+      panelState: { thread: rootA },
+    };
+    const initial = createSingleLayout(view, (kind) => `${kind}-a`);
+    if (dragFixture || new URLSearchParams(location.search).has("single"))
+      return makeController(initial);
+    return makeController(
+      focusPane(
+        splitPane(
+          initial,
+          initial.root.id,
+          {
+            ...createConversationView(view.channelId),
+            id: "b",
+            panelState: { thread: rootB },
+          },
+          "horizontal",
+          (kind) => `${kind}-b`,
+        ),
+        initial.root.id,
+      ),
+    );
+  });
+  const state = React.useSyncExternalStore(
+    controller.subscribe,
+    controller.getSnapshot,
+  );
+  const layout = state.layout;
+  React.useEffect(() => () => controller.dispose(), [controller]);
+  const surfaceRef = React.useRef<HTMLDivElement>(null);
+  const bounds = () =>
+    surfaceRef.current?.getBoundingClientRect() ?? { width: 0, height: 0 };
+  const requestHeader = () => {
+    const next = controller.getSnapshot().layout;
+    const pane = listPanes(next.root).find(
+      (value) => value.id === next.focusedPaneId,
+    );
+    if (pane)
+      setFocusRequest({
+        viewId: pane.viewInstanceId,
+        sequence: ++focusSequence.current,
+      });
+  };
+  harnessWindow.layoutSnapshot = () => layout;
+  return (
+    <div className="flex h-full min-h-0 min-w-0">
+      {dragFixture && (
+        <FixtureDragSidebar
+          channels={fixtureChannels}
+          onEvent={(event) => harnessWindow.dragEvents?.push(event)}
+        />
+      )}
+      <div ref={surfaceRef} className="min-h-0 min-w-0 flex-1">
+        <ConversationLayoutSurface
+          dragTarget={
+            dragFixture
+              ? {
+                  resolveConversation: (id) => {
+                    const target = fixtureChannels.find(
+                      (value) =>
+                        value.id === id &&
+                        (value.channelType === "stream" ||
+                          value.channelType === "dm"),
+                    );
+                    return target
+                      ? {
+                          channelId: target.id,
+                          label:
+                            target.channelType === "dm"
+                              ? "Existing DM"
+                              : target.name,
+                        }
+                      : null;
+                  },
+                  onOpen: (drop) => {
+                    harnessWindow.dragEvents?.push({ type: "canvas", ...drop });
+                    if (
+                      controller.open(
+                        drop.paneId,
+                        drop.channelId,
+                        drop.edge === "right" ? "horizontal" : "vertical",
+                        bounds(),
+                        window.innerWidth,
+                      )
+                    )
+                      requestHeader();
+                  },
+                }
+              : undefined
+          }
+          layout={layout}
+          focusRequest={focusRequest}
+          labelForView={(view) =>
+            dragFixture
+              ? view.channelId === channel?.id
+                ? `General ${view.id === "a" ? "A" : "B"}`
+                : "Existing DM"
+              : `General ${view.id}`
+          }
+          onFocusPane={(id) => controller.focus(id)}
+          onResize={(id, sizes, commit) => controller.resize(id, sizes, commit)}
+          canRestore={state.canRestore}
+          onCommand={(paneId, command) => {
+            const panes = listPanes(layout.root);
+            const pane = panes.find((value) => value.id === paneId);
+            if (!pane) return;
+            if (command === "splitRight" || command === "splitBottom") {
+              if (
+                controller.open(
+                  paneId,
+                  layout.views[pane.viewInstanceId].channelId,
+                  command === "splitRight" ? "horizontal" : "vertical",
+                  bounds(),
+                  window.innerWidth,
+                )
+              )
+                requestHeader();
+            } else if (command === "swap" && panes.length === 2)
+              controller.swap(panes[0].id, panes[1].id);
+            else if (command === "horizontal" || command === "vertical")
+              controller.orient(command, bounds(), window.innerWidth);
+            else if (command === "close" || command === "closeSplit") {
+              if (controller.close(paneId, command === "closeSplit"))
+                requestHeader();
+            } else if (command === "restore") {
+              if (controller.restore()) requestHeader();
+            }
+          }}
+          renderPane={({ view, pane, focused, visible, headerEndActions }) => {
+            const visit = controller.visitToken(view.id);
+            return (
+              <PerViewShell id={view.id}>
+                <ConversationViewHost
+                  viewInstanceId={view.id}
+                  focused={focused}
+                  visible={visible}
+                  label={`General ${view.id}`}
+                  initialPanelState={view.panelState}
+                  onPanelNavigate={(patch) =>
+                    controller.update(view.id, view.channelId, visit, {
+                      panelState: patch,
+                    })
+                  }
+                  onFocusView={() => controller.focus(pane.id)}
+                  channel={{
+                    activeChannel:
+                      fixtureChannels.find(
+                        (value) => value.id === view.channelId,
+                      ) ?? null,
+                    currentIdentity: identity,
+                    headerEndActions,
+                    autoSendDraftKey: channel?.id ?? null,
+                    onCloseForumPost: noop,
+                    onSelectForumPost: noop,
+                    selectedForumPostId: null,
+                    targetForumReplyId: null,
+                    targetMessageEvents: emptyEvents,
+                    targetMessageId: null,
+                  }}
+                />
+              </PerViewShell>
+            );
+          }}
+        />
+      </div>
+    </div>
+  );
+}
 function Screen() {
+  useMarkAsReadShortcuts({
+    activeChannelId: channel?.id ?? null,
+    activeChannelLastMessageAt: channel?.lastMessageAt,
+    selectedView: dragFixture ? "channel" : "home",
+    markChannelRead: (id) => {
+      if (dragFixture)
+        harnessWindow.dragEvents?.push({
+          type: "shortcut-mark-read",
+          channelId: id,
+        });
+    },
+    markAllChannelsRead: () => {
+      if (dragFixture)
+        harnessWindow.dragEvents?.push({ type: "shortcut-mark-all" });
+    },
+  });
   const fallback = useAppShell();
   const read = useReadState(identity.pubkey, fakeRelay);
   harnessWindow.hostEffective = (id: string) =>
@@ -173,44 +438,63 @@ function Screen() {
         <Toaster />
         <main className="flex h-screen flex-col bg-background text-foreground">
           <div className="flex gap-3 border-b border-border p-2">
-            <span>Buzz Ideaflow · production host regression</span>
-            <button
-              type="button"
-              onClick={() => {
-                setShowA(false);
-                setFocused("b");
-              }}
-            >
-              Unmount A
-            </button>
+            <span>
+              Buzz Ideaflow ·{" "}
+              {layoutFixture
+                ? "layout regression"
+                : "production host regression"}
+            </span>
+            {!layoutFixture && (
+              <button
+                type="button"
+                onClick={() => {
+                  setShowA(false);
+                  setFocused("b");
+                }}
+              >
+                Unmount A
+              </button>
+            )}
           </div>
           <div
             className="grid min-h-0 flex-1"
-            style={{ gridTemplateColumns: showA ? "1fr 1fr" : "1fr" }}
+            style={{
+              gridTemplateColumns: layoutFixture
+                ? "1fr"
+                : showA
+                  ? "1fr 1fr"
+                  : "1fr",
+            }}
           >
-            {[...(showA ? ["a"] : []), "b"].map((id) => (
-              <PerViewShell key={id} id={id}>
-                <ConversationViewHost
-                  viewInstanceId={id}
-                  focused={focused === id}
-                  visible
-                  label={`General ${id}`}
-                  onFocusView={setFocused}
-                  initialPanelState={{ thread: id === "a" ? rootA : rootB }}
-                  channel={{
-                    activeChannel: channel ?? null,
-                    currentIdentity: identity,
-                    autoSendDraftKey: channel?.id ?? null,
-                    onCloseForumPost: noop,
-                    onSelectForumPost: noop,
-                    selectedForumPostId: null,
-                    targetForumReplyId: null,
-                    targetMessageEvents: emptyEvents,
-                    targetMessageId: null,
-                  }}
-                />
-              </PerViewShell>
-            ))}
+            {layoutFixture ? (
+              <FixtureDragScope>
+                <LayoutBody />
+              </FixtureDragScope>
+            ) : (
+              [...(showA ? ["a"] : []), "b"].map((id) => (
+                <PerViewShell key={id} id={id}>
+                  <ConversationViewHost
+                    viewInstanceId={id}
+                    focused={focused === id}
+                    visible
+                    label={`General ${id}`}
+                    onFocusView={setFocused}
+                    initialPanelState={{ thread: id === "a" ? rootA : rootB }}
+                    channel={{
+                      activeChannel: channel ?? null,
+                      currentIdentity: identity,
+                      autoSendDraftKey: channel?.id ?? null,
+                      onCloseForumPost: noop,
+                      onSelectForumPost: noop,
+                      selectedForumPostId: null,
+                      targetForumReplyId: null,
+                      targetMessageEvents: emptyEvents,
+                      targetMessageId: null,
+                    }}
+                  />
+                </PerViewShell>
+              ))
+            )}
           </div>
         </main>
       </ConversationDraftEditorsProvider>

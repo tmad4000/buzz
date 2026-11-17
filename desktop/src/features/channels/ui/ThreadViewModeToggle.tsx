@@ -42,8 +42,8 @@ const THREAD_VIEW_MODE_TOGGLE = {
 /**
  * Switches an open thread between the focus drawer and the split pane.
  *
- * Writes straight to the persisted preference, so the control doubles as the
- * setting: choosing a layout here is choosing how threads open from now on. That
+ * A conversation view changes its local presentation; the legacy single route
+ * writes the device preference, so its control doubles as the setting. That
  * is the intended behaviour — the place you form the opinion is the place you are
  * looking at the thread, not a settings page — and it is why the label names an
  * action rather than a state.

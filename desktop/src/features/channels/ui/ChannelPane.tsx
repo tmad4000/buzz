@@ -1,5 +1,6 @@
 import { InlineAutoExpansionProvider } from "@/features/messages/ui/InlineAutoExpansion";
 import { InlineChannelThread } from "./InlineChannelThread";
+import { ConversationViewContext } from "@/features/conversations/ConversationViewContext";
 import type { ThreadSummaryRenderer } from "@/features/messages/ui/TimelineMessageRow";
 import { PinnedBar } from "@/features/messages/pins/PinnedBar";
 import * as React from "react";
@@ -109,6 +110,8 @@ export const ChannelPane = React.memo(function ChannelPane({
   isSinglePanelView = false,
   isSending,
   isTimelineError = false,
+  paneHeaderEndActions,
+  paneConversationTitle,
   isTimelineLoading,
   onRetryTimeline,
   entranceMessageId = null,
@@ -193,6 +196,7 @@ export const ChannelPane = React.memo(function ChannelPane({
   threadFirstUnreadReplyId,
   typingPubkeys,
 }: ChannelPaneProps) {
+  const conversationView = React.useContext(ConversationViewContext);
   const timelineScrollRef = React.useRef<HTMLDivElement>(null);
   const messageTimelineRef = React.useRef<MessageTimelineHandle>(null);
   const composerWrapperRef = React.useRef<HTMLDivElement>(null);
@@ -576,7 +580,27 @@ export const ChannelPane = React.memo(function ChannelPane({
       onClose={onCloseThread}
       ref={threadSurface.ref}
     >
-      {useFocusThreadDrawer ? panel : wrapAux(panel, "message-thread-panel")}
+      {conversationView ? (
+        <RightAuxiliaryPane
+          canResetWidth={canResetThreadPanelWidth}
+          onResetWidth={onResetThreadPanelWidth}
+          onResizeStart={onThreadPanelResizeStart}
+          widthPx={threadPanelWidthPx}
+          fillAvailable={!useSplitAuxiliaryPane || useFocusThreadDrawer}
+          detached={!useSplitAuxiliaryPane || useFocusThreadDrawer}
+          testId={
+            useSplitAuxiliaryPane && !useFocusThreadDrawer
+              ? "message-thread-panel"
+              : undefined
+          }
+        >
+          {panel}
+        </RightAuxiliaryPane>
+      ) : useFocusThreadDrawer ? (
+        panel
+      ) : (
+        wrapAux(panel, "message-thread-panel")
+      )}
     </ThreadPanelSurface>
   );
   const wrapIdlePanel = (panel: React.ReactNode) =>
@@ -612,15 +636,27 @@ export const ChannelPane = React.memo(function ChannelPane({
           </IdleAuxiliaryPanel>,
         )
       : null;
-  const threadHeaderLeading = useSplitAuxiliaryPane ? (
-    <ThreadViewModeToggle onChange={changeThreadViewMode} />
+  const threadHeaderLeading = isSinglePanelView ? (
+    paneHeaderEndActions
+  ) : useSplitAuxiliaryPane ? (
+    <>
+      {useFocusThreadDrawer ? paneHeaderEndActions : null}
+      <ThreadViewModeToggle onChange={changeThreadViewMode} />
+    </>
   ) : undefined;
-  const threadLayoutProps = getThreadPanelLayout({
-    headerLeading: threadHeaderLeading,
-    isFocusDrawer: useFocusThreadDrawer,
-    isSinglePanelView,
-    useSplitAuxiliaryPane,
-  });
+  const threadLayoutProps = {
+    ...getThreadPanelLayout({
+      headerLeading: threadHeaderLeading,
+      isFocusDrawer: useFocusThreadDrawer,
+      isSinglePanelView,
+      useSplitAuxiliaryPane,
+    }),
+    ...(conversationView &&
+    (isSinglePanelView || useFocusThreadDrawer) &&
+    paneConversationTitle
+      ? { headerTitle: `${paneConversationTitle} · Thread` }
+      : {}),
+  };
   const timelineReplyHandler =
     activeChannel?.archivedAt || isHuddleTranscript ? undefined : onOpenThread;
   return (

@@ -1,4 +1,6 @@
-import type * as React from "react";
+import * as React from "react";
+import { ConversationDragContext } from "@/features/conversations/ConversationDragCoordinator";
+import { DraggableChannelRow } from "@/features/sidebar/ui/SidebarDnd";
 import { BellOff, ChevronDown, CircleDot, X } from "lucide-react";
 
 import {
@@ -425,6 +427,7 @@ export function SidebarSection({
   onUnmuteChannel?: (channelId: string) => void;
   sectionActionsOpen?: boolean;
 }) {
+  const sharedDrag = React.useContext(ConversationDragContext);
   if (items.length === 0 && !action && !emptyState) {
     return null;
   }
@@ -469,24 +472,37 @@ export function SidebarSection({
           {items.length > 0 ? (
             <SidebarMenu data-testid={testId}>
               {items.map((channel) => {
+                const channelButton = (
+                  <ChannelMenuButton
+                    channel={channel}
+                    activeWorking={activeWorkingByChannelId?.get(channel.id)}
+                    dmParticipants={dmParticipantsByChannelId?.[channel.id]}
+                    hasUnread={unreadChannelIds.has(channel.id)}
+                    isMuted={mutedChannelIds?.has(channel.id)}
+                    isActive={
+                      isActiveChannel && selectedChannelId === channel.id
+                    }
+                    label={channelLabels?.[channel.id] ?? channel.name}
+                    presenceStatus={presenceByChannelId?.[channel.id]}
+                    onSelectChannel={onSelectChannel}
+                  />
+                );
                 const menuItem = (
                   <SidebarMenuItem
                     key={onMarkChannelUnread ? undefined : channel.id}
                     className="group/menu-item"
                   >
-                    <ChannelMenuButton
-                      channel={channel}
-                      activeWorking={activeWorkingByChannelId?.get(channel.id)}
-                      dmParticipants={dmParticipantsByChannelId?.[channel.id]}
-                      hasUnread={unreadChannelIds.has(channel.id)}
-                      isMuted={mutedChannelIds?.has(channel.id)}
-                      isActive={
-                        isActiveChannel && selectedChannelId === channel.id
-                      }
-                      label={channelLabels?.[channel.id] ?? channel.name}
-                      presenceStatus={presenceByChannelId?.[channel.id]}
-                      onSelectChannel={onSelectChannel}
-                    />
+                    {sharedDrag ? (
+                      <DraggableChannelRow
+                        channelId={channel.id}
+                        label={channelLabels?.[channel.id] ?? channel.name}
+                        allowGrouping={channel.channelType !== "dm"}
+                      >
+                        {channelButton}
+                      </DraggableChannelRow>
+                    ) : (
+                      channelButton
+                    )}
                     {channel.channelType === "dm" &&
                     unreadChannelIds.has(channel.id) &&
                     !(isActiveChannel && selectedChannelId === channel.id) ? (

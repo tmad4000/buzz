@@ -1,7 +1,13 @@
 import * as React from "react";
 import { ChannelScreen } from "@/features/channels/ui/ChannelScreen";
 import type { ChannelScreenProps } from "@/features/channels/ui/ChannelScreen.types";
+import {
+  ThreadViewModeScopeProvider,
+  type ThreadViewMode,
+} from "@/features/channels/lib/threadViewModePreference";
 import { MainInsetProvider } from "@/shared/layout/MainInsetContext";
+import { useElementWidth } from "@/shared/hooks/use-mobile";
+import { ThreadPanelWidthScopeProvider } from "@/shared/hooks/useThreadPanelWidth";
 import {
   HistorySearchScopeProvider,
   type HistorySearchScope,
@@ -16,6 +22,10 @@ export type ConversationViewHostProps = {
   visible: boolean;
   label: string;
   initialPanelState?: HistorySearchValues;
+  initialThreadViewMode?: ThreadViewMode;
+  onThreadViewModeChange?: (mode: ThreadViewMode) => void;
+  initialThreadPanelWidthPx?: number;
+  onThreadPanelWidthChange?: (width: number) => void;
   onPanelNavigate?: HistorySearchScope["applyPatch"];
   onFocusView: (viewInstanceId: string) => void;
   channel: ChannelScreenProps;
@@ -28,6 +38,10 @@ export function ConversationViewHost({
   visible,
   label,
   initialPanelState,
+  initialThreadViewMode,
+  onThreadViewModeChange,
+  initialThreadPanelWidthPx,
+  onThreadPanelWidthChange,
   onPanelNavigate,
   onFocusView,
   channel,
@@ -37,10 +51,16 @@ export function ConversationViewHost({
     throw new Error(
       "ConversationViewHost requires a shared scoped draft editor provider",
     );
-  const insetRef = React.useRef<HTMLDivElement>(null);
+  const [insetRef, contentWidthPx] = useElementWidth<HTMLDivElement>();
   const admission = React.useMemo(
-    () => ({ viewInstanceId, focused, visible }),
-    [viewInstanceId, focused, visible],
+    () => ({
+      viewInstanceId,
+      focused,
+      visible,
+      rootRef: insetRef,
+      contentWidthPx,
+    }),
+    [viewInstanceId, focused, visible, insetRef, contentWidthPx],
   );
   const focusView = () => onFocusView(viewInstanceId);
   return (
@@ -51,18 +71,29 @@ export function ConversationViewHost({
       data-focused-conversation={focused || undefined}
       className="relative flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
       hidden={!visible}
-      style={visible ? undefined : { display: "none" }}
+      style={{ contain: "layout paint", display: visible ? undefined : "none" }}
       onPointerDownCapture={focusView}
       onFocusCapture={focusView}
     >
       <ConversationViewContext.Provider value={admission}>
         <MainInsetProvider mainInsetRef={insetRef}>
-          <HistorySearchScopeProvider
-            initialValues={initialPanelState}
-            onNavigate={onPanelNavigate}
+          <ThreadViewModeScopeProvider
+            initialMode={initialThreadViewMode}
+            onChange={onThreadViewModeChange}
           >
-            <ChannelScreen {...channel} />
-          </HistorySearchScopeProvider>
+            <ThreadPanelWidthScopeProvider
+              initialWidthPx={initialThreadPanelWidthPx}
+              onChange={onThreadPanelWidthChange}
+            >
+              <HistorySearchScopeProvider
+                key={channel.activeChannel?.id ?? "unavailable"}
+                initialValues={initialPanelState}
+                onNavigate={onPanelNavigate}
+              >
+                <ChannelScreen {...channel} />
+              </HistorySearchScopeProvider>
+            </ThreadPanelWidthScopeProvider>
+          </ThreadViewModeScopeProvider>
         </MainInsetProvider>
       </ConversationViewContext.Provider>
     </section>

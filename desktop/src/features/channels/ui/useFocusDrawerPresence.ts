@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useConversationControlScope } from "@/features/conversations/ConversationViewContext";
 
 import { subscribeToFocusedThreadCloseRequest } from "@/features/channels/focusedThreadCloseRequest";
 
@@ -19,12 +20,15 @@ export function usePresenceCoverage(open: boolean) {
 
 /** Keeps the covered channel inert and owns external dismissal while open. */
 export function useFocusDrawerPresence(open: boolean, onClose: () => void) {
+  const { active, canHandle } = useConversationControlScope();
   const { covered, markExitComplete } = usePresenceCoverage(open);
 
   React.useEffect(() => {
-    if (!open) return;
-    return subscribeToFocusedThreadCloseRequest(onClose);
-  }, [onClose, open]);
+    if (!open || !active) return;
+    return subscribeToFocusedThreadCloseRequest(() => {
+      if (canHandle()) onClose();
+    });
+  }, [active, canHandle, onClose, open]);
 
   return {
     channelIsCovered: covered,

@@ -1,4 +1,5 @@
 import * as React from "react";
+import { ConversationViewContext } from "@/features/conversations/ConversationViewContext";
 
 import { useIsAuxiliaryPanelOverlay } from "@/shared/hooks/use-mobile";
 import { AUXILIARY_PANEL_MIN_WIDTH_PX } from "@/shared/layout/auxiliaryPanelLayout";
@@ -70,8 +71,10 @@ export function AuxiliaryPanel({
   transparentChrome = false,
   widthPx,
 }: AuxiliaryPanelProps) {
+  const conversationView = React.useContext(ConversationViewContext);
   const isOverlay = useIsAuxiliaryPanelOverlay();
-  const isFloatingOverlay = isOverlay && !isSinglePanelView;
+  const isFloatingOverlay =
+    conversationView === null && isOverlay && !isSinglePanelView;
   const isSplitLayout = layout === "split";
   const mode = getAuxiliaryPanelMode(isSplitLayout, isFloatingOverlay);
 
@@ -128,6 +131,29 @@ export function AuxiliaryPanel({
       </button>
     ) : null;
 
+  // Keep this ancestry stable while a scoped leaf docks, narrows, or expands.
+  // Reparenting the live composer would release its editor lease and media state.
+  if (conversationView) {
+    return (
+      <AuxiliaryPanelContext.Provider value={contextValue}>
+        <aside
+          className={cn(
+            "relative flex min-h-0 min-w-0 flex-1 flex-col",
+            className,
+          )}
+          role={isSplitLayout ? "presentation" : undefined}
+          data-testid={isSplitLayout ? undefined : testId}
+          style={{ width: "100%" }}
+        >
+          {resizeHandle}
+          {header}
+          {children}
+          {footer}
+        </aside>
+        {siblings}
+      </AuxiliaryPanelContext.Provider>
+    );
+  }
   if (isSplitLayout) {
     return (
       <AuxiliaryPanelContext.Provider value={contextValue}>
