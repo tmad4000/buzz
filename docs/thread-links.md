@@ -1,10 +1,9 @@
-# Thread organization annotations (v1 foundation)
+# Thread organization annotations (v1)
 
-This is a protocol/parser/projector foundation. It is **not connected to the
-desktop UI or a CLI publisher**. No messages have been moved, no relay or
-database changes are included, and the commands below are a proposed contract,
-not installed commands. Follow-up work must exercise the actual client and an
-isolated relay before using it on a real conversation.
+This branch includes the strict parser, pure presentation projector and a scoped
+GCP publisher CLI. It does **not connect the overlay to the desktop UI**. No
+messages have been moved by this PR; relay admission and real client behavior
+still require independently reviewed private-channel smoke testing before DM use.
 
 The original seven signed Nostr fields stay unchanged. An author may publish a
 separate signed annotation describing a presentation parent for their own
@@ -22,7 +21,7 @@ duplicate, `e`, `p`, mention, actor, broadcast or grant tags are allowed.
 ```json
 {
   "kind": 9,
-  "content": "Thread organization: linked one prior message. Originals unchanged.",
+  "content": "Thread organization: one prior message reorganized. Original signed messages unchanged.",
   "tags": [
     ["h", "CHANNEL_UUID"],
     ["t", "buzz-thread-link-v1"],
@@ -95,75 +94,117 @@ waits forever on an unresolvable annotation or silently treats failure as zero
 history. Malformed or unauthorized subtype messages must remain visible as
 ordinary content/audit diagnostics rather than disappear from the UI.
 
-## Planned CLI dry-run interface
+## Scoped CLI
+
+The executable is `scripts/ideaflow/thread-links`. The bridge may dispatch
+`buzz-paseo thread` to this executable after review; this PR does not change the
+live bridge dispatcher. All stdout is JSON; stderr contains fixed error codes.
+`--help` reads no key and makes no network request.
 
 ```text
-buzz-paseo thread link CHILD --parent PARENT --dry-run
-buzz-paseo thread unlink CHILD --dry-run
-buzz-paseo thread plan --channel CHANNEL --out PLAN.json
-buzz-paseo thread apply PLAN.json --expected-digest SHA256
-buzz-paseo thread verify PLAN.json
+scripts/ideaflow/thread-links link CHILD --parent PARENT --dry-run --out PLAN.json
+scripts/ideaflow/thread-links unlink CHILD --dry-run --out UNDO.json
+scripts/ideaflow/thread-links plan --operations OPS.json --out PLAN.json
+scripts/ideaflow/thread-links apply PLAN.json --expected-digest SHA256
+scripts/ideaflow/thread-links verify PLAN.json --expected-digest SHA256
 ```
 
-These commands are not implemented in this PR. A dry run must read/verify the
-exact source events and complete annotation closure, then invoke the same
-projection rules. Do not create a second, drifting ancestry policy in the
-bridge. A JSON plan contains schema version, captured community/channel,
-canonical child/parent IDs and hashes, native and proposed parent/root,
-effective author, previous annotation head, authority outcome, reason and
-confidence, source fetch boundary and plan SHA256. Ambiguous associations or
-cross-author links are `proposed`, never actionable. No source body archive.
+`OPS.json` is an owned, regular, single-link 0600 file containing an explicit
+array; it does not infer relationships or ingest chat bodies:
 
-Root reviews the exact digest-bound DM mapping before apply. Applying must
-recheck scope/membership and the expected head, persist the exact signed event
-bytes/ID in a private journal before publish, and read back that same ID before
-claiming success. A timeout retries the same signed event, not a new event.
-Partial batches retain durable retry records. Verify signature, exact saved
-annotation, selected projection head, and unchanged originals separately.
-
-The proposed read-only commands are:
-
-```text
-buzz-paseo thread link CHILD --parent PARENT --dry-run
-buzz-paseo thread unlink CHILD --dry-run
-buzz-paseo thread plan --channel CHANNEL --out PLAN.json
+```json
+[{
+  "operation": "link",
+  "childEventId": "CHILD_EVENT_ID",
+  "parentEventId": "PARENT_EVENT_ID",
+  "confidence": "explicit"
+}]
 ```
 
-They should produce the same body-free plan shape. These commands are not
-implemented by this PR. Example field names (placeholder IDs abbreviated):
+Use `operation: unlink` with `parentEventId: null` for append-only undo. It
+restores the canonical native parent. A plan refuses no-op operations, duplicate
+children, cycles, incomplete closure and invalid canonical roots. Cross-author
+rows are `proposal-only`, contain no signed event bytes, and cannot be applied.
+
+Dry runs authenticate reads against the fixed existing community, verify signed
+channel metadata/roster, complete bounded message and annotation history, then
+run the production parser/projector. Plans contain IDs, graph metadata and the
+new annotation's literal receipt only; source message bodies stay in memory.
+Event IDs are Nostr hashes of the original signed fields. The exact signed
+annotation bytes and ID are frozen in the dry-run plan, before review. Applying
+never signs a replacement annotation. Review binds SHA256 of the exact canonical
+UTF8 plan file bytes, including its final newline. `--out` creates a new 0600
+file exclusively and refuses to overwrite an existing file.
+
+The default scope is the verified Jacob/Paseo DM
+`ad66b837-7232-4fa0-b41f-cbc49d415b0b`, with its exact two expected pubkeys.
+The only other permitted scope is a parent-created, pre-authorized, private,
+Paseo-owned smoke channel registered at the fixed task-local file
+`/home/dev/code/buzz-worklog-20261116/thread-link-smoke-scope.json`:
 
 ```json
 {
   "version": 1,
-  "communityUrl": "https://relay.example",
-  "channelId": "CHANNEL_UUID",
-  "publisherPubkey": "SIGNER_PUBKEY",
-  "snapshotComplete": true,
-  "operations": [{
-    "operation": "link",
-    "childEventId": "CHILD_EVENT_ID",
-    "parentEventId": "PARENT_EVENT_ID",
-    "effectiveChildAuthor": "SIGNER_PUBKEY",
-    "canonicalParentId": null,
-    "canonicalRootId": null,
-    "presentationParentId": null,
-    "presentationRootId": "CHILD_EVENT_ID",
-    "expectedAnnotationHead": null,
-    "requiredCanonicalRoots": ["CHILD_EVENT_ID", "PARENT_EVENT_ID"],
-    "eligibility": "self-author",
-    "reason": "Reviewed reply relationship"
-  }]
+  "channelId": "FRESH_PRIVATE_CHANNEL_UUID",
+  "creatorEventId": "SIGNED_CREATE_EVENT_ID",
+  "ownerPubkey": "38ba46f41d56ff5c71cfbfb856d00b209e6216a218260d2a30c4f1b712bdd1cb",
+  "purpose": "thread-link-smoke",
+  "expiresAt": 0
 }
 ```
 
-Unlink uses a null proposed parent; its native restoration parent remains in
-`canonicalParentId`. Cross-author rows have `eligibility: proposal-only`, never
-`self-author`. Snapshot failure is an error/incomplete plan, never a valid empty
-plan. Source event IDs are their signed content hashes; read back their complete
-signed originals in memory for verification without writing body archives.
-Review/approval binds the SHA256 of the **exact UTF8 plan file bytes**. A future
-`thread apply PLAN.json --expected-digest SHA256` must fail if even whitespace
-changed, and repeat all authority, membership, completeness and head checks.
+The registration must be owned, regular, single-link 0600 with an actual future
+UTC expiry no more than seven days away. Its digest is bound into plan/journal.
+The signed creation event, current private metadata, sole-owner membership,
+creator and non-archived status must agree. Registration records a concrete
+already-authorized test scope; it does not authorize arbitrary channels. Do not
+unarchive old tests. No endpoint, key, content, arbitrary-event or state-directory
+override is exposed. The existing 0600 Paseo key is read in place on GCP only;
+NIP-98 binds the fixed endpoint, method, fresh nonce and POST payload hash.
+
+## Apply, retry and recovery
+
+Before every submission, apply rechecks current scope/membership, tool source
+fingerprint, original IDs/canonical closure, unchanged snapshot and expected
+annotation head. Relay acceptance is distinct from deterministic projector
+selection: the relay offers no atomic compare-and-swap. A concurrent same-head
+winner may leave this operation accepted but not selected. Output reports both
+facts and always reports `uiVerified: false`; publisher success proves no UI work.
+
+The private journal lives at `~/.local/state/buzz-thread-links/PLAN_SHA256`.
+Its directory is 0700 and journal files are 0600. A global writer lock serializes
+plans. Before any POST, an atomically renamed, file-and-directory-fsynced journal
+contains the exact reviewed plan bytes and **all** exact signed annotation bytes
+and IDs. A second durable marker records the particular attempt before POST.
+Original message bodies are never journaled. Preserve this journal after errors.
+
+There are no automatic retries. Repeat `apply` with the same exact plan/digest
+after an uncertain timeout: it first reads the saved ID, then either verifies it
+or explicitly resubmits the same saved bytes/ID while still valid. It never
+creates a duplicate ID by signing again. Another plan for the same child is
+blocked while an earlier intent is submitting/uncertain, and an accepted prior
+intent must appear in the new plan's verified annotation history. A known
+verified event that disappears is not automatically resurrected.
+
+Signed annotations expire operationally after 15 minutes. An expired/uncertain
+operation is never silently refreshed or adopted under a new tool hash. A parent
+may generate a fresh **unsubmitted** plan and operationally revalidate the same
+approved semantic mapping against unchanged original hashes and heads. Pure
+timestamp refresh of the already-approved mapping requires no new Jacob approval.
+Changed mapping, source or head requires root review. Submitted/uncertain intents
+remain bound to the saved bytes/IDs; retain the receipt and resolve with root.
+
+A stale lock is not automatically broken. Inspect its PID, `/proc` start identity
+and owner token, establish that no task-owned writer remains, and obtain an
+operational recovery review before removing only that task lock. Never remove a
+live/foreign owner's lock or clear a journal to force a retry. `verify` is
+read-only and reports presence, selected heads, unchanged reviewed originals and
+tool fingerprint match. It can inspect old plans without rewriting their state.
+
+Parent review must precede private-channel publication. Test link, exact readback,
+conflict and unlink on a fresh own/private channel first. DM application also
+requires the reviewed mapping and completed union-loader/UI tests. This tool
+neither changes read frontiers/collapse preferences nor claims desktop visibility.
 
 ## Required production integration
 

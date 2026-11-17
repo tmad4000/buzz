@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -euo pipefail
+repo="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
+. "$repo/bin/activate-hermit" >/dev/null
+exec "$repo/bin/node" --import "$repo/scripts/ideaflow/thread_link_loader.mjs" --experimental-strip-types "$repo/scripts/ideaflow/thread_link_cli.mjs" "$@"
