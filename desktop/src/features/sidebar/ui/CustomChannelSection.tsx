@@ -740,7 +740,12 @@ export function CustomChannelSection({
                       <ContextMenu key={channel.id}>
                         <ContextMenuTrigger asChild>
                           <SidebarMenuItem>
-                            <DraggableChannelRow channelId={channel.id}>
+                            <DraggableChannelRow
+                              channelId={channel.id}
+                              label={
+                                channelLabels?.[channel.id] ?? channel.name
+                              }
+                            >
                               <ChannelMenuButton
                                 channel={channel}
                                 label={channelLabels?.[channel.id]}
