@@ -33,6 +33,8 @@ test("assigned DM shares a collapsible section with channels and can move back",
   await expect(section.getByTestId("channel-DM")).toBeVisible();
   await expect(section.getByTestId("channel-DM")).toContainText(/charlie/i);
   await expect(section.getByTestId("channel-engineering")).toBeVisible();
+  await section.getByTestId("channel-engineering").click();
+  await expect(page.getByTestId("chat-title")).toHaveText("engineering");
   await expect(
     page.getByTestId("dm-list").getByTestId("channel-DM"),
   ).toHaveCount(0);
