@@ -252,11 +252,16 @@ export class ConversationLayoutController {
       (view) => saved.views[view.id]?.channelId !== view.channelId,
     );
     if (!this.allowLeaving(outgoing)) return false;
+    for (const view of outgoing) {
+      this.presentations.remember(view);
+      this.visits.set(view.id, (this.visits.get(view.id) ?? 0) + 1);
+    }
     const views = { ...saved.views };
     // Keep edits to surviving presentations since Close split; closed views use the snapshot.
     for (const view of Object.values(current.views)) {
       if (views[view.id]?.channelId === view.channelId) views[view.id] = view;
     }
+    for (const view of Object.values(views)) this.presentations.remember(view);
     const focused = listPanes(saved.root).find(
       (pane) =>
         pane.viewInstanceId ===

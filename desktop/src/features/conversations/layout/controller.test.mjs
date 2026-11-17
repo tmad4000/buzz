@@ -51,6 +51,35 @@ const panes = (controller) => listPanes(controller.getSnapshot().layout.root);
 const split = (controller) =>
   controller.open(panes(controller)[0].id, "chat", "horizontal", bounds, 1440);
 
+test("Restore split remembers the outgoing chat and retires its callbacks", () => {
+  const { controller } = setup();
+  split(controller);
+  const [a, b] = panes(controller);
+  controller.close(b.id);
+  controller.navigate(a.viewInstanceId, "dm");
+  const oldVisit = controller.visitToken(a.viewInstanceId);
+  controller.update(a.viewInstanceId, "dm", oldVisit, {
+    panelState: { thread: "latest-dm-thread" },
+    timelineAnchor: { messageId: "latest-dm-anchor", offset: 42 },
+  });
+  assert.equal(controller.restore(), true);
+  assert.notEqual(controller.visitToken(a.viewInstanceId), oldVisit);
+  controller.navigate(a.viewInstanceId, "dm");
+  const view = controller.getSnapshot().layout.views[a.viewInstanceId];
+  assert.equal(view.panelState.thread, "latest-dm-thread");
+  assert.deepEqual(view.timelineAnchor, {
+    messageId: "latest-dm-anchor",
+    offset: 42,
+  });
+  assert.equal(
+    controller.update(a.viewInstanceId, "dm", oldVisit, {
+      panelState: { thread: "stale" },
+    }),
+    false,
+  );
+  controller.dispose();
+});
+
 test("returning to a chat restores only that view's latest presentation", () => {
   const { controller } = setup();
   const a = panes(controller)[0].viewInstanceId;
