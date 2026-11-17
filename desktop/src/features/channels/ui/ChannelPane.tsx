@@ -342,6 +342,7 @@ export const ChannelPane = React.memo(function ChannelPane({
         threadHeadId: string | null;
       } | null,
       forceRest?: boolean,
+      outbox?: import("@/features/messages/outbox/types").OutboxSubmission,
     ) => {
       const shouldCompleteWelcomeBanner =
         isActiveWelcomeChannel &&
@@ -356,6 +357,7 @@ export const ChannelPane = React.memo(function ChannelPane({
         channelId,
         threadContext,
         forceRest,
+        outbox,
       );
       if (
         channelId &&
