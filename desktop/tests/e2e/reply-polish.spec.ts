@@ -502,3 +502,84 @@ test("sidebar required unseen paths bypass both smart branch budget and row wind
     Math.abs((await scroller.evaluate((el) => el.scrollTop)) - before),
   ).toBeLessThan(4);
 });
+
+test("sidebar older never-observed reply below newer observed frontier stays open", async ({
+  page,
+}, info) => {
+  await installMockBridge(page);
+  await page.goto("/");
+  await page.getByTestId("channel-general").click();
+  await page.keyboard.press("ControlOrMeta+,");
+  await page.getByTestId("settings-nav-appearance").click();
+  await page.getByTestId("thread-display-channels-collapsed").click();
+  await page.getByTestId("settings-back-to-app").click();
+  await waitForMockChannelHeadReady(
+    page,
+    "general",
+    "9a1657ac-f7aa-5db0-b632-d8bbeb6dfb50",
+  );
+  const root = "f7".repeat(32);
+  const now = Math.floor(Date.now() / 1000) + 10;
+  await page.evaluate(
+    ({ root, now, pubkey }) => {
+      for (const [id, content, createdAt, parentEventId] of [
+        [root, "Exact observed authority browser root", now, undefined],
+        ["f8".repeat(32), "First context reply", now + 1, root],
+        ["f9".repeat(32), "Newer actually observed reply", now + 200, root],
+      ] as const)
+        window.__BUZZ_E2E_EMIT_MOCK_MESSAGE__?.({
+          id,
+          content,
+          createdAt,
+          parentEventId,
+          pubkey,
+          channelName: "general",
+        });
+    },
+    { root, now, pubkey: TEST_IDENTITIES.bob.pubkey },
+  );
+  const summary = page
+    .locator(
+      `[data-testid="message-thread-summary"][data-thread-head-id="${root}"]`,
+    )
+    .first();
+  await expect(summary).toHaveAttribute("aria-expanded", "false");
+  await expect(summary.getByTestId("thread-unread-badge")).toHaveText("2 new");
+  const open = page.locator(
+    `[data-testid="open-thread-side-panel"][data-thread-head-id="${root}"]`,
+  );
+  await open.click();
+  const panel = page.getByTestId("message-thread-panel");
+  const newer = panel
+    .getByTestId("message-body")
+    .filter({ hasText: "Newer actually observed reply" });
+  await newer.scrollIntoViewIfNeeded();
+  await expect(newer).toBeInViewport();
+  await expect(summary.getByTestId("thread-unread-badge")).toHaveCount(0);
+  await panel.getByRole("button", { name: "Close panel", exact: true }).click();
+  await expect(panel).toHaveCount(0);
+  await page.evaluate(
+    ({ root, now, pubkey }) =>
+      window.__BUZZ_E2E_EMIT_MOCK_MESSAGE__?.({
+        id: "fa".repeat(32),
+        content: "Older never observed below newer frontier",
+        createdAt: now + 100,
+        parentEventId: root,
+        pubkey,
+        channelName: "general",
+      }),
+    { root, now, pubkey: TEST_IDENTITIES.bob.pubkey },
+  );
+  await expect(summary).toHaveAttribute("aria-expanded", "false");
+  await expect(summary.getByTestId("thread-unread-badge")).toHaveText("1 new");
+  await open.click();
+  const older = panel
+    .getByTestId("message-body")
+    .filter({ hasText: "Older never observed below newer frontier" });
+  await expect(older).toBeVisible();
+  await expect(older).toBeInViewport();
+  await expect(panel.getByTestId("sidebar-earlier-run")).toHaveCount(0);
+  await page.screenshot({
+    path: info.outputPath("older-never-observed-open.png"),
+  });
+});
