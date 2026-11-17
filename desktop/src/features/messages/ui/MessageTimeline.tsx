@@ -370,6 +370,7 @@ const MessageTimelineBase = React.forwardRef<
     onScroll,
     scrollToBottom,
     scrollToBottomOnNextUpdate,
+    settleAtBottomAfterLayout,
     scrollToMessage,
     onVirtualizerAtBottomStateChange,
   } = useAnchoredScroll({
@@ -502,15 +503,11 @@ const MessageTimelineBase = React.forwardRef<
             )
           : undefined,
       scrollToBottomOnNextUpdate: prepareForOwnMessage,
-      settleAtBottom: () => {
-        if (!timelineVirtualizerApi) return false;
-        scrollToBottom("auto");
-        return true;
-      },
+      settleAtBottom: settleAtBottomAfterLayout,
     }),
     [
       prepareForOwnMessage,
-      scrollToBottom,
+      settleAtBottomAfterLayout,
       timelineVirtualizerApi,
       activeScrollContainerRef,
       messages,
