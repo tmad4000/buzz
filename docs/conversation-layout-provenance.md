@@ -1,0 +1,5 @@
+# Conversation layout provenance
+
+The small recursive group/leaf model, positive-weight normalization and immutable split/remove/collapse patterns are adapted from `tmad4000/paseo` at `135a3b4c9e49a28b9d16ced8fc0e45b4da9fc502`, `packages/app/src/stores/workspace-layout-actions.ts`. The edge-distance/drop-preview approach is adapted from `packages/app/src/components/split-drop-zone.tsx`; Buzz's first slice deliberately uses its design's 32 CSS-pixel right/bottom targets and normalized corner distances, rather than Paseo's four-edge/center percentages.
+
+Upstream notice: Copyright (c) 2025-present Mohamed Boudra. Paseo is licensed under Apache License 2.0, as reproduced in the repository LICENSE (the same license governs this Buzz repository). There is no upstream NOTICE file at that revision. Relevant extracted/adapted modules retain this notice and link here. Buzz DOM rendering, persistence and conversation instances are local implementations; no React Native/Zustand host or `panelResourceKey` singleton lookup is imported. Channel resource identity is never used to deduplicate view instances.
