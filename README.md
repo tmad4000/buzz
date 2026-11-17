@@ -17,6 +17,8 @@ Protocol: existing Buzz kind **40004**, tags `h` (channel) and `e` (source messa
 
 The Mac app is **Buzz Ideaflow.app**, bundle **app.ideaflow.buzz**, with its own Application Support directory, Keychain service `buzz-ideaflow`, managed-agent nest `.buzz-ideaflow`, CLI name and URL scheme `buzz-ideaflow`. Its updater endpoints are empty. Official Buzz is separate and keeps its updater. Provision the same identity locally through the established keychain workflow; do not copy databases or overwrite official keys. Build and signing must be verified on macOS.
 
+Work log bridge: see [commands and metadata contract](docs/ideaflow-worklog.md) for private major-thrust/task posts, stable edits and the body-free Buzz source adapter.
+
 Upstream maintenance: run `scripts/ideaflow/upstream-sync.sh` weekly. It fetches release tags and reports the newest stable desktop release at least **31 days** old; it never merges or installs. Review release notes and dependency ages, branch from the current fork, merge the eligible tag, preserve the identity/isolation and pin contract, run the checks and test channel flow, then review/install separately. Never advance younger dependencies without an explicit exception. A weekly reminder is configured for Mondays at 10:00 America/Los_Angeles in the owning Paseo conversation.
 
 Validation steps: create a private test channel, send a message, pin/unpin/repin, run Now twice and confirm one root plus an edit; open an older pin outside the loaded timeline, and verify another signer cannot unpin yours. The draft PR remains draft until the repository's human-testing requirement is fulfilled. No claim of macOS UI verification is made by Linux tests.

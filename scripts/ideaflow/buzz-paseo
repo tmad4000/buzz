@@ -1,0 +1,85 @@
+#!/usr/bin/python3
+"""Buzz worklog commands; writes use only the existing task identity/relay."""
+import argparse
+import fcntl
+import json
+import os
+from pathlib import Path
+import sys
+import time
+
+sys.dont_write_bytecode = True
+from worklog_client import Buzz, WORKLOG, TEST_CHANNEL
+from worklog_posts import Posts
+from worklog_source import export
+
+
+def main(argv=None):
+    os.umask(0o077)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--state-dir', type=Path, default=Path('/home/dev/code/buzz-worklog-20261116/state'))
+    sub = parser.add_subparsers(dest='namespace', required=True)
+    worklog = sub.add_parser('worklog').add_subparsers(dest='action', required=True)
+    for verb in ('post', 'update'):
+        command = worklog.add_parser(verb)
+        command.add_argument('--key', required=True)
+        command.add_argument('--kind', choices=['thrust', 'task', 'query', 'daily', 'weekly'])
+        command.add_argument('--owner')
+        command.add_argument('--title')
+        command.add_argument('--status', choices=['open', 'progress', 'waiting', 'done'], required=True)
+        command.add_argument('--page-url')
+        command.add_argument('--summary-file', type=Path)
+        if verb == 'post':
+            command.add_argument('--parent-key')
+    worklog.add_parser('list')
+    worklog.add_parser('show').add_argument('--key', required=True)
+    recovery = worklog.add_parser('reconcile')
+    recovery.add_argument('--key', required=True)
+    recovery.add_argument('--event', help='Exact inspected event ID when acceptance ID was lost')
+    command = worklog.add_parser('export')
+    command.add_argument('--classifications', type=Path, required=True)
+    command.add_argument('--output-dir', type=Path, required=True)
+    args = parser.parse_args(argv)
+    args.state_dir.mkdir(parents=True, mode=0o700, exist_ok=True)
+    config = json.loads((args.state_dir / 'config.json').read_text())
+    if config['channel_id'] not in {WORKLOG, TEST_CHANNEL}:
+        raise ValueError('Destination must be the verified Work log or isolated test channel')
+    api = Buzz(config['buzz_cli'], Path(__file__).resolve().with_name('worklog_verify.mjs'))
+    # Hold the local single writer through readback; never retry an uncertain send.
+    with (args.state_dir / 'writer.lock').open('a') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        posts = Posts(api, args.state_dir, config)
+        if args.action == 'list':
+            result = [posts.receipt(k, v) for k, v in posts.state['posts'].items() if v['state'] == 'verified']
+        elif args.action == 'show':
+            entry = posts.spec(args.key)
+            if not entry:
+                raise ValueError('Unknown canonical key')
+            result = dict(key=args.key, state=entry['state'], event_id=entry.get('event_id'))
+        elif args.action == 'reconcile':
+            result = posts.reconcile(args.key, args.event)
+        elif args.action == 'export':
+            args.output_dir.mkdir(parents=True, mode=0o700, exist_ok=True)
+            result = export(api, args.output_dir, args.classifications, config['provenance_db'], int(time.time()))
+        else:
+            existing = posts.spec(args.key)
+            spec = dict(existing['spec']) if args.action == 'update' and existing else {}
+            for key in ('kind', 'owner', 'title', 'status', 'page_url'):
+                value = getattr(args, key)
+                if value is not None:
+                    spec[key] = value
+            if args.summary_file:
+                spec['summary'] = args.summary_file.read_text()
+            if not all(k in spec for k in ('kind', 'owner', 'title', 'status')):
+                raise ValueError('Initial posts require kind, owner, title and explicit status')
+            result = posts.post(args.key, spec, args.parent_key) if args.action == 'post' else posts.update(args.key, spec)
+    print(json.dumps(result, ensure_ascii=False))
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except (OSError, ValueError, RuntimeError, KeyError) as error:
+        # No source bodies, command arguments, secret values or tracebacks.
+        print(json.dumps({'error': type(error).__name__, 'message': str(error) if isinstance(error, (ValueError, RuntimeError)) else 'Local configuration or operation unavailable'}), file=sys.stderr)
+        raise SystemExit(1)
