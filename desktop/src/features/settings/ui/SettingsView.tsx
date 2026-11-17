@@ -1,5 +1,5 @@
 import * as React from "react";
-import { getVersion } from "@tauri-apps/api/app";
+import { AppStamp } from "../AppStamp";
 import { AlertCircle, ArrowLeft, LoaderCircle, RefreshCw } from "lucide-react";
 
 import { useMyRelayMembershipLookupQuery } from "@/features/community-members/hooks";
@@ -161,15 +161,10 @@ export function SettingsView({
   }, [myMembershipQuery.data, featureState]);
 
   const [isLoaded, setIsLoaded] = React.useState(false);
-  const [appVersion, setAppVersion] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     const frameId = window.requestAnimationFrame(() => setIsLoaded(true));
     return () => window.cancelAnimationFrame(frameId);
-  }, []);
-
-  React.useEffect(() => {
-    void getVersion().then(setAppVersion);
   }, []);
 
   React.useEffect(() => {
@@ -309,17 +304,7 @@ export function SettingsView({
           ))}
         </SidebarContent>
 
-        <SidebarFooter>
-          {appVersion ? (
-            <p
-              className="px-2 pb-1 text-xs text-sidebar-foreground/45"
-              data-buzz-sidebar-secondary
-              data-testid="settings-version"
-            >
-              v{appVersion}
-            </p>
-          ) : null}
-        </SidebarFooter>
+        <SidebarFooter>{!isMobile ? <AppStamp /> : null}</SidebarFooter>
       </Sidebar>
 
       <SidebarInset
@@ -352,6 +337,7 @@ export function SettingsView({
               className="mx-auto flex min-h-full w-full max-w-4xl flex-col gap-4"
               data-testid={`settings-panel-${section}`}
             >
+              {isMobile ? <AppStamp /> : null}
               {renderSettingsSection(section, {
                 currentPubkey,
                 fallbackDisplayName,
