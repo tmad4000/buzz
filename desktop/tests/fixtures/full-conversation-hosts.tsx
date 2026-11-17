@@ -12,6 +12,7 @@ import {
 } from "@/features/conversations/ConversationViewGuards";
 import { ConversationDragCoordinator } from "@/features/conversations/ConversationDragCoordinator";
 import { FixtureDragSidebar } from "./shared-drag-sidebar";
+import { FixtureSectionDragSidebar } from "./section-drag-sidebar";
 import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
@@ -297,7 +298,7 @@ function LayoutBody() {
   return (
     <div className="flex h-full min-h-0 min-w-0">
       {dragFixture && (
-        <FixtureDragSidebar
+        <FixtureSectionSidebar
           channels={fixtureChannels}
           onEvent={(event) => harnessWindow.dragEvents?.push(event)}
         />
@@ -422,6 +423,11 @@ function LayoutBody() {
     </div>
   );
 }
+const FixtureSectionSidebar = new URLSearchParams(location.search).has(
+  "sections",
+)
+  ? FixtureSectionDragSidebar
+  : FixtureDragSidebar;
 function Screen() {
   const [guards] = React.useState(() => new ConversationViewGuards());
   useMarkAsReadShortcuts({
