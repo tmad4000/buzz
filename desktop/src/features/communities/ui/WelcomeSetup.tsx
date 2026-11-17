@@ -328,7 +328,7 @@ export function WelcomeSetup({
           ) : null}
         </div>
       </OnboardingFooterProvider>
-      <footer className="shrink-0 px-4 pb-3">
+      <footer className="relative z-20 shrink-0 px-4 pb-3">
         <AppStamp />
       </footer>
     </div>
