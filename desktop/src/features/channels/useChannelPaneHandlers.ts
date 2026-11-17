@@ -363,6 +363,7 @@ export function useChannelPaneHandlers({
         mediaTags,
         channelId,
         parentEventId: context.parentEventId,
+        threadHeadId: context.threadHeadId,
         forceRest,
       });
     },

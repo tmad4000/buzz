@@ -11,7 +11,7 @@ const reactURL = new URL(
 const modules = {
   "./MessageComposer": "export const MessageComposer=()=>null;",
   "./MessageThreadRow":
-    'export const MessageThreadRow=({message})=>React.createElement("div",{"data-message-id":message.id},message.body);',
+    'export const MessageThreadRow=({message})=>React.createElement("div",{"data-message-id":message.id,"data-testid":"message-row"},message.body);',
   "./MessageThreadSummaryRow": "export const MessageThreadSummaryRow=()=>null;",
   "./MessageThreadPanelSkeleton":
     "export const MessageThreadPanelHeader=()=>null;export const ThreadMessageSkeleton=()=>null;",
@@ -63,6 +63,33 @@ test("read callbacks contain only committed rows and never descendants hidden by
     IS_REACT_ACT_ENVIRONMENT: true,
     CSS: { escape: (value) => value },
   });
+  const originalObserver = globalThis.IntersectionObserver;
+  globalThis.IntersectionObserver = class {
+    disconnected = false;
+    constructor(callback) {
+      this.callback = callback;
+    }
+    observe(node) {
+      node.getClientRects = () => [{}];
+      queueMicrotask(() => {
+        if (!this.disconnected)
+          this.callback([{ target: node, isIntersecting: true }]);
+      });
+    }
+    disconnect() {
+      this.disconnected = true;
+    }
+  };
+  test.after(() => {
+    globalThis.IntersectionObserver = originalObserver;
+  });
+  const { threadExpansionKey } = await import(
+    "../lib/threadExpansionStorage.ts"
+  );
+  localStorage.setItem(
+    threadExpansionKey(null, undefined, "channel", "root"),
+    JSON.stringify([["root", false]]),
+  );
   const { MessageThreadPanel } = await import("./MessageThreadPanel.tsx");
   const { buildThreadPanelData } = await import("../lib/threadPanel.ts");
   const msg = (id, parentId = null) => ({
