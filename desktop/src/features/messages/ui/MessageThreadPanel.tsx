@@ -1084,6 +1084,7 @@ export function MessageThreadPanel({
               compactWhenEmpty={
                 hasStoredDisclosure && sidebarMessages.length <= 1
               }
+              autoFocus={!useOpeningDefaults}
               audienceContext={{
                 type: "thread",
                 rootTags: threadHead.tags,
