@@ -26,12 +26,14 @@ test("true projection echo preserves A; explicit same-message route with copied 
     views: { a, b },
   };
   let navigations = 0;
+  let lastIntent;
   // Controlled port isolates the production hook's origin classification; the
   // separate controller tests own navigation/guard/cache behavior.
   const controller = {
     getSnapshot: () => ({ layout }),
-    navigateRoute: () => {
+    navigateRoute: (request) => {
       navigations++;
+      lastIntent = request.intent;
       return "a";
     },
   };
@@ -83,7 +85,7 @@ test("true projection echo preserves A; explicit same-message route with copied 
   const container = document.createElement("div");
   document.body.append(container);
   const root = createRoot(container);
-  const render = (key, state) =>
+  const render = (key, state, historyTraversal = false) =>
     act(() =>
       root.render(
         React.createElement(Harness, {
@@ -92,6 +94,7 @@ test("true projection echo preserves A; explicit same-message route with copied 
             channelId: "chat",
             search: { messageId: "m" },
             state,
+            historyTraversal,
           },
         }),
       ),
@@ -106,7 +109,12 @@ test("true projection echo preserves A; explicit same-message route with copied 
       searchHighlight: null,
     });
     assert.equal(navigations, 1);
+    assert.equal(lastIntent.kind, "external");
     assert.equal(highlights.a, null);
+    assert.equal(highlights.b, originalB);
+    await render("back", echoState, true);
+    assert.equal(navigations, 2);
+    assert.deepEqual(lastIntent, { kind: "history", viewInstanceId: "a" });
     assert.equal(highlights.b, originalB);
   } finally {
     await act(() => root.unmount());
