@@ -184,11 +184,13 @@ for (const surface of ["sidebar", "inline"] as const) {
         )
         .click();
     } else {
-      await page
-        .locator(
-          `[data-testid="message-thread-summary"][data-thread-head-id="${root}"]`,
-        )
-        .click();
+      const rootSummary = page.locator(
+        `[data-testid="message-thread-summary"][data-thread-head-id="${root}"]`,
+      );
+      await expect(rootSummary).toBeVisible();
+      if ((await rootSummary.getAttribute("aria-expanded")) !== "true") {
+        await rootSummary.click();
+      }
     }
     const panel =
       surface === "sidebar"
