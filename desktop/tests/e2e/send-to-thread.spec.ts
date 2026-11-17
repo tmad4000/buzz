@@ -81,7 +81,8 @@ test("explicit keyboard routing, cancel and new-message fallback preserve inline
   await expect(main.getByTestId("send-to-thread")).toBeDisabled();
   await editor.fill("Signed release rollback checklist");
   const before = await count();
-  await main.getByTestId("send-to-thread").click();
+  await main.getByTestId("send-to-thread").focus();
+  await page.keyboard.press("Enter");
   const menu = page.getByRole("menu", { name: "Thread destinations" });
   await expect(menu.getByRole("menuitem").first()).toContainText(
     "Signed release rollback plan",
