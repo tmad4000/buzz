@@ -1,75 +1,99 @@
 # Channel HTML Page (Ideaflow fork)
 
-Every channel and DM has one shared Page. Members open **Page** in the chat
-header, then **Create Page** / **Edit HTML** to replace it. Closing the Page
-restores the existing auxiliary/thread surface. Open state belongs to each
-conversation view instance; duplicate views do not share panel state.
-
-Agents publish with:
+Channels and DMs have one shared **Page**, displayed inside Buzz's auxiliary
+panel. Members replace the HTML in-app or through the CLI:
 
 ```sh
 buzz page set --channel <channel-uuid> --file page.html
 buzz page get --channel <channel-uuid>
 ```
 
-`set` reads a UTF-8 file of at most 524288 bytes. `get` returns the latest signed
-Page event as JSON (or `null`); its `content` is the original HTML, suitable for
-round-tripping to a file. Errors propagate; failed writes never report success.
+`set` accepts a UTF-8 file up to 524288 bytes. `get` returns
+`{"event": <signed manifest>, "html": <reconstructed HTML>, "page": "page"}`,
+or `null` when no eligible head exists. The event signature covers the manifest;
+its `content` is not rewritten to pretend the reconstructed HTML was signed as
+one event. Failures propagate, including rejected chunk/manifest acknowledgements.
 
-## Event contract
+## Hosted-relay storage
 
-Kind `40101`, raw HTML content, tags `h=<channel UUID>`, `d=page`, and
-`m=text/html`. The reserved `d` slot allows future page IDs/slugs without
-changing the payload shape. The first release accepts only `d=page`.
+This works with the existing `jprojects.communities.buzz.xyz` relay. It does not
+add kinds, modify a relay, change its limits, or require deployment privileges.
+It reuses channel-scoped pin kind **40004**, already accepted and replicated by
+the hosted relay. Page JSON never equals `pin` or `unpin`, so existing pin clients
+ignore it. All Page events carry the actual channel's `h` tag.
 
-This is shared channel state, not author-owned NIP-33 state. Any actual channel
-member may replace the visible Page. The current head is the most recent event
-across all authors (`created_at DESC, id ASC`, matching relay history order).
-Signed revisions remain in the event log, as with channel canvases; replacement
-is a projection rather than deleting the audit history. Concurrent writes use
-the deterministic ordering; this version has no merge or optimistic conflict UI.
-Writers read the head and advance the timestamp so sequential writes within one
-second are visible. A future head beyond five minutes is refused.
+A manifest has `d=buzz-page:page`, the reserved Page slot, plus `e` equal to
+SHA-256(`buzz-page:page`):
+`b54af358b595b466bdb36d30cc7f2d32385aaeb5731674dc557a030c234ea7d1`.
+The `e` tag uses the pin kind's existing indexed target lookup. This matters:
+the hosted relay can apply custom `d`/`t` filtering after a query limit; chunk
+events can otherwise shadow a manifest. The manifest content is:
 
-The relay enforces actual membership even for open channels, requires channel
-scope and one `d=page` tag, caps Page UTF-8 content at 512 KiB, and applies the
-five-minute future ceiling. Ordinary event payload limits remain 256 KiB.
-The transport envelope allows 4 MiB to accommodate worst-case JSON escaping.
-Existing operators with a lower explicit `BUZZ_MAX_FRAME_BYTES` must raise it
-for full-size WebSocket publication. CLI publication uses the HTTP event route.
+```json
+{"type":"buzz.page","version":1,"page":"page","publication":"<uuid>","chunks":["<event-id>"],"bytes":123}
+```
 
-## Offline rendering
+Chunks use the same kind and channel, `d=buzz-page:chunk:<publication>:<index>`,
+and JSON `{type:"buzz.page.chunk",version:1,page:"page",publication,index,html}`.
+They have no Page-head `e` tag. Each contains at most about 24 KiB of HTML, so
+even control characters and JSON escaping fit existing event/frame caps. There
+are at most 24 chunks and 512 KiB reconstructed UTF-8. Empty Pages use no chunks.
+Readers require exact referenced IDs, manifest author, channel, publication and
+index, and verify the final byte count before rendering.
 
-The original content is preserved on the relay. Display uses `srcdoc` in an
-iframe with exactly `sandbox="allow-scripts"`, without same-origin access,
-popups, forms, downloads, or top navigation. The iframe uses a strict CSP,
-no-referrer, and inert template parsing before rendering. Author scripts,
-inline event handlers, meta refresh and base tags cannot execute/navigate.
-Only Buzz's hash-pinned link bridge runs. HTML/CSS, data images/fonts/media,
-and native interactions such as `<details>` work. External resources and author
-JavaScript are disabled by default: arbitrary scripts can self-navigate an
-iframe despite ordinary CSP resource restrictions, so enabling them would break
-the offline contract. Inline JavaScript dashboards must use native HTML controls
-or a future separately designed trusted interactive mode.
+Every chunk must be acknowledged before its manifest is published. A failed
+upload leaves the previous shared head intact. Retrying can leave unreferenced
+immutable chunks in the event log; this version does not delete audit history.
+The visible Page is a shared LWW projection across eligible authors, ordered by
+`created_at DESC, id ASC`. Writers advance past the read/visible head and refuse
+a head more than five minutes ahead. Concurrent edits have deterministic ordering,
+without merging or a conflict editor. The slot/anchor/JSON `page` field leave a
+seam for future named pages.
 
-Clicking an HTTP(S) link offers a host-controlled **Open externally** action
-showing the actual URL. Untrusted frame messages cannot open a browser by
-themselves. Non-HTTP schemes and credential-bearing URLs are refused.
+## Membership and privacy
 
-## Pane integration seam
+Private channel and DM visibility use the hosted relay's existing membership
+policy for kind40004. No global kind30078 state or public Nostr broadcast is used.
+Writers verify their membership, including again immediately before committing
+the manifest. Because the existing open-channel event policy permits ordinary
+open-channel posting, clients also enforce membership on **reads**: head queries
+use native `authors` filtering from the current roster plus the indexed `e` tag.
+This prevents a raw nonmember event from becoming the displayed Page. Desktop
+rosters refresh at least every 15 seconds and on each live head; failures clear
+the author gate rather than treating an old roster as authoritative.
 
-`ChannelPage` accepts `channelId`, `canEdit`, and optional `onClose`. Content is
-keyed by the containing view's channel. `ChannelScreen` composes its header
-button with `headerEndActions`, preserving pane options, and supplies the Page
-to `idleAuxiliaryPanel`, with Page priority over the retained thread while open.
-There are no global URL writes or shared open-state singletons. The future
-layout controller can mount the same component as a page pane.
+V1 tradeoff: a removed member's Page revision is excluded on roster refresh;
+a current member must republish it to retain it as the visible shared Page.
+Signed revisions/chunks remain in channel history. This is client projection
+policy, not a claim that the hosted relay enforces custom Page JSON semantics.
 
-## Verification
+Empirical tests used the Paseo identity on an expiring private test channel,
+not Jacob's DM: HTTP acceptance, live WebSocket delivery, exact readback,
+private/restricted/closed metadata, indexed-target isolation from newer unrelated
+events, and a 512 KiB/22-chunk Unicode/control-character round-trip. Anonymous
+read returned401; that particular probe does not establish authenticated
+nonmember isolation. No private pilot content is committed in this repository.
 
-Focused model and component tests live next to the implementation. The direct
-`sandbox.browser-test.mjs` probe runs production srcdoc generation in sandboxed
-Chrome and verifies blocked network/navigation, author scripts/handlers, native
-HTML interaction and external-link requests. This Linux validation does not
-verify macOS WebKit or the native release. PR readiness retains the repository's
-separate human runtime confirmation requirement.
+## Offline rendering and pane seam
+
+Display uses `srcdoc` and exactly `sandbox="allow-scripts"`, without same-origin,
+popups, forms, downloads or top navigation. Inert template parsing removes author
+scripts, meta refresh and base tags; strict CSP permits only Buzz's hash-pinned
+link bridge, inline CSS and data assets. Author JavaScript and external resources
+are disabled: arbitrary scripts can navigate their own iframe despite resource
+CSP. HTML/CSS and native controls such as `<details>` work. HTTP(S) links offer a
+host-controlled **Open externally** action showing their real URL; frame messages
+cannot open the browser automatically. Non-HTTP and credential-bearing URLs are
+refused. The same bridge hash is in the native parent CSP inherited by srcdoc.
+
+`ChannelPage` accepts its owning view's `channelId`, edit permission and optional
+close callback. Open state is per view; `headerEndActions` preserves pane options.
+Stream/DM use the existing idle auxiliary slot, with Page priority over a retained
+thread. Forum uses its auxiliary shell and retains hidden posts on narrow screens.
+There are no global URL writes or community data singletons. A future pane host
+can mount the same component.
+
+Focused tests cover protocol bounds/integrity, membership projection, upload
+failure and ordering, views and forum restoration. The browser probe runs the
+production builder under the native parent CSP with sandboxed Chrome. Linux
+checks do not verify macOS WebKit, native release behavior or human acceptance.

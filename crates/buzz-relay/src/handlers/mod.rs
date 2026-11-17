@@ -4,8 +4,6 @@ pub mod admin_outbox_worker;
 pub mod auth;
 /// Pure NIP-29 channel membership-authority decisions (kinds 9000/9001/9022).
 pub mod channel_authz;
-/// Shared HTML Page validation and strict member write gate.
-pub(crate) mod channel_page;
 /// Subscription close (CLOSE) handler.
 pub mod close;
 /// Command executor — transactional processing for command kinds.

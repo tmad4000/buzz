@@ -775,7 +775,7 @@ pub enum ChannelsCmd {
 
 #[derive(Subcommand)]
 pub enum PageCmd {
-    /// Get the current shared HTML Page (JSON event, or null)
+    /// Get the shared Page (signed manifest plus reconstructed HTML, or null)
     Get {
         /// Channel UUID
         #[arg(long)]

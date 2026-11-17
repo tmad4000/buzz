@@ -1,3 +1,4 @@
+import { usePageAuthors } from "./usePageAuthors";
 import * as React from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { relayClient } from "@/shared/api/relayClient";
@@ -5,7 +6,7 @@ import type { RelayEvent } from "@/shared/api/types";
 import { useUserProfileQuery } from "@/features/profile/hooks";
 import { Button } from "@/shared/ui/button";
 import { pageHead, validatePage } from "./model";
-import { pageFilter, setPage } from "./service";
+import { pageFilter, setPage, getPageHtml } from "./service";
 import { pageDocument, pageExternalLink } from "./sandbox";
 
 /** Pane-ready content: scope and lifetime belong to the containing view instance. */
@@ -20,15 +21,35 @@ export function ChannelPage({
 }) {
   const editorId = React.useId();
   const [head, setHead] = React.useState<RelayEvent | null>(null);
+  const [html, setHtml] = React.useState<string | null>(null);
+  const [loadAttempt, setLoadAttempt] = React.useState(0);
+  const { authors, refresh, membershipError } = usePageAuthors(
+    channelId,
+    loadAttempt,
+  );
   const [loaded, setLoaded] = React.useState(false);
   const [error, setError] = React.useState("");
+  const [writeError, setWriteError] = React.useState("");
   const [draft, setDraft] = React.useState<string | null>(null);
   const [saving, setSaving] = React.useState(false);
   const [external, setExternal] = React.useState<string | null>(null);
   const [tick, setTick] = React.useState(0);
   const frame = React.useRef<HTMLIFrameElement>(null);
   const generation = React.useRef(0);
+  const channelGeneration = React.useRef(0);
+  const savingVersion = React.useRef<number | null>(null);
   const profile = useUserProfileQuery(head?.pubkey).data;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: channelId is the editor reset boundary.
+  React.useEffect(() => {
+    channelGeneration.current++;
+    setDraft(null);
+    setSaving(false);
+    setExternal(null);
+    setWriteError("");
+    return () => {
+      channelGeneration.current++;
+    };
+  }, [channelId]);
   React.useEffect(() => {
     const timer = setInterval(() => setTick((t) => t + 1), 30000);
     return () => clearInterval(timer);
@@ -40,18 +61,28 @@ export function ChannelPage({
     setHead(null);
     setLoaded(false);
     setError("");
-    setDraft(null);
-    setSaving(false);
-    setExternal(null);
     const accept = (event: RelayEvent) => {
-      if (generation.current === version)
+      if (generation.current === version && authors?.includes(event.pubkey))
         setHead((old) => pageHead(old ? [old, event] : [event], channelId));
+    };
+    if (!authors?.length) {
+      setLoaded(authors !== null);
+      return () => {
+        generation.current++;
+      };
+    }
+    const acceptLive = (event: RelayEvent) => {
+      void refresh()
+        .then((current) => {
+          if (current.includes(event.pubkey)) accept(event);
+        })
+        .catch(() => {});
     };
     // Subscribe before history; merge by deterministic order so late history cannot erase a live edit.
     void relayClient
       .subscribeLive(
         pageFilter(channelId),
-        accept,
+        acceptLive,
         undefined,
         undefined,
         controller.signal,
@@ -64,7 +95,7 @@ export function ChannelPage({
         if (generation.current === version) setError(String(e));
       });
     void relayClient
-      .fetchEvents(pageFilter(channelId))
+      .fetchEvents(pageFilter(channelId, authors))
       .then((events) => {
         if (generation.current !== version) return;
         for (const event of events) accept(event);
@@ -78,7 +109,25 @@ export function ChannelPage({
       controller.abort();
       stop?.();
     };
-  }, [channelId]);
+  }, [channelId, authors, refresh]);
+  React.useEffect(() => {
+    let disposed = false;
+    setHtml(null);
+    if (head)
+      void getPageHtml(head, channelId)
+        .then((value) => {
+          if (!disposed) {
+            setHtml(value);
+            setError("");
+          }
+        })
+        .catch((error) => {
+          if (!disposed) setError(String(error));
+        });
+    return () => {
+      disposed = true;
+    };
+  }, [head, channelId]);
   React.useEffect(() => {
     const receive = (event: MessageEvent) => {
       if (
@@ -92,21 +141,26 @@ export function ChannelPage({
     return () => window.removeEventListener("message", receive);
   }, []);
   const save = async () => {
-    if (draft === null || saving || !canEdit) return;
-    const version = generation.current;
+    const version = channelGeneration.current;
+    if (draft === null || savingVersion.current === version || !canEdit) return;
+    savingVersion.current = version;
     setSaving(true);
-    setError("");
+    setWriteError("");
     try {
       validatePage(draft);
       const event = await setPage(channelId, draft, head?.created_at);
-      if (generation.current === version) {
+      if (channelGeneration.current !== version) return;
+      if (!(await refresh()).includes(event.pubkey))
+        throw new Error("Page author is no longer a channel member");
+      if (channelGeneration.current === version) {
         setHead((old) => pageHead(old ? [old, event] : [event], channelId));
         setDraft(null);
       }
-    } catch (e) {
-      if (generation.current === version) setError(String(e));
+    } catch (error) {
+      if (channelGeneration.current === version) setWriteError(String(error));
     } finally {
-      if (generation.current === version) setSaving(false);
+      if (savingVersion.current === version) savingVersion.current = null;
+      if (channelGeneration.current === version) setSaving(false);
     }
   };
   const age = head
@@ -124,13 +178,13 @@ export function ChannelPage({
             ? `Updated ${age < 1 ? "just now" : age < 60 ? `${age}m ago` : age < 1440 ? `${Math.floor(age / 60)}h ago` : `${Math.floor(age / 1440)}d ago`} by ${profile?.displayName || head.pubkey}`
             : "One shared HTML Page for this conversation"}
         </span>
-        {canEdit && loaded && draft === null ? (
+        {canEdit && loaded && (!head || html !== null) && draft === null ? (
           <Button
             size="sm"
             variant="outline"
             onClick={() =>
               setDraft(
-                head?.content ??
+                html ??
                   "<!doctype html><html><body><h1>Page</h1></body></html>",
               )
             }
@@ -144,9 +198,16 @@ export function ChannelPage({
           </Button>
         ) : null}
       </div>
-      {error ? (
+      {writeError || error || membershipError ? (
         <p role="alert" className="text-sm text-destructive">
-          {error}
+          {writeError || error || membershipError}
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setLoadAttempt((value) => value + 1)}
+          >
+            Retry loading
+          </Button>
         </p>
       ) : null}
       {draft !== null ? (
@@ -174,20 +235,22 @@ export function ChannelPage({
             </Button>
           </div>
         </>
-      ) : head ? (
+      ) : head && html !== null ? (
         <iframe
           ref={frame}
           title="Channel Page HTML"
           sandbox="allow-scripts"
           referrerPolicy="no-referrer"
-          srcDoc={pageDocument(head.content)}
+          srcDoc={pageDocument(html ?? "")}
           className="min-h-96 w-full flex-1 border-0 bg-white"
         />
       ) : (
         <p className="text-sm text-muted-foreground">
-          {loaded
-            ? "No Page yet. Publish one here or with buzz page set."
-            : "Loading Page…"}
+          {head
+            ? "Loading Page content…"
+            : loaded
+              ? "No Page yet. Publish one here or with buzz page set."
+              : "Loading Page…"}
         </p>
       )}
       {external ? (
