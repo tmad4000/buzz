@@ -1,4 +1,6 @@
 import { getThreadReference } from "./threading";
+import { dedupeMessagesById } from "./messageQueryKeys";
+import { reconcileIncomingMessage } from "./messageMerge";
 import {
   formatTimelineMessages,
   isTimelineContentEvent,
@@ -51,6 +53,40 @@ function headAuxEventsFromChannelWindow(
   return [...directAux, ...deletionsOfAux];
 }
 
+/** Reuse the channel cache's owned local echoes in independently fetched views. */
+export function mergeOwnThreadLocalEvents(
+  channelEvents: RelayEvent[],
+  replyEvents: RelayEvent[],
+  rootId: string,
+  currentPubkey?: string,
+) {
+  const replies = dedupeMessagesById(replyEvents);
+  const replyEventIds = new Set(replies.map((event) => event.id));
+  const ownLocal = channelEvents.filter((event) => {
+    if ((!event.pending && !event.localKey) || event.pubkey !== currentPubkey)
+      return false;
+    const ref = getThreadReference(event.tags);
+    return (
+      ref.rootId === rootId ||
+      ref.parentId === rootId ||
+      (ref.parentId !== null && replyEventIds.has(ref.parentId))
+    );
+  });
+  let remaining = ownLocal;
+  const canonical = replies.map((event) => {
+    // A query/live receipt may arrive before the publication ACK callback.
+    // Match its stable client ID as well as its eventual signed event ID.
+    const reconciled = reconcileIncomingMessage(remaining, event);
+    const incoming = reconciled.at(-1);
+    remaining = reconciled.slice(0, -1);
+    return incoming ?? event;
+  });
+  return [
+    ...canonical,
+    ...remaining.filter((event) => !replyEventIds.has(event.id)),
+  ];
+}
+
 export function buildIndependentThreadPanel(
   channelEvents: RelayEvent[],
   replyEvents: RelayEvent[],
@@ -74,31 +110,13 @@ export function buildIndependentThreadPanel(
         (event) => !replyEventIds.has(event.id),
       )
     : [];
-  // The channel cache owns optimistic sends and their acknowledged local key.
-  // Keep that local echo in this projection until the thread query catches up.
-  const ownLocal = channelEvents.filter((event) => {
-    if ((!event.pending && !event.localKey) || event.pubkey !== formatArgs[1])
-      return false;
-    const ref = getThreadReference(event.tags);
-    return (
-      ref.rootId === rootId ||
-      ref.parentId === rootId ||
-      (ref.parentId !== null && replyEventIds.has(ref.parentId))
-    );
-  });
-  const localById = new Map(ownLocal.map((event) => [event.id, event]));
-  const canonicalReplies = replyEvents.map((event) => {
-    const echo = localById.get(event.id);
-    // Only presentation identity crosses into the query result. Server body,
-    // tags, acknowledgement state and auxiliary overlays remain authoritative.
-    return echo?.localKey && echo.pubkey === event.pubkey
-      ? { ...event, localKey: echo.localKey }
-      : event;
-  });
-  const localEcho = ownLocal.filter((event) => !replyEventIds.has(event.id));
-  const events = head
-    ? [head, ...headAux, ...canonicalReplies, ...localEcho]
-    : [...canonicalReplies, ...localEcho];
+  const replies = mergeOwnThreadLocalEvents(
+    channelEvents,
+    replyEvents,
+    rootId,
+    formatArgs[1],
+  );
+  const events = head ? [head, ...headAux, ...replies] : replies;
   const messages = formatTimelineMessages(events, ...formatArgs);
   return {
     ...buildThreadPanelData(messages, rootId, replyTargetId, expandedReplyIds),

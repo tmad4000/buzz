@@ -1,12 +1,9 @@
 import * as React from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { channelWindowKey } from "../lib/messageQueryKeys";
 import {
-  emptyChannelWindowStore,
-  mergeLiveChannelWindowEvent,
-  type ChannelWindowStore,
-} from "../lib/channelWindowStore";
-import { projectChannelWindowMessages } from "../lib/projectChannelWindow";
+  projectAcceptedOutboxEvent,
+  projectPendingOutboxRows,
+} from "./projection";
 import { outboxSnapshot, startOutbox, subscribeOutbox } from "./runtime";
 import type { OutboxRecord } from "./types";
 
@@ -41,29 +38,27 @@ export function OutboxProvider({
     outboxSnapshot,
     () => EMPTY,
   );
-  React.useEffect(
-    () =>
-      startOutbox((event, row) => {
-        // Native publication is scope-fenced. Do not project an old community's
-        // late acknowledgement into the new community's unscoped query caches.
-        if (
-          event.pubkey !== signerPubkey ||
-          outboxRelayUrl(row.message.relayUrl) !==
-            outboxRelayUrl(relayUrl ?? "")
-        )
-          return;
-        const key = channelWindowKey(row.message.channelId);
-        const current =
-          queryClient.getQueryData<ChannelWindowStore>(key) ??
-          emptyChannelWindowStore();
-        queryClient.setQueryData(
-          key,
-          mergeLiveChannelWindowEvent(current, event),
-        );
-        projectChannelWindowMessages(queryClient, row.message.channelId);
-      }),
-    [queryClient, relayUrl, signerPubkey],
-  );
+  // These caches are unscoped. Fence even a queued callback from the previous
+  // effect against the currently rendered relay/account/query-client owner.
+  const active = React.useRef({ queryClient, relayUrl, signerPubkey });
+  active.current = { queryClient, relayUrl, signerPubkey };
+  React.useLayoutEffect(() => {
+    const inScope = (row: OutboxRecord) =>
+      active.current.queryClient === queryClient &&
+      row.message.signerPubkey === active.current.signerPubkey &&
+      outboxRelayUrl(row.message.relayUrl) ===
+        outboxRelayUrl(active.current.relayUrl ?? "");
+    return startOutbox(
+      (event, row) => {
+        if (!inScope(row) || event.pubkey !== row.message.signerPubkey) return;
+        projectAcceptedOutboxEvent(queryClient, event, row);
+      },
+      (row) => {
+        if (!inScope(row)) return;
+        projectPendingOutboxRows(queryClient, outboxSnapshot().filter(inScope));
+      },
+    );
+  }, [queryClient]);
   const scope = outboxRelayUrl(relayUrl ?? "");
   const rows = React.useMemo(
     () =>
@@ -74,6 +69,9 @@ export function OutboxProvider({
       ),
     [snapshot, scope, signerPubkey],
   );
+  React.useLayoutEffect(() => {
+    projectPendingOutboxRows(queryClient, rows);
+  }, [queryClient, rows]);
   const waiting = rows.filter((row) => !row.accepted).length;
   return (
     <OutboxContext.Provider

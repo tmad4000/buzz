@@ -10,49 +10,86 @@ function getLocalRenderKey(message: RelayEvent) {
   return message.localKey ?? message.id;
 }
 
+function sameDestination(left: RelayEvent, right: RelayEvent) {
+  const a = getThreadReference(left.tags),
+    b = getThreadReference(right.tags);
+  return (
+    left.kind === right.kind &&
+    left.pubkey.toLowerCase() === right.pubkey.toLowerCase() &&
+    getChannelIdFromTags(left.tags) === getChannelIdFromTags(right.tags) &&
+    a.parentId === b.parentId &&
+    a.rootId === b.rootId
+  );
+}
+
+function clientMessageId(event: RelayEvent) {
+  return event.tags.find((tag) => tag[0] === "client_msg_id")?.[1];
+}
+
 function isMatchingPendingMessage(pending: RelayEvent, incoming: RelayEvent) {
   if (
     !pending.pending ||
     incoming.pending ||
-    pending.content !== incoming.content ||
-    pending.kind !== incoming.kind ||
-    pending.pubkey.toLowerCase() !== incoming.pubkey.toLowerCase() ||
-    getChannelIdFromTags(pending.tags) !== getChannelIdFromTags(incoming.tags)
-  ) {
+    !sameDestination(pending, incoming)
+  )
     return false;
-  }
-
-  const pendingThread = getThreadReference(pending.tags);
-  const incomingThread = getThreadReference(incoming.tags);
-
-  return (
-    pendingThread.parentId === incomingThread.parentId &&
-    pendingThread.rootId === incomingThread.rootId
-  );
+  const pendingId = clientMessageId(pending),
+    incomingId = clientMessageId(incoming);
+  // Durable attachment bodies can change after upload; identical messages are
+  // distinct sends. Never fall back to body matching when either has an ID.
+  if (pendingId || incomingId)
+    return Boolean(pendingId && pendingId === incomingId);
+  return pending.content === incoming.content;
 }
 
 export function reconcileIncomingMessage(
   current: RelayEvent[],
   incoming: RelayEvent,
 ): RelayEvent[] {
-  const normalizedCurrent = dedupeMessagesById(current);
-  const replacedPending = normalizedCurrent.find((message) =>
-    isMatchingPendingMessage(message, incoming),
-  );
-  const incomingWithLocalKey = replacedPending
+  const normalized = dedupeMessagesById(current);
+  const clientId = clientMessageId(incoming);
+  const existing =
+    normalized.find(
+      (message) =>
+        message.id === incoming.id && sameDestination(message, incoming),
+    ) ??
+    (clientId
+      ? normalized.find(
+          (message) =>
+            clientMessageId(message) === clientId &&
+            sameDestination(message, incoming),
+        )
+      : undefined) ??
+    normalized.find((message) => isMatchingPendingMessage(message, incoming));
+  // A delayed durable snapshot cannot turn an already observed relay receipt
+  // back into a synthetic pending event.
+  const canonical =
+    incoming.pending && existing && !existing.pending ? existing : incoming;
+  const next = existing
     ? {
-        ...incoming,
-        localKey: replacedPending.localKey ?? replacedPending.id,
+        ...canonical,
+        localKey:
+          canonical.localKey ??
+          existing.localKey ??
+          (existing.pending ? existing.id : undefined),
+        ...((canonical.localSendIntent ?? existing.localSendIntent)
+          ? {
+              localSendIntent:
+                canonical.localSendIntent ?? existing.localSendIntent,
+            }
+          : {}),
       }
-    : incoming;
-  const incomingLocalKey = getLocalRenderKey(incomingWithLocalKey);
-  const deduped = normalizedCurrent.filter(
-    (message) =>
-      message.id !== incoming.id &&
-      getLocalRenderKey(message) !== incomingLocalKey,
-  );
-
-  return [...deduped, incomingWithLocalKey];
+    : canonical;
+  const localKey = getLocalRenderKey(next);
+  return [
+    ...normalized.filter(
+      (message) =>
+        message.id !== next.id &&
+        message.id !== existing?.id &&
+        getLocalRenderKey(message) !== localKey,
+    ),
+    next,
+  ];
 }
 
 function mergeMessagesWithNormalizer(
