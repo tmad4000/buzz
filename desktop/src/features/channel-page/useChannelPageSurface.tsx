@@ -1,3 +1,4 @@
+import type { PageLeaveGuard, PageLeaveGuardRegistrar } from "./pageLeaveGuard";
 import * as React from "react";
 import type { Channel } from "@/shared/api/types";
 import { Button } from "@/shared/ui/button";
@@ -7,10 +8,31 @@ import { ChannelPage } from "./ChannelPage";
 export function useChannelPageSurface(
   channel: Channel | null,
   endActions: React.ReactNode,
+  registerTargetLeaveGuard?: PageLeaveGuardRegistrar,
 ) {
   const [pageChannel, setPageChannel] = React.useState<string | null>(null);
   const pageOpen = Boolean(channel && pageChannel === channel.id);
-  const closePage = React.useCallback(() => setPageChannel(null), []);
+  const guard = React.useRef<PageLeaveGuard>(() => true);
+  const requirePageEditResolution = React.useCallback(
+    () => guard.current(),
+    [],
+  );
+  const registerLeaveGuard = React.useCallback<PageLeaveGuardRegistrar>(
+    (next) => {
+      guard.current = next;
+      return () => {
+        if (guard.current === next) guard.current = () => true;
+      };
+    },
+    [],
+  );
+  React.useLayoutEffect(
+    () => registerTargetLeaveGuard?.(requirePageEditResolution),
+    [registerTargetLeaveGuard, requirePageEditResolution],
+  );
+  const closePage = React.useCallback(() => {
+    if (requirePageEditResolution()) setPageChannel(null);
+  }, [requirePageEditResolution]);
   const pageHeaderActions = React.useMemo(
     () => (
       <>
@@ -18,7 +40,10 @@ export function useChannelPageSurface(
           <Button
             size="sm"
             variant={pageOpen ? "secondary" : "outline"}
-            onClick={() => setPageChannel(pageOpen ? null : channel.id)}
+            onClick={() => {
+              if (pageOpen) closePage();
+              else setPageChannel(channel.id);
+            }}
           >
             Page
           </Button>
@@ -26,7 +51,7 @@ export function useChannelPageSurface(
         {endActions}
       </>
     ),
-    [channel, pageOpen, endActions],
+    [channel, pageOpen, endActions, closePage],
   );
   const pagePanel =
     pageOpen && channel ? (
@@ -34,7 +59,14 @@ export function useChannelPageSurface(
         key={channel.id}
         channelId={channel.id}
         canEdit={channel.isMember}
+        registerLeaveGuard={registerLeaveGuard}
       />
     ) : null;
-  return { pageOpen, closePage, pageHeaderActions, pagePanel };
+  return {
+    pageOpen,
+    closePage,
+    pageHeaderActions,
+    pagePanel,
+    requirePageEditResolution,
+  };
 }

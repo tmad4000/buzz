@@ -90,7 +90,7 @@ export function ChannelScreen({
   autoSendDraftKey,
   currentIdentity,
   currentProfile,
-  headerEndActions, idleAuxiliaryPanel,
+  headerEndActions, idleAuxiliaryPanel, registerPageLeaveGuard,
   idleAuxiliaryHeaderActions, idleAuxiliaryOverridesThread,
   idleAuxiliaryTitle,
   onAddFiles, onCloseIdleAuxiliaryPanel,
@@ -99,7 +99,7 @@ export function ChannelScreen({
   targetMessageEvents, targetMessageId,
   ...searchTarget
 }: ChannelScreenProps) {
-  const { pageOpen, closePage, pageHeaderActions, pagePanel } = useChannelPageSurface(activeChannel, headerEndActions);
+  const { pageOpen, closePage, pageHeaderActions, pagePanel, requirePageEditResolution } = useChannelPageSurface(activeChannel, headerEndActions, registerPageLeaveGuard);
   const queryClient = useQueryClient();
   const { goHome } = useAppNavigation();
   const { activeCommunity } = useCommunities();
@@ -639,7 +639,7 @@ export function ChannelScreen({
     setThreadReplyTargetId,
     setThreadScrollTargetId,
   });
-  useNavigationGuard(requireThreadEditResolution);
+  useNavigationGuard(React.useCallback(() => requirePageEditResolution() && requireThreadEditResolution(), [requirePageEditResolution, requireThreadEditResolution]));
   const mainTimelineTargetMessageId = useChannelRouteTarget({
     activeChannel,
     activeChannelId,
