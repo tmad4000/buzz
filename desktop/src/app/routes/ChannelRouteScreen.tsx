@@ -284,6 +284,13 @@ export function ChannelRouteScreen({
     };
   }, [channelId, selectedPostId, targetMessageId, targetThreadRootId]);
 
+  // Hide the old payload during the render before channel-reset effects commit.
+  const targetOwnsChannel = previousResetKeyRef.current === channelId;
+  const channelTargetEvents = targetOwnsChannel ? targetMessageEvents : [];
+  const channelSearchHighlight = targetOwnsChannel
+    ? activeSearchHighlight
+    : null;
+
   if (
     !activeChannel &&
     (channelsQuery.isPending ||
@@ -307,7 +314,7 @@ export function ChannelRouteScreen({
         autoSendDraftKey={autoSendDraftKey}
         project={projectHome}
         projects={projectsQuery.data ?? [projectHome]}
-        targetMessageEvents={targetMessageEvents}
+        targetMessageEvents={channelTargetEvents}
         targetMessageId={targetMessageId}
       />
     );
@@ -326,10 +333,10 @@ export function ChannelRouteScreen({
     },
     selectedForumPostId: selectedPostId,
     targetForumReplyId: targetReplyId,
-    targetMessageEvents,
+    targetMessageEvents: channelTargetEvents,
     targetMessageId,
-    targetSearchMessageId: activeSearchHighlight?.messageId,
-    targetSearchQuery: activeSearchHighlight?.query,
+    targetSearchMessageId: channelSearchHighlight?.messageId,
+    targetSearchQuery: channelSearchHighlight?.query,
   };
   return renderChannel ? (
     renderChannel(channelProps)
