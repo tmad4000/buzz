@@ -35,7 +35,7 @@ export type ComposerMessageLinkAttributes = {
 };
 
 const BARE_BUZZ_LINK_AT_START =
-  /^buzz:\/\/(?:message\?|channel\/|(?:pr|issue|repo|project)\?)[^\s<>"')\]}*]+/i;
+  /^buzz(?:-ideaflow)?:\/\/(?:message\?|channel\/|(?:pr|issue|repo|project)\?)[^\s<>"')\]}*]+/i;
 const BUZZ_LINK_SUFFIX_AT_START =
   /^:\/\/(?:message\?|channel\/|(?:pr|issue|repo|project)\?)[^\s<>"')\]}*]+/i;
 const TRAILING_PUNCTUATION = /[.,;:!?]+$/;
@@ -305,10 +305,13 @@ export function registerComposerMessageLinkMarkdownIt(
     const remaining = state.src.slice(state.pos);
     const fullMatch = BARE_BUZZ_LINK_AT_START.exec(remaining);
     const suffixMatch = BUZZ_LINK_SUFFIX_AT_START.exec(remaining);
+    const pendingScheme =
+      /(buzz(?:-ideaflow)?)$/i.exec(state.pending ?? "")?.[0] ?? "";
     const resumesTextToken =
-      !fullMatch && suffixMatch && /buzz$/i.test(state.pending ?? "");
+      !fullMatch && suffixMatch && Boolean(pendingScheme);
     const rawHref =
-      fullMatch?.[0] ?? (resumesTextToken ? `buzz${suffixMatch[0]}` : null);
+      fullMatch?.[0] ??
+      (resumesTextToken ? `${pendingScheme}${suffixMatch[0]}` : null);
     if (!rawHref) return false;
     const href = trimBareBuzzLink(rawHref);
     const attrs = resolveComposerMessageLinkAttributes(
@@ -317,11 +320,12 @@ export function registerComposerMessageLinkMarkdownIt(
     );
     if (!attrs) return false;
     if (!silent) {
-      if (resumesTextToken) state.pending = state.pending.slice(0, -4);
+      if (resumesTextToken)
+        state.pending = state.pending.slice(0, -pendingScheme.length);
       const token = state.push(tokenType, "span", 0);
       token.meta = attrs;
     }
-    state.pos += href.length - (resumesTextToken ? 4 : 0);
+    state.pos += href.length - (resumesTextToken ? pendingScheme.length : 0);
     return true;
   };
 
