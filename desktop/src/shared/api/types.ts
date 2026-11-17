@@ -189,6 +189,7 @@ export type RelayEvent = {
 };
 
 export type SendChannelMessageResult = {
+  signedEvent?: RelayEvent;
   eventId: string;
   parentEventId: string | null;
   rootEventId: string | null;
@@ -681,6 +682,8 @@ export type RuntimeConfigSurface = {
 
 export type UpdateManagedAgentInput = {
   pubkey: string;
+  expectedRelayUrl?: string;
+  expectedSignerPubkey?: string;
   name?: string;
   model?: string | null;
   provider?: string | null;

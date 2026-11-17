@@ -71,6 +71,7 @@ export type PendingNonMemberMentionSend = {
   invitationSignal?: AbortSignal;
   addressedAgentPubkeys: string[];
   inlineAgentMentionPubkeys: string[];
+  outboxScope?: { relayUrl: string; signerPubkey: string };
   capturedChannelId: string | null;
   capturedThreadContext: {
     parentEventId: string | null;

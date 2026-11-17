@@ -145,6 +145,14 @@ pub async fn update_managed_agent(
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<UpdateManagedAgentResponse, String> {
+    crate::relay::assert_expected_relay_scope(
+        input.expected_relay_url.as_deref(),
+        &crate::relay::relay_api_base_url_with_override(&state),
+    )?;
+    crate::relay::assert_expected_signer(
+        input.expected_signer_pubkey.as_deref(),
+        &state.signing_keys()?.public_key().to_hex(),
+    )?;
     // Captured before Phase 1 stops the runtime for an access-policy change: a
     // community removed while this update runs refuses the restart.
     let admission = crate::managed_agents::AdmissionSnapshot::capture(&state);

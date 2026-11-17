@@ -99,6 +99,7 @@ export type MessageComposerProps = {
     } | null,
     /** Route through the REST publisher even when best-effort enrichment settled empty. */
     forceRest?: boolean,
+    outbox?: import("../outbox/types").OutboxSubmission,
   ) => Promise<void>;
   placeholder?: string;
   profiles?: UserProfileLookup;
@@ -112,6 +113,7 @@ export type MessageComposerProps = {
   showTopBorder?: boolean;
   /** Render the app-wide upload queue above this composer dock. */
   showBackgroundUploadProgress?: boolean;
+  showOutboxRows?: boolean;
   toolbarExtraActions?: ReactNode;
   /** Loaded roots from this pane only; enables explicit routing beside Send. */
   threadRoutingEntries?: readonly import("../lib/threadPanel").MainTimelineEntry[];

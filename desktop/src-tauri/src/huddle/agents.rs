@@ -318,8 +318,18 @@ pub(crate) async fn sync_agents_for_active_huddle(
 pub async fn sync_agents_to_active_huddle(
     channel_id: String,
     agent_pubkeys: Vec<String>,
+    expected_relay_url: Option<String>,
+    expected_signer_pubkey: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<AgentHuddleSyncResult, String> {
+    crate::relay::assert_expected_relay_scope(
+        expected_relay_url.as_deref(),
+        &crate::relay::relay_api_base_url_with_override(&state),
+    )?;
+    crate::relay::assert_expected_signer(
+        expected_signer_pubkey.as_deref(),
+        &state.signing_keys()?.public_key().to_hex(),
+    )?;
     sync_agents_for_active_huddle(&channel_id, agent_pubkeys, &state).await
 }
 

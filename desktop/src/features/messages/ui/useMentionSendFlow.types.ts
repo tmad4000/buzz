@@ -14,6 +14,8 @@ export type UseMentionSendFlowOptions = {
   getComposerRevision: () => number;
   runComposerUpdate: (update: () => void) => void;
   channelId: string | null;
+  durableOutbox?: boolean;
+  outboxScope?: { relayUrl: string; signerPubkey: string };
   /** The actual persistence key, including same-channel thread identity. */
   effectiveDraftKey: string | null | undefined;
   channelLinks: Pick<UseChannelLinksResult, "clearChannels">;
@@ -41,6 +43,7 @@ export type UseMentionSendFlowOptions = {
         threadHeadId: string | null;
       } | null,
       forceRest?: boolean,
+      outbox?: import("../outbox/types").OutboxSubmission,
     ) => Promise<void>
   >;
   richText: Pick<UseRichTextEditorResult, "clearContent" | "setContent">;
