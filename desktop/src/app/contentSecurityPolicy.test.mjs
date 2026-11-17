@@ -179,3 +179,16 @@ test("script-src stays free of unsafe-inline and unsafe-eval", () => {
   assert.ok(!allowed.includes("'unsafe-inline'"));
   assert.ok(!allowed.includes("'unsafe-eval'"));
 });
+
+test("feedback allows only its three widget scripts", () => {
+  for (const script of ["wit-feedback.js", "wit-core.js", "wit-drafts.js"])
+    assert.ok(
+      sources("script-src").includes(
+        `https://worldissuetracker.com/widget/${script}`,
+      ),
+    );
+  assert.ok(!sources("script-src").includes("https://worldissuetracker.com"));
+  assert.ok(
+    !sources("script-src").includes("https://worldissuetracker.com/widget/"),
+  );
+});

@@ -258,7 +258,8 @@ export function ProfilePopover({
               <button
                 className={MENU_ITEM_CLASS}
                 data-testid="profile-popover-send-feedback"
-                onClick={() => {
+                onClick={(event) => {
+                  event.stopPropagation();
                   closePopover();
                   window.requestAnimationFrame(() => {
                     onSendFeedback();

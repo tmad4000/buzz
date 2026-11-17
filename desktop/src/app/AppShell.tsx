@@ -343,6 +343,14 @@ export function AppShell() {
     pubkey: identityQuery.data?.pubkey,
     relayUrl: communitiesHook.activeCommunity?.relayUrl,
   });
+  React.useEffect(() => {
+    const thing = settingsOpen
+      ? "Settings"
+      : activeChannel?.name ||
+        (selectedView === "home" ? "Home" : selectedView);
+    document.title = thing ? `${thing} · Buzz Ideaflow` : "Buzz Ideaflow";
+  }, [activeChannel?.name, selectedView, settingsOpen]);
+
   const effectiveTerminalContext = terminalContextOverride
     ? {
         ...terminalContext,

@@ -1,3 +1,4 @@
+import { relativeUpdated } from "@/shared/lib/appBuild";
 /**
  * Shared date/time formatters for the message timeline.
  *
@@ -76,21 +77,16 @@ export function formatShortMonthDay(unixSeconds: number): string {
 }
 
 /**
- * Relative thread-summary timestamp with expanded units, e.g. "3 hours ago",
- * falling back to "on May 19" for older replies.
+ * Relative-first thread summary, e.g. "3h ago" or "May 19".
  */
 export function formatThreadSummaryLastReplyTime(
   unixSeconds: number,
   nowSeconds = Date.now() / 1_000,
 ): string {
-  const diff = Math.max(0, nowSeconds - unixSeconds);
-
-  if (diff < 60) return "just now";
-  if (diff < 3_600) return formatAgo(Math.floor(diff / 60), "minute");
-  if (diff < 86_400) return formatAgo(Math.floor(diff / 3_600), "hour");
-  if (diff < 604_800) return formatAgo(Math.floor(diff / 86_400), "day");
-
-  return `on ${formatShortMonthDay(unixSeconds)}`;
+  return relativeUpdated(
+    new Date(unixSeconds * 1000).toISOString(),
+    nowSeconds * 1000,
+  );
 }
 
 function isSameDayDate(a: Date, b: Date): boolean {
@@ -99,8 +95,4 @@ function isSameDayDate(a: Date, b: Date): boolean {
     a.getMonth() === b.getMonth() &&
     a.getDate() === b.getDate()
   );
-}
-
-function formatAgo(value: number, unit: string): string {
-  return `${value} ${unit}${value === 1 ? "" : "s"} ago`;
 }

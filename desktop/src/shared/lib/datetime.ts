@@ -1,3 +1,4 @@
+import { relativeUpdated } from "./appBuild";
 /**
  * Relative date labels shared by the chat timeline and the Inbox.
  *
@@ -25,26 +26,6 @@ const MONTH_DAY_YEAR_FORMATTER = new Intl.DateTimeFormat("en-US", {
   month: "long",
   day: "numeric",
   year: "numeric",
-});
-
-const SHORT_WEEKDAY_SHORT_MONTH_DAY_FORMATTER = new Intl.DateTimeFormat(
-  "en-US",
-  {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-  },
-);
-
-const SHORT_MONTH_DAY_YEAR_FORMATTER = new Intl.DateTimeFormat("en-US", {
-  month: "short",
-  day: "numeric",
-  year: "numeric",
-});
-
-const TIME_FORMATTER = new Intl.DateTimeFormat("en-US", {
-  hour: "numeric",
-  minute: "2-digit",
 });
 
 /** Days in a week, past which the weekday name stops being unambiguous. */
@@ -101,34 +82,7 @@ export function formatDayGroupLabel(
     : MONTH_DAY_YEAR_FORMATTER.format(date);
 }
 
-/**
- * Label for a single item's timestamp — an Inbox list row, or a message in the
- * Inbox thread pane.
- *
- * ```
- * withTime: false (narrow rows)   withTime: true (roomy rows)
- * Today   → "2:34 PM"             Today   → "2:34 PM"
- * Yest.   → "Yesterday"           Yest.   → "Yesterday at 2:34 PM"
- * 2–6d    → "Monday"              2–6d    → "Monday at 2:34 PM"
- * year    → "Sat, Jun 20"         year    → "Sat, Jun 20 at 2:34 PM"
- * older   → "Jun 20, 2025"        older   → "Jun 20, 2025 at 2:34 PM"
- * ```
- *
- * The weekday stays through the current year (abbreviated, matching the month)
- * and drops once the year appears — see `formatDayGroupLabel` for why.
- *
- * Today needs no date word in either mode: a bare clock time already reads as
- * today, and "Today at 2:34 PM" is longer without saying more.
- *
- * `withTime` is a surface decision, not a preference. Somewhere you read
- * conversation, the time is part of the content, so pass `true`. In a narrow
- * list row it costs more width than it earns and the full timestamp is a hover
- * away, so pass `false`.
- *
- * Months are abbreviated here but spelled out in `formatDayGroupLabel` — a
- * day divider is a roomy header of its own, an item label shares a row with a
- * name, a channel, and a preview.
- */
+/** Shared relative-first labels. Exact local time belongs in the surface tooltip. */
 export function formatItemTimestamp(
   unixSeconds: number,
   {
@@ -136,26 +90,11 @@ export function formatItemTimestamp(
     nowSeconds = Date.now() / 1_000,
   }: { withTime?: boolean; nowSeconds?: number } = {},
 ): string {
-  const date = new Date(unixSeconds * 1_000);
-  const now = new Date(nowSeconds * 1_000);
-  const dayDiff = calendarDaysBetween(now, date);
-  const time = TIME_FORMATTER.format(date);
-
-  if (dayDiff === 0) return time;
-
-  let dayLabel: string;
-  if (dayDiff === 1) {
-    dayLabel = "Yesterday";
-  } else if (dayDiff > 1 && dayDiff < WEEKDAY_BAND_DAYS) {
-    dayLabel = WEEKDAY_FORMATTER.format(date);
-  } else {
-    dayLabel =
-      date.getFullYear() === now.getFullYear()
-        ? SHORT_WEEKDAY_SHORT_MONTH_DAY_FORMATTER.format(date)
-        : SHORT_MONTH_DAY_YEAR_FORMATTER.format(date);
-  }
-
-  return withTime ? `${dayLabel} at ${time}` : dayLabel;
+  void withTime;
+  return relativeUpdated(
+    new Date(unixSeconds * 1000).toISOString(),
+    nowSeconds * 1000,
+  );
 }
 
 /** Local midnight of the calendar day containing `date`. */
