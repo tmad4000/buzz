@@ -53,13 +53,22 @@ test("projection uses canonical resource/panel IDs and excludes commands and pri
 
 test("history carries initiating view and scope while retaining unrelated router state", () => {
   const projection = conversationRouteProjection(view, "scope", false);
-  const previous = { routerKey: "keep", unrelated: 42 };
+  const previous = {
+    routerKey: "keep",
+    unrelated: 42,
+    searchHighlight: { activationId: "previous" },
+  };
   const state = projection.state(previous);
   assert.equal(conversationHistoryViewId(state, "scope"), "private-view");
   assert.equal(conversationHistoryViewId(state, "other-scope"), null);
   assert.equal(state.routerKey, "keep");
   assert.equal(state.unrelated, 42);
-  assert.deepEqual(previous, { routerKey: "keep", unrelated: 42 });
+  assert.equal(state.searchHighlight, null);
+  assert.deepEqual(previous, {
+    routerKey: "keep",
+    unrelated: 42,
+    searchHighlight: { activationId: "previous" },
+  });
   assert.equal(projection.replace, false);
 });
 

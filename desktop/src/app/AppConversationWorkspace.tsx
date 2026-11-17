@@ -11,6 +11,8 @@ import { useProjectsQuery } from "@/features/projects/hooks";
 import { findProjectHomeByChannelId } from "@/features/projects/lib/projectHomeChannel";
 import { isProjectCollectionAuthoritative } from "@/features/projects/projectSnapshot";
 import type { Channel } from "@/shared/api/types";
+import type { SearchHighlightNavigation } from "./navigation/searchHighlightNavigation";
+import { admittedRouteSearchHighlight } from "@/features/conversations/routeSearchHighlight";
 
 const ChannelRouteScreen = React.lazy(async () => {
   const module = await import("./routes/ChannelRouteScreen");
@@ -77,6 +79,17 @@ export function AppConversationWorkspace({
     | null
   >(null);
   const recent = React.useRef<string[]>([]);
+  const [highlights, setHighlights] = React.useState<
+    Record<
+      string,
+      {
+        scopeKey: string;
+        channelId: string;
+        visit: number;
+        value: SearchHighlightNavigation | null;
+      }
+    >
+  >({});
   React.useLayoutEffect(() => {
     const element = root.current;
     if (!element) return;
@@ -151,6 +164,20 @@ export function AppConversationWorkspace({
     ? snapshot?.layout.views[focusedViewId]
     : null;
   React.useLayoutEffect(() => {
+    setHighlights((previous) => {
+      const kept = Object.entries(previous).filter(
+        ([id, entry]) =>
+          session !== null &&
+          session.scopeKey === entry.scopeKey &&
+          snapshot?.layout.views[id]?.channelId === entry.channelId &&
+          session.controller.visitToken(id) === entry.visit,
+      );
+      return kept.length === Object.keys(previous).length
+        ? previous
+        : Object.fromEntries(kept);
+    });
+  }, [session, snapshot?.layout.views]);
+  React.useLayoutEffect(() => {
     onFocusedChannelChange(active ? (focusedView?.channelId ?? null) : null);
   }, [active, focusedView?.channelId, onFocusedChannelChange]);
   React.useLayoutEffect(() => {
@@ -205,6 +232,27 @@ export function AppConversationWorkspace({
         : null,
     visibleViewIds: visible,
     recentViewIds: recent.current,
+    onAdmitted: (viewId, route, { projectionEcho }) => {
+      if (!session) return;
+      const view = session.controller.getSnapshot().layout.views[viewId];
+      const visit = session.controller.visitToken(viewId);
+      if (!view || visit === undefined) return;
+      const value = admittedRouteSearchHighlight(
+        route,
+        view.channelId,
+        projectionEcho,
+      );
+      if (value === undefined) return;
+      setHighlights((previous) => ({
+        ...previous,
+        [viewId]: {
+          scopeKey: session.scopeKey,
+          channelId: view.channelId,
+          visit,
+          value,
+        },
+      }));
+    },
     onRejected: () => {
       setRetryAction({ kind: "incoming" });
       setMessage(
@@ -268,7 +316,14 @@ export function AppConversationWorkspace({
                 channelId={view.channelId}
                 autoSendDraftKey={null}
                 selectedPostId={null}
-                searchHighlight={undefined}
+                searchHighlight={
+                  highlights[view.id]?.scopeKey === session.scopeKey &&
+                  highlights[view.id]?.channelId === view.channelId &&
+                  highlights[view.id]?.visit ===
+                    session.controller.visitToken(view.id)
+                    ? highlights[view.id].value
+                    : undefined
+                }
                 targetMessageId={view.panelState.messageId ?? null}
                 targetReplyId={null}
                 targetThreadRootId={

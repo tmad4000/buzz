@@ -4,8 +4,10 @@ import {
   conversationHistoryViewId,
   conversationPanelStateFromSearch,
   sameConversationPanelRoute,
+  conversationProjectionId,
 } from "./routeProjection";
 import type { ConversationWorkspaceSession } from "./useConversationWorkspace";
+import { projectionEchoesFor } from "./projectionEchoes";
 
 export type IncomingConversationRoute = {
   /** Router entry key plus canonical href; must change for a distinct route action. */
@@ -23,6 +25,7 @@ export function useConversationIncomingRoute({
   visibleViewIds,
   recentViewIds,
   onRejected,
+  onAdmitted,
 }: {
   session: ConversationWorkspaceSession | null;
   active: boolean;
@@ -30,6 +33,11 @@ export function useConversationIncomingRoute({
   visibleViewIds: ReadonlySet<string>;
   recentViewIds: readonly string[];
   onRejected: (route: IncomingConversationRoute) => void;
+  onAdmitted?: (
+    viewId: string,
+    route: IncomingConversationRoute,
+    options: { projectionEcho: boolean },
+  ) => void;
 }) {
   const [retry, setRetry] = React.useState(0);
   const attempted = React.useRef<{
@@ -44,8 +52,9 @@ export function useConversationIncomingRoute({
       previous?.session === session &&
       previous.key === route.key &&
       previous.retry === retry
-    )
+    ) {
       return;
+    }
     // Record before invoking guards/subscribers. Removing a veto never replays
     // a pending action; the caller must request an explicit retry.
     attempted.current = { session, key: route.key, retry };
@@ -63,9 +72,21 @@ export function useConversationIncomingRoute({
       view &&
       historyViewId === view.id &&
       view.channelId === route.channelId &&
-      sameConversationPanelRoute(view.panelState, route.search)
-    )
+      sameConversationPanelRoute(view.panelState, route.search) &&
+      projectionEchoesFor(controller).consume(
+        conversationProjectionId(route.state),
+        (route.state as { __TSR_key?: string } | null)?.__TSR_key,
+        {
+          scopeKey: session.scopeKey,
+          viewId: view.id,
+          channelId: route.channelId,
+          panelState: route.search,
+        },
+      )
+    ) {
+      onAdmitted?.(view.id, route, { projectionEcho: true });
       return;
+    }
     const target = controller.navigateRoute({
       channelId: route.channelId,
       intent: historyViewId
@@ -76,6 +97,7 @@ export function useConversationIncomingRoute({
       recentViewIds,
     });
     if (!target) onRejected(route);
+    else onAdmitted?.(target, route, { projectionEcho: false });
     // autoSend is deliberately excluded from presentation. An explicit,
     // separately guarded one-shot command adapter is still required.
   }, [
@@ -85,6 +107,7 @@ export function useConversationIncomingRoute({
     visibleViewIds,
     recentViewIds,
     onRejected,
+    onAdmitted,
     retry,
   ]);
   return React.useCallback(() => setRetry((value) => value + 1), []);

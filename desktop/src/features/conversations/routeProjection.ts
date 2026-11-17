@@ -40,6 +40,7 @@ export function conversationRouteProjection(
   view: Pick<ConversationView, "id" | "channelId" | "panelState">,
   scopeKey: string,
   replace: boolean,
+  projectionId?: string,
 ) {
   const search: Record<string, string> = {};
   for (const key of CHANNEL_SEARCH_KEYS) {
@@ -58,11 +59,24 @@ export function conversationRouteProjection(
     search,
     state: (previous: Record<string, unknown>) => ({
       ...previous,
-      [HISTORY_KEY]: metadata,
+      // Local projection is not another search activation. Each view retains
+      // its highlight locally instead of inheriting the previous route's one.
+      searchHighlight: null,
+      [HISTORY_KEY]: { ...metadata, ...(projectionId ? { projectionId } : {}) },
     }),
     replace,
     resetScroll: false,
   };
+}
+
+export function conversationProjectionId(state: unknown): string | null {
+  if (!state || typeof state !== "object") return null;
+  const metadata = (state as Record<string, unknown>)[HISTORY_KEY];
+  if (!metadata || typeof metadata !== "object") return null;
+  const id = (metadata as Record<string, unknown>).projectionId;
+  return typeof id === "string" && id.length > 0 && id.length <= 256
+    ? id
+    : null;
 }
 
 /** Ignore foreign-scope or malformed history metadata; ordinary links use matching-view policy. */
