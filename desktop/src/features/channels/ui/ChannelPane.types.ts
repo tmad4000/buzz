@@ -185,6 +185,7 @@ export type ChannelPaneProps = {
   profilePanelView: ProfilePanelView;
   threadHeadMessage: TimelineMessage | null;
   threadAllMessages: TimelineMessage[];
+  onSidebarRepliesRevealed?: (messages: TimelineMessage[]) => void;
   threadMessages: MainTimelineEntry[];
   threadMessagesPending?: boolean;
   threadMessagesError?: boolean;

@@ -173,6 +173,7 @@ export const ChannelPane = React.memo(function ChannelPane({
   targetSearchMessageId,
   targetSearchQuery,
   threadAllMessages,
+  onSidebarRepliesRevealed,
   threadHeadMessage,
   threadMessages,
   threadMessagesPending = false,
@@ -895,6 +896,8 @@ export const ChannelPane = React.memo(function ChannelPane({
                 videoReviewPresentation={threadVideoReviewPresentation}
                 widthPx={threadPanelWidthPx}
                 threadReplies={threadMessages}
+                allThreadMessages={threadAllMessages}
+                onSidebarRepliesRevealed={onSidebarRepliesRevealed}
                 threadRepliesPending={threadMessagesPending}
                 threadRepliesError={threadMessagesError}
                 onRetryThreadReplies={onRetryThreadReplies}

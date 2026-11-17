@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Buzz Ideaflow",
-  "version": "0.5.28-ideaflow.1",
+  "version": "0.5.28-ideaflow.2",
   "identifier": "app.ideaflow.buzz",
   "build": {
     "beforeDevCommand": {

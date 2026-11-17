@@ -35,6 +35,7 @@ type UseChannelUnreadStateOptions = {
   threadReplyTargetId: string | null;
   expandedThreadReplyIds: ReadonlySet<string>;
   openThreadMessages?: MainTimelineEntry[];
+  openThreadAllMessages?: TimelineMessage[];
   getChannelReadAt: (channelId: string) => number | null;
   getMessageReadAt: (messageId: string) => number | null;
   clearChannelUnreadSource: (
@@ -67,6 +68,7 @@ export function useChannelUnreadState({
   threadReplyTargetId,
   expandedThreadReplyIds,
   openThreadMessages,
+  openThreadAllMessages,
   getChannelReadAt,
   getMessageReadAt,
   clearChannelUnreadSource,
@@ -142,13 +144,23 @@ export function useChannelUnreadState({
     };
   }, [activeChannelId]);
 
+  const readMessages = React.useMemo(
+    () => [
+      ...new Map(
+        [...timelineMessages, ...(openThreadAllMessages ?? [])].map(
+          (message) => [message.id, message],
+        ),
+      ).values(),
+    ],
+    [timelineMessages, openThreadAllMessages],
+  );
   const directReplyIdsByParentId = React.useMemo(
-    () => buildDirectReplyIdsByParentId(timelineMessages),
-    [timelineMessages],
+    () => buildDirectReplyIdsByParentId(readMessages),
+    [readMessages],
   );
   const repliesByRootId = React.useMemo(
-    () => buildRepliesByRootId(timelineMessages),
-    [timelineMessages],
+    () => buildRepliesByRootId(readMessages),
+    [readMessages],
   );
   const getFirstReplyIdForMessage = React.useCallback(
     (messageId: string) => directReplyIdsByParentId.get(messageId)?.[0] ?? null,
@@ -160,16 +172,16 @@ export function useChannelUnreadState({
     [directReplyIdsByParentId],
   );
   const createdAtByMessageId = React.useMemo(
-    () => buildCreatedAtByMessageId(timelineMessages),
-    [timelineMessages],
+    () => buildCreatedAtByMessageId(readMessages),
+    [readMessages],
   );
   const messageById = React.useMemo(
-    () => new Map(timelineMessages.map((message) => [message.id, message])),
-    [timelineMessages],
+    () => new Map(readMessages.map((message) => [message.id, message])),
+    [readMessages],
   );
   const threadPanelIndex = React.useMemo(
-    () => buildThreadPanelIndex(timelineMessages),
-    [timelineMessages],
+    () => buildThreadPanelIndex(readMessages),
+    [readMessages],
   );
   const threadPanelData = React.useMemo(
     () =>
@@ -318,7 +330,7 @@ export function useChannelUnreadState({
     () =>
       openThreadHeadId
         ? computeThreadReplyUnreadCounts({
-            timelineMessages,
+            timelineMessages: readMessages,
             subtreeReplyIds: getReplyDescendantIdsForMessage(openThreadHeadId),
             visibleReplyIds: threadMessages.map((entry) => entry.message.id),
             expandedReplyIds: expandedThreadReplyIds,
@@ -330,7 +342,7 @@ export function useChannelUnreadState({
     [
       openThreadHeadId,
       threadMessages,
-      timelineMessages,
+      readMessages,
       getMessageReadAt,
       expandedThreadReplyIds,
       getReplyDescendantIdsForMessage,
@@ -350,7 +362,7 @@ export function useChannelUnreadState({
   const threadUnreadCountsRaw = React.useMemo(
     () =>
       computeThreadBadgeCounts(
-        timelineMessages,
+        readMessages,
         repliesByRootId,
         getMessageReadAt,
         (rootId) => !isThreadMuted(rootId),
@@ -359,7 +371,7 @@ export function useChannelUnreadState({
       ),
     [
       currentPubkey,
-      timelineMessages,
+      readMessages,
       repliesByRootId,
       getMessageReadAt,
       isThreadMuted,
@@ -446,6 +458,24 @@ export function useChannelUnreadState({
     ],
   );
 
+  const markSidebarRepliesRead = React.useCallback(
+    (messages: TimelineMessage[]) => {
+      if (!openThreadHeadId || isThreadMuted(openThreadHeadId)) return;
+      for (const message of messages) {
+        captureDividerReadState(message.id);
+        if ((getMessageReadAt(message.id) ?? 0) < message.createdAt)
+          markMessageRead(message.id, message.createdAt);
+      }
+    },
+    [
+      captureDividerReadState,
+      getMessageReadAt,
+      markMessageRead,
+      openThreadHeadId,
+      isThreadMuted,
+    ],
+  );
+
   // Mark a message and its whole subtree READ (LP4 v3 menu action). Writes a
   // msg:<id> marker at each message's createdAt — a real, persisted advance —
   // and clears those same ids from the forced-unread overlay, so mark-read is
@@ -505,6 +535,7 @@ export function useChannelUnreadState({
     handleMarkUnread,
     isMessageUnread,
     markRevealedRepliesRead,
+    markSidebarRepliesRead,
     openThreadHeadMessage,
     threadFirstUnreadReplyId,
     threadMessages,
