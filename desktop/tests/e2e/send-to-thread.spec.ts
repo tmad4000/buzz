@@ -1,0 +1,300 @@
+import { expect, test } from "@playwright/test";
+import fs from "node:fs";
+import { installMockBridge, TEST_IDENTITIES } from "../helpers/bridge";
+
+test("explicit keyboard routing, cancel and new-message fallback preserve inline/side state", async ({
+  page,
+}) => {
+  await installMockBridge(page);
+  await page.goto("/");
+  await page.getByTestId("channel-general").click();
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        window.__BUZZ_E2E_HAS_MOCK_LIVE_SUBSCRIPTION__?.({
+          channelName: "general",
+        }),
+      ),
+    )
+    .toBe(true);
+  const root = "d1".repeat(32),
+    other = "d2".repeat(32);
+  await page.evaluate(
+    ({ root, other, pubkey }) => {
+      const emit = window.__BUZZ_E2E_EMIT_MOCK_MESSAGE__;
+      if (!emit) throw new Error("Missing mock emitter");
+      const now = Math.floor(Date.now() / 1000) + 10;
+      emit({
+        channelName: "general",
+        id: root,
+        content: "Signed release rollback plan",
+        pubkey,
+        createdAt: now,
+      });
+      emit({
+        channelName: "general",
+        id: "d3".repeat(32),
+        parentEventId: root,
+        content: "Keep the receipt",
+        pubkey,
+        createdAt: now + 1,
+      });
+      emit({
+        channelName: "general",
+        id: other,
+        content: "Lunch with the team",
+        pubkey,
+        createdAt: now + 2,
+      });
+      emit({
+        channelName: "general",
+        id: "d4".repeat(32),
+        parentEventId: other,
+        content: "Meet tomorrow",
+        pubkey,
+        createdAt: now + 3,
+      });
+    },
+    { root, other, pubkey: TEST_IDENTITIES.bob.pubkey },
+  );
+  const main = page
+    .getByTestId("message-composer")
+    .filter({ has: page.getByTestId("send-to-thread") });
+  const editor = main.getByTestId("message-input");
+  const count = () =>
+    page.evaluate(
+      () =>
+        (window.__BUZZ_E2E_COMMAND_PAYLOADS__ ?? []).filter(
+          (x) => x.command === "send_channel_message",
+        ).length,
+    );
+  const lastSend = () =>
+    page.evaluate(
+      () =>
+        [...(window.__BUZZ_E2E_COMMAND_PAYLOADS__ ?? [])]
+          .reverse()
+          .find((x) => x.command === "send_channel_message")?.payload as {
+          parentEventId?: string;
+          content: string;
+        },
+    );
+  await expect(main.getByTestId("send-to-thread")).toBeDisabled();
+  await editor.fill("Signed release rollback checklist");
+  const before = await count();
+  await main.getByTestId("send-to-thread").click();
+  const menu = page.getByRole("menu", { name: "Thread destinations" });
+  await expect(menu.getByRole("menuitem").first()).toContainText(
+    "Signed release rollback plan",
+  );
+  await expect(menu.getByRole("menuitem")).toHaveCount(4);
+  expect(await count()).toBe(before);
+  const shots =
+    process.env.BUZZ_THREAD_ROUTING_SCREENSHOTS ??
+    "test-results/send-to-thread";
+  fs.mkdirSync(shots, { recursive: true });
+  await page.screenshot({ path: `${shots}/ranked-picker.png` });
+  await page.keyboard.press("Escape");
+  await expect(menu).not.toBeVisible();
+  await expect(editor).toContainText("Signed release rollback checklist");
+  expect(await count()).toBe(before);
+  // Side panel selection is unrelated to the routing destination.
+  await page
+    .locator(
+      `[data-testid="open-thread-side-panel"][data-thread-head-id="${other}"]`,
+    )
+    .click();
+  const side = page.getByTestId("message-thread-panel");
+  await expect(side).toContainText("Lunch with the team");
+  await main.getByTestId("send-to-thread").click();
+  await expect(menu.getByRole("menuitem").first()).toBeFocused();
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Home");
+  await page.keyboard.press("Enter");
+  await expect.poll(count).toBe(before + 1);
+  await expect.poll(async () => (await lastSend()).parentEventId).toBe(root);
+  await expect(editor).toBeEmpty();
+  await expect(side).toContainText("Lunch with the team");
+  await expect(page.getByText("Sent to thread", { exact: true })).toBeVisible();
+  // The routed reply is in the existing inline thread and opens no other panel.
+  await page
+    .locator(
+      `[data-testid="message-thread-summary"][data-thread-head-id="${root}"]`,
+    )
+    .click();
+  const inline = page.locator(
+    `[data-testid="inline-thread"][data-thread-head-id="${root}"]`,
+  );
+  await expect(inline).toContainText("Signed release rollback checklist");
+  await expect(inline.getByTestId("send-to-thread")).toHaveCount(0);
+  await page.screenshot({
+    path: `${shots}/routed-inline-and-independent-panel.png`,
+  });
+  await editor.fill("A separate announcement");
+  await main.getByTestId("send-to-thread").click();
+  await expect(menu.getByRole("menuitem").first()).toBeFocused();
+  await page.keyboard.press("End");
+  await page.keyboard.press("Enter");
+  await expect(editor).toBeEmpty();
+  const announcement = page.getByText("A separate announcement", {
+    exact: true,
+  });
+  await expect(announcement).toBeVisible();
+  expect(
+    await announcement.evaluate(
+      (node) => node.closest('[data-testid="inline-thread"]') === null,
+    ),
+  ).toBe(true);
+  // Plain roots use the existing WebSocket publisher; only the reply used REST.
+  expect(await count()).toBe(before + 1);
+});
+
+test("channel navigation dismisses picker and uses only destination channel's roots", async ({
+  page,
+}) => {
+  await installMockBridge(page);
+  await page.goto("/");
+  await page.getByTestId("channel-general").click();
+  const main = page
+    .getByTestId("message-composer")
+    .filter({ has: page.getByTestId("send-to-thread") });
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        window.__BUZZ_E2E_HAS_MOCK_LIVE_SUBSCRIPTION__?.({
+          channelName: "general",
+        }),
+      ),
+    )
+    .toBe(true);
+  await page.evaluate(
+    (pubkey) =>
+      window.__BUZZ_E2E_EMIT_MOCK_MESSAGE__?.({
+        channelName: "general",
+        id: "e2".repeat(32),
+        content: "GENERAL_ONLY routing source",
+        pubkey,
+        createdAt: Math.floor(Date.now() / 1000) + 10,
+      }),
+    TEST_IDENTITIES.bob.pubkey,
+  );
+  await main
+    .getByTestId("message-input")
+    .fill("GENERAL_ONLY private draft stays here");
+  await main.getByTestId("send-to-thread").click();
+  const menu = page.getByRole("menu", { name: "Thread destinations" });
+  await expect(menu).toContainText("GENERAL_ONLY routing source");
+  await page.getByTestId("channel-random").click();
+  await expect(menu).not.toBeVisible();
+  await expect(main.getByTestId("message-input")).toBeEmpty();
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        window.__BUZZ_E2E_HAS_MOCK_LIVE_SUBSCRIPTION__?.({
+          channelName: "random",
+        }),
+      ),
+    )
+    .toBe(true);
+  await page.evaluate(
+    (pubkey) =>
+      window.__BUZZ_E2E_EMIT_MOCK_MESSAGE__?.({
+        channelName: "random",
+        id: "e3".repeat(32),
+        content: "RANDOM_ONLY routing source",
+        pubkey,
+        createdAt: Math.floor(Date.now() / 1000) + 10,
+      }),
+    TEST_IDENTITIES.bob.pubkey,
+  );
+  await main.getByTestId("message-input").fill("RANDOM_ONLY update");
+  await main.getByTestId("send-to-thread").click();
+  await expect(menu).toContainText("RANDOM_ONLY routing source");
+  await expect(menu).not.toContainText("GENERAL_ONLY");
+  await page.keyboard.press("Escape");
+  await page.getByTestId("channel-general").click();
+  await expect(main.getByTestId("message-input")).toContainText(
+    "GENERAL_ONLY private draft stays here",
+  );
+  expect(
+    await page.evaluate(
+      () =>
+        (window.__BUZZ_E2E_COMMAND_PAYLOADS__ ?? []).filter(
+          (x) => x.command === "send_channel_message",
+        ).length,
+    ),
+  ).toBe(0);
+});
+
+test("DM routing stays scoped and failed publish keeps draft for explicit retry", async ({
+  page,
+}) => {
+  await installMockBridge(page, {
+    sendMessageErrors: ["Routing test: offline"],
+  });
+  await page.goto("/");
+  await page.getByTestId("channel-alice-tyler").click();
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        window.__BUZZ_E2E_HAS_MOCK_LIVE_SUBSCRIPTION__?.({
+          channelName: "alice-tyler",
+        }),
+      ),
+    )
+    .toBe(true);
+  const root = "e1".repeat(32);
+  await page.evaluate(
+    ({ root, pubkey }) => {
+      const emit = window.__BUZZ_E2E_EMIT_MOCK_MESSAGE__;
+      if (!emit) throw new Error("Missing mock emitter");
+      emit({
+        channelName: "alice-tyler",
+        id: root,
+        content: "Private invoice review",
+        pubkey,
+        createdAt: Math.floor(Date.now() / 1000) + 5,
+      });
+    },
+    { root, pubkey: TEST_IDENTITIES.bob.pubkey },
+  );
+  const main = page
+    .getByTestId("message-composer")
+    .filter({ has: page.getByTestId("send-to-thread") });
+  const editor = main.getByTestId("message-input");
+  await editor.fill("Private invoice review follow-up");
+  await main.getByTestId("send-to-thread").click();
+  const menu = page.getByRole("menu", { name: "Thread destinations" });
+  await expect(menu.getByRole("menuitem").first()).toContainText(
+    "Private invoice review",
+  );
+  await expect(menu).not.toContainText("Welcome to #general");
+  await menu.getByRole("menuitem").first().click();
+  await expect(
+    page.getByText("Routing test: offline", { exact: false }),
+  ).toBeVisible();
+  await expect(editor).toContainText("Private invoice review follow-up");
+  await main.getByTestId("send-to-thread").click();
+  await expect(menu.getByRole("menuitem").first()).toContainText(
+    "Private invoice review",
+  );
+  const shots =
+    process.env.BUZZ_THREAD_ROUTING_SCREENSHOTS ??
+    "test-results/send-to-thread";
+  fs.mkdirSync(shots, { recursive: true });
+  await page.setViewportSize({ width: 1000, height: 800 });
+  await page.screenshot({ path: `${shots}/dm-retry-picker.png` });
+  await menu.getByRole("menuitem").first().click();
+  await expect(editor).toBeEmpty();
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const sends = (window.__BUZZ_E2E_COMMAND_PAYLOADS__ ?? []).filter(
+          (x) => x.command === "send_channel_message",
+        );
+        return sends.map(
+          (x) => (x.payload as { parentEventId?: string }).parentEventId,
+        );
+      }),
+    )
+    .toEqual([root, root]);
+});

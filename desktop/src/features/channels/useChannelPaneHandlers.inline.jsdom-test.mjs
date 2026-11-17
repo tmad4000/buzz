@@ -88,6 +88,20 @@ test("inline send uses captured channel/parent without mutating the side panel",
     );
     assert.equal(mutations.length, 1);
     assert.deepEqual(panelWrites, []);
+    // Main-composer routing must honor the chosen root after side selection changes.
+    await act(() =>
+      latest.handleSendMessage("routed draft", [], undefined, "channel-a", {
+        parentEventId: "chosen-root",
+        threadHeadId: "chosen-root",
+      }),
+    );
+    assert.equal(mutations[1].parentEventId, "chosen-root");
+    assert.equal(mutations[1].channelId, "channel-a");
+    await act(() =>
+      latest.handleSendMessage("new root", [], undefined, "channel-a", null),
+    );
+    assert.equal(mutations[2].parentEventId, undefined);
+    assert.deepEqual(panelWrites, []);
   } finally {
     await act(() => root.unmount());
     container.remove();

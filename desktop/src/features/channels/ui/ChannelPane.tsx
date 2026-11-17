@@ -831,6 +831,7 @@ export const ChannelPane = React.memo(function ChannelPane({
                         : undefined
                     }
                     onSend={handleSendMessage}
+                    threadRoutingEntries={mainTimelineEntries}
                     {...{ profiles, recentMentionPubkeys: recentMentions }}
                     showBackgroundUploadProgress={false}
                     placeholder={
