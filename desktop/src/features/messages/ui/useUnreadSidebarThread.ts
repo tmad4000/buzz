@@ -24,7 +24,13 @@ import {
   THREAD_EXPANSION_CHANGED,
 } from "@/features/messages/lib/threadExpansionStorage";
 
-type Reveal = { external: string | null; id: string | null; handled: boolean };
+type Reveal = {
+  external: string | null;
+  id: string | null;
+  handled: boolean;
+  ancestors?: ReadonlySet<string>;
+  blocked?: ReadonlySet<string>;
+};
 
 type State = {
   key: string | null;
@@ -137,11 +143,13 @@ export function useUnreadSidebarThread({
   let reveal =
     scrollTargetId === state.reveal.external
       ? state.reveal
-      : {
-          external: scrollTargetId,
-          id: scrollTargetId,
-          handled: false,
-        };
+      : scrollTargetId === null && state.reveal.handled
+        ? { ...state.reveal, external: null }
+        : {
+            external: scrollTargetId,
+            id: scrollTargetId,
+            handled: false,
+          };
   const fulfillReveal = (preferences: ThreadExpansion, request: Reveal) => {
     if (pending || !request.id || request.handled)
       return { branches: preferences, reveal: request };
@@ -151,15 +159,19 @@ export function useUnreadSidebarThread({
       request.id,
     );
     if (!parents) return { branches: preferences, reveal: request };
-    let next: Map<string, boolean> | undefined;
-    for (const parent of parents) {
-      if (preferences.get(parent) === true) continue;
-      next ??= new Map(preferences);
-      next.set(parent, true);
-    }
+    if (
+      request.blocked?.has(request.id) ||
+      [...parents].some((id) => request.blocked?.has(id))
+    )
+      return {
+        branches: preferences,
+        reveal: { ...request, handled: true, ancestors: undefined },
+      };
+    // Programmatic navigation temporarily exposes ancestry in this view only.
+    // It must not overwrite saved collapse choices or broadcast a sibling reveal.
     return {
-      branches: next ?? preferences,
-      reveal: { ...request, handled: true },
+      branches: preferences,
+      reveal: { ...request, handled: true, ancestors: new Set(parents) },
     };
   };
   ({ branches, reveal } = fulfillReveal(branches, reveal));
@@ -176,6 +188,37 @@ export function useUnreadSidebarThread({
       reveal,
     }),
     [key, branches, automatic, state.mode, stableNewIds, reveal],
+  );
+  const withoutRevealedBranches = React.useCallback(
+    (
+      reveal: Reveal,
+      changed: ReadonlySet<string>,
+      cancelRequest = false,
+    ): Reveal => {
+      const ancestors = new Set(
+        [...(reveal.ancestors ?? [])].filter((id) => {
+          if (changed.has(id)) return false;
+          const parents = completeThreadAncestors(index.messageById, root, id);
+          return (
+            !parents || ![...parents].some((parent) => changed.has(parent))
+          );
+        }),
+      );
+      const path = reveal.id
+        ? completeThreadAncestors(index.messageById, root, reveal.id)
+        : null;
+      const relevant =
+        changed.has(root ?? "") ||
+        changed.has(reveal.id ?? "") ||
+        Boolean(path && [...path].some((id) => changed.has(id)));
+      return {
+        ...reveal,
+        handled: cancelRequest || reveal.handled || relevant,
+        ancestors,
+        blocked: new Set([...(reveal.blocked ?? []), ...changed]),
+      };
+    },
+    [index, root],
   );
   const live = React.useRef(view);
   React.useLayoutEffect(() => {
@@ -197,7 +240,16 @@ export function useUnreadSidebarThread({
       const updated = {
         ...current,
         branches: change.branches,
-        reveal: { ...current.reveal, handled: true },
+        reveal: withoutRevealedBranches(
+          current.reveal,
+          new Set(
+            [...change.branches]
+              .filter(
+                ([id, open]) => !open && current.branches.get(id) !== false,
+              )
+              .map(([id]) => id),
+          ),
+        ),
       };
       live.current = updated;
       setSaved(updated);
@@ -205,7 +257,7 @@ export function useUnreadSidebarThread({
     };
     window.addEventListener(THREAD_EXPANSION_CHANGED, changed);
     return () => window.removeEventListener(THREAD_EXPANSION_CHANGED, changed);
-  }, [enabled, key]);
+  }, [enabled, key, withoutRevealedBranches]);
   React.useEffect(() => {
     if (!enabled || !key || live.current !== view) return;
     if (
@@ -225,6 +277,7 @@ export function useUnreadSidebarThread({
       .filter(([, open]) => open)
       .map(([id]) => id),
   );
+  for (const id of view.reveal.ancestors ?? []) expanded.add(id);
   if (autoRevealId && !pending) {
     const parents = completeThreadAncestors(
       index.messageById,
@@ -258,20 +311,26 @@ export function useUnreadSidebarThread({
     const updated = { ...current, branches: next, reveal };
     live.current = updated;
     // Persist in the interaction, before navigation or an immediate app close.
-    if (current.key)
+    if (current.key && current.branches !== next)
       setPreferenceError(!saveThreadExpansion(current.key, next));
     setSaved(updated);
   };
   const setExpanded = (id: string, open: boolean) => {
     const next = new Map(live.current.branches);
     next.set(id, open);
-    commit(next, { ...live.current.reveal, handled: true });
+    commit(
+      next,
+      withoutRevealedBranches(live.current.reveal, new Set([id]), true),
+    );
   };
   const toggle = (message: TimelineMessage) => {
     const next = new Map(live.current.branches);
-    next.set(message.id, !(next.get(message.id) ?? expanded.has(message.id)));
+    next.set(message.id, !expanded.has(message.id));
     // The user's toggle also cancels any older pending automatic reveal.
-    commit(next, { ...live.current.reveal, handled: true });
+    commit(
+      next,
+      withoutRevealedBranches(live.current.reveal, new Set([message.id]), true),
+    );
   };
   const revealMessage = (id: string) => {
     const current = live.current;
@@ -279,6 +338,7 @@ export function useUnreadSidebarThread({
       ...current.reveal,
       id,
       handled: false,
+      blocked: undefined,
     });
     commit(next.branches, next.reveal);
   };

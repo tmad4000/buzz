@@ -117,10 +117,10 @@ test("only intersecting reply bodies in the foreground are observed, with re-ent
   const writes = [];
   const onReveal = (rows) => writes.push(rows.map((x) => x.id));
   const messages = [{ id: "reply", createdAt: 20 }];
-  function Host({ focused }) {
+  function Host({ focused, viewId = "test" }) {
     return React.createElement(
       ConversationViewContext.Provider,
-      { value: { viewInstanceId: "test", focused, visible: true } },
+      { value: { viewInstanceId: viewId, focused, visible: true } },
       React.createElement(Rows),
     );
   }
@@ -175,6 +175,29 @@ test("only intersecting reply bodies in the foreground are observed, with re-ent
     observer.callback([{ target: body, isIntersecting: true }]),
   );
   assert.equal(writes.length, 1);
+  const retired = observer;
+  await act(async () =>
+    root.render(
+      React.createElement(Host, { focused: true, viewId: "replacement-view" }),
+    ),
+  );
+  await act(async () =>
+    retired.callback([{ target: body, isIntersecting: true }]),
+  );
+  assert.equal(
+    writes.length,
+    1,
+    "same canonical reply rejects retired view callbacks",
+  );
+  observer = observers.at(-1);
+  await act(async () =>
+    observer.callback([{ target: body, isIntersecting: true }]),
+  );
+  assert.equal(
+    writes.length,
+    2,
+    "replacement view has its own observation lifecycle",
+  );
   await act(async () => root.unmount());
   container.remove();
 });
