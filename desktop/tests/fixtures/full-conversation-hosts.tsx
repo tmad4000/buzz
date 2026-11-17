@@ -10,6 +10,20 @@ import {
   RouterProvider,
 } from "@tanstack/react-router";
 import { AppShellProvider, useAppShell } from "@/app/AppShellContext";
+import { ConversationLayoutSurface } from "@/features/conversations/ConversationLayoutSurface";
+import {
+  createConversationView,
+  createSingleLayout,
+  splitPane,
+  swapPanes,
+  resizeGroup,
+  focusPane,
+  closePane,
+  orientGroup,
+  listPanes,
+  updateViewPresentation,
+  type ConversationLayout,
+} from "@/features/conversations/layout/model";
 import { ConversationViewHost } from "@/features/conversations/ConversationViewHost";
 import { ConversationDraftEditorsProvider } from "@/features/conversations/ConversationDraftEditors";
 import { HuddleProvider } from "@/features/huddle/HuddleContext";
@@ -35,6 +49,7 @@ const harnessWindow = window as typeof window & {
   hostReads: { view: string; kind: string; id: string }[];
   hostEffective: (messageId: string) => number | null;
   hostChannelRead: () => number | null;
+  layoutSnapshot?: () => ConversationLayout;
 };
 harnessWindow.hostReads = [];
 const community = {
@@ -118,6 +133,106 @@ function PerViewShell({
   );
   return <AppShellProvider value={value}>{children}</AppShellProvider>;
 }
+const layoutFixture = new URLSearchParams(location.search).has("layout");
+function LayoutBody() {
+  const [layout, setLayout] = React.useState(() => {
+    const view = {
+      ...createConversationView(channel?.id ?? "missing"),
+      id: "a",
+      panelState: { thread: rootA },
+    };
+    const initial = createSingleLayout(view, (kind) => `${kind}-a`);
+    return focusPane(
+      splitPane(
+        initial,
+        initial.root.id,
+        {
+          ...createConversationView(view.channelId),
+          id: "b",
+          panelState: { thread: rootB },
+        },
+        "horizontal",
+        (kind) => `${kind}-b`,
+      ),
+      initial.root.id,
+    );
+  });
+  const lastSplit = React.useRef<ConversationLayout | null>(null);
+  harnessWindow.layoutSnapshot = () => layout;
+  return (
+    <ConversationLayoutSurface
+      layout={layout}
+      labelForView={(view) => `General ${view.id}`}
+      onFocusPane={(id) => setLayout((current) => focusPane(current, id))}
+      onResize={(id, sizes) =>
+        setLayout((current) => resizeGroup(current, id, sizes))
+      }
+      canRestore={lastSplit.current !== null}
+      onCommand={(paneId, command) =>
+        setLayout((current) => {
+          const panes = listPanes(current.root);
+          if (command === "swap" && panes.length === 2)
+            return swapPanes(current, panes[0].id, panes[1].id);
+          if (
+            (command === "horizontal" || command === "vertical") &&
+            current.root.kind === "group"
+          )
+            return orientGroup(current, current.root.id, command);
+          if (command === "close") {
+            lastSplit.current = current;
+            return closePane(current, paneId);
+          }
+          if (command === "closeSplit") {
+            lastSplit.current = current;
+            return panes.reduce(
+              (next, pane) =>
+                pane.id === current.focusedPaneId
+                  ? next
+                  : closePane(next, pane.id),
+              current,
+            );
+          }
+          if (command === "restore" && lastSplit.current)
+            return lastSplit.current;
+          return current;
+        })
+      }
+      renderPane={({ view, pane, focused, visible, headerEndActions }) => (
+        <PerViewShell id={view.id}>
+          <ConversationViewHost
+            viewInstanceId={view.id}
+            focused={focused}
+            visible={visible}
+            label={`General ${view.id}`}
+            initialPanelState={view.panelState}
+            onPanelNavigate={(patch) =>
+              setLayout((current) =>
+                updateViewPresentation(current, view.id, view.channelId, {
+                  panelState: patch,
+                }),
+              )
+            }
+            onFocusView={() =>
+              setLayout((current) => focusPane(current, pane.id))
+            }
+            channel={{
+              activeChannel: channel ?? null,
+              currentIdentity: identity,
+              headerEndActions,
+              autoSendDraftKey: channel?.id ?? null,
+              onCloseForumPost: noop,
+              onSelectForumPost: noop,
+              selectedForumPostId: null,
+              targetForumReplyId: null,
+              targetMessageEvents: emptyEvents,
+              targetMessageId: null,
+            }}
+          />
+        </PerViewShell>
+      )}
+    />
+  );
+}
 function Screen() {
   const fallback = useAppShell();
   const read = useReadState(identity.pubkey, fakeRelay);
@@ -153,44 +268,61 @@ function Screen() {
       <ConversationDraftEditorsProvider>
         <main className="flex h-screen flex-col bg-background text-foreground">
           <div className="flex gap-3 border-b border-border p-2">
-            <span>Buzz Ideaflow · production host regression</span>
-            <button
-              type="button"
-              onClick={() => {
-                setShowA(false);
-                setFocused("b");
-              }}
-            >
-              Unmount A
-            </button>
+            <span>
+              Buzz Ideaflow ·{" "}
+              {layoutFixture
+                ? "layout regression"
+                : "production host regression"}
+            </span>
+            {!layoutFixture && (
+              <button
+                type="button"
+                onClick={() => {
+                  setShowA(false);
+                  setFocused("b");
+                }}
+              >
+                Unmount A
+              </button>
+            )}
           </div>
           <div
             className="grid min-h-0 flex-1"
-            style={{ gridTemplateColumns: showA ? "1fr 1fr" : "1fr" }}
+            style={{
+              gridTemplateColumns: layoutFixture
+                ? "1fr"
+                : showA
+                  ? "1fr 1fr"
+                  : "1fr",
+            }}
           >
-            {[...(showA ? ["a"] : []), "b"].map((id) => (
-              <PerViewShell key={id} id={id}>
-                <ConversationViewHost
-                  viewInstanceId={id}
-                  focused={focused === id}
-                  visible
-                  label={`General ${id}`}
-                  onFocusView={setFocused}
-                  initialPanelState={{ thread: id === "a" ? rootA : rootB }}
-                  channel={{
-                    activeChannel: channel ?? null,
-                    currentIdentity: identity,
-                    autoSendDraftKey: channel?.id ?? null,
-                    onCloseForumPost: noop,
-                    onSelectForumPost: noop,
-                    selectedForumPostId: null,
-                    targetForumReplyId: null,
-                    targetMessageEvents: emptyEvents,
-                    targetMessageId: null,
-                  }}
-                />
-              </PerViewShell>
-            ))}
+            {layoutFixture ? (
+              <LayoutBody />
+            ) : (
+              [...(showA ? ["a"] : []), "b"].map((id) => (
+                <PerViewShell key={id} id={id}>
+                  <ConversationViewHost
+                    viewInstanceId={id}
+                    focused={focused === id}
+                    visible
+                    label={`General ${id}`}
+                    onFocusView={setFocused}
+                    initialPanelState={{ thread: id === "a" ? rootA : rootB }}
+                    channel={{
+                      activeChannel: channel ?? null,
+                      currentIdentity: identity,
+                      autoSendDraftKey: channel?.id ?? null,
+                      onCloseForumPost: noop,
+                      onSelectForumPost: noop,
+                      selectedForumPostId: null,
+                      targetForumReplyId: null,
+                      targetMessageEvents: emptyEvents,
+                      targetMessageId: null,
+                    }}
+                  />
+                </PerViewShell>
+              ))
+            )}
           </div>
         </main>
       </ConversationDraftEditorsProvider>

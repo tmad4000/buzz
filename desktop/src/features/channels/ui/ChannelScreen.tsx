@@ -848,6 +848,8 @@ export function ChannelScreen({
                   canResetThreadPanelWidth={canResetThreadPanelWidth}
                   fetchOlder={fetchOlder}
                   header={channelHeader}
+                  paneHeaderEndActions={headerEndActions}
+                  paneConversationTitle={activeChannelTitle}
                   {...{ idleAuxiliaryHeaderActions, idleAuxiliaryOverridesThread, idleAuxiliaryPanel, idleAuxiliaryTitle, hasOlderMessages, historyExhausted }}
                   {...{ onAddFiles }}
                   onAddAgent={handleOpenAddBot}

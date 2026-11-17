@@ -108,6 +108,8 @@ export const ChannelPane = React.memo(function ChannelPane({
   isSinglePanelView = false,
   isSending,
   isTimelineError = false,
+  paneHeaderEndActions,
+  paneConversationTitle,
   isTimelineLoading,
   onRetryTimeline,
   entranceMessageId = null,
@@ -609,15 +611,22 @@ export const ChannelPane = React.memo(function ChannelPane({
           </IdleAuxiliaryPanel>,
         )
       : null;
-  const threadHeaderLeading = useSplitAuxiliaryPane ? (
+  const threadHeaderLeading = isSinglePanelView ? (
+    paneHeaderEndActions
+  ) : useSplitAuxiliaryPane ? (
     <ThreadViewModeToggle onChange={changeThreadViewMode} />
   ) : undefined;
-  const threadLayoutProps = getThreadPanelLayout({
-    headerLeading: threadHeaderLeading,
-    isFocusDrawer: useFocusThreadDrawer,
-    isSinglePanelView,
-    useSplitAuxiliaryPane,
-  });
+  const threadLayoutProps = {
+    ...getThreadPanelLayout({
+      headerLeading: threadHeaderLeading,
+      isFocusDrawer: useFocusThreadDrawer,
+      isSinglePanelView,
+      useSplitAuxiliaryPane,
+    }),
+    ...(isSinglePanelView && paneHeaderEndActions && paneConversationTitle
+      ? { headerTitle: `${paneConversationTitle} · Thread` }
+      : {}),
+  };
   const timelineReplyHandler =
     activeChannel?.archivedAt || isHuddleTranscript ? undefined : onOpenThread;
   return (
