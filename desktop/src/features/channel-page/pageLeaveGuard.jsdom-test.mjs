@@ -110,7 +110,15 @@ test("background Page veto targets only its own view, protects saves, and unregi
       target: { value: "<h1>Draft A</h1>" },
     }),
   );
+  const focusedEditor = scope("b").querySelector("textarea");
+  focusedEditor.focus();
+  assert.equal(document.activeElement, focusedEditor);
   await act(async () => assert.equal(guards.get("a")(), false));
+  assert.equal(
+    document.activeElement,
+    focusedEditor,
+    "background dirty veto preserves focused sibling editor",
+  );
   assert.equal(
     guards.get("b")(),
     true,
@@ -130,12 +138,18 @@ test("background Page veto targets only its own view, protects saves, and unregi
     release = resolve;
   });
   await click("a", "Save Page");
+  focusedEditor.focus();
   await act(async () =>
     assert.equal(
       guards.get("a")(),
       false,
       "in-flight publication vetoes close",
     ),
+  );
+  assert.equal(
+    document.activeElement,
+    focusedEditor,
+    "saving veto preserves sibling focus",
   );
   assert.equal(guards.get("b")(), true);
   await act(async () => {
