@@ -36,6 +36,13 @@ export function ConversationWorkspaceSurface({
   onFocusedViewChange,
 }: Props) {
   const root = React.useRef<HTMLDivElement>(null);
+  const mounted = React.useRef(false);
+  React.useLayoutEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   const sequence = React.useRef(0);
   const [focusRequest, setFocusRequest] = React.useState<{
     viewId: string;
@@ -60,7 +67,10 @@ export function ConversationWorkspaceSurface({
     resolveConversation,
   };
   const canHandle = () =>
-    current.current.active && current.current.controller === controller;
+    mounted.current &&
+    root.current?.isConnected === true &&
+    current.current.active &&
+    current.current.controller === controller;
   const resolve = (channelId: string) => {
     const candidate = current.current.resolveConversation(channelId);
     return candidate?.channelId === channelId ? candidate : null;
