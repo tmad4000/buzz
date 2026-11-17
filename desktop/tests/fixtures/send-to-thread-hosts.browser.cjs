@@ -203,14 +203,26 @@ const expect = baseExpect.configure({ timeout: 30000 });
       name: "routing-receipt.pdf",
     });
     await expect(mainB).toContainText("routing-receipt.pdf");
+    const inactiveTakeover = a
+      .locator("[data-draft-preview]")
+      .filter({ hasText: "Shared draft survives picker takeover" })
+      .getByRole("button", { name: "Take over", exact: true });
+    await inactiveTakeover.evaluate((button) => {
+      window.hostTakeoverDisabledStates = [];
+      window.hostTakeoverObserver = new MutationObserver(() => {
+        window.hostTakeoverDisabledStates.push(button.disabled);
+      });
+      window.hostTakeoverObserver.observe(button, {
+        attributes: true,
+        attributeFilter: ["disabled"],
+      });
+    });
     await mainB.getByTestId("send-to-thread").click();
     await menu.locator(`[data-thread-destination="${"1".repeat(64)}"]`).click();
-    await expect(
-      a
-        .locator("[data-draft-preview]")
-        .filter({ hasText: "Shared draft survives picker takeover" })
-        .getByRole("button", { name: "Take over", exact: true }),
-    ).toBeDisabled();
+    await expect
+      .poll(() => page.evaluate(() => window.hostTakeoverDisabledStates))
+      .toContain(true);
+    await page.evaluate(() => window.hostTakeoverObserver.disconnect());
     await expect(
       page.getByText("routing integration offline", { exact: false }),
     ).toBeVisible();
