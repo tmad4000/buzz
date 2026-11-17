@@ -533,3 +533,48 @@ test("selected message text owns its row through queued geometry growth", async 
     await h.close();
   }
 });
+
+test("growth between the first visible row and focused inline editor preserves the editor row", async () => {
+  const h = await mount();
+  const inline = document.createElement("div");
+  inline.dataset.testid = "inline-thread";
+  const editor = document.createElement("textarea");
+  editor.value = "Keep this focused inline draft";
+  inline.append(editor);
+  h.rows[32].append(inline);
+  try {
+    const row = h.rows[32];
+    await act(async () => {
+      editor.focus();
+      editor.setSelectionRange(7, 7);
+    });
+    await h.event(editor, "focusin");
+    const firstVisible = h.rows[30];
+    assert.equal(firstVisible.getBoundingClientRect().top, 0);
+    const top = row.getBoundingClientRect().top;
+    assert.ok(top > firstVisible.getBoundingClientRect().top);
+    const pins = h.model.pins;
+    // A preceding inline/media row grows inside the viewport, between the
+    // first intersecting row and the editor the reader is actively using.
+    h.model.shiftFrom = 32;
+    h.model.shift = 64;
+    h.model.height += 128;
+    await h.resize();
+    let result;
+    await act(async () => {
+      result = h.timelineRef.current.settleAtBottom();
+    });
+    assert.equal(result, false);
+    assert.equal(h.model.pins, pins);
+    assert.ok(Math.abs(row.getBoundingClientRect().top - top) <= 1);
+    assert.equal(document.activeElement, editor);
+    assert.equal(editor.value, "Keep this focused inline draft");
+    assert.equal(editor.selectionStart, 7);
+    assert.equal(editor.selectionEnd, 7);
+    await h.event(h.scroller, "pointerleave");
+    assert.equal(h.apiRef.current.isBottomPinned(), false);
+    assert.ok(Math.abs(row.getBoundingClientRect().top - top) <= 1);
+  } finally {
+    await h.close();
+  }
+});
