@@ -10,7 +10,6 @@ import {
   projectSections,
   SECTIONS_LANE,
 } from "./channelSectionsSync";
-import { writeSectionOrder } from "./sidebarSectionOrder";
 import { useLaneSync } from "./sidebarLaneReconciler";
 import { mergeTrees, own, setRegs, type Tree } from "./sidebarLwwMap";
 
@@ -43,13 +42,6 @@ export function useChannelSections(
   pubkey: string | undefined,
   relayUrl?: string,
 ): {
-  layoutOrder: string[];
-  pinConversionHandled: Record<string, boolean>;
-  pendingPinConversions: Record<string, string[]>;
-  requestPinConversion: (id: string, channels: string[]) => void;
-  reorderLayout: (ids: string[]) => void;
-  moveLayout: (id: string, direction: -1 | 1) => void;
-  dismissPinConversion: (id: string) => void;
   bootstrapError: boolean;
   retryBootstrap: () => void;
   sections: ChannelSection[];
@@ -89,48 +81,9 @@ export function useChannelSections(
       disposed = true;
     };
   }, [pubkey, relayUrl, edit, bootstrapAttempt]);
-  const {
-    sections,
-    assignments,
-    layoutOrder,
-    pinConversionHandled,
-    pendingPinConversions,
-  } = React.useMemo(() => projectSections(tree), [tree]);
-
-  const reorderLayout = React.useCallback(
-    (ids: string[]) =>
-      edit((prev) =>
-        writeSectionOrder(prev, projectSections(prev).layoutOrder, ids),
-      ),
-    [edit],
-  );
-  const moveLayout = React.useCallback(
-    (id: string, direction: -1 | 1) =>
-      edit((prev) => {
-        const ids = projectSections(prev).layoutOrder;
-        const from = ids.indexOf(id);
-        const to = from + direction;
-        if (from < 0 || to < 0 || to >= ids.length) return prev;
-        [ids[from], ids[to]] = [ids[to] as string, id];
-        return writeSectionOrder(prev, projectSections(prev).layoutOrder, ids);
-      }),
-    [edit],
-  );
-  const dismissPinConversion = React.useCallback(
-    (id: string) =>
-      edit((prev) =>
-        setRegs(prev, [
-          [["m", id], true],
-          [["c", id], null],
-        ]),
-      ),
-    [edit],
-  );
-
-  const requestPinConversion = React.useCallback(
-    (id: string, channels: string[]) =>
-      edit((prev) => setRegs(prev, [[["c", id], [...new Set(channels)]]])),
-    [edit],
+  const { sections, assignments } = React.useMemo(
+    () => projectSections(tree),
+    [tree],
   );
 
   const createSection = React.useCallback(
@@ -165,12 +118,7 @@ export function useChannelSections(
 
   const deleteSection = React.useCallback(
     (sectionId: string) =>
-      edit((prev) =>
-        setRegs(prev, [
-          [["s", sectionId, "live"], false],
-          [["c", sectionId], null],
-        ]),
-      ),
+      edit((prev) => setRegs(prev, [[["s", sectionId, "live"], false]])),
     [edit],
   );
 
@@ -217,13 +165,6 @@ export function useChannelSections(
   );
 
   return {
-    layoutOrder,
-    pinConversionHandled,
-    pendingPinConversions,
-    requestPinConversion,
-    reorderLayout,
-    moveLayout,
-    dismissPinConversion,
     bootstrapError: bootstrapError && isJacobSidebarScope(pubkey, relayUrl),
     retryBootstrap: () => setBootstrapAttempt((attempt) => attempt + 1),
     sections,

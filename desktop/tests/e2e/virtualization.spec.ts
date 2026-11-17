@@ -212,9 +212,7 @@ test.describe("list virtualization", () => {
     // the row itself is the handle. Scoping to that attribute reads the live
     // section order and excludes the inner disclosure button and the (hidden)
     // assign-to-section context-menu items that reuse the same names.
-    const headers = page
-      .locator('[aria-roledescription="sortable"]')
-      .filter({ has: page.locator('[data-testid^="section-title-sec-"]') });
+    const headers = page.locator('[aria-roledescription="sortable"]');
     const topHeader = headers.filter({ hasText: "Priority" });
     const bottomHeader = headers.filter({ hasText: "Archive" });
     const topHeaderButton = topHeader.getByRole("button", {

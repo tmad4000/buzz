@@ -190,7 +190,7 @@ for (const L of LANES) {
     assert.equal(fx.published.length, 1);
     const doc = JSON.parse(fx.published[0].content);
     assert.equal(doc.version, 1);
-    assert.equal(doc.meta.v, L.lane.metaVersion ?? 1);
+    assert.equal(doc.meta.v, 1);
     await sync(d);
     assert.equal(fx.published.length, 1, "equal digest: no republish");
   });
@@ -250,7 +250,7 @@ for (const L of LANES) {
     assert.deepEqual(L.view(a.store.get()), { k1: "A", k9: "B" });
     assert.equal(
       JSON.parse(fx.head.content).meta.v,
-      L.lane.metaVersion ?? 1,
+      1,
       "next upgraded publish restores meta",
     );
   });
@@ -460,16 +460,6 @@ test("sections: projection is live-only, dense integer order, live assignments",
       { id: "x", name: "X", order: 1 },
     ],
     assignments: { c1: "x" },
-    layoutOrder: [
-      "builtin:starred",
-      "y",
-      "x",
-      "builtin:channels",
-      "builtin:forums",
-      "builtin:dms",
-    ],
-    pinConversionHandled: {},
-    pendingPinConversions: {},
   });
 });
 

@@ -27,7 +27,6 @@ export default defineConfig({
         "**/thread-follow.spec.ts",
         "**/sidebar-offcanvas-rail.spec.ts",
         "**/sidebar-project-sections.spec.ts",
-        "**/sidebar-order-starred.spec.ts",
         "**/tooltip-semantics.spec.ts",
         "**/search-scope-screenshots.spec.ts",
         "**/onboarding-docked-cta-screenshots.spec.ts",

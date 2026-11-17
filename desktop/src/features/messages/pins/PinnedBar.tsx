@@ -158,7 +158,7 @@ export function PinnedBar({
                 );
               }}
             >
-              Unpin message
+              Unpin
             </button>
           ) : null}
         </div>

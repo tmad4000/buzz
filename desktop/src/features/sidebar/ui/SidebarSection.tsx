@@ -1,5 +1,3 @@
-import { useSidebarSectionOrder } from "./SidebarLayout";
-import { SidebarStarToggle } from "./SidebarStars";
 import type * as React from "react";
 import { BellOff, ChevronDown, CircleDot, X } from "lucide-react";
 
@@ -289,7 +287,7 @@ export function ChannelMenuButton({
   const button = (
     <SidebarMenuButton
       className={cn(
-        "data-[active=true]:font-normal pr-12",
+        "data-[active=true]:font-normal",
         isActive
           ? "group-hover/menu-item:bg-sidebar-active group-hover/menu-item:text-sidebar-active-foreground"
           : "group-hover/menu-item:bg-sidebar-accent group-hover/menu-item:text-sidebar-foreground",
@@ -366,21 +364,13 @@ export function ChannelMenuButton({
   );
 
   if (!activeWorking && !hasThreadUnread) {
-    return (
-      <>
-        {button}
-        <SidebarStarToggle id={channel.id} label={resolvedLabel} />
-      </>
-    );
+    return button;
   }
 
   return (
-    <>
-      <ChannelActivityPopover activeWorking={activeWorking} channel={channel}>
-        {button}
-      </ChannelActivityPopover>
-      <SidebarStarToggle id={channel.id} label={resolvedLabel} />
-    </>
+    <ChannelActivityPopover activeWorking={activeWorking} channel={channel}>
+      {button}
+    </ChannelActivityPopover>
   );
 }
 
@@ -446,7 +436,6 @@ export function SidebarSection({
   onUnassignChannel?: (channelId: string) => void;
   onCreateSectionForChannel?: (channelId: string) => void;
 }) {
-  const layout = useSidebarSectionOrder();
   if (items.length === 0 && !action && !emptyState) {
     return null;
   }
@@ -463,7 +452,6 @@ export function SidebarSection({
         <SidebarGroupLabel asChild={canToggle}>
           {canToggle ? (
             <button
-              {...layout?.dragHandleProps}
               aria-controls={contentId}
               aria-expanded={!isCollapsed}
               className={SECTION_LABEL_BUTTON_CLASS}

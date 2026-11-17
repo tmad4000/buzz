@@ -112,8 +112,6 @@ export type AppSidebarProps = {
   onMuteChannel?: (channelId: string) => void;
   onUnmuteChannel?: (channelId: string) => void;
   starredChannelIds?: ReadonlySet<string>;
-  onStarChannel?: (
-    channelId: string | readonly string[],
-  ) => undefined | Promise<boolean>;
+  onStarChannel?: (channelId: string) => void;
   onUnstarChannel?: (channelId: string) => void;
 };

@@ -1,5 +1,3 @@
-import { useSidebarStars } from "./SidebarStars";
-
 import {
   Archive,
   Bell,
@@ -181,10 +179,6 @@ export function ChannelContextMenuItems({
   onDeleteChannel?: (channel: Channel) => void;
   onLeaveChannel?: (channel: Channel) => void;
 }) {
-  const stars = useSidebarStars();
-  const star = onStarChannel ?? stars?.star;
-  const unstar = onUnstarChannel ?? stars?.unstar;
-  const selectedStar = stars?.ids.has(channel.id) ?? isStarred;
   const {
     feedItemState,
     hasSidebarUnreadProjections,
@@ -226,7 +220,7 @@ export function ChannelContextMenuItems({
       canManageChannel ||
       canDeleteChannel,
   );
-  const showStar = Boolean(star && unstar);
+  const showStar = Boolean(onStarChannel && onUnstarChannel);
   const showReadToggle = hasProjectedUnread
     ? Boolean(onMarkChannelRead)
     : Boolean(onMarkChannelUnread);
@@ -306,31 +300,25 @@ export function ChannelContextMenuItems({
         )
       ) : null}
       {showStar ? (
-        selectedStar ? (
+        isStarred ? (
           <ContextMenuItem
-            onSelect={() => deferMenuAction(() => unstar?.(channel.id))}
+            onSelect={() =>
+              deferMenuAction(() => onUnstarChannel?.(channel.id))
+            }
           >
             <ContextMenuIconSlot>
               <StarOff className="h-4 w-4" />
             </ContextMenuIconSlot>
-            <span>
-              {channel.channelType === "dm"
-                ? "Unstar direct message"
-                : "Unstar channel"}
-            </span>
+            <span>Unstar channel</span>
           </ContextMenuItem>
         ) : (
           <ContextMenuItem
-            onSelect={() => deferMenuAction(() => star?.(channel.id))}
+            onSelect={() => deferMenuAction(() => onStarChannel?.(channel.id))}
           >
             <ContextMenuIconSlot>
               <Star className="h-4 w-4" />
             </ContextMenuIconSlot>
-            <span>
-              {channel.channelType === "dm"
-                ? "Star direct message"
-                : "Star channel"}
-            </span>
+            <span>Star channel</span>
           </ContextMenuItem>
         )
       ) : null}
