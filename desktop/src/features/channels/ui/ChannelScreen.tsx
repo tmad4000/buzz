@@ -659,6 +659,7 @@ export function ChannelScreen({
   const handleJumpToThreadMessage = React.useCallback(
     (rootId: string, messageId: string) => {
       if (!requirePageEditResolution() || !requireThreadEditResolution()) return;
+      if (pageOpen) closePage();
       setOpenAgentSessionPubkey(null);
       setProfilePanelPubkey(null);
       setChannelManagementOpen(false);
@@ -671,6 +672,8 @@ export function ChannelScreen({
     [
       requirePageEditResolution,
       requireThreadEditResolution,
+      pageOpen,
+      closePage,
       effectiveOpenThreadHeadId,
       setOpenAgentSessionPubkey,
       setProfilePanelPubkey,
