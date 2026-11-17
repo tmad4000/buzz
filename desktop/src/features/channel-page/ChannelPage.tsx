@@ -38,7 +38,6 @@ export function ChannelPage({
   const [leaveBlocked, setLeaveBlocked] = React.useState(false);
   const draftRef = React.useRef<string | null>(null);
   const baselineRef = React.useRef<string | null>(null);
-  const textareaRef = React.useRef<HTMLTextAreaElement>(null);
   const mounted = React.useRef(false);
   const updateDraft = React.useCallback((value: string | null) => {
     draftRef.current = value;
@@ -59,7 +58,6 @@ export function ChannelPage({
     if (!dirty && savingVersion.current !== channelGeneration.current)
       return true;
     setLeaveBlocked(true);
-    textareaRef.current?.focus();
     return false;
   }, []);
   React.useLayoutEffect(() => {
@@ -268,7 +266,6 @@ export function ChannelPage({
             Self-contained HTML · 512 KiB maximum
           </label>
           <textarea
-            ref={textareaRef}
             id={editorId}
             className="min-h-80 flex-1 rounded border bg-background p-3 font-mono text-sm"
             value={draft}
