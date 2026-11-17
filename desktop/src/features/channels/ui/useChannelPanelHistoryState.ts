@@ -121,7 +121,19 @@ export function useChannelPanelHistoryState() {
     [applyPatch],
   );
 
+  const capturePanelReturn = () => {
+    // One atomic patch through the existing pane/router history owner. Never
+    // restore autoSend: Back is navigation, not a publication trigger.
+    const snapshot = {
+      ...values,
+      autoSend: null,
+      messageId: null,
+      threadRootId: null,
+    };
+    return () => applyPatch(snapshot, { replace: true });
+  };
   return {
+    capturePanelReturn,
     channelManagementOpen: values.channelManagement != null,
     clearAutoSend,
     clearMessageRouteTarget,

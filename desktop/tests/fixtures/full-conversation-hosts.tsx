@@ -3,6 +3,7 @@
 import * as React from "react";
 import {
   resolveThreadReplySeenAt,
+  resolveThreadReplyObservedAt,
   threadReplySeenKey,
   threadSeenKey,
 } from "@/features/channels/readState/threadReplySeen";
@@ -81,7 +82,7 @@ window.__BUZZ_E2E__ = {
   mode: "mock",
   mock: new URLSearchParams(location.search).has("routing")
     ? {
-        sendMessageDelayMs: 1200,
+        sendMessageDelayMs: 6000,
         deferredComposerUploads: true,
         uploadDescriptors: [
           {
@@ -455,7 +456,7 @@ function Screen() {
   harnessWindow.hostChannelRead = () =>
     read.getEffectiveTimestamp(channel?.id ?? "none");
   harnessWindow.hostSeen = (rootId, replyId) =>
-    resolveThreadReplySeenAt(rootId, replyId, read.getOwnTimestamp);
+    resolveThreadReplyObservedAt(rootId, replyId, read.getOwnTimestamp);
   const [focused, setFocused] = React.useState("a");
   const [showA, setShowA] = React.useState(true);
   const shell = React.useMemo(
@@ -463,9 +464,12 @@ function Screen() {
       ...fallback,
       registerContextParents: read.registerContextParents,
       readStateVersion: read.readStateVersion,
+      threadReplySeenReady: read.isReady,
       getChannelReadAt: read.getEffectiveTimestamp,
       getThreadReplySeenAt: (rootId: string, replyId: string) =>
         resolveThreadReplySeenAt(rootId, replyId, read.getOwnTimestamp),
+      getThreadReplyObservedAt: (rootId: string, replyId: string) =>
+        resolveThreadReplyObservedAt(rootId, replyId, read.getOwnTimestamp),
       markThreadReplySeen: (rootId: string, replyId: string, at: number) => {
         read.seedContextRead(threadReplySeenKey(rootId, replyId), at);
         read.seedContextRead(threadSeenKey(rootId), at);
@@ -484,6 +488,7 @@ function Screen() {
       read.getEffectiveTimestamp,
       read.getOwnTimestamp,
       read.seedContextRead,
+      read.isReady,
     ],
   );
   return (

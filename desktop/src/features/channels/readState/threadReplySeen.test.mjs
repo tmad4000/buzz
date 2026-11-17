@@ -3,7 +3,7 @@ import test from "node:test";
 import {
   threadSeenKey,
   threadReplySeenKey,
-  resolveThreadReplySeenAt,
+  resolveThreadReplyObservedAt,
 } from "./threadReplySeen.ts";
 import { mergeReadStateEvents } from "./readStateSnapshot.ts";
 test("encrypted observation snapshot merges on another client without channel/read-all inheritance", async () => {
@@ -32,12 +32,12 @@ test("encrypted observation snapshot merges on another client without channel/re
     },
   );
   const own = (key) => otherDevice.get(key) ?? null;
-  assert.equal(resolveThreadReplySeenAt("root", "seen", own), 200);
+  assert.equal(resolveThreadReplyObservedAt("root", "seen", own), 200);
   assert.equal(
-    resolveThreadReplySeenAt("root", "same-second-unseen", own),
-    199,
+    resolveThreadReplyObservedAt("root", "same-second-unseen", own),
+    null,
   );
-  assert.equal(resolveThreadReplySeenAt("other-root", "reply", own), null);
+  assert.equal(resolveThreadReplyObservedAt("other-root", "reply", own), null);
   assert.equal(
     (
       await mergeReadStateEvents([event], "different-reader", async () =>
@@ -46,4 +46,25 @@ test("encrypted observation snapshot merges on another client without channel/re
     ).size,
     0,
   );
+});
+
+test("a newer observed body never covers an older unobserved or pruned reply", () => {
+  const markers = new Map([
+    [threadSeenKey("root"), 200],
+    [threadReplySeenKey("root", "newer"), 200],
+    [threadReplySeenKey("root", "stale"), 90],
+  ]);
+  const own = (key) => markers.get(key) ?? null;
+  assert.equal(resolveThreadReplyObservedAt("root", "older", own), null);
+  assert.equal(resolveThreadReplyObservedAt("root", "stale", own), 90);
+  assert.equal(resolveThreadReplyObservedAt("root", "newer", own), 200);
+  markers.delete(threadReplySeenKey("root", "newer"));
+  assert.equal(resolveThreadReplyObservedAt("root", "newer", own), null);
+});
+
+test("legacy frontier remains progress-only while observed getter is exact", async () => {
+  const { resolveThreadReplySeenAt } = await import("./threadReplySeen.ts");
+  const own = (key) => (key === threadSeenKey("root") ? 200 : null);
+  assert.equal(resolveThreadReplySeenAt("root", "older", own), 199);
+  assert.equal(resolveThreadReplyObservedAt("root", "older", own), null);
 });

@@ -4,6 +4,12 @@ An accent dot, bold summary and `N new` distinguish reply observation from a
 plain reply count. The header's `Unseen replies (N)` counts reply observations
 pending in loaded channel-window threads and opens the next matching thread at
 its first new reply. It opens an already-open thread without toggling it closed.
+Programmatic navigation temporarily reveals saved collapsed ancestry in that view
+without overwriting or broadcasting saved collapse preferences. Explicit toggles
+persist their chosen branch; unrelated sibling preference changes preserve the
+local reveal, including while history is loading. Local observer lifecycles include
+`viewInstanceId`; canonical synced observation keys do not.
+
 Unloaded channel history remains outside this window; loading older history adds
 its threads to the projection. While summary-only threads are being resolved,
 the count is a lower bound (`N+`); a failed history read exposes a retry action.
@@ -19,13 +25,15 @@ mounted channel scope. It does not acknowledge any reply by fetching it.
 Observation uses the existing self-encrypted, signed, per-user NIP-RS transport:
 
 - `thread:seen:v1:<canonical-root>`: newest actually observed reply author time.
-- `msg:seen:v1:<canonical-root>:<reply>`: exact observed reply evidence for ties.
+- `msg:seen:v1:<canonical-root>:<reply>`: exact observed body evidence for each reply.
 
 These opaque context keys have no channel parent, so opening or marking a channel
-read never advances them. A same-second sibling remains new unless its own body
-was observed. `N new` means replies newer than the last observed thread frontier,
-plus unobserved ties; it is not a checklist of every individually reviewed answer.
-Author-time/backdated arrivals follow the existing read-state ordering contract.
+read never advances them. A reply is seen only when its exact marker is at least
+its creation time. The newest-observed thread frontier is progress metadata and
+never substitutes for an individual body observation, including older/backdated
+replies and same-second siblings. `N new` and sidebar earlier-reply folding use
+the same exact evidence. Missing/pruned markers remain unknown/unseen, leaving
+more content open conservatively.
 Updated desktop/web clients share these markers; native mobile observation UI and
 writer parity are follow-up work. Existing mobile Activity/Inbox remains unchanged.
 
@@ -54,3 +62,9 @@ open. Receive another reply under a collapsed thread: the marker should return.
 Repeat on a second updated desktop/web client signed into the same account after
 sync. Test unsaved edits before using the header: edit resolution must be honored.
 Linux browser verification does not establish native Apple behavior.
+
+AppShell exposes `getThreadReplyObservedAt(root, reply)` for exact observed-body
+markers; badge projection and sidebar folding compare it with reply creation time.
+The legacy `getThreadReplySeenAt` frontier getter remains progress-only and must
+never authorize those states. `threadReplySeenReady` comes from the same existing
+read manager's hydration flag; it gates folding and initial end positioning.

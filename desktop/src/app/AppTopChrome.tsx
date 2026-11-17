@@ -1,3 +1,8 @@
+import { AppStamp } from "@/features/settings/AppStamp";
+import {
+  UpdateIndicator,
+  UpdateStatusAnnouncement,
+} from "@/features/settings/UpdateIndicator";
 import * as React from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
@@ -118,7 +123,7 @@ export function AppTopChrome({
     <div
       ref={topChromeRef}
       className={cn(
-        "relative z-45 flex shrink-0 cursor-default select-none items-center bg-sidebar pr-3 text-sidebar-foreground",
+        "app-version-chrome relative z-45 flex shrink-0 cursor-default select-none items-center bg-sidebar pr-3 text-sidebar-foreground",
         topChromeBackdrop.height,
         navRowPaddingClass,
       )}
@@ -160,6 +165,14 @@ export function AppTopChrome({
         data-tauri-drag-region
         id="app-top-chrome-content"
       />
+      <div
+        className="flex shrink-0 items-center gap-1"
+        data-testid="header-version-cluster"
+      >
+        <AppStamp surface="header" />
+        <UpdateIndicator showLabel />
+        <UpdateStatusAnnouncement />
+      </div>
     </div>
   );
 }

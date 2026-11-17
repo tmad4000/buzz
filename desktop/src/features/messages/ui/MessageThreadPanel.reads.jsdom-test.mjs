@@ -150,6 +150,16 @@ test("read callbacks contain only committed rows and never descendants hidden by
       }),
     ),
   );
+  assert.ok(
+    document.querySelector('[data-message-id="branch"]'),
+    "new sidebar visit ignores legacy root collapse",
+  );
+  await act(() =>
+    document
+      .querySelector('button[data-thread-head-id="root"][aria-expanded="true"]')
+      .click(),
+  );
+  calls.length = 0;
   assert.equal(document.querySelector('[data-message-id="branch"]'), null);
   assert.deepEqual(calls, []);
   const unread = (id) => id === "deep";

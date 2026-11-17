@@ -120,7 +120,7 @@ export function ChannelScreen({
     getChannelReadAt,
     getMessageReadAt,
     markMessageRead,
-    getThreadReplySeenAt,
+    getThreadReplyObservedAt,
     markThreadReplySeen,
     registerContextParents,
     openBrowseChannels,
@@ -135,6 +135,7 @@ export function ChannelScreen({
   } = useAppShell();
   const {
     channelManagementOpen,
+    capturePanelReturn,
     clearAutoSend,
     clearMessageRouteTarget,
     openAgentSessionChannelId,
@@ -486,7 +487,7 @@ export function ChannelScreen({
   const unseenEvidenceMessages = React.useMemo(() => [...timelineMessages, ...unseenEvidence.messages], [timelineMessages, unseenEvidence.messages]);
   const { unseenReplies, threadUnseenCounts, markVisibleReplies } = useUnseenThreadReplies({
     timelineMessages: unseenEvidenceMessages, panelMessages: threadPanelData.messages, currentPubkey,
-    getSeenAt: getThreadReplySeenAt, markSeen: markThreadReplySeen,
+    getSeenAt: getThreadReplyObservedAt, markSeen: markThreadReplySeen,
     markRead: markSidebarRepliesRead, readStateVersion,
   });
   const editTargetMessage = React.useMemo(
@@ -1002,6 +1003,29 @@ export function ChannelScreen({
                   onOpenProfilePanel={handleOpenProfilePanel}
                   onResetThreadPanelWidth={handleThreadPanelWidthReset}
                   onCloseProfilePanel={handleCloseProfilePanel}
+                  onCapturePanelReturn={() => {
+                    if (!requireThreadEditResolution()) return;
+                    const restore = capturePanelReturn();
+                    return () => {
+                      if (!requireThreadEditResolution()) return false;
+                      restore();
+                      setOptimisticOpenThreadHeadId(undefined);
+                      setThreadReplyTargetId(threadReplyTargetId);
+                      setThreadScrollTargetId(threadScrollTargetId);
+                      setExpandedThreadReplyIds(new Set(expandedThreadReplyIds));
+                      return true;
+                    };
+                  }}
+                  onOpenSentReply={(root, messageId) => {
+                    if (!requireThreadEditResolution()) return;
+                    setOpenAgentSessionPubkey(null);
+                    setProfilePanelPubkey(null);
+                    setChannelManagementOpen(false);
+                    setOptimisticOpenThreadHeadId(root.id);
+                    setOpenThreadHeadId(root.id);
+                    setThreadReplyTargetId(root.id);
+                    setThreadScrollTargetId(messageId);
+                  }}
                   onOpenThread={handleOpenThreadAndCloseAgentSession}
                   onSelectThreadReplyTarget={handleSelectThreadReplyTarget}
                   onSendMessage={handleSendMessage}
@@ -1037,6 +1061,7 @@ export function ChannelScreen({
                   threadHeadMessage={displayedThreadHeadMessage}
                   threadMessages={displayedThreadMessages}
                   threadMessagesPending={threadRepliesQuery.isPending}
+                  threadMessagesComplete={threadRepliesQuery.isSuccess && !threadRepliesQuery.isFetching}
                   threadMessagesError={threadRepliesQuery.isError}
                   onRetryThreadReplies={() => {
                     void threadRepliesQuery.refetch();

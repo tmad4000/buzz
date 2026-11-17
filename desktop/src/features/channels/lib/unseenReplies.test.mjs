@@ -44,3 +44,28 @@ test("projection uses the retained canonical-root marker without a second age fi
   );
   assert.equal(unseenRepliesByRoot(messages, "me", () => 100).size, 0);
 });
+
+test("unseen badges share exact observation evidence with sidebar folding", async () => {
+  const { resolveThreadReplyObservedAt, threadSeenKey, threadReplySeenKey } =
+    await import("../readState/threadReplySeen.ts");
+  const markers = new Map([
+    [threadSeenKey("root"), 200],
+    [threadReplySeenKey("root", "newer"), 200],
+    [threadReplySeenKey("root", "stale"), 90],
+  ]);
+  const seenAt = (root, id) =>
+    resolveThreadReplyObservedAt(root, id, (key) => markers.get(key) ?? null);
+  const result = unseenRepliesByRoot(
+    [
+      reply("older", { createdAt: 100 }),
+      reply("stale", { createdAt: 101 }),
+      reply("newer", { createdAt: 200 }),
+    ],
+    "me",
+    seenAt,
+  );
+  assert.deepEqual(
+    result.get("root").map((m) => m.id),
+    ["older", "stale"],
+  );
+});

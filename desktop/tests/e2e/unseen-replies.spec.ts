@@ -1,3 +1,4 @@
+import { waitForMockChannelHeadReady } from "../helpers/channelHeadReady";
 import { expect, test } from "@playwright/test";
 import { installMockBridge, TEST_IDENTITIES } from "../helpers/bridge";
 
@@ -35,6 +36,11 @@ test("unseen summary survives channel opening and clears only on visible reply b
   await expect(page.getByTestId("message-timeline")).toContainText("Hey team", {
     timeout: 30000,
   });
+  await waitForMockChannelHeadReady(
+    page,
+    "general",
+    "9a1657ac-f7aa-5db0-b632-d8bbeb6dfb50",
+  );
   let sequence = 70000;
   let tick = Math.floor(Date.now() / 1000) + 30;
   const emit = async (content: string, parentEventId?: string) => {
@@ -45,14 +51,11 @@ test("unseen summary survives channel opening and clears only on visible reply b
       pubkey: TEST_IDENTITIES.bob.pubkey,
       createdAt: tick++,
     };
-    return page.evaluate(
-      (input) =>
-        window.__BUZZ_E2E_EMIT_MOCK_MESSAGE__!({
-          ...input,
-          channelName: "general",
-        }),
-      input,
-    );
+    return page.evaluate((input) => {
+      const emit = window.__BUZZ_E2E_EMIT_MOCK_MESSAGE__;
+      if (!emit) throw new Error("Missing mock message emitter");
+      return emit({ ...input, channelName: "general" });
+    }, input);
   };
   const root = await emit("Unseen observation acceptance root");
   await emit("First answer body must actually appear", root.id);
@@ -109,8 +112,44 @@ test("unseen summary survives channel opening and clears only on visible reply b
   });
   await emit("Already open thread jump target", root.id);
   await expect(summary.getByTestId("thread-unread-badge")).toBeVisible();
+  const panel = page.getByTestId("message-thread-panel");
+  const savedCollapse = await page.evaluate(
+    (rootId) =>
+      Object.entries(localStorage).filter(
+        ([key]) =>
+          key.startsWith("buzz-thread-expansion.v1:") && key.includes(rootId),
+      ),
+    root.id,
+  );
+  await panel
+    .getByRole("button", { name: "Hide replies", exact: true })
+    .first()
+    .click();
+  await expect(
+    panel
+      .getByTestId("message-body")
+      .filter({ hasText: "Already open thread jump target" }),
+  ).toHaveCount(0);
   await page.getByRole("button", { name: /Unseen replies \(/ }).click();
   await expect(page.getByTestId("message-thread-panel")).toBeVisible();
+  await expect(
+    panel
+      .getByTestId("message-body")
+      .filter({ hasText: "Already open thread jump target" }),
+  ).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        (rootId) =>
+          Object.entries(localStorage).filter(
+            ([key]) =>
+              key.startsWith("buzz-thread-expansion.v1:") &&
+              key.includes(rootId),
+          ),
+        root.id,
+      ),
+    )
+    .toEqual(savedCollapse);
   await expect
     .poll(() => body.evaluate((element) => element.scrollTop))
     .toBeGreaterThan(0);

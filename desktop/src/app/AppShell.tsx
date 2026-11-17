@@ -402,6 +402,7 @@ export function AppShell() {
     unreadChannelNotificationCount,
     getEffectiveTimestamp: getChannelReadAt,
     getOwnTimestamp: getOwnReadAt,
+    threadReplySeenReady,
     readStateVersion,
     registerContextParents,
     participatedRootIds,
@@ -431,6 +432,7 @@ export function AppShell() {
 
   const {
     getThreadReplySeenAt,
+    getThreadReplyObservedAt,
     markThreadReplySeen,
     getThreadReadAt,
     markThreadRead,
@@ -740,6 +742,8 @@ export function AppShell() {
             },
             getChannelReadAt,
             getThreadReplySeenAt,
+            getThreadReplyObservedAt,
+            threadReplySeenReady,
             markThreadReplySeen,
             getThreadReadAt,
             markThreadRead,

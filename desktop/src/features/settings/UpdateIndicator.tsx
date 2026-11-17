@@ -51,7 +51,7 @@ const variants: Record<
   },
   ready: {
     Icon: RotateCw,
-    label: "Update now",
+    label: "Restart to update",
     badgeColor: "bg-emerald-500",
   },
 };
@@ -69,7 +69,13 @@ function getVariant(state: UpdateStatus["state"]) {
   return null;
 }
 
-export function UpdateIndicator({ className }: { className?: string }) {
+export function UpdateIndicator({
+  className,
+  showLabel = false,
+}: {
+  className?: string;
+  showLabel?: boolean;
+}) {
   const { status, installAndRelaunch } = useUpdaterContext();
   const variant = getVariant(status.state);
 
@@ -78,6 +84,8 @@ export function UpdateIndicator({ className }: { className?: string }) {
   }
 
   const { Icon, iconClassName = "h-4 w-4", label, badgeColor } = variant;
+  const visibleLabel =
+    status.state === "manual-required" ? "Update available" : label;
   const isActionable =
     status.state === "ready" || status.state === "manual-required";
   const handleClick =
@@ -94,7 +102,7 @@ export function UpdateIndicator({ className }: { className?: string }) {
       <TooltipTrigger asChild>
         <Button
           aria-label={label}
-          className={`${indicatorButtonClass} ${className ?? ""}`}
+          className={`${indicatorButtonClass} ${showLabel ? "min-h-7 w-auto gap-1 px-2 text-xs" : ""} ${className ?? ""}`}
           disabled={!isActionable}
           onClick={() => {
             if (handleClick) {
@@ -106,6 +114,9 @@ export function UpdateIndicator({ className }: { className?: string }) {
           variant="ghost"
         >
           <Icon aria-hidden className={iconClassName} />
+          {showLabel ? (
+            <span className="header-update-label">{visibleLabel}</span>
+          ) : null}
           <span
             className={`absolute right-1 top-1 h-1.5 w-1.5 rounded-full ${badgeColor} animate-pulse`}
           />
@@ -113,5 +124,23 @@ export function UpdateIndicator({ className }: { className?: string }) {
       </TooltipTrigger>
       <TooltipContent side="bottom">{label}</TooltipContent>
     </Tooltip>
+  );
+}
+
+/** One global live owner; version-age repainting never changes this text. */
+export function UpdateStatusAnnouncement() {
+  const { status } = useUpdaterContext();
+  const variant = getVariant(status.state);
+  const text =
+    variant?.label ?? (status.state === "error" ? "Update check failed" : "");
+  return (
+    <span
+      role="status"
+      aria-live="polite"
+      className="sr-only"
+      data-testid="update-status-announcement"
+    >
+      {text}
+    </span>
   );
 }

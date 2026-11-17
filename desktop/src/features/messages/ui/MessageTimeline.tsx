@@ -1,3 +1,8 @@
+import {
+  captureReadingPosition,
+  restoreReadingPosition,
+  type TimelineReadingPosition,
+} from "./timelineReadingPosition";
 import type { ThreadSummaryRenderer } from "./TimelineMessageRow";
 import * as React from "react";
 
@@ -35,6 +40,10 @@ import {
 import { useSettleGatedPrependMessages } from "./useSettleGatedPrependMessages";
 
 export type MessageTimelineHandle = {
+  captureReadingPosition: () => TimelineReadingPosition | null;
+  restoreReadingPosition: (
+    snapshot: TimelineReadingPosition,
+  ) => (() => void) | undefined;
   scrollToBottomOnNextUpdate: () => void;
   settleAtBottom: () => boolean;
 };
@@ -476,6 +485,22 @@ const MessageTimelineBase = React.forwardRef<
   React.useImperativeHandle(
     ref,
     () => ({
+      captureReadingPosition: () =>
+        activeScrollContainerRef.current
+          ? captureReadingPosition(
+              activeScrollContainerRef.current,
+              messages.map((m) => m.id),
+            )
+          : null,
+      restoreReadingPosition: (snapshot) =>
+        activeScrollContainerRef.current
+          ? restoreReadingPosition(
+              activeScrollContainerRef.current,
+              snapshot,
+              messages.map((m) => m.id),
+              (id) => timelineVirtualizerApi?.scrollToMessage(id) ?? false,
+            )
+          : undefined,
       scrollToBottomOnNextUpdate: prepareForOwnMessage,
       settleAtBottom: () => {
         if (!timelineVirtualizerApi) return false;
@@ -483,7 +508,13 @@ const MessageTimelineBase = React.forwardRef<
         return true;
       },
     }),
-    [prepareForOwnMessage, scrollToBottom, timelineVirtualizerApi],
+    [
+      prepareForOwnMessage,
+      scrollToBottom,
+      timelineVirtualizerApi,
+      activeScrollContainerRef,
+      messages,
+    ],
   );
 
   // Jump-to-message is purely DOM-based now: all loaded rows are mounted, so

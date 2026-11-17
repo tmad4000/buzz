@@ -161,13 +161,25 @@ function ScopedInlineThread(props: Props & { storageKey: string }) {
     data.thread.remembered,
     snapshot,
   ]);
+  const [focusReply, setFocusReply] = React.useState(false);
   const toggle = () => {
     const next = !expanded;
     const persisted = storage.save(storageKey, new Map([[root.id, next]]));
     setChoice(next);
     setStorageFailed(!persisted);
+    setFocusReply(next && summary.replyCount === 0);
     if (next) data.thread.setExpanded(root.id, true);
   };
+  React.useEffect(() => {
+    if (!expanded || !focusReply) return;
+    const editor = contentRef.current?.querySelector<HTMLElement>(
+      '[data-testid="message-input"]',
+    );
+    if (editor?.isContentEditable) {
+      editor.focus();
+      setFocusReply(false);
+    }
+  }, [expanded, focusReply]);
   return (
     <>
       <div ref={controlsRef} className="flex items-center gap-1">
@@ -181,17 +193,19 @@ function ScopedInlineThread(props: Props & { storageKey: string }) {
           controlsId={regionId}
           onOpenThread={toggle}
         />
-        <button
-          type="button"
-          className="mb-1 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-          aria-label="Open thread in side panel"
-          title="Open thread in side panel"
-          data-testid="open-thread-side-panel"
-          data-thread-head-id={root.id}
-          onClick={() => onOpenThread(root)}
-        >
-          <PanelRight className="size-3.5" aria-hidden />
-        </button>
+        {summary.replyCount > 0 ? (
+          <button
+            type="button"
+            className="mb-1 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+            aria-label="Open thread in side panel"
+            title="Open thread in side panel"
+            data-testid="open-thread-side-panel"
+            data-thread-head-id={root.id}
+            onClick={() => onOpenThread(root)}
+          >
+            <PanelRight className="size-3.5" aria-hidden />
+          </button>
+        ) : null}
       </div>
       {storageFailed || data.thread.preferenceError ? (
         <p role="status" className="ml-10 text-xs text-muted-foreground">
@@ -210,6 +224,7 @@ function ScopedInlineThread(props: Props & { storageKey: string }) {
           <InlineThreadContent
             {...props}
             data={data}
+            focusReply={focusReply}
             scope={auto.scope}
             previewTarget={
               choice === undefined ? auto.answerTargets.get(root.id) : undefined
@@ -234,11 +249,13 @@ function InlineThreadContent({
   data,
   scope,
   previewTarget,
+  focusReply,
 }: Props & {
   storageKey: string;
   data: ReturnType<typeof useInlineThreadData>;
   scope: string;
   previewTarget?: string;
+  focusReply: boolean;
 }) {
   const { query, thread, combinedProfiles, canonicalRoot } = data;
   const [replyTarget, setReplyTarget] = React.useState<TimelineMessage | null>(
@@ -399,7 +416,8 @@ function InlineThreadContent({
       !query.isError &&
       !data.missingRange &&
       rootOpen &&
-      thread.entries.length === 0 ? (
+      thread.entries.length === 0 &&
+      summary.replyCount > 0 ? (
         <p className="px-3 py-2 text-sm text-muted-foreground">
           {summary.replyCount > 0
             ? "Some replies are unavailable."
@@ -407,7 +425,9 @@ function InlineThreadContent({
         </p>
       ) : null}
       <MessageComposer
-        autoFocus={false}
+        autoFocus={focusReply}
+        compactWhenEmpty
+        accessibleLabel={`Reply in thread to ${root.author}`}
         channelId={channel.id}
         channelName={channel.name}
         channelType={channel.channelType}
@@ -428,7 +448,7 @@ function InlineThreadContent({
             current?.id === args[4]?.parentEventId ? null : current,
           );
         }}
-        placeholder={`Reply in thread to ${root.author}`}
+        placeholder="Reply…"
         containerClassName="px-2 pb-2"
         showBackgroundUploadProgress={false}
         typingParentEventId={root.id}

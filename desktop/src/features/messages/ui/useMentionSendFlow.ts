@@ -570,7 +570,7 @@ export function useMentionSendFlow({
               revalidatedMentionPubkeys,
             ),
           ];
-          await send(
+          const published = await send(
             finalContent,
             revalidatedMentionPubkeys,
             finalTagsWithAgentAddress,
@@ -578,6 +578,8 @@ export function useMentionSendFlow({
             draft.capturedThreadContext,
             draft.preparedLinkPreviews != null,
           );
+          if (draft.onPublished && published?.id)
+            queueMicrotask(() => draft.onPublished?.(published.id));
           // The relay accepted the publish: flush the queued wakes now,
           // before the post-send cancellation check — a cancellation racing
           // a successful publish must not drop the wake for a message that
@@ -721,6 +723,7 @@ export function useMentionSendFlow({
   );
   const sendMessageWithMentionFlow = React.useCallback(
     async ({
+      onPublished,
       addressedAgentPubkeys = [],
       capturedChannelId,
       capturedThreadContext = null,
@@ -860,6 +863,7 @@ export function useMentionSendFlow({
           } catch {}
         }
         const pendingDraft: PendingNonMemberMentionSend = {
+          onPublished,
           sourceOwner,
           composerRevision,
           addressedAgentPubkeys: uniqueNormalizedPubkeys(addressedAgentPubkeys),

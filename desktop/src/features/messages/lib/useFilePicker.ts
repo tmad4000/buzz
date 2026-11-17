@@ -3,6 +3,7 @@ import * as React from "react";
 type FilePickerOptions = {
   accept?: string;
   multiple?: boolean;
+  onSettled?: () => void;
 };
 
 /**
@@ -18,6 +19,7 @@ export function useFilePicker() {
       const input = inputRef.current;
       if (input) {
         input.onchange = null;
+        input.oncancel = null;
         input.remove();
       }
       inputRef.current = null;
@@ -46,7 +48,9 @@ export function useFilePicker() {
         const files = Array.from(currentInput.files ?? []);
         currentInput.value = "";
         onFiles(files);
+        options.onSettled?.();
       };
+      input.oncancel = () => options.onSettled?.();
       input.click();
     },
     [],

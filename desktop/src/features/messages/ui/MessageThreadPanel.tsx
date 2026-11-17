@@ -1,3 +1,7 @@
+import { useThreadReplyRenderItems } from "./useThreadReplyRenderItems";
+import { useAppShell } from "@/app/AppShellContext";
+import { useSidebarOpening } from "./useSidebarOpening";
+import type { EarlierReplyRun } from "./sidebarOpeningPolicy";
 import { useThreadRowWindow } from "./useThreadRowWindow";
 import { useVisibleThreadReplies } from "./useVisibleThreadReplies";
 import { ThreadWindowRange } from "./ThreadWindowRange";
@@ -16,14 +20,9 @@ import { ArrowDown } from "lucide-react";
 import { HuddleTranscriptIntro } from "@/features/huddle/components/HuddleTranscriptIntro";
 import {
   buildThreadSummaryFromVisibleEntries,
-  getActiveContinuationDepths,
   hasNestedThreadBranches,
   type MainTimelineEntry,
 } from "@/features/messages/lib/threadPanel";
-import {
-  hasSameMessageAuthor,
-  isWithinGroupingWindow,
-} from "@/features/messages/lib/messageGrouping";
 import type { MessageComposerEditTarget } from "@/features/messages/ui/MessageComposer.types";
 import { canManageMessageForCurrentUser } from "@/features/messages/lib/canManageMessage";
 import { handleTimelineMentionCopy } from "@/features/messages/lib/timelineMentionCopy";
@@ -52,7 +51,6 @@ import {
   MessageThreadPanelHeader,
   ThreadMessageSkeleton,
 } from "./MessageThreadPanelSkeleton";
-import type { ThreadDepthGuideAction } from "./MessageRow";
 import { MessageThreadRow } from "./MessageThreadRow";
 import { MessageThreadSummaryRow } from "./MessageThreadSummaryRow";
 import { ThreadReplyRegion } from "./MessageThreadReplyState";
@@ -127,6 +125,8 @@ type MessageThreadPanelProps = ThreadPanelLayoutProps & {
   allThreadMessages?: TimelineMessage[];
   onSidebarRepliesRevealed?: (messages: TimelineMessage[]) => void;
   threadRepliesPending?: boolean;
+  /** All pages of the independent reply query have settled for this visit. */
+  threadRepliesComplete?: boolean;
   /** True when the thread-reply query terminally failed (all retries exhausted). */
   threadRepliesError?: boolean;
   /** Retries the failed thread-reply load; wired to the query's `refetch`. */
@@ -212,6 +212,7 @@ export function MessageThreadPanel({
   allThreadMessages,
   onSidebarRepliesRevealed,
   threadRepliesPending = false,
+  threadRepliesComplete = true,
   threadRepliesError = false,
   onRetryThreadReplies,
   threadUnreadCount,
@@ -282,6 +283,14 @@ export function MessageThreadPanel({
     allThreadMessages !== undefined;
   const hasStoredDisclosure =
     !isHuddleTranscript && allThreadMessages !== undefined;
+  const sidebarVisitScope = `${channelId}:${currentPubkey}:${threadHeadId}`;
+  const sidebarVisit = React.useRef({
+    scope: sidebarVisitScope,
+    enabled: isSidebar,
+  });
+  if (sidebarVisit.current.scope !== sidebarVisitScope)
+    sidebarVisit.current = { scope: sidebarVisitScope, enabled: isSidebar };
+  const useOpeningDefaults = sidebarVisit.current.enabled;
   const sidebarMessages = React.useMemo(
     () =>
       allThreadMessages ?? [
@@ -294,8 +303,24 @@ export function MessageThreadPanel({
     currentPubkey,
     `${channelId}:${threadHeadId}`,
   );
+  const { getThreadReplyObservedAt, threadReplySeenReady } = useAppShell();
+  const opening = useSidebarOpening({
+    enabled: useOpeningDefaults,
+    scope: `${channelId}:${currentPubkey}:${threadHeadId}`,
+    root: threadHeadId,
+    messages: sidebarMessages,
+    reader: currentPubkey,
+    ready: threadReplySeenReady,
+    complete:
+      threadRepliesComplete && !threadRepliesPending && !threadRepliesError,
+    seenAt: getThreadReplyObservedAt,
+    explicitTarget: scrollTargetId,
+  });
+  const runRegionId = React.useId();
   const sidebar = useUnreadSidebarThread({
     enabled: hasStoredDisclosure,
+    visitOnly: useOpeningDefaults,
+    freshRevealIds: opening.fresh,
     initialMode: displayPolicy.replies,
     channelId,
     currentPubkey,
@@ -366,16 +391,20 @@ export function MessageThreadPanel({
     ],
   );
 
+  const runProjection = opening.project(sidebar.entries);
   const effectiveReplies = hasStoredDisclosure
-    ? sidebar.entries
+    ? runProjection.entries
     : threadReplies;
+  const initialPositionTarget = scrollTargetId ?? opening.openingTarget;
   const rowWindow = useThreadRowWindow(
     effectiveReplies,
     `${channelId}:${currentPubkey}:${threadHeadId}`,
-    hasStoredDisclosure,
+    hasStoredDisclosure && !useOpeningDefaults,
     threadRepliesPending,
-    sidebar.firstNewId,
-    pendingJump?.root === threadHeadId ? pendingJump.id : scrollTargetId,
+    opening.firstUnseen ?? sidebar.firstNewId,
+    pendingJump?.root === threadHeadId
+      ? pendingJump.id
+      : (initialPositionTarget ?? sidebar.ownSendTargetId ?? null),
   );
 
   const deferredThreadReplies = React.useDeferredValue(
@@ -402,7 +431,9 @@ export function MessageThreadPanel({
       !isRepliesPending &&
       !threadRepliesPending &&
       !threadRepliesError
-        ? deferredThreadReplies.map((entry) => entry.message)
+        ? deferredThreadReplies
+            .filter((entry) => !runProjection.runs.has(entry.message.id))
+            .map((entry) => entry.message)
         : EMPTY_THREAD_REPLIES.map((entry) => entry.message),
     [
       isThreadHeadRepliesCollapsed,
@@ -410,6 +441,7 @@ export function MessageThreadPanel({
       threadRepliesPending,
       threadRepliesError,
       deferredThreadReplies,
+      runProjection.runs,
     ],
   );
   useVisibleThreadReplies(
@@ -460,127 +492,16 @@ export function MessageThreadPanel({
     () => !isSidebar && hasNestedThreadBranches(deferredThreadReplies),
     [deferredThreadReplies, isSidebar],
   );
-  const highlightedBranch = React.useMemo(() => {
-    if (!hoveredCollapseBranchId) {
-      return null;
-    }
-
-    if (hoveredCollapseBranchId === threadHeadId) {
-      return {
-        depth: 0,
-        endIndex: deferredThreadReplies.length - 1,
-        id: hoveredCollapseBranchId,
-        startIndex: -1,
-      };
-    }
-
-    const startIndex = deferredThreadReplies.findIndex(
-      (entry) => entry.message.id === hoveredCollapseBranchId,
-    );
-    if (startIndex < 0) {
-      return null;
-    }
-
-    const depth = deferredThreadReplies[startIndex].message.depth;
-    let endIndex = startIndex;
-    while (
-      endIndex + 1 < deferredThreadReplies.length &&
-      deferredThreadReplies[endIndex + 1].message.depth > depth
-    ) {
-      endIndex += 1;
-    }
-
-    return {
-      depth,
-      endIndex,
-      id: hoveredCollapseBranchId,
-      startIndex,
-    };
-  }, [deferredThreadReplies, hoveredCollapseBranchId, threadHeadId]);
-  const threadReplyRenderItems = React.useMemo(() => {
-    if (!threadHead) {
-      return [];
-    }
-
-    const ancestorStack: { index: number; message: TimelineMessage }[] = [
-      { index: -1, message: threadHead },
-    ];
-    let previousGroupMessage: TimelineMessage | null = threadHead;
-
-    return deferredThreadReplies.map((entry, index) => {
-      while (
-        ancestorStack.length > 0 &&
-        ancestorStack[ancestorStack.length - 1].message.depth >=
-          entry.message.depth
-      ) {
-        ancestorStack.pop();
-      }
-
-      const ancestors = [...ancestorStack];
-      const continuationDepths = getActiveContinuationDepths({
-        ancestors,
-        entries: deferredThreadReplies,
-        index,
-        message: entry.message,
-      });
-      const collapseDepthGuideAncestors = ancestors.filter((ancestor) =>
-        continuationDepths.includes(ancestor.message.depth),
-      );
-      const collapseDepthGuideActions: ThreadDepthGuideAction[] | undefined =
-        collapseDepthGuideAncestors.length > 0
-          ? collapseDepthGuideAncestors.map((ancestor) => ({
-              active:
-                hoveredCollapseBranchId === ancestor.message.id &&
-                entry.message.depth === ancestor.message.depth + 1,
-              depth: ancestor.message.depth,
-              label:
-                ancestor.message.id === threadHead.id
-                  ? "Collapse thread"
-                  : "Collapse replies",
-              message: ancestor.message,
-            }))
-          : undefined;
-      const nextEntry = deferredThreadReplies[index + 1];
-      const connectsToVisibleChild =
-        nextEntry != null && nextEntry.message.depth > entry.message.depth;
-      const startsUnreadSection =
-        index > 0 && entry.message.id === firstUnreadReplyId;
-      const isContinuation =
-        !isHuddleTranscript &&
-        !startsUnreadSection &&
-        (!isSidebar ||
-          (previousGroupMessage?.depth === entry.message.depth &&
-            previousGroupMessage?.parentId === entry.message.parentId)) &&
-        entry.summary === null &&
-        hasSameMessageAuthor(previousGroupMessage, entry.message) &&
-        isWithinGroupingWindow(
-          previousGroupMessage?.createdAt,
-          entry.message.createdAt,
-        );
-
-      if (connectsToVisibleChild && !entry.summary) {
-        ancestorStack.push({ index, message: entry.message });
-      }
-
-      previousGroupMessage = entry.summary !== null ? null : entry.message;
-
-      return {
-        collapseDepthGuideActions,
-        connectsToVisibleChild,
-        continuationDepths,
-        entry,
-        index,
-        isContinuation,
-      };
+  const { highlightedBranch, threadReplyRenderItems } =
+    useThreadReplyRenderItems({
+      deferredThreadReplies,
+      firstUnreadReplyId,
+      hoveredCollapseBranchId,
+      isHuddleTranscript,
+      isSidebar,
+      threadHead,
+      threadHeadId,
     });
-  }, [
-    deferredThreadReplies,
-    firstUnreadReplyId,
-    hoveredCollapseBranchId,
-    isHuddleTranscript,
-    isSidebar,
-    threadHead,
-  ]);
 
   const {
     isAtBottom,
@@ -591,14 +512,20 @@ export function MessageThreadPanel({
   } = useAnchoredScroll({
     channelId: threadHeadId,
     contentRef: threadContentRef,
-    isLoading: threadRepliesPending || repliesRenderState === "pending",
+    isLoading:
+      threadRepliesPending ||
+      !opening.readyToPosition ||
+      repliesRenderState === "pending",
     messages: threadMessages,
     highlightTargetMessage: scrollTargetHighlights,
-    onTargetReached: onScrollTargetResolved,
+    onTargetReached: () => {
+      opening.positionDone();
+      if (scrollTargetId) onScrollTargetResolved();
+    },
     onTargetSettled: onScrollTargetSettled,
     pinTargetCentered: !scrollTargetHighlights,
     scrollContainerRef: threadBodyRef,
-    targetMessageId: scrollTargetId,
+    targetMessageId: initialPositionTarget,
   });
   useComposerHeightPadding(
     threadBodyRef,
@@ -633,6 +560,28 @@ export function MessageThreadPanel({
   if (!threadHead) {
     return null;
   }
+  const toggleEarlierRun = (run: EarlierReplyRun, open: boolean) => {
+    const id = `${runRegionId}-toggle-${run.id}`;
+    const button = document.getElementById(id);
+    const container = threadBodyRef.current;
+    const offset =
+      button && container
+        ? button.getBoundingClientRect().top -
+          container.getBoundingClientRect().top
+        : 0;
+    if (open) opening.showRun(run);
+    else opening.hideRun(run);
+    requestAnimationFrame(() => {
+      const next = document.getElementById(id);
+      if (next && container?.isConnected) {
+        container.scrollTop +=
+          next.getBoundingClientRect().top -
+          container.getBoundingClientRect().top -
+          offset;
+        next.focus({ preventScroll: true });
+      }
+    });
+  };
   const compactSummary = (
     message: TimelineMessage,
     summary: NonNullable<MainTimelineEntry["summary"]>,
@@ -659,6 +608,12 @@ export function MessageThreadPanel({
       data-buzz-conversation-scroll
       data-testid="message-thread-body"
       mode={isHuddleTranscript ? "panel" : undefined}
+      onFocusCapture={(event) => {
+        const id = (event.target as HTMLElement).closest<HTMLElement>(
+          "[data-message-id]",
+        )?.dataset.messageId;
+        if (id) opening.retain(id);
+      }}
       onCopy={handleTimelineMentionCopy}
       onScroll={onScroll}
       tabIndex={-1}
@@ -839,6 +794,34 @@ export function MessageThreadPanel({
                       index,
                       isContinuation,
                     } = item;
+                    const run = runProjection.runs.get(entry.message.id);
+                    const openRun = runProjection.openStarts.get(
+                      entry.message.id,
+                    );
+                    const runControls = (value: EarlierReplyRun) =>
+                      value.ids.map((id) => `${runRegionId}-${id}`).join(" ");
+                    if (run)
+                      return (
+                        <React.Fragment key={`earlier-${run.id}`}>
+                          <button
+                            id={`${runRegionId}-toggle-${run.id}`}
+                            type="button"
+                            data-testid="sidebar-earlier-run"
+                            aria-expanded="false"
+                            aria-controls={runControls(run)}
+                            className="my-1 min-h-7 rounded px-3 text-xs text-muted-foreground hover:bg-muted focus-visible:ring-2"
+                            onClick={() => toggleEarlierRun(run, true)}
+                          >
+                            {run.ids.length} earlier{" "}
+                            {run.ids.length === 1 ? "reply" : "replies"}
+                          </button>
+                          <div hidden>
+                            {run.ids.map((id) => (
+                              <span key={id} id={`${runRegionId}-${id}`} />
+                            ))}
+                          </div>
+                        </React.Fragment>
+                      );
                     const showUnreadDivider =
                       index > 0 && entry.message.id === firstUnreadReplyId;
                     const highlight = selectThreadRowHighlight({
@@ -856,7 +839,21 @@ export function MessageThreadPanel({
                             "group/message rounded-2xl px-0 py-0.5 transition-colors hover:bg-muted/50 focus-within:bg-muted/50",
                         )}
                         key={entry.message.renderKey ?? entry.message.id}
+                        id={`${runRegionId}-${entry.message.id}`}
                       >
+                        {openRun ? (
+                          <button
+                            type="button"
+                            data-testid="sidebar-hide-earlier-run"
+                            id={`${runRegionId}-toggle-${openRun.id}`}
+                            aria-expanded="true"
+                            aria-controls={runControls(openRun)}
+                            className="min-h-7 rounded px-3 text-xs text-muted-foreground focus-visible:ring-2"
+                            onClick={() => toggleEarlierRun(openRun, false)}
+                          >
+                            Hide earlier replies
+                          </button>
+                        ) : null}
                         {showUnreadDivider ? <UnreadDivider /> : null}
                         {isSidebar && entry.message.depth > 2 ? (
                           <div
@@ -1084,6 +1081,10 @@ export function MessageThreadPanel({
           >
             <ComposerDockBackdrop gutterClassName="inset-x-5" />
             <MessageComposer
+              compactWhenEmpty={
+                hasStoredDisclosure && sidebarMessages.length <= 1
+              }
+              autoFocus={!useOpeningDefaults}
               audienceContext={{
                 type: "thread",
                 rootTags: threadHead.tags,

@@ -331,7 +331,12 @@ export function useMediaUpload({
             if (poster) updateQueuedVideoPoster(id, poster.posterUrl);
           });
         }
-        return { file, id, previewUrl, spoilered: false };
+        return {
+          file,
+          id,
+          previewUrl,
+          spoilered: false,
+        };
       });
 
       setQueuedAttachmentsState((current) => [...current, ...attachments]);
@@ -622,13 +627,18 @@ export function useMediaUpload({
   );
 
   const openFilePicker = useFilePicker();
+  const [isPicking, setIsPicking] = React.useState(false);
 
   const handlePaperclip = React.useCallback(async () => {
     if (queueUntilSend) {
-      openFilePicker({ multiple: true }, (files) => {
-        queueFiles(files.filter(shouldQueueFile));
-        uploadFiles(files.filter((file) => !shouldQueueFile(file)));
-      });
+      setIsPicking(true);
+      openFilePicker(
+        { multiple: true, onSettled: () => setIsPicking(false) },
+        (files) => {
+          queueFiles(files.filter(shouldQueueFile));
+          uploadFiles(files.filter((file) => !shouldQueueFile(file)));
+        },
+      );
       return;
     }
 
@@ -919,6 +929,7 @@ export function useMediaUpload({
       handleDrop,
       handlePaperclip,
       handlePaste,
+      isPicking,
       isDragOver,
       isUploading,
       originalUrlByUrl,
@@ -949,6 +960,7 @@ export function useMediaUpload({
       handleDrop,
       handlePaperclip,
       handlePaste,
+      isPicking,
       isDragOver,
       isUploading,
       originalUrlByUrl,

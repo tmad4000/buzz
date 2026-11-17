@@ -99,7 +99,11 @@ export type MessageComposerProps = {
     } | null,
     /** Route through the REST publisher even when best-effort enrichment settled empty. */
     forceRest?: boolean,
-  ) => Promise<void>;
+  ) => Promise<void | { id: string }>;
+  /** Presentation only: keep the mounted editor compact while empty and fully blurred. */
+  compactWhenEmpty?: boolean;
+  /** Persistent editor name, independent of its visual placeholder. */
+  accessibleLabel?: string;
   placeholder?: string;
   profiles?: UserProfileLookup;
   /** Explicit mention pubkeys from the loaded channel window, newest first. */
@@ -114,6 +118,10 @@ export type MessageComposerProps = {
   showBackgroundUploadProgress?: boolean;
   toolbarExtraActions?: ReactNode;
   /** Loaded roots from this pane only; enables explicit routing beside Send. */
+  /** Capture an origin-bound observer before the routed-send pipeline awaits. */
+  onCaptureRoutedSend?: (
+    rootId: string,
+  ) => ((messageId?: string) => void) | undefined;
   threadRoutingEntries?: readonly import("../lib/threadPanel").MainTimelineEntry[];
   typingParentEventId?: string | null;
   typingRootEventId?: string | null;
