@@ -136,7 +136,7 @@ class SettingsPage extends HookConsumerWidget {
                 try {
                   opened = await launchUrl(
                     Uri.parse(
-                      'https://worldissuetracker.com/tracker/buzz-ideaflow',
+                      'https://worldissuetracker.com/buzz-ideaflow',
                     ),
                     mode: LaunchMode.externalApplication,
                   );
