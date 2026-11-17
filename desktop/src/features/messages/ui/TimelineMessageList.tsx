@@ -1,3 +1,4 @@
+import type { ThreadSummaryRenderer } from "./TimelineMessageRow";
 import * as React from "react";
 import { VList } from "virtua";
 import type { VListHandle } from "virtua";
@@ -74,6 +75,7 @@ type TimelineMessageListProps = {
   onMarkRead?: (message: TimelineMessage) => void;
   onReply?: (message: TimelineMessage) => void;
   onOpenThread?: (message: TimelineMessage) => void;
+  renderThreadSummary?: ThreadSummaryRenderer;
   isSendingVideoReviewComment?: boolean;
   onSendVideoReviewComment?: (
     message: TimelineMessage,
@@ -148,6 +150,7 @@ export const TimelineMessageList = React.memo(function TimelineMessageList({
   onMarkRead,
   onReply,
   onOpenThread,
+  renderThreadSummary,
   isSendingVideoReviewComment = false,
   onSendVideoReviewComment,
   onToggleReaction,
@@ -277,6 +280,7 @@ export const TimelineMessageList = React.memo(function TimelineMessageList({
               onMarkUnread={onMarkUnread}
               onReply={onReply}
               onOpenThread={onOpenThread}
+              renderThreadSummary={renderThreadSummary}
               onToggleReaction={onToggleReaction}
               profiles={profiles}
               searchActiveMessageId={searchActiveMessageId}
@@ -314,6 +318,7 @@ export const TimelineMessageList = React.memo(function TimelineMessageList({
       onMarkUnread,
       onReply,
       onOpenThread,
+      renderThreadSummary,
       onToggleReaction,
       profiles,
       ownerProfiles,

@@ -1,3 +1,5 @@
+import { InlineChannelThread } from "./InlineChannelThread";
+import type { ThreadSummaryRenderer } from "@/features/messages/ui/TimelineMessageRow";
 import { PinnedBar } from "@/features/messages/pins/PinnedBar";
 import * as React from "react";
 import { LogIn } from "lucide-react";
@@ -151,6 +153,8 @@ export const ChannelPane = React.memo(function ChannelPane({
   onSendToChannel,
   onSendVideoReviewComment,
   onSendThreadReply,
+  onSendInlineThreadReply,
+  respondToLookup,
   onThreadScrollTargetResolved,
   onThreadPanelResizeStart,
   onTargetReached,
@@ -269,6 +273,43 @@ export const ChannelPane = React.memo(function ChannelPane({
     timeoutActive ||
     isModerationDmChannel ||
     isSending;
+  const renderThreadSummary = React.useCallback<ThreadSummaryRenderer>(
+    (root, summary) =>
+      activeChannel ? (
+        <InlineChannelThread
+          channel={activeChannel}
+          root={root}
+          summary={summary}
+          currentPubkey={currentPubkey}
+          profiles={profiles}
+          ownerProfiles={ownerProfiles}
+          personaLookup={personaLookup}
+          respondToLookup={respondToLookup}
+          disabled={isComposerDisabled}
+          isSending={isSending}
+          onOpenThread={onOpenThread}
+          onSend={onSendInlineThreadReply}
+          onToggleReaction={onToggleReaction}
+          onRepliesRevealed={onSidebarRepliesRevealed}
+          unreadCount={threadUnreadCounts?.get(root.id)}
+        />
+      ) : null,
+    [
+      activeChannel,
+      currentPubkey,
+      profiles,
+      ownerProfiles,
+      personaLookup,
+      respondToLookup,
+      isComposerDisabled,
+      isSending,
+      onOpenThread,
+      onSendInlineThreadReply,
+      onToggleReaction,
+      onSidebarRepliesRevealed,
+      threadUnreadCounts,
+    ],
+  );
   const knownAgentPubkeys = React.useMemo(() => {
     const pubkeys = new Set<string>();
     for (const pubkey of agentPubkeys ?? []) {
@@ -692,6 +733,9 @@ export const ChannelPane = React.memo(function ChannelPane({
               onMarkRead={onMarkRead}
               onReply={timelineReplyHandler}
               onOpenThread={isHuddleTranscript ? undefined : onOpenThread}
+              renderThreadSummary={
+                isHuddleTranscript ? undefined : renderThreadSummary
+              }
               channelName={activeChannel?.name}
               channelType={activeChannel?.channelType ?? null}
               isSendingVideoReviewComment={isSending}

@@ -1,3 +1,4 @@
+import type { ThreadSummaryRenderer } from "./TimelineMessageRow";
 import * as React from "react";
 
 import {
@@ -98,6 +99,7 @@ type MessageTimelineProps = {
   onMarkRead?: (message: TimelineMessage) => void;
   onReply?: (message: TimelineMessage) => void;
   onOpenThread?: (message: TimelineMessage) => void;
+  renderThreadSummary?: ThreadSummaryRenderer;
   isSendingVideoReviewComment?: boolean;
   onSendVideoReviewComment?: (
     message: TimelineMessage,
@@ -199,6 +201,7 @@ const MessageTimelineBase = React.forwardRef<
     onMarkRead,
     onReply,
     onOpenThread,
+    renderThreadSummary,
     channelName,
     channelType,
     isSendingVideoReviewComment = false,
@@ -681,6 +684,7 @@ const MessageTimelineBase = React.forwardRef<
       onMarkRead={onMarkRead}
       onReply={onReply}
       onOpenThread={onOpenThread}
+      renderThreadSummary={renderThreadSummary}
       isSendingVideoReviewComment={isSendingVideoReviewComment}
       onSendVideoReviewComment={onSendVideoReviewComment}
       onStartReached={loadOlderViaVirtualizer}

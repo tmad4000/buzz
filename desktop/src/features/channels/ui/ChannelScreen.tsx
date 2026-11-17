@@ -496,6 +496,7 @@ export function ChannelScreen({
     handleSendMessage,
     handleSendToChannel,
     handleSendThreadReply,
+    handleSendInlineThreadReply,
     handleSelectThreadReplyTarget,
     handleToggleReaction,
   } = useChannelPaneHandlers({
@@ -933,6 +934,7 @@ export function ChannelScreen({
                   onSendToChannel={handleSendToChannel}
                   onSendVideoReviewComment={effectiveSendVideoReviewComment}
                   onSendThreadReply={handleSendThreadReply}
+                  onSendInlineThreadReply={handleSendInlineThreadReply} respondToLookup={respondToLookup}
                   onThreadScrollTargetResolved={() =>
                     setThreadScrollTargetId(null)
                   }
