@@ -97,3 +97,26 @@ Focused tests cover protocol bounds/integrity, membership projection, upload
 failure and ordering, views and forum restoration. The browser probe runs the
 production builder under the native parent CSP with sandboxed Chrome. Linux
 checks do not verify macOS WebKit, native release behavior or human acceptance.
+
+## Targeted pane close/replace guard
+
+`ChannelScreenProps.registerPageLeaveGuard` accepts a view-local registrar:
+`(guard: () => boolean) => () => void`. Bind it to the immutable owning view ID,
+never whichever pane is currently focused. For a standalone Page pane, pass the
+same registrar as `ChannelPage.registerLeaveGuard`. Cleanup removes only that
+registration; separate views of the same channel have independent guards.
+
+The guard returns false for changed HTML or an in-flight save and shows a local
+save/cancel notice without moving focus, including for background panes. Save acknowledgement or explicit
+Cancel releases it. An unchanged editor can leave. The caller must retry the
+close/replace after resolution; a previous result is not a reusable permission.
+Page header toggles and auxiliary close use the same guard.
+
+Focused route navigation composes Page and thread guards. With PR32's shared
+`useNavigationGuard`, that composite registers with the owning view registry,
+including background views. In scoped ChannelScreen hosts use only this composite:
+replace any direct ChannelPage `useConversationLeaveGuard` registration and do not
+also pass `registerPageLeaveGuard`. Keep the optional registrar for standalone or
+legacy hosts. Preserve the host's registry check before opening Page over an
+active thread, inline edit, upload or voice session.
+This adds no global URL/state and does not reparent the thread or composer.

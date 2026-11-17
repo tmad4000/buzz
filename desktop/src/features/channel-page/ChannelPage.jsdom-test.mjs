@@ -125,6 +125,7 @@ test("production Page merges live edits over late history, isolates scope, sandb
     "@/features/conversations/ConversationViewContext"
   );
   const guards = new ConversationViewGuards();
+  const registerLeaveGuard = (guard) => guards.register("page-host", guard);
   const root = createRoot(document.getElementById("root"));
   const render = async (channel) =>
     act(async () => {
@@ -144,6 +145,7 @@ test("production Page merges live edits over late history, isolates scope, sandb
             React.createElement(ChannelPage, {
               channelId: channel,
               canEdit: true,
+              registerLeaveGuard,
             }),
           ),
         ),
@@ -181,8 +183,8 @@ test("production Page merges live edits over late history, isolates scope, sandb
   await click("Edit HTML");
   assert.equal(
     guards.allow("page-host"),
-    false,
-    "active Page editor guards its owning view",
+    true,
+    "unchanged Page editor can leave without losing edits",
   );
   assert.equal(
     guards.allow("other-view"),

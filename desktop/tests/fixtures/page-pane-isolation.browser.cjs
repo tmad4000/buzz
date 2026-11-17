@@ -4,6 +4,7 @@ const path = require("node:path");
 const { chromium, expect: baseExpect } = require("@playwright/test");
 const expect = baseExpect.configure({ timeout: 30000 });
 const origin = process.env.BUZZ_HOST_FIXTURE_ORIGIN;
+const shots = process.env.BUZZ_PAGE_PANE_SCREENSHOTS;
 if (!origin) throw new Error("Set BUZZ_HOST_FIXTURE_ORIGIN");
 (async () => {
   const browser = await chromium.launch({
@@ -43,6 +44,13 @@ if (!origin) throw new Error("Set BUZZ_HOST_FIXTURE_ORIGIN");
     const pageB = b.getByRole("region", { name: "Channel Page", exact: true });
     await expect(pageB).toBeVisible();
     await expect(pageB.locator("textarea")).toHaveCount(0);
+    await pageB
+      .getByRole("button", { name: /^(Create Page|Edit HTML)$/ })
+      .click();
+    await pageB.locator("textarea").focus();
+    await page.evaluate(() => {
+      window.pageGuardFocusBefore = document.activeElement;
+    });
     await expect(pageA.locator("textarea")).toHaveValue(
       "<h1>Unsaved Page A</h1>",
     );
@@ -60,12 +68,49 @@ if (!origin) throw new Error("Set BUZZ_HOST_FIXTURE_ORIGIN");
     );
     assert.equal(
       await page.evaluate(
+        () => document.activeElement === window.pageGuardFocusBefore,
+      ),
+      true,
+      "background dirty Page veto preserves sibling editor focus",
+    );
+    assert.equal(
+      await page.evaluate(
         ({ a, channel }) =>
           window.requestPaneNavigate(a.viewInstanceId, channel),
         ids,
       ),
       false,
     );
+    assert.equal(
+      await page.evaluate(
+        () => document.activeElement === window.pageGuardFocusBefore,
+      ),
+      true,
+      "background replacement veto preserves sibling editor focus",
+    );
+    assert.deepEqual(
+      await page.evaluate(() => window.pageRegistrarEvents),
+      [],
+      "scoped composite must not also install explicit Page registrar",
+    );
+    await expect(
+      pageA.getByText(
+        "Save or cancel your Page edits before closing or replacing this pane.",
+        { exact: true },
+      ),
+    ).toBeVisible();
+    await expect(
+      pageB.getByText(
+        "Save or cancel your Page edits before closing or replacing this pane.",
+        { exact: true },
+      ),
+    ).toHaveCount(0);
+    if (shots) {
+      fs.mkdirSync(shots, { recursive: true });
+      await page.screenshot({
+        path: path.join(shots, "page-dirty-background-notice.png"),
+      });
+    }
     await a.getByRole("button", { name: "Close panel", exact: true }).click();
     await expect(pageA.locator("textarea")).toHaveValue(
       "<h1>Unsaved Page A</h1>",
@@ -91,7 +136,6 @@ if (!origin) throw new Error("Set BUZZ_HOST_FIXTURE_ORIGIN");
     ).toBeVisible();
     await expect(a.getByText(/^Page ·/)).toBeVisible();
     await expect(b).toBeVisible();
-    const shots = process.env.BUZZ_PAGE_PANE_SCREENSHOTS;
     if (shots) {
       fs.mkdirSync(shots, { recursive: true });
       await page.screenshot({

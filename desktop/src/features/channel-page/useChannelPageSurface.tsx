@@ -1,3 +1,4 @@
+import type { PageLeaveGuard, PageLeaveGuardRegistrar } from "./pageLeaveGuard";
 import * as React from "react";
 import { ConversationViewContext } from "@/features/conversations/ConversationViewContext";
 import { ConversationViewGuardsContext } from "@/features/conversations/ConversationViewGuards";
@@ -9,15 +10,35 @@ import { ChannelPage } from "./ChannelPage";
 export function useChannelPageSurface(
   channel: Channel | null,
   endActions: React.ReactNode,
+  registerTargetLeaveGuard?: PageLeaveGuardRegistrar,
 ) {
+  const [pageChannel, setPageChannel] = React.useState<string | null>(null);
+  const pageOpen = Boolean(channel && pageChannel === channel.id);
+  const guard = React.useRef<PageLeaveGuard>(() => true);
+  const requirePageEditResolution = React.useCallback(
+    () => guard.current(),
+    [],
+  );
+  const registerLeaveGuard = React.useCallback<PageLeaveGuardRegistrar>(
+    (next) => {
+      guard.current = next;
+      return () => {
+        if (guard.current === next) guard.current = () => true;
+      };
+    },
+    [],
+  );
+  React.useLayoutEffect(
+    () => registerTargetLeaveGuard?.(requirePageEditResolution),
+    [registerTargetLeaveGuard, requirePageEditResolution],
+  );
   const guards = React.useContext(ConversationViewGuardsContext);
   const viewId = React.useContext(ConversationViewContext)?.viewInstanceId;
   const canChange = React.useCallback(
-    () => !guards || !viewId || guards.allow(viewId),
-    [guards, viewId],
+    () =>
+      guards && viewId ? guards.allow(viewId) : requirePageEditResolution(),
+    [guards, viewId, requirePageEditResolution],
   );
-  const [pageChannel, setPageChannel] = React.useState<string | null>(null);
-  const pageOpen = Boolean(channel && pageChannel === channel.id);
   const closePage = React.useCallback(() => {
     if (canChange()) setPageChannel(null);
   }, [canChange]);
@@ -29,7 +50,8 @@ export function useChannelPageSurface(
             size="sm"
             variant={pageOpen ? "secondary" : "outline"}
             onClick={() => {
-              if (canChange()) setPageChannel(pageOpen ? null : channel.id);
+              if (pageOpen) closePage();
+              else if (canChange()) setPageChannel(channel.id);
             }}
           >
             Page
@@ -38,7 +60,7 @@ export function useChannelPageSurface(
         {endActions}
       </>
     ),
-    [channel, pageOpen, endActions, canChange],
+    [channel, pageOpen, endActions, closePage, canChange],
   );
   const pagePanel =
     pageOpen && channel ? (
@@ -46,7 +68,14 @@ export function useChannelPageSurface(
         key={channel.id}
         channelId={channel.id}
         canEdit={channel.isMember}
+        registerLeaveGuard={registerLeaveGuard}
       />
     ) : null;
-  return { pageOpen, closePage, pageHeaderActions, pagePanel };
+  return {
+    pageOpen,
+    closePage,
+    pageHeaderActions,
+    pagePanel,
+    requirePageEditResolution,
+  };
 }

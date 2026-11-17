@@ -97,7 +97,7 @@ export function ChannelScreen({
   autoSendDraftKey,
   currentIdentity,
   currentProfile,
-  headerEndActions, idleAuxiliaryPanel,
+  headerEndActions, idleAuxiliaryPanel, registerPageLeaveGuard,
   idleAuxiliaryHeaderActions, idleAuxiliaryOverridesThread,
   idleAuxiliaryTitle,
   onAddFiles, onCloseIdleAuxiliaryPanel,
@@ -108,7 +108,8 @@ export function ChannelScreen({
 }: ChannelScreenProps) {
   const conversationView = React.useContext(ConversationViewContext);
   const conversationGuards = React.useContext(ConversationViewGuardsContext);
-  const { pageOpen, closePage, pageHeaderActions, pagePanel } = useChannelPageSurface(activeChannel, headerEndActions);
+  // Scoped navigation registers the composite once; the explicit registrar is a legacy host seam.
+  const { pageOpen, closePage, pageHeaderActions, pagePanel, requirePageEditResolution } = useChannelPageSurface(activeChannel, headerEndActions, conversationGuards && conversationView ? undefined : registerPageLeaveGuard);
   const queryClient = useQueryClient();
   const { goHome } = useAppNavigation();
   const { activeCommunity } = useCommunities();
@@ -659,7 +660,7 @@ export function ChannelScreen({
     setThreadReplyTargetId,
     setThreadScrollTargetId,
   });
-  useNavigationGuard(requireThreadEditResolution);
+  useNavigationGuard(React.useCallback(() => requirePageEditResolution() && requireThreadEditResolution(), [requirePageEditResolution, requireThreadEditResolution]));
   const mainTimelineTargetMessageId = useChannelRouteTarget({
     activeChannel,
     activeChannelId,
