@@ -1,4 +1,7 @@
-import { useConversationReadAdmission } from "@/features/conversations/ConversationViewContext";
+import {
+  ConversationViewContext,
+  useConversationReadAdmission,
+} from "@/features/conversations/ConversationViewContext";
 import * as React from "react";
 import type { TimelineMessage } from "../types";
 /** A mounted/auto-expanded subtree is not evidence that its rows were visible. */
@@ -12,6 +15,8 @@ export function useVisibleThreadReplies(
   scope: string,
 ) {
   const { admitted, canRead } = useConversationReadAdmission();
+  const view = React.useContext(ConversationViewContext);
+  scope = JSON.stringify([scope, view?.viewInstanceId ?? null]);
   const sent = React.useRef({ scope, ids: new Set<string>() });
   React.useLayoutEffect(() => {
     if (sent.current.scope !== scope) sent.current = { scope, ids: new Set() };

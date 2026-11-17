@@ -323,3 +323,117 @@ test("own defaults do not mistake historical hydration for a send; pending revea
   );
   await app.close();
 });
+
+test("explicit navigation reveals only this view and preserves saved collapsed ancestry", async () => {
+  localStorage.clear();
+  const views = {};
+  function Host({ id, target = null, loaded = true, pending = false }) {
+    views[id] = useUnreadSidebarThread({
+      ...base,
+      messages: [
+        ...messages.filter((message) => loaded || message.id !== "leaf"),
+        msg("other", "root"),
+        msg("other-leaf", "other"),
+      ],
+      pending,
+      isUnread: () => false,
+      scrollTargetId: target,
+    });
+    return null;
+  }
+  const containers = [
+    document.createElement("div"),
+    document.createElement("div"),
+  ];
+  containers.forEach((node) => {
+    document.body.append(node);
+  });
+  const roots = containers.map((node) => createRoot(node));
+  const render = (index, target = null, loaded = true, pending = false) =>
+    act(async () =>
+      roots[index].render(
+        React.createElement(Host, { id: index, target, loaded, pending }),
+      ),
+    );
+  await render(0);
+  await render(1);
+  const before = JSON.stringify({ ...localStorage });
+  const sibling = [...views[1].expanded];
+  await render(0, "leaf");
+  assert.ok(views[0].expanded.has("root"));
+  assert.ok(views[0].expanded.has("branch"));
+  assert.deepEqual(
+    [...views[1].expanded],
+    sibling,
+    "sibling receives no preference/reveal broadcast",
+  );
+  assert.equal(
+    JSON.stringify({ ...localStorage }),
+    before,
+    "navigation does not overwrite saved collapse",
+  );
+  await act(async () => views[1].setExpanded("other", true));
+  assert.ok(
+    views[0].expanded.has("branch"),
+    "unrelated sibling preference change retains local reveal",
+  );
+  await render(0);
+  assert.ok(
+    views[0].expanded.has("branch"),
+    "resolving scroll target keeps the local reveal open for reading",
+  );
+  await act(async () => views[0].toggle(messages[1]));
+  assert.equal(
+    views[0].expanded.has("branch"),
+    false,
+    "explicit collapse wins over transient reveal",
+  );
+  assert.ok(
+    views[0].expanded.has("root"),
+    "nested toggle must not collapse untouched transient ancestor",
+  );
+  await act(async () => roots[0].unmount());
+  roots[0] = createRoot(containers[0]);
+  await render(0);
+  assert.equal(
+    views[0].expanded.has("branch"),
+    false,
+    "new view restores saved collapse",
+  );
+  await act(async () => views[1].setExpanded("other", false));
+  await render(0, "leaf", false, true);
+  await act(async () => views[1].setExpanded("other", true));
+  await render(0, "leaf", true, false);
+  assert.ok(
+    views[0].expanded.has("branch"),
+    "unrelated sibling preferences do not cancel a pending reveal before history arrives",
+  );
+  await render(0);
+  await act(async () => views[1].setExpanded("root", true));
+  await render(0, "leaf", false, true);
+  await act(async () => views[1].setExpanded("root", false));
+  await render(0, "leaf", true, false);
+  assert.equal(
+    views[0].expanded.has("root"),
+    false,
+    "explicit sibling collapse cancels a pending related reveal",
+  );
+  await render(0);
+  await act(async () => views[1].setExpanded("branch", true));
+  await render(0, "leaf", false, true);
+  await act(async () => views[1].setExpanded("branch", false));
+  await render(0, "leaf", true, false);
+  assert.equal(
+    views[0].expanded.has("branch"),
+    false,
+    "late ancestry resolution honors a collapse received while the path was unknown",
+  );
+  await act(async () =>
+    roots.forEach((root) => {
+      root.unmount();
+    }),
+  );
+  containers.forEach((node) => {
+    node.remove();
+  });
+});

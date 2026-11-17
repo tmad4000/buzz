@@ -109,8 +109,42 @@ test("unseen summary survives channel opening and clears only on visible reply b
   });
   await emit("Already open thread jump target", root.id);
   await expect(summary.getByTestId("thread-unread-badge")).toBeVisible();
+  const panel = page.getByTestId("message-thread-panel");
+  await panel
+    .getByRole("button", { name: "Collapse thread", exact: true })
+    .first()
+    .click();
+  const savedCollapse = await page.evaluate(
+    (rootId) =>
+      Object.entries(localStorage).filter(
+        ([key]) =>
+          key.startsWith("buzz-thread-expansion.v1:") &&
+          key.includes(rootId) &&
+          !key.endsWith(":inline"),
+      ),
+    root.id,
+  );
+  expect(
+    savedCollapse.some(
+      ([, value]) => new Map(JSON.parse(value)).get(root.id) === false,
+    ),
+  ).toBe(true);
   await page.getByRole("button", { name: /Unseen replies \(/ }).click();
   await expect(page.getByTestId("message-thread-panel")).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        (rootId) =>
+          Object.entries(localStorage).filter(
+            ([key]) =>
+              key.startsWith("buzz-thread-expansion.v1:") &&
+              key.includes(rootId) &&
+              !key.endsWith(":inline"),
+          ),
+        root.id,
+      ),
+    )
+    .toEqual(savedCollapse);
   await expect
     .poll(() => body.evaluate((element) => element.scrollTop))
     .toBeGreaterThan(0);

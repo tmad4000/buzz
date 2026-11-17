@@ -4,6 +4,12 @@ An accent dot, bold summary and `N new` distinguish reply observation from a
 plain reply count. The header's `Unseen replies (N)` counts reply observations
 pending in loaded channel-window threads and opens the next matching thread at
 its first new reply. It opens an already-open thread without toggling it closed.
+Programmatic navigation temporarily reveals saved collapsed ancestry in that view
+without overwriting or broadcasting saved collapse preferences. Explicit toggles
+persist their chosen branch; unrelated sibling preference changes preserve the
+local reveal, including while history is loading. Local observer lifecycles include
+`viewInstanceId`; canonical synced observation keys do not.
+
 Unloaded channel history remains outside this window; loading older history adds
 its threads to the projection. While summary-only threads are being resolved,
 the count is a lower bound (`N+`); a failed history read exposes a retry action.
