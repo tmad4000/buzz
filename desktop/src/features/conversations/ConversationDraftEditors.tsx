@@ -1,3 +1,4 @@
+import { ConversationViewContext } from "./ConversationViewContext";
 import * as React from "react";
 import { cn } from "@/shared/lib/cn";
 import { DraftEditorCoordinator } from "./draftEditorCoordinator";
@@ -43,6 +44,9 @@ export function DraftEditorBoundary({
   onEditingChange?: (editing: boolean) => void;
   previewContainerClassName?: string;
 }) {
+  const view = React.useContext(ConversationViewContext);
+  const interactive = React.useRef(view?.interactive !== false);
+  interactive.current = view?.interactive !== false;
   const localId = React.useId();
   const editorId = `${viewInstanceId}:${localId}`;
   const locked = React.useRef(false);
@@ -62,11 +66,16 @@ export function DraftEditorBoundary({
   }, [editing, onEditingChange]);
   const presentation = React.useMemo(
     () => ({
-      canEdit: () => coordinator.owner(draftKey) === editorId,
+      canEdit: () =>
+        interactive.current && coordinator.owner(draftKey) === editorId,
       takeFocus: () => {
         const requested = focusRequested.current;
         focusRequested.current = false;
-        return requested && coordinator.owner(draftKey) === editorId;
+        return (
+          requested &&
+          interactive.current &&
+          coordinator.owner(draftKey) === editorId
+        );
       },
       publishPreview: (text: string) =>
         coordinator.publishPreview(draftKey, editorId, text),
@@ -101,8 +110,9 @@ export function DraftEditorBoundary({
           <button
             type="button"
             className="rounded-md border border-border px-3 py-1 text-sm focus-visible:outline focus-visible:outline-2"
-            disabled={!canTakeOver}
+            disabled={!canTakeOver || !interactive.current}
             onClick={() => {
+              if (!interactive.current) return;
               focusRequested.current = true;
               if (!coordinator.takeOver(draftKey, editorId))
                 focusRequested.current = false;

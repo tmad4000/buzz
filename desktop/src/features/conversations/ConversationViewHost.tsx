@@ -26,6 +26,7 @@ export type ConversationViewHostProps = {
   viewInstanceId: string;
   focused: boolean;
   visible: boolean;
+  interactive?: boolean;
   label: string;
   initialPanelState?: HistorySearchValues;
   presentationVisitKey?: string;
@@ -48,6 +49,7 @@ export function ConversationViewHost({
   viewInstanceId,
   focused,
   visible,
+  interactive = true,
   label,
   initialPanelState,
   presentationVisitKey,
@@ -73,20 +75,23 @@ export function ConversationViewHost({
   const admission = React.useMemo(
     () => ({
       viewInstanceId,
-      focused,
-      visible,
+      interactive,
+      focused: focused && interactive,
+      visible: visible && interactive,
       rootRef: insetRef,
       contentWidthPx,
     }),
-    [viewInstanceId, focused, visible, insetRef, contentWidthPx],
+    [viewInstanceId, focused, visible, interactive, insetRef, contentWidthPx],
   );
-  const focusView = () => onFocusView(viewInstanceId);
+  const focusView = () => {
+    if (interactive) onFocusView(viewInstanceId);
+  };
   return (
     <section
       ref={insetRef}
-      aria-label={`${label}${focused ? " · Active conversation" : ""}`}
+      aria-label={`${label}${focused && interactive ? " · Active conversation" : ""}`}
       data-conversation-view={viewInstanceId}
-      data-focused-conversation={focused || undefined}
+      data-focused-conversation={(focused && interactive) || undefined}
       className="relative flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
       hidden={!visible}
       style={{ contain: "layout paint", display: visible ? undefined : "none" }}
