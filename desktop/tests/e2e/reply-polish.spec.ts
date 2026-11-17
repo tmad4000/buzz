@@ -114,7 +114,7 @@ test("header full version and read-only provenance survive narrow/zoom layouts",
   );
   await page.goto("/");
   const stamp = page.getByTestId("header-version");
-  await expect(stamp).toContainText("v0.5.28-ideaflow.6");
+  await expect(stamp).toContainText("v0.5.28-ideaflow.7");
   await stamp.click();
   await expect(page.getByTestId("header-provenance")).toContainText(
     "not installation time",

@@ -89,6 +89,7 @@ test("chosen-thread submit synchronously locks real ownership and stale callback
     const old = presentations.a;
     assert.equal(old.canEdit(), true);
     const scope = {
+      durableOutbox: false,
       presentationRef: {
         current: {
           ...old,
