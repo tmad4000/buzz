@@ -7,6 +7,7 @@ import { useAppNavigation } from "@/app/navigation/useAppNavigation";
 import { useChannelsQuery } from "@/features/channels/hooks";
 import { useOpenChannelDirectoryQuery } from "@/features/channels/openChannelDirectory";
 import { ChannelScreen } from "@/features/channels/ui/ChannelScreen";
+import type { ChannelScreenProps } from "@/features/channels/ui/ChannelScreen.types";
 import { HuddleStartingView } from "@/features/huddle/components/HuddleStartingView";
 import { huddleWindowChannelId } from "@/features/huddle/lib/huddleWindow";
 import {
@@ -30,7 +31,9 @@ import { getEventById } from "@/shared/api/tauri";
 import type { RelayEvent } from "@/shared/api/types";
 import { ViewLoadingFallback } from "@/shared/ui/ViewLoadingFallback";
 
-type ChannelRouteScreenProps = {
+export type ChannelRouteScreenProps = {
+  /** Workspace panes reuse canonical preparation without a second route/loader implementation. */
+  renderChannel?: (props: ChannelScreenProps) => React.ReactNode;
   autoSendDraftKey: string | null;
   channelId: string;
   searchHighlight: SearchHighlightNavigation | null | undefined;
@@ -112,6 +115,7 @@ async function fetchRouteTargetEvents(
 }
 
 export function ChannelRouteScreen({
+  renderChannel,
   autoSendDraftKey,
   channelId,
   searchHighlight,
@@ -263,7 +267,8 @@ export function ChannelRouteScreen({
       targetMessageId,
       targetThreadRootId,
     ).then((events) => {
-      if (!isCancelled) {
+      // A reused pane may now own a different channel with the same target IDs.
+      if (!isCancelled && previousResetKeyRef.current === channelId) {
         setTargetMessageEvents((currentEvents) => {
           const eventsById = new Map<string, RelayEvent>();
           for (const event of [...currentEvents, ...events]) {
@@ -277,7 +282,7 @@ export function ChannelRouteScreen({
     return () => {
       isCancelled = true;
     };
-  }, [selectedPostId, targetMessageId, targetThreadRootId]);
+  }, [channelId, selectedPostId, targetMessageId, targetThreadRootId]);
 
   if (
     !activeChannel &&
@@ -308,24 +313,27 @@ export function ChannelRouteScreen({
     );
   }
 
-  return (
-    <ChannelScreen
-      activeChannel={activeChannel}
-      autoSendDraftKey={autoSendDraftKey}
-      currentIdentity={identityQuery.data}
-      currentProfile={profileQuery.data}
-      onCloseForumPost={() => {
-        void closeForumPost(channelId);
-      }}
-      onSelectForumPost={(postId) => {
-        void goForumPost(channelId, postId);
-      }}
-      selectedForumPostId={selectedPostId}
-      targetForumReplyId={targetReplyId}
-      targetMessageEvents={targetMessageEvents}
-      targetMessageId={targetMessageId}
-      targetSearchMessageId={activeSearchHighlight?.messageId}
-      targetSearchQuery={activeSearchHighlight?.query}
-    />
+  const channelProps: ChannelScreenProps = {
+    activeChannel,
+    autoSendDraftKey,
+    currentIdentity: identityQuery.data,
+    currentProfile: profileQuery.data,
+    onCloseForumPost: () => {
+      void closeForumPost(channelId);
+    },
+    onSelectForumPost: (postId) => {
+      void goForumPost(channelId, postId);
+    },
+    selectedForumPostId: selectedPostId,
+    targetForumReplyId: targetReplyId,
+    targetMessageEvents,
+    targetMessageId,
+    targetSearchMessageId: activeSearchHighlight?.messageId,
+    targetSearchQuery: activeSearchHighlight?.query,
+  };
+  return renderChannel ? (
+    renderChannel(channelProps)
+  ) : (
+    <ChannelScreen {...channelProps} />
   );
 }
