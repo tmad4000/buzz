@@ -712,6 +712,7 @@ const MessageTimelineBase = React.forwardRef<
       alwaysShowMessageIdentity={alwaysShowMessageIdentity}
       hideAgentAccessBadges={hideAgentAccessBadges}
       threadSummaries={threadSummaries}
+      summaryMessages={deferredMessages}
       messages={renderedMessages}
       onDelete={onDelete}
       onEdit={onEdit}

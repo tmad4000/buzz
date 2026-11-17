@@ -450,9 +450,15 @@ export function buildMainTimelineEntries(
   unreadReplyIds: ReadonlySet<string> = new Set(),
   relaySummaries: ReadonlyMap<string, ChannelWindowThreadSummary> = new Map(),
   profiles?: UserProfileLookup,
+  summaryMessages: TimelineMessage[] = messages,
 ): MainTimelineEntry[] {
+  // Reading freezes body membership, not knowledge of replies that arrived.
+  // Keep summary metadata current without inserting buffered rows/roots.
+  const summaryById = new Map(
+    summaryMessages.map((message) => [message.id, message]),
+  );
   const { descendantStatsByMessageId } = buildThreadPanelIndex(
-    messages,
+    [...summaryById.values()],
     unreadReplyIds,
   );
 
