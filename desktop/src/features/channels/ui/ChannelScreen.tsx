@@ -1,5 +1,6 @@
 // biome-ignore-all format: line-count ratchet requires compact forwarding in this legacy component
 import * as React from "react";
+import { buildContextParents } from "@/features/channels/readState/contextParentRegistry";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAppShell } from "@/app/AppShellContext";
 import { useAppNavigation } from "@/app/navigation/useAppNavigation";
@@ -12,10 +13,6 @@ import {
   useChannelMembersQuery,
   useJoinChannelMutation,
 } from "@/features/channels/hooks";
-import {
-  MSG_PREFIX,
-  THREAD_PREFIX,
-} from "@/features/channels/readState/readStateFormat";
 import { ChannelScreenEmptyState } from "@/features/channels/ui/ChannelScreenEmptyState";
 import { ChannelScreenHeader } from "@/features/channels/ui/ChannelScreenHeader";
 import { WelcomeAgentCreateDialog } from "@/features/channels/ui/WelcomeAgentCreateDialog";
@@ -46,7 +43,6 @@ import { buildMessageComposerEditTarget } from "@/features/messages/lib/draftMen
 import { formatTimelineMessages } from "@/features/messages/lib/formatTimelineMessages";
 import { DeleteMessageConfirmDialog } from "@/features/messages/ui/DeleteMessageConfirmDialog";
 import {
-  getThreadReference,
   isThreadReply,
 } from "@/features/messages/lib/threading";
 import { hasPersistedHydratedChannel } from "@/features/messages/lib/channelHeadCache";
@@ -54,6 +50,10 @@ import { resolveTimelineQueryLoadingState } from "@/features/messages/lib/timeli
 import { useFetchOlderMessages } from "@/features/messages/useFetchOlderMessages";
 import { useIndependentThreadPanel } from "@/features/messages/useIndependentThreadPanel";
 import { useThreadReplies } from "@/features/messages/useThreadReplies";
+import { useChannelThreadLinks } from "@/features/messages/useChannelThreadLinks";
+import { applyThreadLinkPresentation, mergeThreadLinkEvents, threadLinkRelaySummaries } from "@/features/messages/lib/applyThreadLinkPresentation";
+import { latestOrdinaryTopLevel } from "@/features/messages/lib/threadLinkReadFrontier";
+import { ThreadOrganizationContext, ThreadOrganizationNotice } from "@/features/messages/ui/ThreadOrganization";
 import { useChannelTyping } from "@/features/messages/useChannelTyping";
 import type { TimelineMessage } from "@/features/messages/types";
 import { useUsersBatchQuery } from "@/features/profile/hooks";
@@ -111,7 +111,7 @@ export function ChannelScreen({
     getChannelReadAt,
     getMessageReadAt,
     markMessageRead,
-    setContextParentResolver,
+    registerContextParents,
     openBrowseChannels,
     openCreateChannel,
     openChannelManagement: openGlobalChannelManagement,
@@ -207,17 +207,18 @@ export function ChannelScreen({
     threadScrollTargetId,
   );
   useChannelSubscription(activeChannel);
+  const organizationScope = React.useMemo(() => {
+    if (!activeCommunity?.relayUrl || !activeChannel?.isMember || activeChannel.channelType === "forum" || isHuddleTranscript) return null;
+    const communityUrl = new URL(activeCommunity.relayUrl);
+    communityUrl.protocol = communityUrl.protocol === "wss:" ? "https:" : "http:";
+    return { communityUrl: communityUrl.toString(), channelId: activeChannel.id, relaySelfPubkey };
+  }, [activeCommunity?.relayUrl, activeChannel?.id, activeChannel?.isMember, activeChannel?.channelType, isHuddleTranscript, relaySelfPubkey]);
+  const organizationKey = organizationScope ? JSON.stringify([activeCommunity?.id, organizationScope, currentPubkey]) : null;
+  const organization = useChannelThreadLinks(organizationScope, organizationKey, currentPubkey);
+
   const { fetchOlder, hasOlderMessages, historyExhausted, isFetchingOlder } =
     useFetchOlderMessages(activeChannel);
-  const latestActiveMessage = React.useMemo(() => {
-    const messages = messagesQuery.data;
-    if (!messages) return null;
-    for (let index = messages.length - 1; index >= 0; index -= 1) {
-      if (getThreadReference(messages[index].tags).parentId === null)
-        return messages[index];
-    }
-    return null;
-  }, [messagesQuery.data]);
+  const latestActiveMessage = React.useMemo(() => latestOrdinaryTopLevel(messagesQuery.data, organizationScope ? organization.rejectedIds : null), [messagesQuery.data, organizationScope, organization.rejectedIds]);
   const activeReadAt = latestActiveMessage
     ? new Date(latestActiveMessage.created_at * 1_000).toISOString()
     : null;
@@ -226,18 +227,12 @@ export function ChannelScreen({
     activeChannel?.isMember,
     activeReadAt,
   );
-  React.useEffect(() => {
-    if (!activeChannelId) {
-      setContextParentResolver(null);
-      return;
-    }
-    setContextParentResolver((contextId) =>
-      contextId.startsWith(THREAD_PREFIX) || contextId.startsWith(MSG_PREFIX)
-        ? activeChannelId
-        : null,
-    );
-    return () => setContextParentResolver(null);
-  }, [activeChannelId, setContextParentResolver]);
+  React.useLayoutEffect(() => {
+    if (!activeChannelId) return;
+    const parents = buildContextParents(activeChannelId, [...(messagesQuery.data ?? []), ...(threadRepliesQuery.data ?? []), ...(targetMessageEvents ?? [])]);
+    return registerContextParents(parents);
+  }, [activeChannelId, messagesQuery.data, threadRepliesQuery.data, targetMessageEvents, registerContextParents]);
+
   const {
     activeChannelTitle,
     activeDmAvatarUrl,
@@ -274,6 +269,11 @@ export function ChannelScreen({
     resolvedMessages,
   });
   const threadReplyEvents = threadRepliesQuery.data ?? EMPTY_RELAY_EVENTS;
+  const presentationEvents = React.useMemo(() => organization.snapshot?.projection.status === "complete"
+    ? mergeThreadLinkEvents(organization.snapshot.events, resolvedMessages)
+    : resolvedMessages, [organization.snapshot, resolvedMessages]);
+  const presentationSummaries = React.useMemo(() => threadLinkRelaySummaries(threadSummaries, organization.snapshot), [threadSummaries, organization.snapshot]);
+
   const {
     entranceMessageId: welcomeEntranceMessageId,
     handleEntranceComplete: handleWelcomeEntranceComplete,
@@ -283,7 +283,7 @@ export function ChannelScreen({
     threadReplyEvents,
   );
   const messageEventProfilePubkeys = useMessageEventProfilePubkeys(
-    resolvedMessages,
+    presentationEvents,
     threadReplyEvents,
     relaySelfPubkey,
   );
@@ -402,8 +402,8 @@ export function ChannelScreen({
   }, [managedAgentsQuery.data, personasQuery.data]);
   const timelineMessages = React.useMemo(
     () =>
-      formatTimelineMessages(
-        resolvedMessages,
+      applyThreadLinkPresentation(formatTimelineMessages(
+        presentationEvents,
         activeChannel,
         currentPubkey,
         currentProfile?.avatarUrl ?? null,
@@ -413,7 +413,7 @@ export function ChannelScreen({
         respondToLookup,
         relaySelfPubkey,
         messageOwnerProfiles,
-      ),
+      ), organization.snapshot),
     [
       activeChannel,
       channelMembers,
@@ -424,13 +424,15 @@ export function ChannelScreen({
       personaLookup,
       relaySelfPubkey,
       respondToLookup,
-      resolvedMessages,
+      presentationEvents,
+      organization.snapshot,
     ],
   );
   const threadPanelData = useIndependentThreadPanel({
     activeChannel,
-    channelEvents: resolvedMessages,
+    channelEvents: presentationEvents,
     threadReplyEvents,
+    organization: organization.snapshot,
     rootId: effectiveOpenThreadHeadId,
     replyTargetId: threadReplyTargetId,
     expandedReplyIds: expandedThreadReplyIds,
@@ -783,6 +785,7 @@ export function ChannelScreen({
     ],
   );
   return (
+    <ThreadOrganizationContext.Provider value={organization}>
     <AgentSessionProvider onOpenAgentSession={handleOpenAgentSession}>
       <ProfilePanelProvider onOpenProfilePanel={handleOpenProfilePanel}>
         <WelcomeAgentCreateDialog
@@ -811,6 +814,7 @@ export function ChannelScreen({
           className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
           ref={channelContentRef}
         >
+          <ThreadOrganizationNotice />
           {activeChannel ? (
             activeChannel.channelType === "forum" ? (
               searchForwarding.renderSearchAwareForum(
@@ -886,7 +890,7 @@ export function ChannelScreen({
                   isSinglePanelView={isSinglePanelView}
                   isTimelineError={messagesQuery.isError} isTimelineLoading={isTimelineLoading}
                   onRetryTimeline={() => void messagesQuery.refetch()} messages={timelineMessages}
-                  threadSummaries={threadSummaries}
+                  threadSummaries={presentationSummaries}
                   huddleThreadRepliesError={huddleThreadRepliesError}
                   onRetryHuddleThreadReplies={onRetryHuddleThreadReplies}
                   onCancelEdit={handleCancelEdit}
@@ -996,5 +1000,6 @@ export function ChannelScreen({
         />
       </ProfilePanelProvider>
     </AgentSessionProvider>
+    </ThreadOrganizationContext.Provider>
   );
 }

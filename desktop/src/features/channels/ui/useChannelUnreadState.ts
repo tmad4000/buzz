@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useConversationReadAdmission } from "@/features/conversations/ConversationViewContext";
 
 import type { ForcedUnreadSource } from "@/features/channels/forcedUnreadStore";
 import {
@@ -77,6 +78,7 @@ export function useChannelUnreadState({
   isThreadMuted,
   readStateVersion,
 }: UseChannelUnreadStateOptions) {
+  const { canRead } = useConversationReadAdmission();
   // Capture the read frontier as it stood the instant this channel was opened,
   // BEFORE the mark-read effect (in ChannelScreen) advances it to latest.
   // Written during render (not in an effect) so the value is read prior to any
@@ -285,12 +287,18 @@ export function useChannelUnreadState({
   // gets its own msg:<id> marker advanced to its createdAt; a NEWER reply
   // re-raises the badge because the predicate is strictly createdAt > read.
   React.useEffect(() => {
-    if (!openThreadHeadId) return;
+    if (!canRead() || !openThreadHeadId) return;
     if (isThreadMuted(openThreadHeadId)) return;
     for (const entry of threadMessages) {
       markMessageRead(entry.message.id, entry.message.createdAt);
     }
-  }, [openThreadHeadId, threadMessages, markMessageRead, isThreadMuted]);
+  }, [
+    canRead,
+    openThreadHeadId,
+    threadMessages,
+    markMessageRead,
+    isThreadMuted,
+  ]);
   // In-thread "New" divider position. Reads the open-time snapshot (frozen
   // before the mark-read effect above), so the divider does not collapse the
   // instant open marks the revealed replies read. A reply absent from the
@@ -442,6 +450,7 @@ export function useChannelUnreadState({
   // anchor to a reply first revealed by expansion.
   const markRevealedRepliesRead = React.useCallback(
     (messageId: string) => {
+      if (!canRead()) return;
       for (const replyId of directReplyIdsByParentId.get(messageId) ?? []) {
         const createdAt = createdAtByMessageId.get(replyId);
         if (createdAt !== undefined) {
@@ -451,6 +460,7 @@ export function useChannelUnreadState({
       }
     },
     [
+      canRead,
       captureDividerReadState,
       createdAtByMessageId,
       directReplyIdsByParentId,
@@ -460,7 +470,7 @@ export function useChannelUnreadState({
 
   const markSidebarRepliesRead = React.useCallback(
     (messages: TimelineMessage[], rootId = openThreadHeadId) => {
-      if (!rootId || isThreadMuted(rootId)) return;
+      if (!canRead() || !rootId || isThreadMuted(rootId)) return;
       for (const message of messages) {
         if (rootId === openThreadHeadId) captureDividerReadState(message.id);
         if ((getMessageReadAt(message.id) ?? 0) < message.createdAt)
@@ -468,6 +478,7 @@ export function useChannelUnreadState({
       }
     },
     [
+      canRead,
       captureDividerReadState,
       getMessageReadAt,
       markMessageRead,

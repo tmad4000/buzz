@@ -1,4 +1,11 @@
 import * as React from "react";
+import {
+  applyThreadLinkPresentation,
+  mergeThreadLinkEvents,
+  threadLinkSubtree,
+} from "./lib/applyThreadLinkPresentation";
+import type { ThreadLinkSnapshot } from "./lib/threadLinkLoader";
+import { buildThreadPanelData } from "./lib/threadPanel";
 
 import { buildIndependentThreadPanel } from "@/features/messages/lib/independentThreadPanel";
 import type { UserProfileLookup } from "@/features/profile/lib/identity";
@@ -14,6 +21,7 @@ export function useIndependentThreadPanel(args: {
   channelEvents: RelayEvent[];
   threadReplyEvents: RelayEvent[];
   rootId: string | null;
+  organization?: ThreadLinkSnapshot | null;
   replyTargetId: string | null;
   expandedReplyIds: ReadonlySet<string>;
   currentPubkey: string | undefined;
@@ -33,27 +41,17 @@ export function useIndependentThreadPanel(args: {
   // screen) that saturates the main thread and starves keystrokes — see
   // typing-latency.perf.ts scenario "thread68+". Mirrors the main timeline's
   // memoization of the same formatter (ChannelScreen `timelineMessages`).
-  return React.useMemo(
-    () =>
-      buildIndependentThreadPanel(
-        args.channelEvents,
-        args.threadReplyEvents,
-        args.rootId,
-        args.replyTargetId,
-        args.expandedReplyIds,
-        args.activeChannel,
-        args.currentPubkey,
-        args.currentAvatarUrl,
-        args.profiles,
-        args.members,
-        args.personaLookup,
-        args.respondToLookup,
-        args.relaySelfPubkey,
-        args.ownerProfiles,
-      ),
-    [
+  return React.useMemo(() => {
+    const union =
+      args.organization?.projection.status === "complete"
+        ? mergeThreadLinkEvents(
+            args.organization.events,
+            args.threadReplyEvents,
+          ).filter((event) => event.id !== args.rootId)
+        : args.threadReplyEvents;
+    const panel = buildIndependentThreadPanel(
       args.channelEvents,
-      args.threadReplyEvents,
+      union,
       args.rootId,
       args.replyTargetId,
       args.expandedReplyIds,
@@ -61,11 +59,40 @@ export function useIndependentThreadPanel(args: {
       args.currentPubkey,
       args.currentAvatarUrl,
       args.profiles,
-      args.ownerProfiles,
       args.members,
       args.personaLookup,
       args.respondToLookup,
       args.relaySelfPubkey,
-    ],
-  );
+      args.ownerProfiles,
+    );
+    const messages = threadLinkSubtree(
+      applyThreadLinkPresentation(panel.messages, args.organization ?? null),
+      args.rootId,
+    );
+    return {
+      ...buildThreadPanelData(
+        messages,
+        args.rootId,
+        args.replyTargetId,
+        args.expandedReplyIds,
+      ),
+      messages,
+    };
+  }, [
+    args.channelEvents,
+    args.organization,
+    args.threadReplyEvents,
+    args.rootId,
+    args.replyTargetId,
+    args.expandedReplyIds,
+    args.activeChannel,
+    args.currentPubkey,
+    args.currentAvatarUrl,
+    args.profiles,
+    args.ownerProfiles,
+    args.members,
+    args.personaLookup,
+    args.respondToLookup,
+    args.relaySelfPubkey,
+  ]);
 }

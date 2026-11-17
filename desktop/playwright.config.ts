@@ -30,6 +30,7 @@ export default defineConfig({
         "**/onboarding-docked-cta-screenshots.spec.ts",
         "**/buzz-setup-smoke.spec.ts",
         "**/inline-threads.spec.ts",
+        "**/send-to-thread.spec.ts",
         "**/identity-key-help.spec.ts",
         "**/exact-key-profile.spec.ts",
         "**/key-import-reveal.spec.ts",

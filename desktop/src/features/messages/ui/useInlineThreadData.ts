@@ -14,6 +14,12 @@ import {
 } from "../lib/threadDisplayPolicy";
 import { useInlineThreadWindow } from "./useInlineThreadWindow";
 import { useUnreadSidebarThread } from "./useUnreadSidebarThread";
+import { ThreadOrganizationContext } from "./ThreadOrganization";
+import {
+  applyThreadLinkPresentation,
+  canonicalThreadRootId,
+  threadLinkSubtree,
+} from "../lib/applyThreadLinkPresentation";
 const EMPTY_EVENTS: RelayEvent[] = [];
 export function useInlineThreadData(
   props: InlineChannelThreadProps,
@@ -33,21 +39,31 @@ export function useInlineThreadData(
     summary,
     isUnread,
   } = props;
-  const canonicalRoot = root.rootId ?? root.id;
+  const organization =
+    React.useContext(ThreadOrganizationContext)?.snapshot ?? null;
+  const projected =
+    enabled &&
+    organization?.projection.scope.channelId === channel.id &&
+    organization?.projection.status === "complete" &&
+    organization.projection.messages.has(root.id) &&
+    organization.projection.heads.size > 0;
+  const canonicalRoot = canonicalThreadRootId(root);
   const query = useInlineThreadWindow(
     channel.id,
     canonicalRoot,
-    enabled,
+    enabled && !projected,
     scope,
     `${summary.replyCount}:${summary.lastReplyAt}`,
     summary.replyCount,
   );
   const events = React.useMemo(
     () =>
-      enabled && query.data
-        ? sortMessages(query.data.pages.flatMap((page) => page.events))
-        : EMPTY_EVENTS,
-    [enabled, query.data],
+      projected
+        ? organization.events
+        : enabled && query.data
+          ? sortMessages(query.data.pages.flatMap((page) => page.events))
+          : EMPTY_EVENTS,
+    [enabled, query.data, projected, organization],
   );
   const relaySelf = useRelaySelfQuery(enabled).data;
   const pubkeys = useMessageEventProfilePubkeys(
@@ -61,37 +77,45 @@ export function useInlineThreadData(
     () => ({ ...profileQuery.data?.profiles, ...profiles }),
     [profileQuery.data?.profiles, profiles],
   );
-  const messages = React.useMemo(
-    () => [
-      root,
-      ...formatTimelineMessages(
-        events,
-        channel,
-        currentPubkey,
-        currentPubkey
-          ? (combinedProfiles[currentPubkey]?.avatarUrl ?? null)
-          : null,
-        combinedProfiles,
-        memberQuery.data,
-        personaLookup,
-        respondToLookup,
-        relaySelf,
-        ownerProfiles,
-      ).filter((message) => message.id !== root.id),
-    ],
-    [
-      root,
+  const messages = React.useMemo(() => {
+    const formatted = formatTimelineMessages(
       events,
       channel,
       currentPubkey,
+      currentPubkey
+        ? (combinedProfiles[currentPubkey]?.avatarUrl ?? null)
+        : null,
       combinedProfiles,
       memberQuery.data,
       personaLookup,
       respondToLookup,
       relaySelf,
       ownerProfiles,
-    ],
-  );
+    );
+    const nativeMessages = projected
+      ? formatted
+      : [root, ...formatted.filter((message) => message.id !== root.id)];
+    return threadLinkSubtree(
+      applyThreadLinkPresentation(
+        nativeMessages,
+        projected ? organization : null,
+      ),
+      root.id,
+    );
+  }, [
+    root,
+    events,
+    channel,
+    currentPubkey,
+    combinedProfiles,
+    memberQuery.data,
+    personaLookup,
+    respondToLookup,
+    relaySelf,
+    ownerProfiles,
+    organization,
+    projected,
+  ]);
   const index = React.useMemo(
     () => buildThreadPanelIndex(messages),
     [messages],
@@ -99,10 +123,12 @@ export function useInlineThreadData(
   const knownCount =
     index.descendantStatsByMessageId.get(root.id)?.descendantCount ?? 0;
   const complete = Boolean(
-    query.data && !query.hasNextPage && knownCount >= summary.replyCount,
+    projected ||
+      (query.data && !query.hasNextPage && knownCount >= summary.replyCount),
   );
   const decision = React.useMemo(() => {
-    if (!query.data || query.isError) return null;
+    if ((!projected && !query.data) || (!projected && query.isError))
+      return null;
     const result = smartThreadDecision(
       root,
       messages,
@@ -118,6 +144,7 @@ export function useInlineThreadData(
     summary.replyCount,
     currentPubkey,
     complete,
+    projected,
   ]);
   const thread = useUnreadSidebarThread({
     enabled: true,
@@ -127,7 +154,7 @@ export function useInlineThreadData(
     messages,
     isUnread,
     scrollTargetId: null,
-    pending: query.isPending || !enabled,
+    pending: (!projected && query.isPending) || !enabled,
     complete,
     indexOverride: index,
     initialMode: policy.replies,
@@ -137,13 +164,23 @@ export function useInlineThreadData(
         : undefined,
   });
   return {
-    query,
+    query: projected
+      ? {
+          ...query,
+          isPending: false,
+          isError: false,
+          isFetching: false,
+          isFetchingNextPage: false,
+          hasNextPage: false,
+        }
+      : query,
     thread,
     messages,
     combinedProfiles,
     decision,
     canonicalRoot,
     ready:
+      (projected && (!profileQuery.isPending || pubkeys.length === 0)) ||
       query.isError ||
       Boolean(
         query.data &&
@@ -152,7 +189,10 @@ export function useInlineThreadData(
       ),
     complete,
     missingRange: Boolean(
-      query.data && !query.hasNextPage && knownCount < summary.replyCount,
+      !projected &&
+        query.data &&
+        !query.hasNextPage &&
+        knownCount < summary.replyCount,
     ),
   };
 }
