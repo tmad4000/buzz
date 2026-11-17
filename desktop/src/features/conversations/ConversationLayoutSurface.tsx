@@ -1,6 +1,10 @@
 import * as React from "react";
 import { Button } from "@/shared/ui/button";
 import {
+  ConversationPaneDropTarget,
+  type ConversationDragTarget,
+} from "./ConversationPaneDropTarget";
+import {
   ConversationDivider,
   type ResizeConversationGroup,
 } from "./ConversationDivider";
@@ -33,6 +37,7 @@ type SurfaceProps = {
   onResize: ResizeConversationGroup;
   canRestore?: boolean;
   focusRequest?: { viewId: string; sequence: number };
+  dragTarget?: ConversationDragTarget;
 };
 
 /** Layout topology determines rectangles; stable view keys own mounted conversation state. */
@@ -45,6 +50,7 @@ export function ConversationLayoutSurface({
   onResize,
   canRestore = false,
   focusRequest,
+  dragTarget,
 }: SurfaceProps) {
   const rootRef = React.useRef<HTMLDivElement>(null);
   const [bounds, setBounds] = React.useState({
@@ -226,6 +232,13 @@ export function ConversationLayoutSurface({
                 />
               ),
             })}
+            {dragTarget && (
+              <ConversationPaneDropTarget
+                {...dragTarget}
+                paneId={pane.id}
+                replace={split}
+              />
+            )}
           </div>
         );
       })}

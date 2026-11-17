@@ -1,13 +1,9 @@
 // biome-ignore format: keep compact to stay within file size limit
 import {
-  DndContext,
   DragOverlay,
-  PointerSensor,
-  pointerWithin,
+  useDndMonitor,
   useDraggable,
   useDroppable,
-  useSensor,
-  useSensors,
 } from "@dnd-kit/core";
 import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
 import {
@@ -20,9 +16,18 @@ import { CSS } from "@dnd-kit/utilities";
 import { Hash } from "lucide-react";
 import * as React from "react";
 
+import {
+  ConversationDragCoordinator,
+  ConversationDragContext,
+} from "@/features/conversations/ConversationDragCoordinator";
 import { cn } from "@/shared/lib/cn";
 
-export type DndChannelData = { type: "channel"; channelId: string };
+export type DndChannelData = {
+  type: "channel";
+  channelId: string;
+  label?: string;
+  allowGrouping?: boolean;
+};
 export type DndSectionData = { type: "section"; sectionId: string };
 export type DndSectionDropData = { type: "section-drop"; sectionId: string };
 export type DndUngroupedData = { type: "ungrouped" };
@@ -30,19 +35,28 @@ export type DndUngroupedData = { type: "ungrouped" };
 export function DraggableChannelRow({
   channelId,
   children,
+  label,
+  allowGrouping = true,
 }: {
   channelId: string;
+  label?: string;
+  allowGrouping?: boolean;
   children: React.ReactNode;
 }) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: channelId,
-    data: { type: "channel", channelId } satisfies DndChannelData,
+  const rowId = React.useId();
+  const { listeners, setNodeRef, isDragging } = useDraggable({
+    id: `sidebar-channel:${channelId}:${rowId}`,
+    data: {
+      type: "channel",
+      channelId,
+      label,
+      allowGrouping,
+    } satisfies DndChannelData,
   });
 
   return (
     <div
       ref={setNodeRef}
-      {...attributes}
       {...listeners}
       className={cn(
         "touch-none transition-[opacity,transform] duration-100 ease-out motion-reduce:transition-none",
@@ -181,7 +195,7 @@ type SidebarDragItem =
   | { type: "channel"; channelId: string; channelName: string }
   | { type: "section"; sectionId: string; sectionName: string };
 
-export function SidebarDndContext({
+function SidebarDndContent({
   sectionIds,
   channels,
   sections,
@@ -200,9 +214,7 @@ export function SidebarDndContext({
 }) {
   const [activeDragItem, setActiveDragItem] =
     React.useState<SidebarDragItem | null>(null);
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-  );
+  const dragScope = React.useContext(ConversationDragContext);
 
   const handleDragStart = React.useCallback(
     (event: DragStartEvent) => {
@@ -214,7 +226,7 @@ export function SidebarDndContext({
           setActiveDragItem({
             type: "channel",
             channelId: ch.id,
-            channelName: ch.name,
+            channelName: typeof data.label === "string" ? data.label : ch.name,
           });
       } else if (data.type === "section") {
         const sec = sections.find((s) => s.id === data.sectionId);
@@ -232,12 +244,13 @@ export function SidebarDndContext({
   const handleDragEnd = React.useCallback(
     (event: DragEndEvent) => {
       setActiveDragItem(null);
+      if (dragScope && !dragScope.canCommit()) return;
       const { active, over } = event;
       if (!over) return;
       const activeData = active.data.current;
       const overData = over.data.current;
       if (!activeData) return;
-      if (activeData.type === "channel") {
+      if (activeData.type === "channel" && activeData.allowGrouping !== false) {
         const channelId = activeData.channelId as string;
         if (overData?.type === "section-drop") {
           onAssignChannel(channelId, overData.sectionId as string);
@@ -254,29 +267,49 @@ export function SidebarDndContext({
         }
       }
     },
-    [sectionIds, onAssignChannel, onUnassignChannel, onReorderSections],
+    [
+      dragScope,
+      sectionIds,
+      onAssignChannel,
+      onUnassignChannel,
+      onReorderSections,
+    ],
   );
 
+  useDndMonitor({
+    onDragStart: handleDragStart,
+    onDragEnd: handleDragEnd,
+    onDragCancel: () => setActiveDragItem(null),
+  });
   return (
-    <DndContext
-      collisionDetection={pointerWithin}
-      onDragEnd={handleDragEnd}
-      onDragStart={handleDragStart}
-      sensors={sensors}
-    >
+    <>
       <SortableContext
         items={sectionIds}
         strategy={verticalListSortingStrategy}
       >
         {children}
       </SortableContext>
-      <DragOverlay>
-        {activeDragItem?.type === "channel" ? (
+      <DragOverlay style={{ pointerEvents: "none" }}>
+        {dragScope?.canCommit() && activeDragItem?.type === "channel" ? (
           <DragOverlayChannel name={activeDragItem.channelName} />
-        ) : activeDragItem?.type === "section" ? (
+        ) : dragScope?.canCommit() && activeDragItem?.type === "section" ? (
           <DragOverlaySection name={activeDragItem.sectionName} />
         ) : null}
       </DragOverlay>
-    </DndContext>
+    </>
+  );
+}
+
+/** Standalone consumers retain their own context; AppShell supplies the shared one. */
+export function SidebarDndContext(
+  props: Parameters<typeof SidebarDndContent>[0],
+) {
+  const shared = React.useContext(ConversationDragContext);
+  return shared ? (
+    <SidebarDndContent {...props} />
+  ) : (
+    <ConversationDragCoordinator>
+      <SidebarDndContent {...props} />
+    </ConversationDragCoordinator>
   );
 }

@@ -1,6 +1,7 @@
 import { motion, useReducedMotion } from "motion/react";
 import * as React from "react";
 import { useConversationControlScope } from "@/features/conversations/ConversationViewContext";
+import { ConversationDragContext } from "@/features/conversations/ConversationDragCoordinator";
 
 import {
   THREAD_FOCUS_DRAWER_TRAVEL_PX,
@@ -200,6 +201,7 @@ export function FocusThreadDrawer({
   const persistent = enabledProp !== undefined;
   const prefersReducedMotion = useReducedMotion();
   const { active, canHandle, canRestoreFocus } = useConversationControlScope();
+  const drag = React.useContext(ConversationDragContext);
   const threadViewMode = useThreadViewMode();
   const latestThreadViewMode = React.useRef(threadViewMode);
   latestThreadViewMode.current = threadViewMode;
@@ -220,7 +222,13 @@ export function FocusThreadDrawer({
     if (!enabled || !escapeEnabled || !active) return;
 
     function handleEscape(event: KeyboardEvent) {
-      if (event.key !== "Escape" || !canHandle()) return;
+      if (
+        event.key !== "Escape" ||
+        event.defaultPrevented ||
+        drag?.active.current ||
+        !canHandle()
+      )
+        return;
       const target = event.target;
       if (
         hasActiveEdit &&
@@ -238,7 +246,7 @@ export function FocusThreadDrawer({
     return () => {
       window.removeEventListener("keydown", handleEscape, { capture: true });
     };
-  }, [active, canHandle, enabled, escapeEnabled, hasActiveEdit, onClose]);
+  }, [active, canHandle, drag, enabled, escapeEnabled, hasActiveEdit, onClose]);
 
   React.useLayoutEffect(() => {
     if (!enabled) return;
