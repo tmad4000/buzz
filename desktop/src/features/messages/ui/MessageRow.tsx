@@ -1,3 +1,5 @@
+import { usePaseoHostHealth } from "@/shared/context/PaseoHostContext";
+import { isPaseoWorkingCard } from "@/features/presence/lib/paseoHostHealth";
 import * as React from "react";
 import { AlertTriangle } from "lucide-react";
 import {
@@ -683,10 +685,25 @@ export const MessageRow = React.memo(
       ? "mt-0"
       : bodyOffsetClass;
 
+    const { offlineSince: paseoOfflineSince } = usePaseoHostHealth();
+    const stalePaseoCard =
+      paseoOfflineSince !== null && isPaseoWorkingCard(message);
     const messageBodyNode = (
       <>
         <SentFromThreadLine channelId={channelId} tags={message.tags} />
-        {renderBody()}
+        {stalePaseoCard ? (
+          <div
+            className="text-xs text-muted-foreground"
+            data-testid="paseo-status-stale"
+          >
+            stale (host offline)
+          </div>
+        ) : null}
+        {stalePaseoCard ? (
+          <div className="opacity-50">{renderBody()}</div>
+        ) : (
+          renderBody()
+        )}
         {continuationMetadataNode}
         <MessageReactions
           messageId={message.id}

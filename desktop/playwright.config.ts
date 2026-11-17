@@ -191,6 +191,7 @@ export default defineConfig({
     {
       name: "integration",
       testMatch: [
+        "**/paseo-host-offline.spec.ts",
         "**/agents.spec.ts",
         "**/agent-availability.spec.ts",
         "**/agent-snapshot-recipient.spec.ts",
