@@ -408,3 +408,111 @@ test("DM routing stays scoped and failed durable admission keeps draft for expli
     await admission.restore();
   }
 });
+
+test("DM committed publish failure keeps the queued reply and explicit Retry delivers without clearing a newer draft", async ({
+  page,
+}) => {
+  await installMockBridge(page, {
+    sendMessageErrors: [
+      "Relay rejected event: Routing test: committed rejection",
+    ],
+  });
+  await page.goto("/");
+  await page.getByTestId("channel-alice-tyler").click();
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        window.__BUZZ_E2E_HAS_MOCK_LIVE_SUBSCRIPTION__?.({
+          channelName: "alice-tyler",
+        }),
+      ),
+    )
+    .toBe(true);
+  const root = "e5".repeat(32);
+  await page.evaluate(
+    ({ root, pubkey }) => {
+      const emit = window.__BUZZ_E2E_EMIT_MOCK_MESSAGE__;
+      if (!emit) throw new Error("Missing mock emitter");
+      const createdAt = Math.floor(Date.now() / 1000) + 10;
+      emit({
+        channelName: "alice-tyler",
+        id: root,
+        content: "Committed DM route",
+        pubkey,
+        createdAt,
+      });
+      emit({
+        channelName: "alice-tyler",
+        id: "e6".repeat(32),
+        parentEventId: root,
+        content: "Existing DM reply",
+        pubkey,
+        createdAt: createdAt + 1,
+      });
+    },
+    { root, pubkey: TEST_IDENTITIES.bob.pubkey },
+  );
+  const main = page
+    .getByTestId("message-composer")
+    .filter({ has: page.getByTestId("send-to-thread") });
+  const editor = main.getByTestId("message-input");
+  await editor.fill("Committed DM reply remains queued");
+  await main.getByTestId("send-to-thread").click();
+  await page
+    .getByRole("menu", { name: "Thread destinations" })
+    .getByRole("menuitem")
+    .filter({ hasText: "Committed DM route" })
+    .click();
+  await expect(editor).toBeEmpty();
+  await expect.poll(async () => (await published(page)).length).toBe(1);
+  const [rejected] = await published(page);
+  expect(threadTags(rejected)).toEqual([["e", root, "", "reply"]]);
+  await expect(page.getByTestId("routed-send-notice")).toHaveCount(0);
+  // The captured destination owns its queue UI, even though the origin is the main composer.
+  await page
+    .locator(
+      `[data-testid="open-thread-side-panel"][data-thread-head-id="${root}"]`,
+    )
+    .click();
+  const panel = page.getByTestId("message-thread-panel");
+  const queued = panel
+    .getByRole("article", { name: "Queued message" })
+    .filter({ hasText: "Committed DM reply remains queued" });
+  await expect(queued).toContainText("Could not send");
+  await expect(queued).toContainText("Routing test: committed rejection");
+  await expect(editor).toBeEmpty();
+  const rowId = await queued.getAttribute("data-outbox-id");
+  expect(rowId).toBeTruthy();
+  await editor.fill("Newer DM draft must survive queue Retry");
+  await page.evaluate(() => window.__BUZZ_E2E_HOLD_OUTBOX_PUBLISH__?.(true));
+  await queued.getByRole("button", { name: "Retry", exact: true }).focus();
+  await queued
+    .getByRole("button", { name: "Retry", exact: true })
+    .press("Enter");
+  await expect
+    .poll(() =>
+      page.evaluate(() => window.__BUZZ_E2E_HELD_OUTBOX_PUBLISHES__?.()),
+    )
+    .toBe(1);
+  await expect(queued).toHaveAttribute("data-outbox-id", rowId ?? "");
+  await expect(editor).toHaveText("Newer DM draft must survive queue Retry");
+  expect((await published(page)).length).toBe(1);
+  expect(
+    await page.evaluate(() => window.__BUZZ_E2E_HOLD_OUTBOX_PUBLISH__?.(false)),
+  ).toBe(1);
+  await expect.poll(async () => (await published(page)).length).toBe(2);
+  const attempts = await published(page);
+  expect(attempts[1].id).toBe(rejected.id);
+  expect(attempts[1].content).toBe("Committed DM reply remains queued");
+  expect(threadTags(attempts[1])).toEqual([["e", root, "", "reply"]]);
+  await expect(queued).toHaveCount(0);
+  await expect(
+    panel
+      .getByTestId("message-body")
+      .filter({ hasText: "Committed DM reply remains queued" }),
+  ).toBeVisible();
+  await expect(editor).toHaveText("Newer DM draft must survive queue Retry");
+  await expect(page.getByTestId("routed-send-notice")).toContainText(
+    "Sent to Committed DM route",
+  );
+});
