@@ -50,6 +50,24 @@ const expect = baseExpect.configure({ timeout: 30000 });
       ),
       "background B mount must not read",
     );
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () => window.hostReads.filter((read) => read.kind === "seen").length,
+        ),
+      )
+      .toBeGreaterThan(0);
+    assert.ok(
+      await page.evaluate(() => {
+        const observed = window.hostReads.find((read) => read.kind === "seen");
+        const [rootId, replyId] = observed.id.split(":");
+        return (
+          window.hostSeen(rootId, replyId) > 0 &&
+          window.hostReads.every((read) => read.view === "a")
+        );
+      }),
+      "visible A writes canonical seen markers; background B never writes",
+    );
     const sends = () =>
       page.evaluate(() =>
         (window.__BUZZ_E2E_COMMAND_PAYLOADS__ ?? []).filter(
@@ -90,26 +108,30 @@ const expect = baseExpect.configure({ timeout: 30000 });
     await expect(
       b.locator(`[data-message-id="${"2".repeat(64)}"]`).first(),
     ).toBeVisible();
+    const mainA = a.getByTestId("channel-composer-overlay");
+    const mainB = b.getByTestId("channel-composer-overlay");
     // Both panes now target the same canonical main-channel draft.
-    await a.getByTestId("message-input").fill("Shared draft before takeover");
-    await expect(b.locator("[data-draft-preview]")).toContainText(
+    await mainA
+      .getByTestId("message-input")
+      .fill("Shared draft before takeover");
+    await expect(mainB.locator("[data-draft-preview]")).toContainText(
       "Shared draft before takeover",
     );
     await page.screenshot({ path: path.join(shots, "shared-preview.png") });
-    await b.getByRole("button", { name: "Take over", exact: true }).click();
-    await expect(b.getByTestId("message-input")).toHaveText(
+    await mainB.getByRole("button", { name: "Take over", exact: true }).click();
+    await expect(mainB.getByTestId("message-input")).toHaveText(
       "Shared draft before takeover",
     );
-    await expect(b.getByTestId("message-input")).toBeFocused();
+    await expect(mainB.getByTestId("message-input")).toBeFocused();
     await page.screenshot({ path: path.join(shots, "immediate-takeover.png") });
-    await expect(a.getByTestId("message-input")).toHaveCount(0);
-    await expect(a.locator("[data-draft-preview]")).toContainText(
+    await expect(mainA.getByTestId("message-input")).toHaveCount(0);
+    await expect(mainA.locator("[data-draft-preview]")).toContainText(
       "Shared draft before takeover",
     );
     assert.equal((await sends()).length, 2, "takeover cannot replay a send");
     await page.getByRole("button", { name: "Unmount A", exact: true }).click();
     await expect(a).toHaveCount(0);
-    await expect(b.getByTestId("message-input")).toHaveText(
+    await expect(mainB.getByTestId("message-input")).toHaveText(
       "Shared draft before takeover",
     );
     await page.evaluate(() => (window.hostReads = []));
@@ -139,7 +161,7 @@ const expect = baseExpect.configure({ timeout: 30000 });
       coverage.reads.length > 0 && coverage.reads.every((r) => r.view === "b"),
     );
     assert.equal((await sends()).length, 2);
-    await expect(b.getByTestId("message-input")).toHaveText(
+    await expect(mainB.getByTestId("message-input")).toHaveText(
       "Shared draft before takeover",
     );
     await page.evaluate(

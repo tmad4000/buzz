@@ -1,4 +1,7 @@
-import { useConversationReadAdmission } from "@/features/conversations/ConversationViewContext";
+import {
+  ConversationViewContext,
+  useConversationReadAdmission,
+} from "@/features/conversations/ConversationViewContext";
 import * as React from "react";
 import type { TimelineMessage } from "../types";
 /** A mounted/auto-expanded subtree is not evidence that its rows were visible. */
@@ -9,8 +12,11 @@ export function useVisibleThreadReplies(
     | ((messages: TimelineMessage[], rootId?: string) => void)
     | undefined,
   rootId: string,
-  scope: string,
+  resourceScope: string,
 ) {
+  const viewId =
+    React.useContext(ConversationViewContext)?.viewInstanceId ?? null;
+  const scope = JSON.stringify([viewId, resourceScope]);
   const { admitted, canRead } = useConversationReadAdmission();
   const sent = React.useRef({ scope, ids: new Set<string>() });
   React.useLayoutEffect(() => {
@@ -41,6 +47,7 @@ export function useVisibleThreadReplies(
             !entry.isIntersecting ||
             !node.isConnected ||
             !root.contains(node) ||
+            node.closest('[hidden], [inert], [aria-hidden="true"]') !== null ||
             node.getClientRects().length === 0
           )
             continue;

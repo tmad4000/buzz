@@ -284,11 +284,9 @@ export function useChannelPaneHandlers({
         return next;
       });
 
-      // Drilling into a branch reveals only its direct replies (LP4 v3
-      // open-at-level): mark exactly those read, never the whole subtree. A
-      // reply still nested in a collapsed grandchild branch keeps its badge
-      // until it too is revealed — the deliberate reversal of #1118's
-      // whole-subtree-on-open collapse.
+      // Snapshot newly disclosed children for the local entry divider.
+      // Actual committed visible bodies acknowledge read/seen later; expanding
+      // an offscreen branch must not consume its replies.
       markRevealedRepliesReadRef.current(message.id);
 
       if (firstReplyId) {
