@@ -152,8 +152,11 @@ export function MessageRowItem({
   const canEdit = canManage && onEdit ? onEdit : undefined;
   const effectiveThreadRootId = message.rootId ?? message.id;
 
+  const isSearchMatch = searchMatchingMessageIds?.has(message.id) ?? false;
+  const isSearchActive = message.id === searchActiveMessageId;
+
   if (summary && onOpenThread) {
-    const isHighlighted = message.id === highlightedMessageId;
+    const isHighlighted = message.id === highlightedMessageId || isSearchActive;
     return (
       <div
         className={cn(
@@ -197,6 +200,7 @@ export function MessageRowItem({
               : undefined
           }
           profiles={profiles}
+          searchQuery={isSearchMatch ? searchQuery : undefined}
           showDepthGuides={false}
           videoReviewContext={videoReviewContext}
         />
@@ -217,9 +221,6 @@ export function MessageRowItem({
       </div>
     );
   }
-
-  const isSearchMatch = searchMatchingMessageIds?.has(message.id) ?? false;
-  const isSearchActive = message.id === searchActiveMessageId;
 
   return (
     <div
