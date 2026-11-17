@@ -77,22 +77,23 @@ export function ConversationViewHost({
     >
       <ConversationViewContext.Provider value={admission}>
         <MainInsetProvider mainInsetRef={insetRef}>
-          <HistorySearchScopeProvider
-            initialValues={initialPanelState}
-            onNavigate={onPanelNavigate}
+          <ThreadViewModeScopeProvider
+            initialMode={initialThreadViewMode}
+            onChange={onThreadViewModeChange}
           >
-            <ThreadViewModeScopeProvider
-              initialMode={initialThreadViewMode}
-              onChange={onThreadViewModeChange}
+            <ThreadPanelWidthScopeProvider
+              initialWidthPx={initialThreadPanelWidthPx}
+              onChange={onThreadPanelWidthChange}
             >
-              <ThreadPanelWidthScopeProvider
-                initialWidthPx={initialThreadPanelWidthPx}
-                onChange={onThreadPanelWidthChange}
+              <HistorySearchScopeProvider
+                key={channel.activeChannel?.id ?? "unavailable"}
+                initialValues={initialPanelState}
+                onNavigate={onPanelNavigate}
               >
                 <ChannelScreen {...channel} />
-              </ThreadPanelWidthScopeProvider>
-            </ThreadViewModeScopeProvider>
-          </HistorySearchScopeProvider>
+              </HistorySearchScopeProvider>
+            </ThreadPanelWidthScopeProvider>
+          </ThreadViewModeScopeProvider>
         </MainInsetProvider>
       </ConversationViewContext.Provider>
     </section>

@@ -1,6 +1,8 @@
 // Test fixture only: real ChannelScreen/ChannelPane/composer hooks over the
 // existing mock IPC bridge. No relay, native build or production account.
 import * as React from "react";
+import { ConversationDragCoordinator } from "@/features/conversations/ConversationDragCoordinator";
+import { FixtureDragSidebar } from "./shared-drag-sidebar";
 import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
@@ -10,6 +12,7 @@ import {
   RouterProvider,
 } from "@tanstack/react-router";
 import { AppShellProvider, useAppShell } from "@/app/AppShellContext";
+import { useMarkAsReadShortcuts } from "@/app/useMarkAsReadShortcuts";
 import { ConversationLayoutSurface } from "@/features/conversations/ConversationLayoutSurface";
 import {
   createConversationView,
@@ -22,6 +25,7 @@ import {
   orientGroup,
   listPanes,
   updateViewPresentation,
+  navigateView,
   type ConversationLayout,
 } from "@/features/conversations/layout/model";
 import { ConversationViewHost } from "@/features/conversations/ConversationViewHost";
@@ -50,6 +54,7 @@ const harnessWindow = window as typeof window & {
   hostEffective: (messageId: string) => number | null;
   hostChannelRead: () => number | null;
   layoutSnapshot?: () => ConversationLayout;
+  dragEvents?: Record<string, unknown>[];
 };
 harnessWindow.hostReads = [];
 const community = {
@@ -64,7 +69,8 @@ window.__BUZZ_E2E__ = { mode: "mock" };
 const { maybeInstallE2eTauriMocks } = await import("@/testing/e2eBridge");
 maybeInstallE2eTauriMocks();
 const identity: Identity = await getIdentity();
-const channel: Channel | undefined = (await getChannels(null)).channels?.find(
+const fixtureChannels = (await getChannels(null)).channels ?? [];
+const channel: Channel | undefined = fixtureChannels.find(
   (value) => value.name === "general",
 );
 if (!channel) throw new Error("Missing synthetic general channel");
@@ -134,6 +140,34 @@ function PerViewShell({
   return <AppShellProvider value={value}>{children}</AppShellProvider>;
 }
 const layoutFixture = new URLSearchParams(location.search).has("layout");
+const dragFixture = new URLSearchParams(location.search).has("drag");
+harnessWindow.dragEvents = [];
+function FixtureDragScope({ children }: { children: React.ReactNode }) {
+  const [generation, setGeneration] = React.useState(0);
+  return (
+    <ConversationDragCoordinator scopeKey={`fixture-${generation}`}>
+      <div className="flex h-full min-h-0 min-w-0 flex-col">
+        {dragFixture && (
+          <button
+            type="button"
+            className="sr-only"
+            data-testid="change-drag-scope"
+            onClick={() => setGeneration((value) => value + 1)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                setGeneration((value) => value + 1);
+              }
+            }}
+          >
+            Change drag scope
+          </button>
+        )}
+        {children}
+      </div>
+    </ConversationDragCoordinator>
+  );
+}
 function LayoutBody() {
   const [focusRequest, setFocusRequest] = React.useState<{
     viewId: string;
@@ -147,7 +181,8 @@ function LayoutBody() {
       panelState: { thread: rootA },
     };
     const initial = createSingleLayout(view, (kind) => `${kind}-a`);
-    if (new URLSearchParams(location.search).has("single")) return initial;
+    if (dragFixture || new URLSearchParams(location.search).has("single"))
+      return initial;
     return focusPane(
       splitPane(
         initial,
@@ -166,107 +201,212 @@ function LayoutBody() {
   const lastSplit = React.useRef<ConversationLayout | null>(null);
   harnessWindow.layoutSnapshot = () => layout;
   return (
-    <ConversationLayoutSurface
-      layout={layout}
-      focusRequest={focusRequest}
-      labelForView={(view) => `General ${view.id}`}
-      onFocusPane={(id) => setLayout((current) => focusPane(current, id))}
-      onResize={(id, sizes) =>
-        setLayout((current) => resizeGroup(current, id, sizes))
-      }
-      canRestore={lastSplit.current !== null}
-      onCommand={(paneId, command) => {
-        if (command === "splitRight" || command === "splitBottom") {
-          const pane = listPanes(layout.root).find(
-            (value) => value.id === paneId,
-          );
-          if (!pane) return;
-          const source = layout.views[pane.viewInstanceId];
-          const view = createConversationView(
-            source.channelId,
-            undefined,
-            source,
-          );
-          setLayout((current) =>
-            splitPane(
-              current,
-              paneId,
-              view,
-              command === "splitRight" ? "horizontal" : "vertical",
-            ),
-          );
-          setFocusRequest({
-            viewId: view.id,
-            sequence: ++focusSequence.current,
-          });
-          return;
-        }
-        setLayout((current) => {
-          const panes = listPanes(current.root);
-
-          if (command === "swap" && panes.length === 2)
-            return swapPanes(current, panes[0].id, panes[1].id);
-          if (
-            (command === "horizontal" || command === "vertical") &&
-            current.root.kind === "group"
-          )
-            return orientGroup(current, current.root.id, command);
-          if (command === "close") {
-            lastSplit.current = current;
-            return closePane(current, paneId);
-          }
-          if (command === "closeSplit") {
-            lastSplit.current = current;
-            return panes.reduce(
-              (next, pane) =>
-                pane.id === current.focusedPaneId
-                  ? next
-                  : closePane(next, pane.id),
-              current,
-            );
-          }
-          if (command === "restore" && lastSplit.current)
-            return lastSplit.current;
-          return current;
-        });
-      }}
-      renderPane={({ view, pane, focused, visible, headerEndActions }) => (
-        <PerViewShell id={view.id}>
-          <ConversationViewHost
-            viewInstanceId={view.id}
-            focused={focused}
-            visible={visible}
-            label={`General ${view.id}`}
-            initialPanelState={view.panelState}
-            onPanelNavigate={(patch) =>
-              setLayout((current) =>
-                updateViewPresentation(current, view.id, view.channelId, {
-                  panelState: patch,
-                }),
-              )
-            }
-            onFocusView={() =>
-              setLayout((current) => focusPane(current, pane.id))
-            }
-            channel={{
-              activeChannel: channel ?? null,
-              currentIdentity: identity,
-              headerEndActions,
-              autoSendDraftKey: channel?.id ?? null,
-              onCloseForumPost: noop,
-              onSelectForumPost: noop,
-              selectedForumPostId: null,
-              targetForumReplyId: null,
-              targetMessageEvents: emptyEvents,
-              targetMessageId: null,
-            }}
-          />
-        </PerViewShell>
+    <div className="flex h-full min-h-0 min-w-0">
+      {dragFixture && (
+        <FixtureDragSidebar
+          channels={fixtureChannels}
+          onEvent={(event) => harnessWindow.dragEvents?.push(event)}
+        />
       )}
-    />
+      <div className="min-h-0 min-w-0 flex-1">
+        <ConversationLayoutSurface
+          dragTarget={
+            dragFixture
+              ? {
+                  resolveConversation: (id) => {
+                    const target = fixtureChannels.find(
+                      (value) =>
+                        value.id === id &&
+                        (value.channelType === "stream" ||
+                          value.channelType === "dm"),
+                    );
+                    return target
+                      ? {
+                          channelId: target.id,
+                          label:
+                            target.channelType === "dm"
+                              ? "Existing DM"
+                              : target.name,
+                        }
+                      : null;
+                  },
+                  onOpen: (drop) => {
+                    const target = listPanes(layout.root).find(
+                      (pane) => pane.id === drop.paneId,
+                    );
+                    if (!target) return;
+                    const source = layout.views[target.viewInstanceId];
+                    const incoming = drop.replace
+                      ? null
+                      : createConversationView(
+                          drop.channelId,
+                          undefined,
+                          source.channelId === drop.channelId
+                            ? source
+                            : undefined,
+                        );
+                    harnessWindow.dragEvents?.push({ type: "canvas", ...drop });
+                    setLayout((current) => {
+                      const pane = listPanes(current.root).find(
+                        (value) => value.id === drop.paneId,
+                      );
+                      if (
+                        !pane ||
+                        current.views[pane.viewInstanceId].channelId !==
+                          source.channelId
+                      )
+                        return current;
+                      return incoming
+                        ? splitPane(
+                            current,
+                            pane.id,
+                            incoming,
+                            drop.edge === "right" ? "horizontal" : "vertical",
+                          )
+                        : focusPane(
+                            navigateView(
+                              current,
+                              pane.viewInstanceId,
+                              drop.channelId,
+                            ),
+                            pane.id,
+                          );
+                    });
+                    setFocusRequest({
+                      viewId: incoming?.id ?? source.id,
+                      sequence: ++focusSequence.current,
+                    });
+                  },
+                }
+              : undefined
+          }
+          layout={layout}
+          focusRequest={focusRequest}
+          labelForView={(view) =>
+            dragFixture
+              ? view.channelId === channel?.id
+                ? `General ${view.id === "a" ? "A" : "B"}`
+                : "Existing DM"
+              : `General ${view.id}`
+          }
+          onFocusPane={(id) => setLayout((current) => focusPane(current, id))}
+          onResize={(id, sizes) =>
+            setLayout((current) => resizeGroup(current, id, sizes))
+          }
+          canRestore={lastSplit.current !== null}
+          onCommand={(paneId, command) => {
+            if (command === "splitRight" || command === "splitBottom") {
+              const pane = listPanes(layout.root).find(
+                (value) => value.id === paneId,
+              );
+              if (!pane) return;
+              const source = layout.views[pane.viewInstanceId];
+              const view = createConversationView(
+                source.channelId,
+                undefined,
+                source,
+              );
+              setLayout((current) =>
+                splitPane(
+                  current,
+                  paneId,
+                  view,
+                  command === "splitRight" ? "horizontal" : "vertical",
+                ),
+              );
+              setFocusRequest({
+                viewId: view.id,
+                sequence: ++focusSequence.current,
+              });
+              return;
+            }
+            setLayout((current) => {
+              const panes = listPanes(current.root);
+
+              if (command === "swap" && panes.length === 2)
+                return swapPanes(current, panes[0].id, panes[1].id);
+              if (
+                (command === "horizontal" || command === "vertical") &&
+                current.root.kind === "group"
+              )
+                return orientGroup(current, current.root.id, command);
+              if (command === "close") {
+                lastSplit.current = current;
+                return closePane(current, paneId);
+              }
+              if (command === "closeSplit") {
+                lastSplit.current = current;
+                return panes.reduce(
+                  (next, pane) =>
+                    pane.id === current.focusedPaneId
+                      ? next
+                      : closePane(next, pane.id),
+                  current,
+                );
+              }
+              if (command === "restore" && lastSplit.current)
+                return lastSplit.current;
+              return current;
+            });
+          }}
+          renderPane={({ view, pane, focused, visible, headerEndActions }) => (
+            <PerViewShell id={view.id}>
+              <ConversationViewHost
+                viewInstanceId={view.id}
+                focused={focused}
+                visible={visible}
+                label={`General ${view.id}`}
+                initialPanelState={view.panelState}
+                onPanelNavigate={(patch) =>
+                  setLayout((current) =>
+                    updateViewPresentation(current, view.id, view.channelId, {
+                      panelState: patch,
+                    }),
+                  )
+                }
+                onFocusView={() =>
+                  setLayout((current) => focusPane(current, pane.id))
+                }
+                channel={{
+                  activeChannel:
+                    fixtureChannels.find(
+                      (value) => value.id === view.channelId,
+                    ) ?? null,
+                  currentIdentity: identity,
+                  headerEndActions,
+                  autoSendDraftKey: channel?.id ?? null,
+                  onCloseForumPost: noop,
+                  onSelectForumPost: noop,
+                  selectedForumPostId: null,
+                  targetForumReplyId: null,
+                  targetMessageEvents: emptyEvents,
+                  targetMessageId: null,
+                }}
+              />
+            </PerViewShell>
+          )}
+        />
+      </div>
+    </div>
   );
 }
 function Screen() {
+  useMarkAsReadShortcuts({
+    activeChannelId: channel?.id ?? null,
+    activeChannelLastMessageAt: channel?.lastMessageAt,
+    selectedView: dragFixture ? "channel" : "home",
+    markChannelRead: (id) => {
+      if (dragFixture)
+        harnessWindow.dragEvents?.push({
+          type: "shortcut-mark-read",
+          channelId: id,
+        });
+    },
+    markAllChannelsRead: () => {
+      if (dragFixture)
+        harnessWindow.dragEvents?.push({ type: "shortcut-mark-all" });
+    },
+  });
   const fallback = useAppShell();
   const read = useReadState(identity.pubkey, fakeRelay);
   harnessWindow.hostEffective = (id: string) =>
@@ -330,7 +470,9 @@ function Screen() {
             }}
           >
             {layoutFixture ? (
-              <LayoutBody />
+              <FixtureDragScope>
+                <LayoutBody />
+              </FixtureDragScope>
             ) : (
               [...(showA ? ["a"] : []), "b"].map((id) => (
                 <PerViewShell key={id} id={id}>

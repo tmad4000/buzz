@@ -1,4 +1,5 @@
 import * as React from "react";
+import { ConversationDragCoordinator } from "@/features/conversations/ConversationDragCoordinator";
 import { ProtectedGlobalOverlay } from "@protected-feature-components";
 import { useQueryClient } from "@tanstack/react-query";
 import { Outlet, useLocation } from "@tanstack/react-router";
@@ -699,7 +700,7 @@ export function AppShell() {
     markChannelRead,
     selectedView,
   });
-  return (
+  const shell = (
     <PreventSleepProvider>
       {!isHuddleRoom ? (
         <AppShellTrayMenu
@@ -1000,5 +1001,16 @@ export function AppShell() {
         </AppShellProvider>
       </ChannelNavigationProvider>
     </PreventSleepProvider>
+  );
+  return (
+    <ConversationDragCoordinator
+      scopeKey={JSON.stringify([
+        communitiesHook.activeCommunity?.id ?? null,
+        communitiesHook.activeCommunity?.relayUrl ?? null,
+        identityQuery.data?.pubkey ?? null,
+      ])}
+    >
+      {shell}
+    </ConversationDragCoordinator>
   );
 }
