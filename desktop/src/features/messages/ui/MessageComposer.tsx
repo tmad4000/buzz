@@ -82,6 +82,7 @@ function MessageComposerImpl({
   containerClassName,
   layoutMode = "standalone",
   disabled = false,
+  autoFocus = true,
   draftKey,
   autoSubmitDraftKey = null,
   onAutoSubmitComplete,
@@ -479,7 +480,7 @@ function MessageComposerImpl({
       return;
     if (presentation?.takeFocus()) richText.focus();
   }, [presentation, richText.editor, richText.focus, canFocusConversation]);
-  useComposerAutofocus(richText.focus, effectiveDraftKey, composerDisabled);
+  useComposerAutofocus(richText.focus, effectiveDraftKey, composerDisabled || !autoFocus);
   const applyAutocompleteEdit = React.useCallback(
     (edit: AutocompleteEdit) => {
       richText.replacePlainTextRange(

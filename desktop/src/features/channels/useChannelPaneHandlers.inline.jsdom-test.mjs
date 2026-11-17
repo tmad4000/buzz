@@ -78,6 +78,7 @@ test("inline send uses captured channel/parent without mutating the side panel",
         mediaTags: [["imeta", "url media"]],
         channelId: "channel-a",
         parentEventId: "inline-parent",
+        threadHeadId: "inline-root",
         forceRest: true,
       },
     ]);

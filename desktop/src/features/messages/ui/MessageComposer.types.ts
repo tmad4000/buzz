@@ -40,6 +40,8 @@ export type MessageComposerProps = {
    */
   layoutMode?: "dock" | "standalone";
   disabled?: boolean;
+  /** Reading previews can mount an editor without taking focus. */
+  autoFocus?: boolean;
   draftKey?: string;
   /**
    * When provided, the composer fires `submitMessage` once on mount after

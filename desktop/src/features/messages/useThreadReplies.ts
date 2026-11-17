@@ -1,3 +1,4 @@
+import { boundedInlineThreadRead as boundedThreadReplyRead } from "./lib/inlineThreadFetch";
 import {
   type QueryClient,
   useQueries,
@@ -48,6 +49,7 @@ export async function loadThreadReplies(
   expectedEventId?: string | null,
   exhaustedTargets?: Set<string>,
   fetcher: ThreadRepliesFetcher = getThreadReplies,
+  signal?: AbortSignal,
 ): Promise<RelayEvent[]> {
   const queryKey = threadRepliesKey(channelId, rootId);
   const cacheAtStart = queryClient.getQueryData<RelayEvent[]>(queryKey) ?? [];
@@ -55,10 +57,15 @@ export async function loadThreadReplies(
   const replies: RelayEvent[] = [];
   let cursor: ThreadCursor | null = null;
   for (let page = 0; page < MAX_THREAD_PAGES; page += 1) {
-    const response = await fetcher(rootId, channelId, {
-      limit: THREAD_PAGE_LIMIT,
-      cursor,
-    });
+    const read = () =>
+      fetcher(rootId, channelId, { limit: THREAD_PAGE_LIMIT, cursor });
+    const response =
+      fetcher === getThreadReplies
+        ? await boundedThreadReplyRead(
+            read,
+            signal ?? new AbortController().signal,
+          )
+        : await read();
     replies.push(...response.events);
     if (!response.nextCursor) {
       const current = queryClient.getQueryData<RelayEvent[]>(queryKey) ?? [];
@@ -131,7 +138,7 @@ export function useThreadReplies(
       activeChannel !== null &&
       activeChannel.channelType !== "forum" &&
       openThreadRootId !== null,
-    queryFn: async (): Promise<RelayEvent[]> => {
+    queryFn: async ({ signal }): Promise<RelayEvent[]> => {
       if (!activeChannel || !openThreadRootId) return [];
       if (expectedEventId) {
         // Reset the counter when the target changes.
@@ -155,6 +162,8 @@ export function useThreadReplies(
         openThreadRootId,
         expectedEventId,
         exhaustedTargetsRef.current,
+        getThreadReplies,
+        signal,
       );
     },
     staleTime: 0,
