@@ -336,6 +336,7 @@ function InlineThreadContent({
             <div key={message.renderKey ?? message.id}>
               <span className="sr-only">Reply depth {message.depth}</span>
               <MessageThreadRow
+                parentMessages={thread.index.messageById}
                 channelId={channel.id}
                 actionBarPlacement="inside"
                 currentPubkey={currentPubkey}

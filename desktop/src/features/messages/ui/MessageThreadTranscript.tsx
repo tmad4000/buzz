@@ -40,6 +40,10 @@ export function MessageThreadTranscript({
   renderAfterMessage,
   testId = "message-thread-transcript",
 }: MessageThreadTranscriptProps) {
+  const parentMessages = React.useMemo(
+    () => new Map(messages.map((message) => [message.id, message])),
+    [messages],
+  );
   const renderItems = React.useMemo(() => {
     let previousMessage: TimelineMessage | null = null;
     return messages.map((message) => {
@@ -63,6 +67,7 @@ export function MessageThreadTranscript({
       {renderItems.map(({ isContinuation, message }) => (
         <React.Fragment key={message.renderKey ?? message.id}>
           <MessageThreadRow
+            parentMessages={parentMessages}
             channelId={channelId}
             currentPubkey={currentPubkey}
             isContinuation={isContinuation}

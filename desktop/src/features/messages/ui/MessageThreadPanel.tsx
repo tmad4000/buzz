@@ -504,6 +504,7 @@ export function MessageThreadPanel({
     });
 
   const {
+    highlightedMessageId,
     isAtBottom,
     newMessageCount,
     onScroll,
@@ -855,23 +856,11 @@ export function MessageThreadPanel({
                           </button>
                         ) : null}
                         {showUnreadDivider ? <UnreadDivider /> : null}
-                        {isSidebar && entry.message.depth > 2 ? (
-                          <div
-                            className="min-w-0 pt-2 text-xs text-muted-foreground"
-                            style={{
-                              marginInlineStart: `${getThreadReplyIndentRem(2) + THREAD_REPLY_BODY_OFFSET_REM}rem`,
-                            }}
-                            data-testid="sidebar-reply-context"
-                          >
-                            <span className="inline-block max-w-full truncate rounded-full bg-muted px-2 py-0.5">
-                              Replying to{" "}
-                              {sidebar.index.messageById.get(
-                                entry.message.parentId ?? "",
-                              )?.author ?? "earlier reply"}
-                            </span>
-                          </div>
-                        ) : null}
                         <MessageThreadRow
+                          parentMessages={sidebar.index.messageById}
+                          highlighted={
+                            entry.message.id === highlightedMessageId
+                          }
                           channelId={channelId}
                           currentPubkey={currentPubkey}
                           collapseDepthGuideActions={collapseDepthGuideActions}
