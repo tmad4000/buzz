@@ -1,3 +1,5 @@
+import { useTimelineView } from "@/features/channels/ui/TimelineViewContext";
+import { buildFlatTimelineEntries } from "../lib/flatTimeline";
 import type { ThreadSummaryRenderer } from "./TimelineMessageRow";
 import * as React from "react";
 import { VList } from "virtua";
@@ -174,11 +176,19 @@ export const TimelineMessageList = React.memo(function TimelineMessageList({
   onVirtualizerRangeChanged,
   onVirtualizerScrollerChange,
 }: TimelineMessageListProps) {
+  const { mode } = useTimelineView();
   const entries = React.useMemo(
     () =>
       mainEntries ??
-      buildMainTimelineEntries(messages, undefined, threadSummaries, profiles),
-    [mainEntries, messages, profiles, threadSummaries],
+      (mode === "timeline"
+        ? buildFlatTimelineEntries(messages)
+        : buildMainTimelineEntries(
+            messages,
+            undefined,
+            threadSummaries,
+            profiles,
+          )),
+    [mainEntries, messages, mode, profiles, threadSummaries],
   );
   // Contexts are memoized per message id so MessageRow/Markdown memo
   // comparisons hold across unrelated timeline re-renders (typing
