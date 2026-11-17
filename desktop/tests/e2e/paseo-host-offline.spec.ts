@@ -20,7 +20,7 @@ test("local expiry warns, marks only Paseo working cards, and recovers", async (
           false;
         return (
           active &&
-          (window.__BUZZ_E2E_COMMAND_PAYLOADS__ ?? []).some(
+          (window.__BUZZ_E2E_COMMAND_LOG__ ?? []).some(
             ({ command, payload }) => {
               if (command !== "plugin:websocket|send") return false;
               const data = (payload as { message?: { data?: unknown } } | null)
