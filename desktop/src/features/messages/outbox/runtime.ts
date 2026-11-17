@@ -35,6 +35,7 @@ const deliveries = new Map<
     onSuperseded?: () => void;
   }
 >();
+const committedListeners = new Set<(row: OutboxRecord) => void>();
 const acceptedListeners = new Set<
   (event: RelayEvent, row: OutboxRecord) => void
 >();
@@ -45,8 +46,12 @@ let lastError: string | null = null;
 let stopReconnect: (() => void) | undefined;
 const normalizeRelay = (url: string) => url.replace(/\/+$/, "");
 
+let refreshGeneration = 0;
 async function refresh(): Promise<void> {
-  snapshot = await outboxStorage.all();
+  const generation = ++refreshGeneration;
+  const rows = await outboxStorage.all();
+  if (generation !== refreshGeneration) return;
+  snapshot = rows;
   for (const listener of listeners) listener();
 }
 export function outboxSnapshot(): readonly OutboxRecord[] {
@@ -239,9 +244,11 @@ async function pump(): Promise<void> {
 /** One application-wide worker, independent of composer visits and drafts. */
 export function startOutbox(
   onAccepted: (event: RelayEvent, row: OutboxRecord) => void,
+  onCommitted?: (row: OutboxRecord) => void,
 ): () => void {
   references++;
   acceptedListeners.add(onAccepted);
+  if (onCommitted) committedListeners.add(onCommitted);
   if (references === 1) {
     window.addEventListener("online", wakeOutbox);
     stopReconnect = relayClient.subscribeToReconnects(wakeOutbox);
@@ -255,6 +262,7 @@ export function startOutbox(
   }
   return () => {
     acceptedListeners.delete(onAccepted);
+    if (onCommitted) committedListeners.delete(onCommitted);
     references--;
     if (references === 0) {
       clearTimeout(timer);
@@ -283,11 +291,21 @@ export async function enqueueOutbox(
 ): Promise<RelayEvent> {
   if (!navigator.locks)
     throw new Error("This webview does not support durable outbox locking.");
+  if (
+    [message.parentEventId, message.rootEventId].some(
+      (id) => id?.startsWith("outbox-local:") || id?.startsWith("optimistic-"),
+    )
+  ) {
+    throw new Error(
+      "This reply target has not been sent yet. Wait for it to finish sending.",
+    );
+  }
   const record = await outboxStorage.add({
     id: crypto.randomUUID(),
     sequence: 0,
     revision: 0,
     intendedAt: Math.floor(Date.now() / 1000),
+    localSendOrigin: submission.localSendOrigin,
     message,
     attachments: submission.attachments.map((attachment) => ({
       bytes: attachment.file,
@@ -308,6 +326,20 @@ export async function enqueueOutbox(
       onSuperseded: submission.onSuperseded,
     }),
   );
+  // Publish the committed presentation row before the worker can publish it.
+  // A passive React effect can otherwise miss the entire pending -> ACK turn.
+  refreshGeneration++;
+  snapshot = [...snapshot.filter((row) => row.id !== record.id), record].sort(
+    (a, b) => a.sequence - b.sequence,
+  );
+  for (const listener of committedListeners) {
+    try {
+      listener(record);
+    } catch (error) {
+      lastError = String(error);
+    }
+  }
+  for (const listener of listeners) listener();
   notifyCommit(submission);
   void refresh().catch((error: unknown) => {
     lastError = String(error);
