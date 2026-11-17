@@ -25,15 +25,22 @@ visit(source);
 assert.ok(callback);
 function owner({
   currentRoot = "root",
+  pageOpen = false,
   pageAllowed = true,
   threadAllowed = true,
 } = {}) {
   const calls = [];
   const state = {
+    pageOpen,
     replyTarget: "newer-draft-target",
     draft: "Keep this exact newer draft",
   };
   const env = {
+    pageOpen,
+    closePage: () => {
+      calls.push(["close-page"]);
+      state.pageOpen = false;
+    },
     effectiveOpenThreadHeadId: currentRoot,
     requirePageEditResolution: () => {
       calls.push(["page-guard"]);
@@ -70,13 +77,15 @@ function owner({
   };
 }
 test("owning pane rejects quote navigation before changing any state when Page or thread edit guard refuses", () => {
-  const page = owner({ pageAllowed: false });
+  const page = owner({ pageOpen: true, pageAllowed: false });
   page.jump("root", "parent");
   assert.deepEqual(page.calls, [["page-guard"]]);
-  const thread = owner({ threadAllowed: false });
+  const thread = owner({ pageOpen: true, threadAllowed: false });
   thread.jump("root", "parent");
   assert.deepEqual(thread.calls, [["page-guard"], ["thread-guard"]]);
   assert.equal(thread.state.replyTarget, "newer-draft-target");
+  assert.equal(page.state.pageOpen, true);
+  assert.equal(thread.state.pageOpen, true);
 });
 test("same-thread parent jump exposes an exact target without retargeting the newer composer draft", () => {
   const h = owner();
@@ -98,6 +107,7 @@ test("same-thread parent jump exposes an exact target without retargeting the ne
     false,
   );
   assert.deepEqual(h.state, {
+    pageOpen: false,
     replyTarget: "newer-draft-target",
     draft: "Keep this exact newer draft",
   });
@@ -112,5 +122,22 @@ test("opening a different thread sets only its root as the default composer targ
         name === "setThreadScrollTargetId" && value === "exact-parent",
     ),
   );
+  assert.equal(h.state.draft, "Keep this exact newer draft");
+});
+
+test("allowed owning-pane jump closes the covering Page before opening the parent target", () => {
+  const h = owner({ pageOpen: true });
+  h.jump("root", "parent");
+  assert.deepEqual(h.calls.slice(0, 3), [
+    ["page-guard"],
+    ["thread-guard"],
+    ["close-page"],
+  ]);
+  const closeIndex = h.calls.findIndex(([name]) => name === "close-page");
+  for (const name of ["setOpenThreadHeadId", "setThreadScrollTargetId"]) {
+    assert.ok(h.calls.findIndex(([call]) => call === name) > closeIndex);
+  }
+  assert.equal(h.state.pageOpen, false);
+  assert.equal(h.state.replyTarget, "newer-draft-target");
   assert.equal(h.state.draft, "Keep this exact newer draft");
 });

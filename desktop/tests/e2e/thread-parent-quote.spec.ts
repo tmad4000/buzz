@@ -69,7 +69,14 @@ test("native parent quote survives folds and jumps to the highlighted parent in 
   await expect(inline).toHaveCount(0);
   await summary.click();
   await expect(chip).toHaveText("↪ re: The parent's current first line");
+  await page.getByRole("button", { name: "Page", exact: true }).click();
+  const coveringPage = page.getByRole("region", {
+    name: "Channel Page",
+    exact: true,
+  });
+  await expect(coveringPage).toBeVisible();
   await chip.click();
+  await expect(coveringPage).toHaveCount(0);
   const panel = page.getByTestId("message-thread-panel");
   const parent = panel.locator(`[data-message-id="${ids.parent}"]`);
   await expect(parent).toBeInViewport();
