@@ -80,6 +80,8 @@ function MessageComposerImpl({
   channelName,
   channelType = null,
   containerClassName,
+  compactWhenEmpty = false,
+  accessibleLabel,
   layoutMode = "standalone",
   disabled = false,
   autoFocus = true,
@@ -107,6 +109,8 @@ function MessageComposerImpl({
   showTopBorder = false,
   toolbarExtraActions,
   threadRoutingEntries,
+  onCaptureRoutedSend,
+  routedSendNotice,
   typingParentEventId = null,
   typingRootEventId = null,
 }: MessageComposerProps) {
@@ -686,6 +690,8 @@ function MessageComposerImpl({
       ) {
         return;
       }
+      const onPublished =
+        typeof id === "string" ? onCaptureRoutedSend?.(id) : undefined;
       presentationRef.current?.setLocked(true);
       isSubmitLockedRef.current = true;
       setIsSubmitLocked(true);
@@ -697,6 +703,7 @@ function MessageComposerImpl({
           ? null
           : prepareBackgroundLinkPreviews(getLiveLinkPreviewCandidates());
         await mentionSendFlow.sendMessageWithMentionFlow({
+          onPublished,
           addressedAgentPubkeys: persistentAudience.pubkeys,
           capturedChannelId: channelId,
           capturedThreadContext,
@@ -722,6 +729,7 @@ function MessageComposerImpl({
       }
     },
     [
+      onCaptureRoutedSend,
       channelId,
       channelLinks.clearChannels,
       customEmoji,
@@ -881,6 +889,30 @@ function MessageComposerImpl({
   const handlePaperclipClick = React.useCallback(() => {
     if (!voiceNote.hasAttachmentRef.current) void media.handlePaperclip();
   }, [media.handlePaperclip, voiceNote.hasAttachmentRef]);
+  // Presentation never writes or clears a draft. The existing lifecycle remains
+  // authoritative for text, rich content, media and captured send context.
+  const compact =
+    compactWhenEmpty &&
+    !composerDisabled &&
+    !composerOwnsFocus &&
+    isContentEmpty &&
+    (richText.editor?.isEmpty ?? true) &&
+    media.pendingImeta.length === 0 &&
+    media.queuedAttachments.length === 0 &&
+    !media.isUploading &&
+    !media.isPicking &&
+    media.uploadState.status !== "error" &&
+    !ownershipLocked &&
+    !replyTarget &&
+    !isEmojiPickerOpen &&
+    !isFormattingOpen &&
+    !linkEditor.isCardOpen &&
+    !linkEditor.isDialogOpen &&
+    !isAutocompleteOpenRef.current;
+  React.useEffect(() => {
+    if (accessibleLabel)
+      richText.editor?.view.dom.setAttribute("aria-label", accessibleLabel);
+  }, [accessibleLabel, richText.editor]);
   const acceptsDrop = ownsDropZone && voiceNote.acceptsAttachment;
   return (
     <>
@@ -896,6 +928,7 @@ function MessageComposerImpl({
           className="absolute inset-x-0 bottom-0 h-5 bg-transparent"
         />
         <div className="relative flex w-full flex-col gap-0">
+          {routedSendNotice}
           <ComposerReplyEditBanner
             isEditing={editTarget != null}
             isEditCancelDisabled={isDeferredEditPending}
@@ -915,9 +948,11 @@ function MessageComposerImpl({
           <form
             className={cn(
               "relative z-10 isolate rounded-2xl border border-border/50 bg-background/80 px-3 pb-2 pt-3 shadow-none supports-[backdrop-filter]:bg-background/70 dark:bg-background/70 dark:supports-[backdrop-filter]:bg-background/55 sm:px-4",
+              compact && "!rounded-lg !px-3 !py-2",
               layoutMode === "standalone" &&
                 "backdrop-blur-md dark:backdrop-blur-xl",
             )}
+            data-compact={compact ? "true" : "false"}
             data-submit-locked={isSubmitLocked ? "true" : "false"}
             data-testid="message-composer"
             onDragEnter={acceptsDrop ? media.handleDragEnter : undefined}
@@ -1016,57 +1051,59 @@ function MessageComposerImpl({
             >
               <EditorContent editor={richText.editor} />
             </div>
-            <ComposerDockToolbar
-              addressedAgents={
-                editTarget == null && !composerDisabled ? lockedAgents : []
-              }
-              autoPinConfirmationTitle={autoPinConfirmationTitle}
-              layoutMode={layoutMode}
-              composerDisabled={composerDisabled}
-              editor={richText.editor}
-              extraActions={
-                <>
-                  {toolbarExtraActions}
-                  {threadRoutingEntries && editTarget == null ? (
-                    <SendToThreadPicker
-                      key={`${channelId}:${effectiveDraftKey}`}
-                      entries={threadRoutingEntries}
-                      disabled={sendDisabled || isSubmitLocked || isSending}
-                      getDraft={syncComposerContentFromEditor}
-                      onPick={(id) => {
-                        void submitMessage(id);
-                      }}
-                    />
-                  ) : null}
-                </>
-              }
-              formattingDisabled={composerDisabled}
-              gifMediaController={media}
-              isEmojiPickerOpen={isEmojiPickerOpen}
-              isFormattingOpen={isFormattingOpen}
-              isSending={isSending || mentionSendFlow.isPreparingMentionSend}
-              isUploading={media.isUploading}
-              isVoiceNoteProcessing={voiceNote.status !== "recording"}
-              isVoiceNoteRecording={voiceNote.status !== "idle"}
-              hasVoiceNoteAttachment={voiceNote.hasAttachment}
-              voiceNoteRecorder={voiceNote.recorderElement}
-              onCaptureSelection={handleCaptureSelection}
-              onAutoPinConfirmationDismiss={dismissAutoPinConfirmation}
-              onAutoPinConfirmationHoverChange={setAutoPinConfirmationHovered}
-              onAutoPinConfirmationTurnOff={mentionPicker.turnOff}
-              onEmojiPickerOpenChange={setIsEmojiPickerOpen}
-              onEmojiSelect={insertEmoji}
-              onFormattingToggle={handleFormattingToggle}
-              onLinkButton={linkEditor.openFromToolbar}
-              onOpenMentionPicker={mentionPicker.openMentionSettings}
-              onPaperclip={handlePaperclipClick}
-              onFinishVoiceNote={() => void voiceNote.finish()}
-              onVoiceNote={voiceNote.toggle}
-              onRemoveAddressedAgent={removeAddressedAgent}
-              pulseVersionByPubkey={addressPulse.pulseVersionByPubkey}
-              sendDisabled={sendDisabled}
-              shakeVersionByPubkey={addressPulse.shakeVersionByPubkey}
-            />
+            <div hidden={compact}>
+              <ComposerDockToolbar
+                addressedAgents={
+                  editTarget == null && !composerDisabled ? lockedAgents : []
+                }
+                autoPinConfirmationTitle={autoPinConfirmationTitle}
+                layoutMode={layoutMode}
+                composerDisabled={composerDisabled}
+                editor={richText.editor}
+                extraActions={
+                  <>
+                    {toolbarExtraActions}
+                    {threadRoutingEntries && editTarget == null ? (
+                      <SendToThreadPicker
+                        key={`${channelId}:${effectiveDraftKey}`}
+                        entries={threadRoutingEntries}
+                        disabled={sendDisabled || isSubmitLocked || isSending}
+                        getDraft={syncComposerContentFromEditor}
+                        onPick={(id) => {
+                          void submitMessage(id);
+                        }}
+                      />
+                    ) : null}
+                  </>
+                }
+                formattingDisabled={composerDisabled}
+                gifMediaController={media}
+                isEmojiPickerOpen={isEmojiPickerOpen}
+                isFormattingOpen={isFormattingOpen}
+                isSending={isSending || mentionSendFlow.isPreparingMentionSend}
+                isUploading={media.isUploading}
+                isVoiceNoteProcessing={voiceNote.status !== "recording"}
+                isVoiceNoteRecording={voiceNote.status !== "idle"}
+                hasVoiceNoteAttachment={voiceNote.hasAttachment}
+                voiceNoteRecorder={voiceNote.recorderElement}
+                onCaptureSelection={handleCaptureSelection}
+                onAutoPinConfirmationDismiss={dismissAutoPinConfirmation}
+                onAutoPinConfirmationHoverChange={setAutoPinConfirmationHovered}
+                onAutoPinConfirmationTurnOff={mentionPicker.turnOff}
+                onEmojiPickerOpenChange={setIsEmojiPickerOpen}
+                onEmojiSelect={insertEmoji}
+                onFormattingToggle={handleFormattingToggle}
+                onLinkButton={linkEditor.openFromToolbar}
+                onOpenMentionPicker={mentionPicker.openMentionSettings}
+                onPaperclip={handlePaperclipClick}
+                onFinishVoiceNote={() => void voiceNote.finish()}
+                onVoiceNote={voiceNote.toggle}
+                onRemoveAddressedAgent={removeAddressedAgent}
+                pulseVersionByPubkey={addressPulse.pulseVersionByPubkey}
+                sendDisabled={sendDisabled}
+                shakeVersionByPubkey={addressPulse.shakeVersionByPubkey}
+              />
+            </div>
           </form>
         </div>
       </footer>

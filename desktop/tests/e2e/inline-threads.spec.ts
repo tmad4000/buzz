@@ -135,7 +135,7 @@ test("inline replies, scoped sends, saved expansion and side panel coexist", asy
 
   // The same inline path can create the first reply, without opening a panel.
   await toggle(fresh.id).click();
-  await expect(inline(fresh.id)).toContainText("No replies yet.");
+  await expect(inline(fresh.id)).not.toContainText("No replies yet.");
   await inline(fresh.id)
     .getByTestId("message-input")
     .fill("First reply from the channel");

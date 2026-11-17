@@ -66,6 +66,8 @@ export type ComposerDraftOwner = {
 };
 
 export type PendingNonMemberMentionSend = {
+  /** Observer captured at submission; called only after publisher acceptance. */
+  onPublished?: (messageId?: string) => void;
   sourceOwner: ComposerDraftOwner;
   composerRevision: number;
   invitationSignal?: AbortSignal;
@@ -99,6 +101,7 @@ export type PendingNonMemberMentionSend = {
 };
 
 export type SendMessageWithMentionFlowInput = {
+  onPublished?: (messageId?: string) => void;
   addressedAgentPubkeys?: readonly string[];
   capturedChannelId: string | null;
   capturedThreadContext?: PendingNonMemberMentionSend["capturedThreadContext"];

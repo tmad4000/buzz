@@ -1,3 +1,4 @@
+import { useRoutedSendReturn } from "./useRoutedSendReturn";
 import { InlineAutoExpansionProvider } from "@/features/messages/ui/InlineAutoExpansion";
 import { InlineChannelThread } from "./InlineChannelThread";
 import type { ThreadSummaryRenderer } from "@/features/messages/ui/TimelineMessageRow";
@@ -135,6 +136,8 @@ export const ChannelPane = React.memo(function ChannelPane({
   onBrowseChannels,
   onCreateChannel,
   onCloseThread,
+  onCapturePanelReturn,
+  onOpenSentReply,
   onDelete,
   onEdit,
   onEditSave,
@@ -342,8 +345,9 @@ export const ChannelPane = React.memo(function ChannelPane({
         isActiveWelcomeChannel &&
         (containsWelcomePersonaMention(content) ||
           mentionsKnownAgent(mentionPubkeys, knownAgentPubkeys));
-      messageTimelineRef.current?.scrollToBottomOnNextUpdate();
-      await onSendMessage(
+      if (!threadContext?.parentEventId)
+        messageTimelineRef.current?.scrollToBottomOnNextUpdate();
+      const published = await onSendMessage(
         content,
         mentionPubkeys,
         mediaTags,
@@ -362,6 +366,7 @@ export const ChannelPane = React.memo(function ChannelPane({
       if (shouldCompleteWelcomeBanner) {
         completeWelcomeComposerBanner();
       }
+      return published;
     },
     [
       activeChannelId,
@@ -612,9 +617,25 @@ export const ChannelPane = React.memo(function ChannelPane({
           </IdleAuxiliaryPanel>,
         )
       : null;
+  const routedSend = useRoutedSendReturn({
+    channelId: activeChannelId,
+    channelName: activeChannel?.name ?? "channel",
+    entries: mainTimelineEntries,
+    timeline: messageTimelineRef,
+    onOpenThread,
+    onCloseThread,
+    previousThread: threadHeadMessage,
+    capturePanelReturn: onCapturePanelReturn,
+    onOpenSentReply,
+  });
   const threadHeaderLeading = useSplitAuxiliaryPane ? (
-    <ThreadViewModeToggle onChange={changeThreadViewMode} />
-  ) : undefined;
+    <>
+      {routedSend.backAction}
+      <ThreadViewModeToggle onChange={changeThreadViewMode} />
+    </>
+  ) : (
+    routedSend.backAction
+  );
   const threadLayoutProps = getThreadPanelLayout({
     headerLeading: threadHeaderLeading,
     isFocusDrawer: useFocusThreadDrawer,
@@ -843,6 +864,8 @@ export const ChannelPane = React.memo(function ChannelPane({
                     }
                     onSend={handleSendMessage}
                     threadRoutingEntries={mainTimelineEntries}
+                    onCaptureRoutedSend={routedSend.captureSend}
+                    routedSendNotice={routedSend.notice}
                     {...{ profiles, recentMentionPubkeys: recentMentions }}
                     showBackgroundUploadProgress={false}
                     placeholder={

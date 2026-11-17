@@ -113,6 +113,48 @@ const expect = baseExpect.configure({ timeout: 30000 });
     const first = (await sends())[0];
     assert.equal(first.parentEventId, "1".repeat(64));
     assert.ok(first.channelId);
+    const receiptA = a.getByTestId("routed-send-notice");
+    await expect(receiptA).toContainText("Sent to Release plan for pane A");
+    await expect(b.getByTestId("routed-send-notice")).toHaveCount(0);
+    await mainA.getByTestId("message-input").fill("Newer draft across return");
+    const readingBefore = await a
+      .getByTestId("message-timeline")
+      .evaluate((el) => el.scrollTop);
+    for (let cycle = 0; cycle < 2; cycle++) {
+      await receiptA
+        .getByRole("button", { name: /Open thread Release plan/ })
+        .click();
+      await expect(
+        ta
+          .getByTestId("message-body")
+          .filter({ hasText: "Release plan routing stays captured" }),
+      ).toBeVisible();
+      await page.evaluate(
+        ({ pubkey, cycle }) =>
+          window.__BUZZ_E2E_EMIT_MOCK_MESSAGE__?.({
+            id: `e${cycle + 1}`.repeat(32),
+            content: "Incoming during return",
+            pubkey,
+            channelName: "general",
+            createdAt: Math.floor(Date.now() / 1000) + 60 + cycle,
+          }),
+        { pubkey: "c".repeat(64), cycle },
+      );
+      await a.getByTestId("routed-send-back").click();
+      await expect(ta).toHaveCount(0);
+      await expect(mainA.getByTestId("message-input")).toHaveText(
+        "Newer draft across return",
+      );
+      await expect(
+        receiptA.getByRole("button", { name: /Open thread Release plan/ }),
+      ).toBeFocused();
+      await expect
+        .poll(() =>
+          a.getByTestId("message-timeline").evaluate((el) => el.scrollTop),
+        )
+        .toBe(readingBefore);
+      assert.equal((await sends()).length, 1, "Open/Back cannot republish");
+    }
     await expect(tb).toContainText("Design decisions for pane B");
     await expect(tb.getByTestId("message-input")).toHaveText(
       "Sibling thread draft remains independent",
@@ -236,6 +278,7 @@ const expect = baseExpect.configure({ timeout: 30000 });
         .filter({ hasText: "Shared draft survives picker takeover" })
         .getByRole("button", { name: "Take over", exact: true }),
     ).toBeEnabled();
+    await expect(b.getByTestId("routed-send-notice")).toHaveCount(0);
     assert.equal(
       (await sends()).length,
       2,

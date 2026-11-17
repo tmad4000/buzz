@@ -121,6 +121,7 @@ test("chosen-thread submit synchronously locks real ownership and stale callback
           await held;
         },
       },
+      onCaptureRoutedSend: () => undefined,
       onCaptureSendContext: () => {
         throw new Error("explicit choice must override live selection");
       },

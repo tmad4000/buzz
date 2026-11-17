@@ -85,6 +85,52 @@ export function useUnreadSidebarThread({
     () => indexOverride ?? buildThreadPanelIndex(messages),
     [messages, indexOverride],
   );
+  // A new locally authored row is a reveal intent, independent of unread
+  // frontiers and smart budgets. Stable render keys bridge optimistic ack IDs.
+  const authoredVisit = React.useRef<{
+    key: string | null;
+    seen: Set<string>;
+    latestOwnKey?: string;
+  }>({ key: null, seen: new Set() });
+  const own = messages.filter(
+    (m) =>
+      currentPubkey &&
+      m.pubkey?.toLowerCase() === currentPubkey.toLowerCase() &&
+      m.id !== root,
+  );
+  const freshOwn = own.filter(
+    (m) =>
+      m.pending === true &&
+      !authoredVisit.current.seen.has(m.renderKey ?? m.id),
+  );
+  const freshPaths = new Set<string>();
+  for (const message of freshOwn) {
+    const parents = completeThreadAncestors(
+      index.messageById,
+      root,
+      message.id,
+    );
+    if (parents) {
+      for (const id of parents) freshPaths.add(id);
+      freshPaths.add(message.id);
+    }
+  }
+  const latestOwnKey =
+    freshOwn.at(-1)?.renderKey ??
+    freshOwn.at(-1)?.id ??
+    (authoredVisit.current.key === key
+      ? authoredVisit.current.latestOwnKey
+      : undefined);
+  const ownSendTargetId = own.find(
+    (m) => (m.renderKey ?? m.id) === latestOwnKey,
+  )?.id;
+  React.useLayoutEffect(() => {
+    authoredVisit.current = {
+      latestOwnKey,
+      key,
+      seen: new Set(messages.map((m) => m.renderKey ?? m.id)),
+    };
+  }, [key, messages, latestOwnKey]);
   const unread = new Set(
     messages.filter((m) => m.id !== root && isUnread?.(m.id)).map((m) => m.id),
   );
@@ -134,6 +180,11 @@ export function useUnreadSidebarThread({
           isUnread && !pending ? new Set(paths.keys()) : null,
         )
       : state.branches;
+  if (freshPaths.size) {
+    const next = new Map(branches);
+    for (const id of freshPaths) next.set(id, true);
+    branches = next;
+  }
   let reveal =
     scrollTargetId === state.reveal.external
       ? state.reveal
@@ -225,6 +276,18 @@ export function useUnreadSidebarThread({
       .filter(([, open]) => open)
       .map(([id]) => id),
   );
+  // Older own replies default open as well. Explicit choices still win;
+  // only a fresh send above supersedes a pre-existing collapsed path once.
+  for (const message of own) {
+    const parents = completeThreadAncestors(
+      index.messageById,
+      root,
+      message.id,
+    );
+    if (parents)
+      for (const id of [...parents, message.id])
+        if (branches.get(id) !== false) expanded.add(id);
+  }
   if (autoRevealId && !pending) {
     const parents = completeThreadAncestors(
       index.messageById,
@@ -283,6 +346,7 @@ export function useUnreadSidebarThread({
     commit(next.branches, next.reveal);
   };
   return {
+    ownSendTargetId,
     entries,
     expanded,
     newIds: new Set([...view.newIds].filter((id) => index.messageById.has(id))),

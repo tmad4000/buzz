@@ -22,6 +22,7 @@ export type UpdateStatus =
 /** Read-only fork release discovery. Never invokes the official updater. */
 export function useUpdater() {
   const [status, setStatus] = useState<UpdateStatus>({ state: "idle" });
+  const [latestCheck, setLatestCheck] = useState("Latest version not verified");
   const inFlight = useRef(false);
   const generation = useRef(0);
   const manual = useRef(false);
@@ -33,6 +34,7 @@ export function useUpdater() {
     }
     inFlight.current = true;
     const request = generation.current;
+    setLatestCheck("Checking latest fork release…");
     if (!background) setStatus({ state: "checking" });
     try {
       const response = await fetch(FORK_RELEASE_FEED, {
@@ -51,10 +53,21 @@ export function useUpdater() {
         navigator.platform,
       );
       if (request !== generation.current) return;
+      setLatestCheck(
+        update
+          ? `Update available: ${update.version}`
+          : releases.length
+            ? "Last check: no newer compatible fork release found"
+            : "Latest version unavailable",
+      );
       if (update) setStatus({ state: "manual-required", ...update });
       else if (manual.current)
         setStatus({ state: releases.length ? "up-to-date" : "unavailable" });
     } catch (error) {
+      if (request === generation.current)
+        setLatestCheck(
+          `Check failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
       if (request === generation.current && manual.current)
         setStatus({
           state: "error",
@@ -90,5 +103,5 @@ export function useUpdater() {
   }, [run]);
   // Kept for existing shared indicators. Fork releases require explicit installation.
   const installAndRelaunch = useCallback(async () => {}, []);
-  return { status, checkForUpdate, installAndRelaunch };
+  return { status, latestCheck, checkForUpdate, installAndRelaunch };
 }

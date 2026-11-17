@@ -253,3 +253,73 @@ test("a suspended scope render cannot redirect the committed thread's toggle", a
   );
   await app.close();
 });
+
+test("own defaults do not mistake historical hydration for a send; pending reveal survives ack/read and later collapse wins", async () => {
+  localStorage.clear();
+  const app = mount();
+  const older = { ...msg("older", "branch"), pubkey: "identity-a" };
+  const options = {
+    ...base,
+    initialMode: "collapsed",
+    isUnread: () => false,
+    complete: false,
+  };
+  await app.render({ ...options, messages: [...messages, older] });
+  assert.ok(
+    latest.expanded.has("branch"),
+    "older own reply defaults open despite collapsed automatic policy",
+  );
+  await act(() => latest.setExpanded("root", false));
+  const historical = {
+    ...msg("history", "branch"),
+    pubkey: "identity-a",
+    createdAt: 0,
+  };
+  await app.render({ ...options, messages: [...messages, older, historical] });
+  assert.equal(
+    latest.expanded.has("root"),
+    false,
+    "history load cannot override explicit collapse",
+  );
+  const pending = {
+    ...msg("optimistic-1", "branch"),
+    renderKey: "local-1",
+    pubkey: "identity-a",
+    pending: true,
+  };
+  await app.render({
+    ...options,
+    messages: [...messages, older, historical, pending],
+  });
+  assert.ok(
+    latest.entries.some((e) => e.message.id === pending.id),
+    "actual local pending send exposes collapsed ancestor path",
+  );
+  const ack = { ...pending, id: "ack-1", pending: false };
+  await app.render({
+    ...options,
+    messages: [...messages, older, historical, ack],
+    isUnread: () => true,
+  });
+  await app.render({
+    ...options,
+    messages: [...messages, older, historical, ack],
+    isUnread: () => false,
+    complete: true,
+  });
+  assert.ok(
+    latest.entries.some((e) => e.message.id === ack.id),
+    "ack and read changes retain body visibility",
+  );
+  await act(() => latest.setExpanded("root", false));
+  await app.render({
+    ...options,
+    messages: [...messages, older, historical, ack],
+  });
+  assert.equal(
+    latest.expanded.has("root"),
+    false,
+    "later manual collapse is never replayed over",
+  );
+  await app.close();
+});

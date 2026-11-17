@@ -114,6 +114,7 @@ export function createOptimisticMessage(
   mediaTags: string[][] = [],
   sentFromThreadRootId: string | null = null,
   sentFromThreadRootExcerpt: string | null = null,
+  capturedRootId: string | null = null,
 ): RelayEvent {
   const localKey = `optimistic-${crypto.randomUUID()}`;
   const tags: string[][] = [];
@@ -124,7 +125,7 @@ export function createOptimisticMessage(
         channelId,
         identity.pubkey,
         parentEventId,
-        resolveReplyRootId(parentEventId, currentMessages),
+        capturedRootId ?? resolveReplyRootId(parentEventId, currentMessages),
         mentionPubkeys,
       ),
     );
@@ -664,6 +665,7 @@ export function useSendMessageMutation(
       content,
       mentionPubkeys,
       parentEventId,
+      threadHeadId,
       mediaTags,
       sentFromThreadRootId,
       sentFromThreadRootExcerpt,
@@ -710,6 +712,7 @@ export function useSendMessageMutation(
         mediaTags ?? [],
         sentFromThreadRootId ?? null,
         sentFromThreadRootExcerpt ?? null,
+        threadHeadId ?? null,
       );
 
       const nextWindow = mergeLiveChannelWindowEvent(

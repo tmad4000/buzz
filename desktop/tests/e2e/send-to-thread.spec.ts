@@ -132,13 +132,15 @@ test("explicit keyboard routing, cancel and new-message fallback preserve inline
   await expect.poll(async () => (await lastSend()).parentEventId).toBe(root);
   await expect(editor).toBeEmpty();
   await expect(side).toContainText("Lunch with the team");
-  await expect(page.getByText("Sent to thread", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("routed-send-notice")).toContainText(
+    "Sent to Signed release rollback plan",
+  );
   // The routed reply is in the existing inline thread and opens no other panel.
-  await page
-    .locator(
-      `[data-testid="message-thread-summary"][data-thread-head-id="${root}"]`,
-    )
-    .click();
+  const disclosure = page.locator(
+    `[data-testid="message-thread-summary"][data-thread-head-id="${root}"]`,
+  );
+  if ((await disclosure.getAttribute("aria-expanded")) !== "true")
+    await disclosure.click();
   const inline = page.locator(
     `[data-testid="inline-thread"][data-thread-head-id="${root}"]`,
   );

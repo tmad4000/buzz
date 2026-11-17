@@ -375,7 +375,9 @@ export function MessageThreadPanel({
     hasStoredDisclosure,
     threadRepliesPending,
     sidebar.firstNewId,
-    pendingJump?.root === threadHeadId ? pendingJump.id : scrollTargetId,
+    pendingJump?.root === threadHeadId
+      ? pendingJump.id
+      : (scrollTargetId ?? sidebar.ownSendTargetId ?? null),
   );
 
   const deferredThreadReplies = React.useDeferredValue(

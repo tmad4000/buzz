@@ -1,3 +1,4 @@
+import { getThreadReference } from "./threading";
 import {
   formatTimelineMessages,
   isTimelineContentEvent,
@@ -73,7 +74,25 @@ export function buildIndependentThreadPanel(
         (event) => !replyEventIds.has(event.id),
       )
     : [];
-  const events = head ? [head, ...headAux, ...replyEvents] : replyEvents;
+  // The channel cache owns optimistic sends and their acknowledged local key.
+  // Keep that local echo in this projection until the thread query catches up.
+  const localEcho = channelEvents.filter((event) => {
+    if (
+      (!event.pending && !event.localKey) ||
+      event.pubkey !== formatArgs[1] ||
+      replyEventIds.has(event.id)
+    )
+      return false;
+    const ref = getThreadReference(event.tags);
+    return (
+      ref.rootId === rootId ||
+      ref.parentId === rootId ||
+      (ref.parentId !== null && replyEventIds.has(ref.parentId))
+    );
+  });
+  const events = head
+    ? [head, ...headAux, ...replyEvents, ...localEcho]
+    : [...replyEvents, ...localEcho];
   const messages = formatTimelineMessages(events, ...formatArgs);
   return {
     ...buildThreadPanelData(messages, rootId, replyTargetId, expandedReplyIds),

@@ -10,6 +10,10 @@ export function UpdaterProvider({ children }: { children: ReactNode }) {
   return <UpdaterContext value={updater}>{children}</UpdaterContext>;
 }
 
+export function useOptionalUpdaterContext() {
+  return useContext(UpdaterContext);
+}
+
 export function useUpdaterContext(): UpdaterContextValue {
   const ctx = useContext(UpdaterContext);
   if (!ctx) {

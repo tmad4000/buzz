@@ -121,6 +121,7 @@ export function ChannelScreen({
   } = useAppShell();
   const {
     channelManagementOpen,
+    capturePanelReturn,
     clearAutoSend,
     clearMessageRouteTarget,
     openAgentSessionChannelId,
@@ -919,6 +920,25 @@ export function ChannelScreen({
                   onOpenProfilePanel={handleOpenProfilePanel}
                   onResetThreadPanelWidth={handleThreadPanelWidthReset}
                   onCloseProfilePanel={handleCloseProfilePanel}
+                  onCapturePanelReturn={() => {
+                    if (!requireThreadEditResolution()) return;
+                    const restore = capturePanelReturn();
+                    return () => {
+                      if (!requireThreadEditResolution()) return false;
+                      restore();
+                      return true;
+                    };
+                  }}
+                  onOpenSentReply={(root, messageId) => {
+                    if (!requireThreadEditResolution()) return;
+                    setOpenAgentSessionPubkey(null);
+                    setProfilePanelPubkey(null);
+                    setChannelManagementOpen(false);
+                    setOptimisticOpenThreadHeadId(root.id);
+                    setOpenThreadHeadId(root.id);
+                    setThreadReplyTargetId(root.id);
+                    setThreadScrollTargetId(messageId);
+                  }}
                   onOpenThread={handleOpenThreadAndCloseAgentSession}
                   onSelectThreadReplyTarget={handleSelectThreadReplyTarget}
                   onSendMessage={handleSendMessage}

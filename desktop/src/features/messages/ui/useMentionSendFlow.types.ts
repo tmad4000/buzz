@@ -41,7 +41,7 @@ export type UseMentionSendFlowOptions = {
         threadHeadId: string | null;
       } | null,
       forceRest?: boolean,
-    ) => Promise<void>
+    ) => Promise<void | { id: string }>
   >;
   richText: Pick<UseRichTextEditorResult, "clearContent" | "setContent">;
   setContent: (content: string) => void;

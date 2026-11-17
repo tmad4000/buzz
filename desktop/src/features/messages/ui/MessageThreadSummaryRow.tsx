@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, Reply } from "lucide-react";
 import * as React from "react";
 
 import type {
@@ -124,12 +124,12 @@ export function MessageThreadSummaryRow({
     THREAD_SUMMARY_SURFACE_AVATAR_INSET_REM,
   )})`;
   const replyLabel = summary.replyCount === 1 ? "reply" : "replies";
-  const summaryAriaLabel =
-    expanded !== undefined
-      ? `${expanded ? "Collapse" : "Expand"} ${summary.replyCount} ${replyLabel} inline`
-      : summary.lastReplyAt
-        ? `View thread with ${summary.replyCount} ${replyLabel}, last reply ${formatThreadSummaryLastReplyTime(summary.lastReplyAt)}`
-        : `View thread with ${summary.replyCount} ${replyLabel}`;
+  const empty = summary.replyCount === 0;
+  const summaryAriaLabel = expanded
+    ? `Hide replies to ${message.author}`
+    : empty
+      ? `Reply in thread to ${message.author}`
+      : `Show ${summary.replyCount} ${replyLabel} to ${message.author}`;
   const guideDepths = depthGuideDepths
     ? [...depthGuideDepths]
     : Array.from({ length: Math.max(0, depth - 1) }, (_, index) => index + 1);
@@ -181,7 +181,7 @@ export function MessageThreadSummaryRow({
                   />
                   <button
                     aria-label={collapseAction.label}
-                    className="absolute bottom-0 top-0 z-20 w-5 -translate-x-1/2 cursor-pointer rounded-full focus-visible:outline-hidden"
+                    className="absolute bottom-0 top-0 z-20 w-5 -translate-x-1/2 cursor-pointer rounded-full focus-visible:ring-2 focus-visible:ring-ring"
                     data-thread-head-id={collapseAction.message.id}
                     data-testid="thread-collapse-guide"
                     onBlur={() =>
@@ -244,7 +244,7 @@ export function MessageThreadSummaryRow({
         aria-label={summaryAriaLabel}
         aria-expanded={expanded}
         aria-controls={controlsId}
-        className="group relative isolate inline-flex h-[1.875rem] w-fit max-w-full cursor-pointer items-center gap-1.5 rounded-full py-0 pr-3 text-left text-xs font-medium text-muted-foreground transition-[color,opacity] hover:text-foreground hover:opacity-90 focus-visible:outline-hidden"
+        className="group relative isolate inline-flex h-[1.875rem] w-fit max-w-full cursor-pointer items-center gap-1.5 rounded-full py-0 pr-3 text-left text-xs font-medium text-muted-foreground transition-[color,opacity] hover:text-foreground hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring"
         data-thread-head-id={message.id}
         data-testid="message-thread-summary"
         onClick={() => onOpenThread(message)}
@@ -282,7 +282,9 @@ export function MessageThreadSummaryRow({
             right: 0,
           }}
         />
-        {expanded !== undefined ? (
+        {empty && !expanded ? (
+          <Reply className="size-3" aria-hidden />
+        ) : expanded !== undefined ? (
           expanded ? (
             <ChevronDown className="relative z-10 size-3" aria-hidden />
           ) : (
@@ -290,29 +292,30 @@ export function MessageThreadSummaryRow({
           )
         ) : null}
         <div className="relative z-10 flex shrink-0 items-center">
-          {summary.participants.map((participant, index) => (
-            <ParticipantAvatar
-              foregroundIsAgent={
-                summary.participants[index + 1]?.isAgent === true
-              }
-              index={index}
-              key={participant.id}
-              participant={participant}
-              participantCount={summary.participants.length}
-            />
-          ))}
+          {!empty &&
+            summary.participants.map((participant, index) => (
+              <ParticipantAvatar
+                foregroundIsAgent={
+                  summary.participants[index + 1]?.isAgent === true
+                }
+                index={index}
+                key={participant.id}
+                participant={participant}
+                participantCount={summary.participants.length}
+              />
+            ))}
         </div>
         <div className="relative z-10 min-w-0">
           <div>
             <span className="font-medium transition-colors group-hover:text-foreground">
-              {summary.replyCount} {replyLabel}
+              {empty ? "Reply" : `${summary.replyCount} ${replyLabel}`}
             </span>
             {unreadCount != null && unreadCount > 0 ? (
               <span className="ml-1" data-testid="thread-unread-badge">
                 ({unreadCount} new)
               </span>
             ) : null}
-            {summary.lastReplyAt ? (
+            {!empty && summary.lastReplyAt ? (
               <>
                 <span className="mx-1 font-normal text-muted-foreground/50">
                   ·
@@ -329,7 +332,7 @@ export function MessageThreadSummaryRow({
                     className="col-start-1 row-start-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
                     data-testid="message-thread-summary-hover-action"
                   >
-                    View thread
+                    {expanded ? "Hide replies" : "Show replies"}
                   </span>
                 </span>
               </>
