@@ -67,26 +67,38 @@ export function readChannelStarsStore(pubkey: string): ChannelStarStore {
 
 export function boundStarStore(
   store: ChannelStarStore,
-  preservedKey?: string,
+  preservedKey?: string | readonly string[],
 ): ChannelStarStore {
-  const preservedEntry =
-    preservedKey === undefined ? undefined : store.channels[preservedKey];
+  const preserved = new Set(
+    typeof preservedKey === "string" ? [preservedKey] : (preservedKey ?? []),
+  );
+  const preservedEntries = Object.entries(store.channels).filter(([id]) =>
+    preserved.has(id),
+  );
   const entries = Object.entries(store.channels).filter(
-    ([channelId]) => channelId !== preservedKey,
+    ([id]) => !preserved.has(id),
   );
-  if (entries.length + (preservedEntry ? 1 : 0) <= MAX_CHANNEL_STAR_ENTRIES)
+  if (entries.length + preservedEntries.length <= MAX_CHANNEL_STAR_ENTRIES)
     return store;
-  entries.sort(([leftId, left], [rightId, right]) => {
-    if (left.updatedAt !== right.updatedAt)
-      return left.updatedAt - right.updatedAt;
-    return leftId < rightId ? -1 : leftId > rightId ? 1 : 0;
-  });
-  const retainedEntries = entries.slice(
-    -(MAX_CHANNEL_STAR_ENTRIES - (preservedEntry ? 1 : 0)),
+  entries.sort(
+    ([leftId, left], [rightId, right]) =>
+      left.updatedAt - right.updatedAt ||
+      (leftId < rightId ? -1 : leftId > rightId ? 1 : 0),
   );
-  if (preservedEntry && preservedKey !== undefined) {
-    retainedEntries.push([preservedKey, preservedEntry]);
-  }
+  const retainedEntries = [
+    ...entries.slice(
+      -Math.max(0, MAX_CHANNEL_STAR_ENTRIES - preservedEntries.length),
+    ),
+    ...preservedEntries,
+  ];
+  // A protected full batch has no room for other entries (`slice(-0)` is all).
+  if (preservedEntries.length >= MAX_CHANNEL_STAR_ENTRIES)
+    return {
+      ...store,
+      channels: Object.fromEntries(
+        preservedEntries.slice(-MAX_CHANNEL_STAR_ENTRIES),
+      ),
+    };
   return {
     ...store,
     channels: Object.fromEntries(retainedEntries),
@@ -111,6 +123,7 @@ export function writeChannelStarsStore(
 export function mergeStores(
   local: ChannelStarStore,
   remote: ChannelStarStore,
+  requireAllFavorites = false,
 ): ChannelStarStore {
   const allIds = new Set([
     ...Object.keys(local.channels),
@@ -126,7 +139,18 @@ export function mergeStores(
       merged[id] = (l ?? r) as ChannelStarEntry;
     }
   }
-  return boundStarStore({ version: 1, channels: merged });
+  if (
+    requireAllFavorites &&
+    Object.values(merged).filter((entry) => entry.starred).length >
+      MAX_CHANNEL_STAR_ENTRIES
+  )
+    throw new Error("Starred is full");
+  return boundStarStore(
+    { version: 1, channels: merged },
+    requireAllFavorites
+      ? Object.keys(merged).filter((id) => merged[id].starred)
+      : undefined,
+  );
 }
 
 export function starredChannelIdsFromStore(

@@ -17,7 +17,7 @@ export function groupSidebarChannels(
   channels: readonly Channel[],
   sections: readonly ChannelSection[],
   assignments: Readonly<Record<string, string>>,
-  starredChannelIds: ReadonlySet<string> | undefined,
+  _starredChannelIds: ReadonlySet<string> | undefined,
   sortModeFor: (group: ChannelSortGroupKey) => ChannelSortMode,
 ): {
   groups: SidebarSectionGroup[];
@@ -31,10 +31,6 @@ export function groupSidebarChannels(
   const sectionIds = new Set(sections.map((section) => section.id));
   for (const channel of channels) {
     if (channel.channelType !== "stream" && channel.channelType !== "dm")
-      continue;
-    // Preserve the upstream Starred placement; message pins are channel data
-    // and travel unchanged with the original channel object and canonical ID.
-    if (channel.channelType !== "dm" && starredChannelIds?.has(channel.id))
       continue;
     const sectionId = assignments[channel.id];
     if (sectionId && sectionIds.has(sectionId)) {
