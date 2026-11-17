@@ -20,6 +20,10 @@ import { canSplit, type Size } from "./geometry";
 import type { ConversationVisitCache } from "./visitCache";
 import { restoreVisitCache, saveVisitCache } from "./visitCacheStorage";
 import {
+  selectConversationRouteTarget,
+  type ConversationRouteIntent,
+} from "../routeTarget";
+import {
   restoreLayout,
   saveLayout,
   SESSION_ONLY_MESSAGE,
@@ -219,6 +223,43 @@ export class ConversationLayoutController {
     );
     this.presentations.remember(next.views[viewId]);
     return this.change(next);
+  }
+  /** Apply an explicit route through the target's normal authorization/leave/cache transaction. */
+  navigateRoute({
+    channelId,
+    intent,
+    visibleViewIds,
+    recentViewIds,
+    presentation,
+  }: {
+    channelId: string;
+    intent: ConversationRouteIntent;
+    visibleViewIds: ReadonlySet<string>;
+    recentViewIds: readonly string[];
+    presentation?: Parameters<typeof navigateView>[3];
+  }): string | null {
+    if (
+      !this.current() ||
+      (intent.kind === "external" && intent.channelId !== channelId)
+    )
+      return null;
+    const layout = this.snapshot.layout;
+    const focused = listPanes(layout.root).find(
+      (pane) => pane.id === layout.focusedPaneId,
+    );
+    if (!focused) return null;
+    const target = selectConversationRouteTarget({
+      views: listPanes(layout.root).map(
+        (pane) => layout.views[pane.viewInstanceId],
+      ),
+      focusedViewId: focused.viewInstanceId,
+      visibleViewIds,
+      recentViewIds,
+      intent,
+    });
+    return target && this.navigate(target, channelId, presentation)
+      ? target
+      : null;
   }
   /** Capture at render time; use for delayed panel/anchor persistence callbacks. */
   visitToken(viewId: string) {
