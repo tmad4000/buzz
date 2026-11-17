@@ -751,6 +751,15 @@ pub async fn nip44_decrypt_from_self(
     .map_err(|e| format!("spawn_blocking failed: {e}"))?
 }
 
+/// Decrypt the fixed sidebar bootstrap using the current local identity.
+#[tauri::command]
+pub async fn load_sidebar_section_defaults(state: State<'_, AppState>) -> Result<String, String> {
+    let keys = state.signing_keys()?;
+    tauri::async_runtime::spawn_blocking(move || crate::sidebar_section_defaults::load(&keys))
+        .await
+        .map_err(|e| format!("spawn_blocking failed: {e}"))?
+}
+
 #[cfg(test)]
 mod nostr_identity_binding_tests {
     use super::build_nostr_identity_binding_event;
