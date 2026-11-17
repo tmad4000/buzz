@@ -313,7 +313,7 @@ test("missing and unauthorized annotations stay visible ordinary content without
     page.locator(
       `[data-testid="message-thread-summary"][data-thread-head-id="${parent.id}"]`,
     ),
-  ).toHaveAttribute("aria-label", /0 replies inline$/);
+  ).toHaveAttribute("aria-label", /^Reply in thread to .+$/);
   await page.mouse.move(5, 5);
   await page.screenshot({ path: `${shots}/rejected-and-missing-audit.png` });
 });
