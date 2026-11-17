@@ -44,7 +44,7 @@ def main(argv=None):
     config = json.loads((args.state_dir / 'config.json').read_text())
     if config['channel_id'] not in {WORKLOG, TEST_CHANNEL}:
         raise ValueError('Destination must be the verified Work log or isolated test channel')
-    api = Buzz(config['buzz_cli'], Path(__file__).with_name('worklog_verify.mjs'))
+    api = Buzz(config['buzz_cli'], Path(__file__).resolve().with_name('worklog_verify.mjs'))
     # Hold the local single writer through readback; never retry an uncertain send.
     with (args.state_dir / 'writer.lock').open('a') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
