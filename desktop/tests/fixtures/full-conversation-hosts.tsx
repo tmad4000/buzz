@@ -2,6 +2,11 @@
 // existing mock IPC bridge. No relay, native build or production account.
 import * as React from "react";
 import {
+  resolveThreadReplySeenAt,
+  threadReplySeenKey,
+  threadSeenKey,
+} from "@/features/channels/readState/threadReplySeen";
+import {
   ConversationViewGuards,
   ConversationViewGuardsContext,
 } from "@/features/conversations/ConversationViewGuards";
@@ -53,6 +58,7 @@ const harnessWindow = window as typeof window & {
   hostReads: { view: string; kind: string; id: string }[];
   hostEffective: (messageId: string) => number | null;
   hostChannelRead: () => number | null;
+  hostSeen?: (rootId: string, replyId: string) => number | null;
   layoutSnapshot?: () => ConversationLayout;
   requestPaneClose?: (paneId: string) => boolean;
   requestPaneNavigate?: (viewId: string, channelId: string) => boolean;
@@ -145,6 +151,16 @@ function PerViewShell({
           id: args[0],
         });
         base.markChannelRead(...args);
+      },
+      markThreadReplySeen: (
+        ...args: Parameters<typeof base.markThreadReplySeen>
+      ) => {
+        harnessWindow.hostReads.push({
+          view: id,
+          kind: "seen",
+          id: `${args[0]}:${args[1]}`,
+        });
+        base.markThreadReplySeen(...args);
       },
       markMessageRead: (...args: Parameters<typeof base.markMessageRead>) => {
         harnessWindow.hostReads.push({
@@ -420,6 +436,8 @@ function Screen() {
     read.getEffectiveTimestamp(`msg:${id}`);
   harnessWindow.hostChannelRead = () =>
     read.getEffectiveTimestamp(channel?.id ?? "none");
+  harnessWindow.hostSeen = (rootId, replyId) =>
+    resolveThreadReplySeenAt(rootId, replyId, read.getOwnTimestamp);
   const [focused, setFocused] = React.useState("a");
   const [showA, setShowA] = React.useState(true);
   const shell = React.useMemo(
@@ -428,6 +446,12 @@ function Screen() {
       registerContextParents: read.registerContextParents,
       readStateVersion: read.readStateVersion,
       getChannelReadAt: read.getEffectiveTimestamp,
+      getThreadReplySeenAt: (rootId: string, replyId: string) =>
+        resolveThreadReplySeenAt(rootId, replyId, read.getOwnTimestamp),
+      markThreadReplySeen: (rootId: string, replyId: string, at: number) => {
+        read.seedContextRead(threadReplySeenKey(rootId, replyId), at);
+        read.seedContextRead(threadSeenKey(rootId), at);
+      },
       getMessageReadAt: (id: string) => read.getEffectiveTimestamp(`msg:${id}`),
       markChannelRead: (id: string, at?: string | null) => {
         if (at) read.seedContextRead(id, Math.floor(Date.parse(at) / 1000));
@@ -440,6 +464,7 @@ function Screen() {
       read.registerContextParents,
       read.readStateVersion,
       read.getEffectiveTimestamp,
+      read.getOwnTimestamp,
       read.seedContextRead,
     ],
   );

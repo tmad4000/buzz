@@ -264,7 +264,7 @@ export function useChannelUnreadState({
   );
   if (openThreadHeadId) {
     // Capture each visible reply's read state the first render it appears —
-    // before the on-open mark-read effect advances its marker. Replies revealed
+    // before a visible-body observer advances its marker. Replies disclosed
     // by expanding a branch are captured eagerly in markRevealedRepliesRead
     // (before that path's synchronous mark-read), so this render-time pass
     // covers replies present at open and acts as the fallback for any reply
@@ -280,27 +280,10 @@ export function useChannelUnreadState({
       threadOpenReadSnapshotRef.current.delete(rootId);
     };
   }, [openThreadHeadId]);
-  // Mark the revealed set read when the thread opens (LP4 v3): only the replies
-  // visible on open are read, never the whole subtree. A reply nested in a
-  // still-collapsed branch keeps its badge until it too is revealed (the
-  // deliberate reversal of #1118's whole-subtree-on-open). Each revealed reply
-  // gets its own msg:<id> marker advanced to its createdAt; a NEWER reply
-  // re-raises the badge because the predicate is strictly createdAt > read.
-  React.useEffect(() => {
-    if (!canRead() || !openThreadHeadId) return;
-    if (isThreadMuted(openThreadHeadId)) return;
-    for (const entry of threadMessages) {
-      markMessageRead(entry.message.id, entry.message.createdAt);
-    }
-  }, [
-    canRead,
-    openThreadHeadId,
-    threadMessages,
-    markMessageRead,
-    isThreadMuted,
-  ]);
+  // Mount/open/expansion is not viewport evidence. Reply acknowledgements
+  // arrive only from committed visible bodies via markSidebarRepliesRead.
   // In-thread "New" divider position. Reads the open-time snapshot (frozen
-  // before the mark-read effect above), so the divider does not collapse the
+  // before visibility acknowledgements), so the divider does not collapse the
   // instant open marks the revealed replies read. A reply absent from the
   // snapshot (loaded after open) falls back to its live marker.
   const { firstUnreadReplyId: threadFirstUnreadReplyId } = React.useMemo(() => {
@@ -437,43 +420,27 @@ export function useChannelUnreadState({
     markChannelUnread(activeChannelId);
   }, [activeChannelId, markChannelUnread]);
 
-  // Mark a message's directly-revealed children read (LP4 v3 open-at-level):
-  // expanding a branch reveals only its direct replies, so only those get a
-  // msg:<id> marker advanced to their createdAt. A reply still nested in a
-  // collapsed grandchild branch keeps its badge until it too is revealed.
-  //
-  // Capture each child's pre-read state into the divider snapshot BEFORE
-  // advancing its marker. This path runs synchronously in the expand event
-  // handler, before React re-renders with the child visible — so without the
-  // pre-capture the render-time pass above would snapshot the child as already
-  // read (this mark-read having won the race) and the "New" divider would never
-  // anchor to a reply first revealed by expansion.
+  // Capture expansion's pre-read divider state without acknowledging children:
+  // disclosure can commit offscreen or under a covering panel. The body observer
+  // owns the later read/seen write after visibility and focus admission.
   const markRevealedRepliesRead = React.useCallback(
     (messageId: string) => {
-      if (!canRead()) return;
-      for (const replyId of directReplyIdsByParentId.get(messageId) ?? []) {
-        const createdAt = createdAtByMessageId.get(replyId);
-        if (createdAt !== undefined) {
-          captureDividerReadState(replyId);
-          markMessageRead(replyId, createdAt);
-        }
-      }
+      for (const replyId of directReplyIdsByParentId.get(messageId) ?? [])
+        captureDividerReadState(replyId);
     },
-    [
-      canRead,
-      captureDividerReadState,
-      createdAtByMessageId,
-      directReplyIdsByParentId,
-      markMessageRead,
-    ],
+    [captureDividerReadState, directReplyIdsByParentId],
   );
 
+  // The committed body observer supplies only actually visible replies.
   const markSidebarRepliesRead = React.useCallback(
     (messages: TimelineMessage[], rootId = openThreadHeadId) => {
       if (!canRead() || !rootId || isThreadMuted(rootId)) return;
       for (const message of messages) {
         if (rootId === openThreadHeadId) captureDividerReadState(message.id);
-        if ((getMessageReadAt(message.id) ?? 0) < message.createdAt)
+        if (
+          !message.pending &&
+          (getMessageReadAt(message.id) ?? 0) < message.createdAt
+        )
           markMessageRead(message.id, message.createdAt);
       }
     },

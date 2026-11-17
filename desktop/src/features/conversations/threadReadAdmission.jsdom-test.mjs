@@ -90,7 +90,15 @@ test("thread mount/reveal/visibility and queued callbacks obey the view focus gu
     latest.b.markSidebarRepliesRead([messages[1]]);
     assert.deepEqual(writes, []);
     await render("a");
-    assert.ok(writes.length > 0);
+    assert.deepEqual(
+      writes,
+      [],
+      "focused mount alone is not viewport evidence",
+    );
+    latest.a.markRevealedRepliesRead("root");
+    assert.deepEqual(writes, [], "expansion alone cannot acknowledge replies");
+    latest.a.markSidebarRepliesRead([messages[1]]);
+    assert.deepEqual(writes, [["reply", 2]]);
     const queued = latest.a.markSidebarRepliesRead;
     writes.length = 0;
     await render(null);
