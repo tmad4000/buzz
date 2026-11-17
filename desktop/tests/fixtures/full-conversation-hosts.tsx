@@ -218,16 +218,20 @@ function LayoutBody() {
       windowSlot: "main",
     };
     const entries = new Map<string, string>();
-    const makeController = (layout: ReturnType<typeof createSingleLayout>) => {
-      entries.set(layoutStorageKey(scope), JSON.stringify(layout));
-      return new ConversationLayoutController({
-        scope,
-        storage: {
-          getItem: (key) => entries.get(key) ?? null,
-          setItem: (key, value) => {
+    const storage = new URLSearchParams(location.search).has("persistVisits")
+      ? localStorage
+      : {
+          getItem: (key: string) => entries.get(key) ?? null,
+          setItem: (key: string, value: string) => {
             entries.set(key, value);
           },
-        },
+        };
+    const makeController = (layout: ReturnType<typeof createSingleLayout>) => {
+      if (storage.getItem(layoutStorageKey(scope)) === null)
+        storage.setItem(layoutStorageKey(scope), JSON.stringify(layout));
+      return new ConversationLayoutController({
+        scope,
+        storage,
         initialChannelId: channel?.id ?? "missing",
         isCurrentScope: () => true,
         canOpen: (id) =>

@@ -3,6 +3,7 @@ import test from "node:test";
 import { ConversationLayoutController } from "./controller.ts";
 import { listPanes } from "./model.ts";
 import { layoutStorageKey } from "./storage.ts";
+import { visitCacheStorageKey } from "./visitCacheStorage.ts";
 
 const bounds = { width: 1000, height: 800 };
 const scope = {
@@ -78,6 +79,76 @@ test("Restore split remembers the outgoing chat and retires its callbacks", () =
     false,
   );
   controller.dispose();
+});
+
+test("scoped visit cache survives controller reconstruction independently of canonical drafts", () => {
+  const first = setup();
+  const id = panes(first.controller)[0].viewInstanceId;
+  first.controller.update(id, "chat", first.controller.visitToken(id), {
+    panelState: { thread: "remembered-root" },
+    threadAnchor: { messageId: "reply", offset: 17 },
+  });
+  first.controller.navigate(id, "dm");
+  first.controller.dispose();
+  const saved = new Map(first.entries);
+  saved.set("unrelated-draft", "keep this draft");
+  const second = setup({
+    storage: {
+      getItem: (key) => saved.get(key) ?? null,
+      setItem: (key, value) => saved.set(key, value),
+    },
+  });
+  assert.equal(
+    second.controller.getSnapshot().layout.views[id].channelId,
+    "dm",
+  );
+  second.controller.navigate(id, "chat");
+  const restored = second.controller.getSnapshot().layout.views[id];
+  assert.equal(restored.panelState.thread, "remembered-root");
+  assert.deepEqual(restored.threadAnchor, { messageId: "reply", offset: 17 });
+  assert.equal(saved.get("unrelated-draft"), "keep this draft");
+  const other = setup({
+    scope: { ...scope, identityPubkey: "other" },
+    storage: {
+      getItem: (key) => saved.get(key) ?? null,
+      setItem: (key, value) => saved.set(key, value),
+    },
+  });
+  assert.deepEqual(
+    Object.values(other.controller.getSnapshot().layout.views)[0].panelState,
+    {},
+  );
+  other.controller.dispose();
+  second.controller.dispose();
+});
+
+test("corrupt cache backup precedes replacement and cache quota failure keeps live navigation", () => {
+  const fixture = setup();
+  const key = visitCacheStorageKey(scope);
+  fixture.entries.set(key, "{broken cache");
+  const id = panes(fixture.controller)[0].viewInstanceId;
+  fixture.controller.navigate(id, "dm");
+  assert.equal(fixture.entries.get(`${key}:recovery`), "{broken cache");
+  assert.ok(
+    fixture.writes.indexOf(`${key}:recovery`) < fixture.writes.indexOf(key),
+  );
+  const failing = setup({
+    storage: {
+      getItem: () => null,
+      setItem: (entry) => {
+        if (entry.endsWith(":visits")) throw new Error("cache quota");
+      },
+    },
+  });
+  const failedId = panes(failing.controller)[0].viewInstanceId;
+  assert.equal(failing.controller.navigate(failedId, "dm"), true);
+  assert.equal(
+    failing.controller.getSnapshot().message,
+    "Layout saved for this session only.",
+  );
+  assert.equal(failing.controller.navigate(failedId, "chat"), true);
+  fixture.controller.dispose();
+  failing.controller.dispose();
 });
 
 test("returning to a chat restores only that view's latest presentation", () => {
