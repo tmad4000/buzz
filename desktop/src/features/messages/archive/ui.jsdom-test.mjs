@@ -31,7 +31,7 @@ const root = {
   depth: 0,
   time: "",
 };
-let api, live, replyIds, cmds, qc;
+let api, live, replyIds, cmds, qc, reconnects;
 function Probe() {
   api = useArchive();
   return h(
@@ -92,6 +92,7 @@ function mount(children) {
 beforeEach(() => {
   window.localStorage.clear();
   live = [];
+  reconnects = [];
   replyIds = ["q"];
   cmds = [];
   mock.method(relayClient, "fetchEvents", async () => []);
@@ -99,7 +100,10 @@ beforeEach(() => {
     if (filter["#h"]) live.push(cb);
     return async () => {};
   });
-  mock.method(relayClient, "subscribeToReconnects", () => () => {});
+  mock.method(relayClient, "subscribeToReconnects", (callback) => {
+    reconnects.push(callback);
+    return () => {};
+  });
   window.__TAURI_INTERNALS__ = {
     invoke: async (cmd) => {
       cmds.push(cmd);
@@ -231,4 +235,130 @@ test("archived replies disappear from unseen candidates while their observation 
     ["a", "c"],
   );
   assert.equal(items.length, 3, "projection does not mutate canonical data");
+});
+
+test("on-open and expansion legacy paths never acknowledge an archived reply; actual-body callback still can", async () => {
+  const { useChannelUnreadState } = await import(
+    "@/features/channels/ui/useChannelUnreadState.ts"
+  );
+  mock.method(document, "hasFocus", () => true);
+  const descriptor = Object.getOwnPropertyDescriptor(
+    document,
+    "visibilityState",
+  );
+  Object.defineProperty(document, "visibilityState", {
+    configurable: true,
+    value: "visible",
+  });
+  const read = [];
+  const messages = [
+    root,
+    { ...root, id: "q", parentId: "r", rootId: "r", createdAt: 11 },
+  ];
+  let unread;
+  function ReadProbe() {
+    const [open, setOpen] = React.useState(false);
+    unread = useChannelUnreadState({
+      activeChannelId: "c",
+      timelineMessages: messages,
+      currentPubkey: "a".repeat(64),
+      openThreadHeadId: open ? "r" : null,
+      threadReplyTargetId: null,
+      expandedThreadReplyIds: new Set(),
+      getChannelReadAt: () => null,
+      getMessageReadAt: () => null,
+      clearChannelUnreadSource: () => {},
+      markChannelUnread: () => {},
+      markMessageRead: (...args) => read.push(args),
+      isThreadMuted: () => false,
+      readStateVersion: 0,
+    });
+    return h(
+      "button",
+      { onClick: () => setOpen(true) },
+      "Open regression thread",
+    );
+  }
+  try {
+    mount(h(ReadProbe));
+    await waitFor(() => assert.equal(api.ready, true));
+    await React.act(async () => api.toggle("c", messages[1]));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Open regression thread" }),
+    );
+    assert.deepEqual(read, []);
+    await React.act(async () => unread.markRevealedRepliesRead("r"));
+    assert.deepEqual(read, []);
+    await React.act(async () =>
+      unread.markSidebarRepliesRead([messages[1]], "r"),
+    );
+    assert.deepEqual(
+      read,
+      [["q", 11]],
+      "observer callback remains the committed-body authority",
+    );
+  } finally {
+    if (descriptor)
+      Object.defineProperty(document, "visibilityState", descriptor);
+    else delete document.visibilityState;
+  }
+});
+
+test("nonmember scopes expose no dead archive controls", async () => {
+  mount(h(ArchiveHoverAction, { channelId: "not-joined", message: root }));
+  await waitFor(() => assert.equal(api.ready, true));
+  assert.equal(api.canArchive("not-joined"), false);
+  assert.equal(
+    screen.queryByRole("button", { name: "Archive message for me" }),
+    null,
+  );
+  assert.equal(api.records.size, 0);
+});
+
+test("reconnect catch-up restores an archived thread without a live event or read acknowledgement", async () => {
+  mount(null);
+  await waitFor(() => assert.equal(api.ready, true));
+  fireEvent.click(screen.getByRole("button", { name: "Archive whole thread" }));
+  await waitFor(() => assert.equal(api.records.has("t:r"), true));
+  replyIds = ["q", "offline-backdated"];
+  await React.act(async () => {
+    for (const callback of reconnects) callback();
+  });
+  await waitFor(() => assert.equal(api.records.has("t:r"), false));
+  assert.deepEqual([...new Set(cmds)], ["get_thread_replies"]);
+});
+
+test("thread archive completing after channel membership revocation cannot commit", async () => {
+  let release,
+    started = false;
+  window.__TAURI_INTERNALS__.invoke = async (cmd) => {
+    if (cmd === "get_thread_replies") {
+      started = true;
+      return new Promise((resolve) => {
+        release = () => resolve({ events: [], nextCursor: null });
+      });
+    }
+    throw Error(`Unexpected ${cmd}`);
+  };
+  qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const frame = (channels) =>
+    h(
+      QueryClientProvider,
+      { client: qc },
+      h(
+        ArchiveProvider,
+        { pubkey: "a".repeat(64), relayUrl: "wss://archive.test", channels },
+        h(Probe),
+      ),
+    );
+  const view = render(frame([{ id: "c", isMember: true }]));
+  await waitFor(() => assert.equal(api.ready, true));
+  fireEvent.click(screen.getByRole("button", { name: "Archive whole thread" }));
+  await waitFor(() => assert.equal(started, true));
+  view.rerender(frame([]));
+  await React.act(async () => {
+    release();
+  });
+  assert.equal(api.canArchive("c"), false);
+  assert.equal(api.records.has("t:r"), false);
 });

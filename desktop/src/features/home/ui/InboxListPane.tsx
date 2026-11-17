@@ -626,6 +626,7 @@ export function InboxListPane({
                 <PopoverTrigger asChild>
                   <button
                     aria-label="Inbox options"
+                    disabled={showArchive}
                     className={cn(INBOX_HEADER_ICON_BUTTON_CLASS, "-mr-4")}
                     data-testid="inbox-options-trigger"
                     type="button"

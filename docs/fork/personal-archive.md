@@ -55,7 +55,10 @@ Channel `TimelineMessageList` projects full `MessageRowItem` entries through
 entries/IDs/rootId/parentId remain unchanged, including virtualizer keys.
 Contiguous hidden entries share one run; Show reveals that run for this mounted
 channel visit without unarchiving or changing saved disclosure preferences.
-Per-channel Show archived is a separate synced preference. Timeline's flattened
+Per-channel Show archived is a separate synced preference. Opening an entry from
+the Archived list explicitly enables that synced channel preference, so all
+archived messages in that channel become visible on this user’s devices.
+The open button’s tooltip names this effect. Timeline's flattened
 root/reply entries should use the same projection, not a second read observer.
 Sections should project archived children at the same row seam; never remove
 canonical entries from tree/ancestry indexes. A collapsed section can retain its
@@ -74,3 +77,10 @@ Check an archived reply is absent from header unseen counts after the adapter;
 unarchive should reveal its previous unseen status. Verify split background
 panes cannot mark shown bodies seen and saved collapse preferences survive.
 Linux/browser evidence cannot verify macOS/iOS behavior or relay/native packaging.
+
+Retain the integrating owner’s removal of legacy thread-open/expansion read
+writes. On this frozen base those paths at least skip archived IDs; explicit
+Show still relies on the admitted committed-body observer. Nested subtree
+badges use an exclusion predicate on counted IDs and retain all ancestry nodes.
+Controls and the archive list require current membership; an in-flight thread
+archive rechecks that membership before committing.

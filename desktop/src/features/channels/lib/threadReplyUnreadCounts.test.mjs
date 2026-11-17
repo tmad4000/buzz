@@ -177,3 +177,25 @@ test("computeThreadReplyUnreadCounts_forcedUnread_relightsReadDescendant", () =>
   assert.equal(counts.get("a"), 1); // a1 forced unread
   assert.equal(counts.has("b"), false); // b subtree still read
 });
+
+test("archive excludes only counted IDs, preserving hidden intermediate ancestry and forced-unread semantics", () => {
+  const counts = computeThreadReplyUnreadCounts({
+    timelineMessages: fixture(),
+    subtreeReplyIds: ROOT_SUBTREE,
+    visibleReplyIds: ["a", "b"],
+    expandedReplyIds: new Set(),
+    getReadAt: () => null,
+    isExcluded: (message) => ["a1", "b1"].includes(message.id),
+    isForcedUnread: () => true,
+  });
+  assert.equal(
+    counts.has("a"),
+    false,
+    "archived forced-unread leaf must not count",
+  );
+  assert.equal(
+    counts.get("b"),
+    1,
+    "b2 still rolls up through archived intermediate b1",
+  );
+});

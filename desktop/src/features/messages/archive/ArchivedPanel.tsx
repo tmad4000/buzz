@@ -21,12 +21,16 @@ export function ArchivedPanel({
   const entries = React.useMemo(
     () =>
       [...archive.records.values()]
-        .filter((entry) => availableChannelIds.has(entry.channelId))
+        .filter(
+          (entry) =>
+            availableChannelIds.has(entry.channelId) &&
+            archive.canArchive(entry.channelId),
+        )
         .sort(
           (a, b) =>
             b.archivedAt - a.archivedAt || a.targetId.localeCompare(b.targetId),
         ),
-    [archive.records, availableChannelIds],
+    [archive, availableChannelIds],
   );
   const ids = entries.map((entry) => entry.targetId);
   const sources = useQuery({
@@ -83,6 +87,7 @@ export function ArchivedPanel({
             <button
               type="button"
               className="min-w-0 flex-1 text-left"
+              title="Open in channel and show archived messages"
               onClick={() => {
                 archive.setShowArchived(entry.channelId, true);
                 onOpen(

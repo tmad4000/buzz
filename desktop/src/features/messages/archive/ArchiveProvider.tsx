@@ -23,6 +23,7 @@ const noopSubscribe = () => () => {};
 const emptyGet = () => empty;
 export type ArchiveApi = {
   enabled: boolean;
+  canArchive: (channelId: string) => boolean;
   ready: boolean;
   revision: number;
   records: ReadonlyMap<string, ArchiveTarget>;
@@ -42,7 +43,9 @@ export type ArchiveApi = {
 };
 const ArchiveContext = React.createContext<ArchiveApi>({
   ...empty,
+  ready: true, // Isolated consumers without the AppShell provider retain existing behavior.
   enabled: false,
+  canArchive: () => false,
   isArchived: () => false,
   showArchived: () => false,
   setShowArchived: () => {},
@@ -92,6 +95,16 @@ export function ArchiveProvider({
     () => new Set<string>(JSON.parse(membershipKey)),
     [membershipKey],
   );
+  const admission = React.useRef<{
+    owner: ArchiveEngine | null;
+    allowed: ReadonlySet<string>;
+  } | null>(null);
+  React.useLayoutEffect(() => {
+    admission.current = { owner: current, allowed };
+    return () => {
+      admission.current = null;
+    };
+  }, [current, allowed]);
   const replyReads = React.useRef(new Map<string, Promise<string[]>>());
   const readIds = React.useCallback(
     (channelId: string, rootId: string) => {
@@ -215,6 +228,7 @@ export function ArchiveProvider({
   const value = React.useMemo<ArchiveApi>(
     () => ({
       enabled: Boolean(current),
+      canArchive: (channelId) => Boolean(current && allowed.has(channelId)),
       ready: snapshot.ready,
       revision: snapshot.revision,
       records: snapshot.records,
@@ -252,6 +266,11 @@ export function ArchiveProvider({
           return;
         }
         const commit = (replyIds?: string[]) => {
+          if (
+            admission.current?.owner !== owner ||
+            !admission.current.allowed.has(channelId)
+          )
+            throw new Error("Channel access changed; archive was not applied");
           notify(
             owner,
             owner.set(key, {

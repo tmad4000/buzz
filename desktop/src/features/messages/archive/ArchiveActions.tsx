@@ -15,7 +15,8 @@ import { archiveKey } from "./model";
 type Props = { channelId?: string | null; message: TimelineMessage };
 export function ArchiveMenuItems({ channelId, message }: Props) {
   const archive = useArchive();
-  if (!archive.enabled || !channelId || message.pending) return null;
+  if (!channelId || !archive.canArchive(channelId) || message.pending)
+    return null;
   return (
     <>
       {(["message", "thread"] as const).map((kind) => {
@@ -38,7 +39,8 @@ export function ArchiveMenuItems({ channelId, message }: Props) {
 }
 export function ArchiveHoverAction({ channelId, message }: Props) {
   const archive = useArchive();
-  if (!archive.enabled || !channelId || message.pending) return null;
+  if (!channelId || !archive.canArchive(channelId) || message.pending)
+    return null;
   const archived = archive.records.has(archiveKey("message", message.id));
   const Icon = archived ? ArchiveRestore : Archive;
   return (
@@ -62,7 +64,8 @@ export function ArchiveRowActions({
   children,
 }: Props & { children: React.ReactNode }) {
   const archive = useArchive();
-  if (!archive.enabled || !channelId || message.pending) return <>{children}</>;
+  if (!channelId || !archive.canArchive(channelId) || message.pending)
+    return <>{children}</>;
   return (
     <ContextMenu modal={false}>
       <ContextMenuTrigger asChild>
@@ -116,7 +119,7 @@ export function ArchiveRowActions({
 }
 export function ArchiveChannelToggle({ channelId }: { channelId: string }) {
   const archive = useArchive();
-  if (!archive.enabled) return null;
+  if (!archive.canArchive(channelId)) return null;
   const shown = archive.showArchived(channelId);
   return (
     <Button

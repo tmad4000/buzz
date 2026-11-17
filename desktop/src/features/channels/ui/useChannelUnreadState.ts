@@ -302,9 +302,10 @@ export function useChannelUnreadState({
   // gets its own msg:<id> marker advanced to its createdAt; a NEWER reply
   // re-raises the badge because the predicate is strictly createdAt > read.
   React.useEffect(() => {
-    if (!canRead() || !openThreadHeadId) return;
+    if (!canRead() || !openThreadHeadId || !archive.ready) return;
     if (isThreadMuted(openThreadHeadId)) return;
     for (const entry of threadMessages) {
+      if (isArchived(entry.message)) continue;
       markMessageRead(entry.message.id, entry.message.createdAt);
     }
   }, [
@@ -313,6 +314,8 @@ export function useChannelUnreadState({
     threadMessages,
     markMessageRead,
     isThreadMuted,
+    isArchived,
+    archive.ready,
   ]);
   // In-thread "New" divider position. Reads the open-time snapshot (frozen
   // before the mark-read effect above), so the divider does not collapse the
@@ -323,7 +326,9 @@ export function useChannelUnreadState({
       return { firstUnreadReplyId: null, unreadCount: 0 };
     }
     const snapshot = threadOpenReadSnapshotRef.current.get(openThreadHeadId);
-    const replies = threadMessages.map((entry) => entry.message);
+    const replies = threadMessages
+      .map((entry) => entry.message)
+      .filter((message) => !isArchived(message));
     return computeThreadUnreadMarker(
       replies,
       // Use the snapshot value when the reply was captured — even when it is
@@ -338,7 +343,13 @@ export function useChannelUnreadState({
           : getMessageReadAt(replyId),
       currentPubkey,
     );
-  }, [currentPubkey, getMessageReadAt, openThreadHeadId, threadMessages]);
+  }, [
+    currentPubkey,
+    getMessageReadAt,
+    openThreadHeadId,
+    threadMessages,
+    isArchived,
+  ]);
   // Per-row subtree unread counts for the in-panel thread summary rows. Scoped
   // to the open thread's subtree and decided per-reply against the live
   // per-message read state (getMessageReadAt): each collapsed row's badge
@@ -360,6 +371,7 @@ export function useChannelUnreadState({
             getReadAt: getMessageReadAt,
             currentPubkey,
             isForcedUnread: isMsgForcedUnread,
+            isExcluded: isArchived,
           })
         : new Map<string, number>(),
     [
@@ -373,6 +385,7 @@ export function useChannelUnreadState({
       isMsgForcedUnread,
       readStateVersion,
       forcedUnreadVersion,
+      isArchived,
     ],
   );
   // Per-thread unread counts for the main-timeline summary rows. Unread is
@@ -465,8 +478,10 @@ export function useChannelUnreadState({
   // anchor to a reply first revealed by expansion.
   const markRevealedRepliesRead = React.useCallback(
     (messageId: string) => {
-      if (!canRead()) return;
+      if (!canRead() || !archive.ready) return;
       for (const replyId of directReplyIdsByParentId.get(messageId) ?? []) {
+        const reply = messageById.get(replyId);
+        if (reply && isArchived(reply)) continue;
         const createdAt = createdAtByMessageId.get(replyId);
         if (createdAt !== undefined) {
           captureDividerReadState(replyId);
@@ -479,6 +494,9 @@ export function useChannelUnreadState({
       captureDividerReadState,
       createdAtByMessageId,
       directReplyIdsByParentId,
+      messageById,
+      isArchived,
+      archive.ready,
       markMessageRead,
     ],
   );
