@@ -52,6 +52,7 @@ class SearchHit {
 @immutable
 class SearchState {
   final String query;
+  final String? channelId;
   final List<SearchHit> messageResults;
   final List<DirectoryUser> userResults;
   final List<Channel> channelResults;
@@ -60,6 +61,7 @@ class SearchState {
 
   const SearchState({
     this.query = '',
+    this.channelId,
     this.messageResults = const [],
     this.userResults = const [],
     this.channelResults = const [],
@@ -67,7 +69,7 @@ class SearchState {
     this.error,
   });
 
-  const SearchState.initial()
+  const SearchState.initial({this.channelId})
     : query = '',
       messageResults = const [],
       userResults = const [],
@@ -82,65 +84,98 @@ class SearchState {
     List<Channel>? channelResults,
     bool? isLoading,
     String? error,
+    bool clearError = false,
   }) => SearchState(
     query: query ?? this.query,
+    channelId: channelId,
     messageResults: messageResults ?? this.messageResults,
     userResults: userResults ?? this.userResults,
     channelResults: channelResults ?? this.channelResults,
     isLoading: isLoading ?? this.isLoading,
-    error: error ?? this.error,
+    error: clearError ? null : error ?? this.error,
   );
 }
 
 class SearchNotifier extends Notifier<SearchState> {
+  SearchNotifier({this.initialChannelId});
+
+  final String? initialChannelId;
   Timer? _debounce;
+  int _generation = 0;
+  bool _built = false;
 
   @override
   SearchState build() {
     // Watch relayConfig so search state resets on community switch.
     ref.watch(relayConfigProvider);
+    _debounce?.cancel();
+    _generation++;
+    // A channel belongs to its opening community. Never carry that scope or
+    // its query/results into a newly selected community.
+    final channelId = _built ? null : initialChannelId;
+    _built = true;
     ref.onDispose(() {
       _debounce?.cancel();
+      _generation++;
     });
-    return const SearchState.initial();
+    return SearchState.initial(channelId: channelId);
   }
 
   void search(String query) {
     _debounce?.cancel();
+    final generation = ++_generation;
+    final channelId = state.channelId;
 
     final trimmed = query.trim();
     if (trimmed.isEmpty) {
-      state = const SearchState.initial();
+      state = SearchState.initial(channelId: channelId);
       return;
     }
 
-    state = SearchState(query: trimmed, isLoading: true);
+    state = SearchState(query: trimmed, channelId: channelId, isLoading: true);
 
     _debounce = Timer(const Duration(milliseconds: 300), () {
-      _executeSearch(trimmed);
+      _executeSearch(trimmed, channelId, generation);
     });
   }
 
-  Future<void> _executeSearch(String query) async {
-    // If the query changed while debouncing, bail out.
-    if (state.query != query) return;
+  bool _isCurrent(String query, String? channelId, int generation) =>
+      ref.mounted &&
+      _generation == generation &&
+      state.query == query &&
+      state.channelId == channelId;
+
+  void _executeSearch(String query, String? channelId, int generation) {
+    if (!_isCurrent(query, channelId, generation)) return;
 
     // Fire all three lookups in parallel.
-    _searchMessages(query);
-    _searchUsers(query);
-    _searchChannels(query);
+    unawaited(_searchMessages(query, channelId, generation));
+    if (channelId == null) {
+      unawaited(_searchUsers(query, generation));
+      _searchChannels(query, generation);
+    }
   }
 
-  Future<void> _searchMessages(String query) async {
+  Future<void> _searchMessages(
+    String query,
+    String? channelId,
+    int generation,
+  ) async {
     try {
       final session = ref.read(relaySessionProvider.notifier);
       final events = await session.fetchHistory(
         NostrFilter(
           kinds: const [9, 40002, 45001, 45003],
           search: query,
+          tags: channelId == null
+              ? const {}
+              : {
+                  '#h': [channelId],
+                },
           limit: 20,
         ),
       );
+      if (!_isCurrent(query, channelId, generation)) return;
 
       // Channel-name lookup from the cached channels list — not all hits
       // will have a known channel (e.g. ones we're not a member of).
@@ -150,6 +185,9 @@ class SearchNotifier extends Notifier<SearchState> {
       };
 
       final hits = events
+          // The visible scope must remain true even if a relay returns an
+          // unrelated hit. The request is still scoped at the relay as well.
+          .where((event) => channelId == null || event.channelId == channelId)
           .map(
             (e) => SearchHit(
               eventId: e.id,
@@ -167,31 +205,32 @@ class SearchNotifier extends Notifier<SearchState> {
           )
           .toList();
 
-      if (state.query != query) return;
-      state = state.copyWith(messageResults: hits, isLoading: false);
+      if (!_isCurrent(query, channelId, generation)) return;
+      state = state.copyWith(
+        messageResults: hits,
+        isLoading: false,
+        clearError: true,
+      );
     } catch (e) {
-      if (state.query != query) return;
+      if (!_isCurrent(query, channelId, generation)) return;
       state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
 
-  Future<void> _searchUsers(String query) async {
+  Future<void> _searchUsers(String query, int generation) async {
     try {
       final users = await ref
           .read(channelActionsProvider)
           .searchUsers(query, limit: 8);
 
-      if (state.query != query) return;
-      state = state.copyWith(
-        userResults: users,
-        isLoading: state.messageResults.isEmpty && state.channelResults.isEmpty,
-      );
+      if (!_isCurrent(query, null, generation)) return;
+      state = state.copyWith(userResults: users);
     } catch (_) {
       // User search failure is non-critical — keep existing results.
     }
   }
 
-  void _searchChannels(String query) {
+  void _searchChannels(String query, int generation) {
     final channels = ref.read(channelsProvider).value ?? [];
     final lowerQuery = query.toLowerCase();
     final matches = channels.where((c) {
@@ -200,19 +239,46 @@ class SearchNotifier extends Notifier<SearchState> {
           c.description.toLowerCase().contains(lowerQuery);
     }).toList();
 
-    if (state.query != query) return;
-    state = state.copyWith(
-      channelResults: matches,
-      isLoading: state.messageResults.isEmpty && state.userResults.isEmpty,
-    );
+    if (!_isCurrent(query, null, generation)) return;
+    state = state.copyWith(channelResults: matches);
   }
 
   void clear() {
     _debounce?.cancel();
-    state = const SearchState.initial();
+    _generation++;
+    state = SearchState.initial(channelId: state.channelId);
+  }
+
+  /// Retry only the failed message source. Directory results and this route's
+  /// query/scope remain intact; no automatic loop or concurrent retry is added.
+  void retryMessages() {
+    if (state.error == null || state.isLoading || state.query.isEmpty) return;
+    final query = state.query;
+    final channelId = state.channelId;
+    state = state.copyWith(isLoading: true);
+    unawaited(_searchMessages(query, channelId, _generation));
+  }
+
+  void setChannelScope(String? channelId) {
+    if (state.channelId == channelId) return;
+    final query = state.query;
+    state = SearchState.initial(channelId: channelId);
+    search(query);
   }
 }
 
 final searchProvider = NotifierProvider<SearchNotifier, SearchState>(
   SearchNotifier.new,
 );
+
+/// A channel search route must not change the global Search tab's query/scope.
+/// Identity equality also separates two open search routes for the same channel.
+class ChannelSearchScope {
+  ChannelSearchScope(this.channelId);
+  final String channelId;
+}
+
+final channelSearchProvider = NotifierProvider.autoDispose
+    .family<SearchNotifier, SearchState, ChannelSearchScope>(
+      (scope) => SearchNotifier(initialChannelId: scope.channelId),
+    );

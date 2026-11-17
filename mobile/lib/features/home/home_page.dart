@@ -62,7 +62,7 @@ class HomePage extends HookConsumerWidget {
     _HomeDestination(
       icon: BuzzIcons.inbox300,
       selectedIcon: BuzzIcons.inbox500,
-      label: 'Activity',
+      label: 'Inbox',
     ),
     _HomeDestination(
       icon: BuzzIcons.search300,

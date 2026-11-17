@@ -1,3 +1,4 @@
+import 'package:buzz/features/search/search_page.dart';
 import 'dart:async';
 import 'package:buzz/features/channels/channel_actions_sheet.dart';
 
@@ -621,6 +622,33 @@ void main() {
   }
 
   group('ChannelDetailPage', () {
+    testWidgets(
+      'channel header search opens the same scoped route from native and Flutter actions',
+      (tester) async {
+        final observer = _RecordingNavigatorObserver();
+        await tester.pumpWidget(
+          _buildTestable(messages: [], navigatorObservers: [observer]),
+        );
+        await tester.pumpAndSettle();
+        final context = tester.element(find.byType(ChannelDetailPage));
+        await tester.tap(find.byTooltip('Search this channel'));
+        var route = observer.pushedRoutes.last as MaterialPageRoute<void>;
+        var search = route.builder(context) as SearchPage;
+        expect(search.channelId, _channelId);
+        expect(search.showBackButton, isTrue);
+        final appBar = tester.widget<FrostedAppBar>(
+          find.byType(FrostedAppBar).first,
+        );
+        appBar.nativeActions!
+            .singleWhere((action) => action.label == 'Search this channel')
+            .onPressed!();
+        route = observer.pushedRoutes.last as MaterialPageRoute<void>;
+        search = route.builder(context) as SearchPage;
+        expect(search.channelId, _channelId);
+        expect(search.showBackButton, isTrue);
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
     testWidgets(
       'bot-role author avatars stay squircles in channel and thread',
       (tester) async {
@@ -10390,9 +10418,11 @@ void main() {
       expect(payload['subtitle'], '0 members');
       expect(payload['titleEnabled'], isTrue);
       final actions = payload['actions']! as List;
-      expect(actions, hasLength(1));
-      expect(actions.single, containsPair('label', 'Start Huddle'));
-      expect(actions.single, containsPair('enabled', true));
+      expect(actions, hasLength(2));
+      expect(actions.first, containsPair('label', 'Search this channel'));
+      expect(actions.first, containsPair('enabled', true));
+      expect(actions.last, containsPair('label', 'Start Huddle'));
+      expect(actions.last, containsPair('enabled', true));
       const channel = MethodChannel('buzz/ios_navigation_bar/97');
       tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
         channel,

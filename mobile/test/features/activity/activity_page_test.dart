@@ -190,7 +190,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('No activity yet'), findsOneWidget);
+    expect(find.text('Inbox is empty'), findsOneWidget);
   });
 
   testWidgets('does not imply a back button for the top-level Activity tab', (
@@ -301,7 +301,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Failed to load activity'), findsOneWidget);
+    expect(find.text('Failed to load inbox'), findsOneWidget);
     expect(find.text('Retry'), findsOneWidget);
   });
 

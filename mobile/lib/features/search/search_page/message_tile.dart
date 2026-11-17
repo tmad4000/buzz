@@ -153,13 +153,22 @@ class _MessageTile extends ConsumerWidget {
 
   void _navigateToHit(BuildContext context, SearchHit hit, Channel? channel) {
     if (channel == null) return;
+    final thread = threadReferenceOf(hit.tags);
+    final threadRootId = isBroadcastReply(hit.tags) ? null : thread.rootId;
 
-    if (hit.kind == 45001) {
+    if (hit.kind == 45001 || hit.kind == 45003) {
+      final postId = hit.kind == 45001 ? hit.eventId : thread.rootId;
+      if (postId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Thread could not be opened')),
+        );
+        return;
+      }
       Navigator.of(context).push(
         MaterialPageRoute<void>(
           builder: (_) => ForumThreadPage(
             channelId: channel.id,
-            postEventId: hit.eventId,
+            postEventId: postId,
             currentPubkey: currentPubkey,
             isMember: channel.isMember,
             isArchived: channel.isArchived,
@@ -169,7 +178,13 @@ class _MessageTile extends ConsumerWidget {
     } else {
       Navigator.of(context).push(
         MaterialPageRoute<void>(
-          builder: (_) => ChannelDetailPage(channel: channel),
+          builder: (_) => ChannelDetailPage(
+            channel: channel,
+            initialMessageId: hit.eventId,
+            initialThreadRootId: threadRootId,
+            initialThreadRouteBehavior:
+                InitialThreadRouteBehavior.replaceCurrentRoute,
+          ),
         ),
       );
     }

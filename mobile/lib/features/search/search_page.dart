@@ -6,6 +6,7 @@ import 'package:buzz/shared/theme/buzz_icons.dart';
 import '../../shared/identity_names/identity_names_provider.dart';
 import '../../shared/mentions/agent_identity_provider.dart';
 import '../../shared/mentions/mention_tags.dart';
+import '../../shared/relay/relay.dart';
 import '../../shared/theme/theme.dart';
 import '../../shared/widgets/avatar_image.dart';
 import '../../shared/widgets/buzz_loading_indicator.dart';
@@ -31,6 +32,8 @@ import 'recent_searches_provider.dart';
 import 'search_provider.dart';
 
 part 'search_page/message_tile.dart';
+part 'search_page/scope_bar.dart';
+part 'search_page/message_error.dart';
 
 enum _SearchFilter { all, messages, channels, people }
 
@@ -103,21 +106,48 @@ double _searchHeaderFiltersHeight(BuildContext context) {
 }
 
 class SearchPage extends HookConsumerWidget {
-  const SearchPage({this.tabReselection, super.key});
+  const SearchPage({
+    this.tabReselection,
+    this.channelId,
+    this.channelName,
+    this.showBackButton = false,
+    super.key,
+  });
 
   /// Notifies this page when its already-selected tab is tapped again.
   final ValueListenable<int>? tabReselection;
+  final String? channelId;
+  final String? channelName;
+  final bool showBackButton;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final searchState = ref.watch(searchProvider);
+    final scope = useMemoized(
+      () => channelId == null ? null : ChannelSearchScope(channelId!),
+      [channelId],
+    );
+    final provider = scope == null
+        ? searchProvider
+        : channelSearchProvider(scope);
+    final searchState = ref.watch(provider);
     final currentPubkey = ref
         .watch(profileProvider)
         .whenData((value) => value?.pubkey)
         .value;
-    final activeFilter = useState(_SearchFilter.all);
-    final textController = useTextEditingController();
+    final activeFilter = useState(
+      channelId == null ? _SearchFilter.all : _SearchFilter.messages,
+    );
+    final textController = useTextEditingController(
+      text: searchState.query,
+      keys: [channelId],
+    );
     final focusNode = useFocusNode();
+    ref.listen(relayConfigProvider, (previous, next) {
+      if (previous == next) return;
+      textController.clear();
+      activeFilter.value = _SearchFilter.all;
+      focusNode.unfocus();
+    });
     final isSearchEditing = useState(false);
     final showSearchTitle = useState(true);
     final isTabActivationInFlight = useRef(false);
@@ -223,7 +253,7 @@ class SearchPage extends HookConsumerWidget {
       );
       activateSearch();
       ref.read(recentSearchesProvider.notifier).record(query);
-      ref.read(searchProvider.notifier).search(query);
+      ref.read(provider.notifier).search(query);
     }
 
     return FrostedScaffold(
@@ -239,7 +269,7 @@ class SearchPage extends HookConsumerWidget {
             : _searchFieldMoveDuration,
         nativeLargeTitle: !isSearchEditing.value,
         nativeActions: const [],
-        automaticallyImplyLeading: false,
+        automaticallyImplyLeading: showBackButton,
         horizontalInset: Grid.twelve,
         showBottomDivider: true,
         bottomDividerOpacity: 0.07,
@@ -296,7 +326,7 @@ class SearchPage extends HookConsumerWidget {
                       behavior: HitTestBehavior.opaque,
                       onTap: () {
                         textController.clear();
-                        ref.read(searchProvider.notifier).clear();
+                        ref.read(provider.notifier).clear();
                         deactivateSearch();
                         focusNode.unfocus();
                       },
@@ -348,7 +378,9 @@ class SearchPage extends HookConsumerWidget {
                 child: BuzzSearchField(
                   controller: textController,
                   focusNode: focusNode,
-                  hintText: 'Search messages, channels, and people',
+                  hintText: searchState.channelId == null
+                      ? 'Search messages, channels, and people'
+                      : 'Search messages in this channel',
                   iconColor: searchPrimaryColor,
                   inputColor: searchPrimaryColor,
                   placeholderColor: searchPlaceholderColor,
@@ -358,7 +390,7 @@ class SearchPage extends HookConsumerWidget {
                   motionDuration: _searchFieldMoveDuration,
                   onTap: activateSearch,
                   onChanged: (value) =>
-                      ref.read(searchProvider.notifier).search(value),
+                      ref.read(provider.notifier).search(value),
                   onSubmitted: (value) {
                     final query = value.trim();
                     if (query.isEmpty) return;
@@ -381,7 +413,7 @@ class SearchPage extends HookConsumerWidget {
                     behavior: HitTestBehavior.opaque,
                     onTap: () {
                       textController.clear();
-                      ref.read(searchProvider.notifier).clear();
+                      ref.read(provider.notifier).clear();
                       deactivateSearch();
                       focusNode.unfocus();
                     },
@@ -441,7 +473,10 @@ class SearchPage extends HookConsumerWidget {
                               selected: activeFilter.value,
                               onSelected: (f) => activeFilter.value = f,
                               items: [
-                                for (final f in _SearchFilter.values)
+                                for (final f
+                                    in searchState.channelId == null
+                                        ? _SearchFilter.values
+                                        : [_SearchFilter.messages])
                                   FilterChipItem(id: f, label: f.label),
                               ],
                             ),
@@ -470,12 +505,26 @@ class SearchPage extends HookConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    if (channelId != null)
+                      _SearchScopeBar(
+                        channelName: searchState.channelId == null
+                            ? null
+                            : channelName,
+                        scoped: searchState.channelId != null,
+                        onAllChannels: () {
+                          activeFilter.value = _SearchFilter.all;
+                          ref.read(provider.notifier).setChannelScope(null);
+                        },
+                      ),
                     Expanded(
                       child: _SearchBody(
                         state: searchState,
                         filter: activeFilter.value,
                         currentPubkey: currentPubkey,
                         onRecentSearchSelected: runRecentSearch,
+                        onRetryMessages: ref
+                            .read(provider.notifier)
+                            .retryMessages,
                       ),
                     ),
                   ],
@@ -494,12 +543,14 @@ class _SearchBody extends ConsumerWidget {
   final _SearchFilter filter;
   final String? currentPubkey;
   final ValueChanged<String> onRecentSearchSelected;
+  final VoidCallback onRetryMessages;
 
   const _SearchBody({
     required this.state,
     required this.filter,
     required this.currentPubkey,
     required this.onRecentSearchSelected,
+    required this.onRetryMessages,
   });
 
   @override
@@ -548,13 +599,14 @@ class _SearchBody extends ConsumerWidget {
         filter == _SearchFilter.all || filter == _SearchFilter.messages;
 
     final hasAnyResults =
-        state.channelResults.isNotEmpty ||
-        state.userResults.isNotEmpty ||
-        state.messageResults.isNotEmpty;
+        (showChannels && state.channelResults.isNotEmpty) ||
+        (showPeople && state.userResults.isNotEmpty) ||
+        (showMessages && state.messageResults.isNotEmpty);
+    final messageSearchFailed = showMessages && state.error != null;
     void recordResultSelection() =>
         ref.read(recentSearchesProvider.notifier).record(state.query);
 
-    if (!state.isLoading && !hasAnyResults) {
+    if (!state.isLoading && !hasAnyResults && !messageSearchFailed) {
       return Padding(
         key: const Key('search-no-results-state'),
         padding: EdgeInsets.only(
@@ -580,6 +632,11 @@ class _SearchBody extends ConsumerWidget {
             MediaQuery.viewInsetsOf(context).bottom,
       ),
       children: [
+        if (messageSearchFailed)
+          _MessageSearchError(
+            onRetry: onRetryMessages,
+            retrying: state.isLoading,
+          ),
         if (showChannels && state.channelResults.isNotEmpty)
           _ChannelsSection(
             channels: state.channelResults,
