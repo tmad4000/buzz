@@ -85,7 +85,12 @@ test("true projection echo preserves A; explicit same-message route with copied 
   const container = document.createElement("div");
   document.body.append(container);
   const root = createRoot(container);
-  const render = (key, state, historyTraversal = false) =>
+  const render = (
+    key,
+    state,
+    historyTraversal = false,
+    sidebarNavigation = false,
+  ) =>
     act(() =>
       root.render(
         React.createElement(Harness, {
@@ -95,6 +100,7 @@ test("true projection echo preserves A; explicit same-message route with copied 
             search: { messageId: "m" },
             state,
             historyTraversal,
+            sidebarNavigation,
           },
         }),
       ),
@@ -112,8 +118,16 @@ test("true projection echo preserves A; explicit same-message route with copied 
     assert.equal(lastIntent.kind, "external");
     assert.equal(highlights.a, null);
     assert.equal(highlights.b, originalB);
-    await render("back", echoState, true);
+    await render(
+      "sidebar",
+      { ...echoState, __TSR_key: "sidebar-entry" },
+      false,
+      true,
+    );
     assert.equal(navigations, 2);
+    assert.equal(lastIntent.kind, "sidebar");
+    await render("back", echoState, true, true);
+    assert.equal(navigations, 3);
     assert.deepEqual(lastIntent, { kind: "history", viewInstanceId: "a" });
     assert.equal(highlights.b, originalB);
   } finally {

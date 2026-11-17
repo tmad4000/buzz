@@ -35,6 +35,7 @@ test("cold boot and fresh navigation ignore copied metadata as an origin signal"
   assert.deepEqual(origins.getSnapshot(), {
     entryKey: "boot",
     traversal: false,
+    fresh: false,
   });
   const stop = origins.subscribe(() => {});
   for (const type of ["PUSH", "REPLACE"]) {
@@ -42,6 +43,7 @@ test("cold boot and fresh navigation ignore copied metadata as an origin signal"
     assert.deepEqual(origins.getSnapshot(), {
       entryKey: type,
       traversal: false,
+      fresh: true,
     });
   }
   stop();
@@ -55,6 +57,7 @@ test("only observed Back/Forward/Go admit history targeting, including returning
     assert.deepEqual(origins.getSnapshot(), {
       entryKey: "boot",
       traversal: true,
+      fresh: false,
     });
   }
   stop();
@@ -74,6 +77,7 @@ test("subscription cleanup retires observers; resubscription catches a new exter
   assert.deepEqual(origins.getSnapshot(), {
     entryKey: "new",
     traversal: false,
+    fresh: false,
   });
   stop();
 });

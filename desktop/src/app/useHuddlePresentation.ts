@@ -319,7 +319,7 @@ export function useHuddlePresentation() {
         showHuddleInMainApp(channelId);
         return;
       }
-      void goChannel(channelId);
+      void goChannel(channelId, { paneNavigationOrigin: "sidebar" });
     },
     [goChannel, isHuddleDrawerOpen, showHuddleInMainApp],
   );
