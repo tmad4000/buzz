@@ -1,3 +1,4 @@
+/** A view-local message anchor and bounded fallback, never a draft snapshot. */
 export type TimelineReadingPosition = {
   id: string | null;
   offset: number;

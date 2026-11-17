@@ -35,6 +35,7 @@ export function useRoutedSendReturn({
     destination: string;
     restore: () => boolean;
   } | null>(null);
+  const noticeRef = React.useRef<HTMLDivElement>(null);
   const cleanup = React.useRef<(() => void) | undefined>(undefined);
   React.useEffect(() => () => cleanup.current?.(), []);
   const receipt = channelId ? receipts.get(channelId) : undefined;
@@ -79,12 +80,23 @@ export function useRoutedSendReturn({
       else onCloseThread();
       cleanup.current?.();
       // Let the existing pane history transition commit before geometry restore.
-      const frame = requestAnimationFrame(() => {
+      let frame = 0;
+      let attempts = 0;
+      const restoreWhenMounted = () => {
+        if (++attempts > 30) return;
+        if (!timeline.current) {
+          frame = requestAnimationFrame(restoreWhenMounted);
+          return;
+        }
         cleanup.current = position
-          ? timeline.current?.restoreReadingPosition(position)
+          ? timeline.current.restoreReadingPosition(position)
           : undefined;
-        if (focused?.isConnected) focused.focus({ preventScroll: true });
-      });
+        const target = focused?.isConnected
+          ? focused
+          : noticeRef.current?.querySelector<HTMLElement>("[data-routed-open]");
+        target?.focus({ preventScroll: true });
+      };
+      frame = requestAnimationFrame(restoreWhenMounted);
       cleanup.current = () => cancelAnimationFrame(frame);
       return true;
     };
@@ -96,6 +108,7 @@ export function useRoutedSendReturn({
   const notice = receipt ? (
     <div
       className="mb-2 flex min-w-0 items-center gap-2 rounded-lg border border-border/50 px-3 py-2 text-xs"
+      ref={noticeRef}
       data-testid="routed-send-notice"
     >
       <span
@@ -108,6 +121,7 @@ export function useRoutedSendReturn({
       <button
         type="button"
         className="min-h-7 shrink-0 rounded px-1 focus-visible:ring-2"
+        data-routed-open
         aria-label={`Open thread ${receipt.title}`}
         onClick={open}
       >

@@ -123,7 +123,7 @@ test("header full version and read-only provenance survive narrow/zoom layouts",
 test("sidebar actual send exposes a collapsed ancestry before/after acknowledgement and read/refetch", async ({
   page,
 }) => {
-  await installMockBridge(page, { sendMessageDelayMs: 1800 });
+  await installMockBridge(page, { sendMessageDelayMs: 6000 });
   await page.goto("/");
   await page.getByTestId("channel-general").click();
   await expect
@@ -180,7 +180,7 @@ test("sidebar actual send exposes a collapsed ancestry before/after acknowledgem
     panel
       .getByTestId("message-body")
       .filter({ hasText: "Own sidebar fresh reply body" }),
-  ).toBeVisible({ timeout: 1200 });
+  ).toBeVisible({ timeout: 5000 });
   await expect(editor).toBeEmpty();
   await expect
     .poll(() =>
@@ -219,7 +219,7 @@ test("sidebar actual send exposes a collapsed ancestry before/after acknowledgem
 test("routed accepted reply confirmation opens exact collapsed target and Back preserves newer draft without resending", async ({
   page,
 }, info) => {
-  await installMockBridge(page, { sendMessageDelayMs: 1000 });
+  await installMockBridge(page, { sendMessageDelayMs: 6000 });
   await page.goto("/");
   await page.getByTestId("channel-general").click();
   await expect

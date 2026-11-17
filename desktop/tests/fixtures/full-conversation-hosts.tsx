@@ -50,7 +50,7 @@ window.__BUZZ_E2E__ = {
   mode: "mock",
   mock: new URLSearchParams(location.search).has("routing")
     ? {
-        sendMessageDelayMs: 1200,
+        sendMessageDelayMs: 6000,
         deferredComposerUploads: true,
         uploadDescriptors: [
           {

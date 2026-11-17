@@ -926,6 +926,10 @@ export function ChannelScreen({
                     return () => {
                       if (!requireThreadEditResolution()) return false;
                       restore();
+                      setOptimisticOpenThreadHeadId(undefined);
+                      setThreadReplyTargetId(threadReplyTargetId);
+                      setThreadScrollTargetId(threadScrollTargetId);
+                      setExpandedThreadReplyIds(new Set(expandedThreadReplyIds));
                       return true;
                     };
                   }}

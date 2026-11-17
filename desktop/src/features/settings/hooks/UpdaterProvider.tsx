@@ -10,6 +10,7 @@ export function UpdaterProvider({ children }: { children: ReactNode }) {
   return <UpdaterContext value={updater}>{children}</UpdaterContext>;
 }
 
+/** Settings provenance may also render in isolated settings hosts. */
 export function useOptionalUpdaterContext() {
   return useContext(UpdaterContext);
 }
