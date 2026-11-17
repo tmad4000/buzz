@@ -1,8 +1,9 @@
 import * as React from "react";
+import { cn } from "@/shared/lib/cn";
 import { appBuild, relativeUpdated } from "@/shared/lib/appBuild";
 
 /** Build provenance in About; activation cannot reach conversation hotkeys. */
-export function AppStamp() {
+export function AppStamp({ className }: { className?: string }) {
   const [exact, setExact] = React.useState(false);
   const [, repaint] = React.useReducer((n) => n + 1, 0);
   React.useEffect(() => {
@@ -26,7 +27,10 @@ export function AppStamp() {
     <button
       type="button"
       data-testid="settings-version"
-      className="block max-w-full px-2 pb-1 text-left text-2xs text-muted-foreground tabular-nums focus-visible:outline focus-visible:outline-2"
+      className={cn(
+        "block max-w-full px-2 pb-1 text-left text-2xs text-muted-foreground tabular-nums focus-visible:outline focus-visible:outline-2",
+        className,
+      )}
       title={detail || undefined}
       aria-expanded={exact}
       onClick={(event) => {

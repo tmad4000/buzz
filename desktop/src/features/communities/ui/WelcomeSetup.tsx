@@ -329,7 +329,7 @@ export function WelcomeSetup({
         </div>
       </OnboardingFooterProvider>
       <footer className="absolute bottom-3 right-4 z-20 max-w-[calc(100%-128px)]">
-        <AppStamp />
+        <AppStamp className="text-foreground/75" />
       </footer>
     </div>
   );
