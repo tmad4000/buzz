@@ -88,6 +88,16 @@ test("held durable inline publish preserves queue height, anchor and real nested
       });
     await expect(queued).toHaveCount(1);
     await expect(queued).toBeVisible();
+    const queueId = await queued.getAttribute("data-outbox-id");
+    if (!queueId) throw new Error("Missing durable queue identity");
+    const cardBefore = await queued.boundingBox();
+    if (!cardBefore) throw new Error("Missing visible pending card box");
+    const statusBefore = await queued.getByRole("status").innerText();
+    const progressBefore = await queued
+      .getByRole("progressbar")
+      .evaluateAll((elements) =>
+        elements.map((element) => element.getAttribute("aria-valuenow")),
+      );
     const target = inline.locator(`[data-message-id="${child}"]`);
     await target.hover();
     const before = await target.boundingBox();
@@ -108,7 +118,7 @@ test("held durable inline publish preserves queue height, anchor and real nested
         page.evaluate(() => window.__BUZZ_E2E_HELD_OUTBOX_PUBLISHES__?.()),
       )
       .toBe(1);
-    const samples = await target.evaluate(async (element) => {
+    const samples = await target.evaluate(async (element, queueId) => {
       const scroller = element.closest('[data-testid="message-timeline"]');
       if (!(scroller instanceof HTMLElement))
         throw new Error("Missing timeline owner");
@@ -117,16 +127,34 @@ test("held durable inline publish preserves queue height, anchor and real nested
         await new Promise<void>((resolve) =>
           requestAnimationFrame(() => resolve()),
         );
+        const card = document.querySelector(`[data-outbox-id="${queueId}"]`);
+        if (!(card instanceof HTMLElement))
+          throw new Error("Held pending card disappeared");
         rows.push({
+          cardHeight: card.getBoundingClientRect().height,
+          status: card.querySelector('[role="status"]')?.textContent?.trim(),
+          progress: [...card.querySelectorAll('[role="progressbar"]')].map(
+            (progress) => progress.getAttribute("aria-valuenow"),
+          ),
           top: element.getBoundingClientRect().top,
           scrollTop: scroller.scrollTop,
           estimateCalls: Number(scroller.dataset.virtuaEstimateCallCount),
         });
       }
       return rows;
-    });
+    }, queueId);
     await info.attach("held-inline-layout-samples", {
-      body: JSON.stringify({ before, height, estimates, scroll, samples }),
+      body: JSON.stringify({
+        before,
+        height,
+        estimates,
+        scroll,
+        queueId,
+        cardBefore,
+        statusBefore,
+        progressBefore,
+        samples,
+      }),
       contentType: "application/json",
     });
     expect(
@@ -138,6 +166,13 @@ test("held durable inline publish preserves queue height, anchor and real nested
         Math.min(...samples.map((row) => row.scrollTop)),
     ).toBeLessThanOrEqual(1);
     expect(samples.at(-1)?.estimateCalls).toBe(samples[0].estimateCalls);
+    for (const sample of samples) {
+      expect(
+        Math.abs(sample.cardHeight - cardBefore.height),
+      ).toBeLessThanOrEqual(1);
+      expect(sample.status).toBe(statusBefore.trim());
+      expect(sample.progress).toEqual(progressBefore);
+    }
     const afterInline = await inline.boundingBox();
     if (!afterInline) throw new Error("Inline layout disappeared during click");
     expect(Math.abs(afterInline.height - height)).toBeLessThanOrEqual(1);
