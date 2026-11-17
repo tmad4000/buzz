@@ -58,6 +58,9 @@ export function conversationRouteProjection(
     search,
     state: (previous: Record<string, unknown>) => ({
       ...previous,
+      // Local projection is not another search activation. Each view retains
+      // its highlight locally instead of inheriting the previous route's one.
+      searchHighlight: null,
       [HISTORY_KEY]: metadata,
     }),
     replace,
