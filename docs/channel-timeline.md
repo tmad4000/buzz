@@ -1,6 +1,14 @@
-# Channel Timeline view
+# Channel Order setting and Timeline view
 
-The desktop channel header offers **Threads | Timeline**. Threads remains the default.
+The desktop channel header offers one **Order** setting:
+
+1. **Threads by post time** — the existing default, available now.
+2. **Threads by latest activity** — reserved and visibly disabled as coming soon.
+3. **Timeline** — flat chronological conversation, available now.
+
+This first increment ships modes 1 and 3 under Jacob's explicit fallback. It keeps
+the original per-channel preference key/values, including any saved Timeline choice;
+there is no second overlapping toggle. Activity ordering is not silently simulated.
 The choice is local to this browser/device, relay and channel; no signed events,
 thread relations or other participants' preferences change.
 
@@ -42,3 +50,35 @@ switch channels and reload. On an integration build including PR31, confirm only
 visible reply bodies clear unseen markers in a focused foreground view.
 
 Linux browser acceptance does not verify native macOS or iOS behavior.
+
+## Latest-activity mode design (follow-up; not enabled)
+
+The stable preference identity `activity` is reserved alongside `threads` and
+`timeline`. Its ordering unit is the whole root plus its inline reply subtree.
+The key is `max(root.created_at, latest_reply.created_at)`, then root ID for ties;
+reply order inside the block remains original timestamp/ID. Signed organization
+annotations never rewrite those clocks. Paginated summary/reply evidence can
+advance the key without changing signed events, read state or identity.
+
+Keep semantic order separate from displayed order while someone is reading. Save
+the current message ID and pixel offset as the viewport anchor. Queue activity
+moves while away from the bottom, retaining that displayed order and placing a
+subtle **thread moved ↓** / **new activity** marker at the origin. Activating the
+marker or returning to following newest applies the queued root-block moves and
+restores the keyed anchor after measurement. At the bottom, following may apply
+moves as one measured update; a short-lived origin marker explains the relocation.
+Do not treat a moved block, a summary, or a history fetch as a seen reply body.
+
+Before enabling mode 2, acceptance must cover live bumps above/below the viewport,
+expanded root blocks, same-second ties, older-page merges, a selected reply inside
+a moved block, focus/background changes, and PR31 body-only acknowledgement. This
+requires scroll-manager integration rather than a simple sort replacement, so it
+is deliberately outside the first stable Timeline increment.
+
+## Desktop screenshots
+
+Synthetic mock-bridge fixtures at 1440 × 1000:
+
+| Threads by post time | Timeline |
+| --- | --- |
+| ![Threads by post time](assets/screenshots/channel-order-threads.png) | ![Timeline](assets/screenshots/channel-order-timeline.png) |
