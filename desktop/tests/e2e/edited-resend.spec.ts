@@ -35,12 +35,45 @@ async function emit(
   createdAt = Math.floor(Date.now() / 1000) + 30,
 ) {
   return page.evaluate(
-    (input) =>
-      window.__BUZZ_E2E_EMIT_MOCK_MESSAGE__?.({
+    (input) => {
+      if (input.kind === 7) {
+        const target = input.extraTags.find((tag) => tag[0] === "e")?.[1];
+        if (!target) throw new Error("Missing test reaction target");
+        return window.__BUZZ_E2E_EMIT_MOCK_REACTION__?.({
+          channelId: input.channelId,
+          targetId: target,
+          pubkey: input.pubkey,
+          content: input.content,
+          extraTags: input.extraTags.filter((tag) => tag[0] !== "e"),
+        });
+      }
+      return window.__BUZZ_E2E_EMIT_MOCK_MESSAGE__?.({
         ...input,
         channelName: "general",
+      });
+    },
+    { id, content, pubkey, kind, extraTags, createdAt, channelId: CHANNEL },
+  );
+}
+async function waitForReceiptSubscription(page: Page, target: string) {
+  await page.waitForFunction(
+    (target) =>
+      (window.__BUZZ_E2E_COMMAND_PAYLOADS__ ?? []).some((call) => {
+        if (call.command !== "plugin:websocket|send") return false;
+        const message = (
+          call.payload as { message?: { type: string; data: string } }
+        )?.message;
+        if (message?.type !== "Text") return false;
+        const [kind, subscription, ...filters] = JSON.parse(message.data);
+        return (
+          kind === "REQ" &&
+          subscription.startsWith("live-") &&
+          filters.some((filter: { "#e"?: string[] }) =>
+            filter["#e"]?.includes(target),
+          )
+        );
       }),
-    { id, content, pubkey, kind, extraTags, createdAt },
+    target,
   );
 }
 async function triggers(page: Page) {
@@ -106,6 +139,7 @@ test("edited label exposes edit time; explicit resend stays Pending until Paseo 
     ["edit", edit],
     ["t", "paseo-resend-v1"],
   ]);
+  await waitForReceiptSubscription(page, trigger.id);
   await emit(page, "a3".repeat(32), "👀", TEST_IDENTITIES.bob.pubkey, 7, [
     ["e", trigger.id],
   ]);
@@ -144,6 +178,7 @@ test("edited label exposes edit time; explicit resend stays Pending until Paseo 
     next,
   ]);
   await expect(row.getByTestId("paseo-resend-status")).toHaveText("Pending");
+  await waitForReceiptSubscription(page, second.id);
   await page.evaluate(
     ({ channel, paseo, target }) =>
       window.__BUZZ_E2E_EMIT_MOCK_REACTION__?.({
@@ -290,25 +325,7 @@ test("own edited DM with canonical Paseo member supports explicit resend and tri
     ["edit", edit],
     ["t", "paseo-resend-v1"],
   ]);
-  await page.waitForFunction(
-    (target) =>
-      (window.__BUZZ_E2E_COMMAND_PAYLOADS__ ?? []).some((call) => {
-        if (call.command !== "plugin:websocket|send") return false;
-        const message = (
-          call.payload as { message?: { type: string; data: string } }
-        )?.message;
-        if (message?.type !== "Text") return false;
-        const [kind, subscription, ...filters] = JSON.parse(message.data);
-        return (
-          kind === "REQ" &&
-          subscription.startsWith("live-") &&
-          filters.some((filter: { "#e"?: string[] }) =>
-            filter["#e"]?.includes(target),
-          )
-        );
-      }),
-    trigger.id,
-  );
+  await waitForReceiptSubscription(page, trigger.id);
   await page.evaluate(
     ({ trigger, channelId, paseo }) =>
       window.__BUZZ_E2E_EMIT_MOCK_REACTION__?.({
