@@ -1,4 +1,9 @@
 import * as React from "react";
+import {
+  CONVERSATION_THREAD_MIN_WIDTH_PX,
+  clampScopedThreadWidth,
+  getScopedThreadMaxWidth,
+} from "@/shared/layout/conversationThreadLayout";
 
 import {
   AUXILIARY_PANEL_DEFAULT_WIDTH_PX,
@@ -7,6 +12,43 @@ import {
 } from "@/shared/layout/AuxiliaryPanel";
 
 const THREAD_PANEL_WIDTH_SESSION_KEY = "buzz.desktop.thread-panel-width";
+
+type WidthScope = { widthPx: number; setWidthPx: (width: number) => void };
+const ThreadPanelWidthScopeContext = React.createContext<WidthScope | null>(
+  null,
+);
+
+export function ThreadPanelWidthScopeProvider({
+  children,
+  initialWidthPx,
+  onChange,
+}: {
+  children: React.ReactNode;
+  initialWidthPx?: number;
+  onChange?: (width: number) => void;
+}) {
+  const [widthPx, updateWidth] = React.useState(() =>
+    typeof initialWidthPx === "number" && Number.isFinite(initialWidthPx)
+      ? Math.max(CONVERSATION_THREAD_MIN_WIDTH_PX, initialWidthPx)
+      : AUXILIARY_PANEL_DEFAULT_WIDTH_PX,
+  );
+  const setWidthPx = React.useCallback(
+    (width: number) => {
+      updateWidth(width);
+      onChange?.(width);
+    },
+    [onChange],
+  );
+  const value = React.useMemo(
+    () => ({ widthPx, setWidthPx }),
+    [widthPx, setWidthPx],
+  );
+  return React.createElement(
+    ThreadPanelWidthScopeContext.Provider,
+    { value },
+    children,
+  );
+}
 
 type ThreadPanelWidthOptions = {
   defaultWidthPx?: number;
@@ -63,21 +105,34 @@ export function useThreadPanelWidth(
   availableWidthPx?: number,
   options: ThreadPanelWidthOptions = {},
 ) {
+  const scope = React.useContext(ThreadPanelWidthScopeContext);
   const defaultWidthPx =
     options.defaultWidthPx ?? AUXILIARY_PANEL_DEFAULT_WIDTH_PX;
-  const minWidthPx = options.minWidthPx ?? AUXILIARY_PANEL_MIN_WIDTH_PX;
+  const minWidthPx = scope
+    ? Math.max(CONVERSATION_THREAD_MIN_WIDTH_PX, options.minWidthPx ?? 0)
+    : (options.minWidthPx ?? AUXILIARY_PANEL_MIN_WIDTH_PX);
   const sessionKey = options.sessionKey ?? THREAD_PANEL_WIDTH_SESSION_KEY;
+  const available = React.useRef(availableWidthPx);
+  available.current = availableWidthPx;
   const getAvailableWidth = React.useCallback(
-    () => availableWidthPx ?? getViewportWidth(),
-    [availableWidthPx],
+    () => available.current ?? getViewportWidth(),
+    [],
   );
-  const [widthPx, setWidthPx] = React.useState<number>(() =>
-    getInitialThreadPanelWidth({ defaultWidthPx, minWidthPx, sessionKey }),
+  const [legacyWidthPx, setLegacyWidthPx] = React.useState<number>(() =>
+    scope
+      ? defaultWidthPx
+      : getInitialThreadPanelWidth({ defaultWidthPx, minWidthPx, sessionKey }),
   );
+  const widthPx = scope
+    ? clampScopedThreadWidth(scope.widthPx, getAvailableWidth())
+    : legacyWidthPx;
+  const setWidthPx = scope?.setWidthPx ?? setLegacyWidthPx;
   const [isResizing, setIsResizing] = React.useState(false);
+  const endResize = React.useRef<(() => void) | null>(null);
+  React.useEffect(() => () => endResize.current?.(), []);
 
   React.useEffect(() => {
-    if (typeof window === "undefined") {
+    if (scope || typeof window === "undefined") {
       return;
     }
 
@@ -86,11 +141,12 @@ export function useThreadPanelWidth(
     } catch {
       // Ignore storage failures and keep in-memory width for this session.
     }
-  }, [sessionKey, widthPx]);
+  }, [scope, sessionKey, widthPx]);
 
   const onResizeStart = React.useCallback(
     (event: React.PointerEvent<HTMLButtonElement>) => {
       event.preventDefault();
+      endResize.current?.();
 
       const startX = event.clientX;
       const startWidth = widthPx;
@@ -106,7 +162,9 @@ export function useThreadPanelWidth(
         const nextWidth = Math.max(
           minWidthPx,
           Math.min(
-            getAuxiliaryPanelMaxWidth(getAvailableWidth()),
+            scope
+              ? getScopedThreadMaxWidth(getAvailableWidth())
+              : getAuxiliaryPanelMaxWidth(getAvailableWidth()),
             startWidth + deltaX,
           ),
         );
@@ -114,6 +172,7 @@ export function useThreadPanelWidth(
       };
 
       const handlePointerEnd = () => {
+        endResize.current = null;
         document.body.style.cursor = previousCursor;
         document.body.style.userSelect = previousUserSelect;
         setIsResizing(false);
@@ -121,20 +180,21 @@ export function useThreadPanelWidth(
         window.removeEventListener("pointerup", handlePointerEnd);
         window.removeEventListener("pointercancel", handlePointerEnd);
       };
+      endResize.current = handlePointerEnd;
 
       window.addEventListener("pointermove", handlePointerMove);
       window.addEventListener("pointerup", handlePointerEnd);
       window.addEventListener("pointercancel", handlePointerEnd);
     },
-    [getAvailableWidth, minWidthPx, widthPx],
+    [getAvailableWidth, minWidthPx, scope, setWidthPx, widthPx],
   );
 
   const onResetWidth = React.useCallback(() => {
     setWidthPx(defaultWidthPx);
-  }, [defaultWidthPx]);
+  }, [defaultWidthPx, setWidthPx]);
 
   return {
-    canReset: widthPx !== defaultWidthPx,
+    canReset: (scope?.widthPx ?? legacyWidthPx) !== defaultWidthPx,
     isResizing,
     onResetWidth,
     onResizeStart,

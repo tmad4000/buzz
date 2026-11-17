@@ -5,6 +5,7 @@ export type ConversationViewAdmission = {
   focused: boolean;
   visible: boolean;
   rootRef?: React.RefObject<HTMLElement | null>;
+  contentWidthPx?: number;
 };
 
 /** Presentation identity and admission, separate from the canonical chat resource. */
