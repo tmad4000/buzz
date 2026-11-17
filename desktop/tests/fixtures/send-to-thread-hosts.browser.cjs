@@ -162,17 +162,17 @@ const expect = baseExpect.configure({ timeout: 30000 });
       )
       .click();
     await expect(ta).toContainText("Design decisions for pane B");
-    await ta
-      .getByTestId("message-input")
-      .fill("A prior panel draft survives return");
+    await expect(a.locator("[data-draft-preview]")).toContainText(
+      "Sibling thread draft remains independent",
+    );
     await receiptA
       .getByRole("button", { name: /Open thread Release plan/ })
       .click();
     await expect(ta).toContainText("Release plan for pane A");
     await a.getByTestId("routed-send-back").click();
     await expect(ta).toContainText("Design decisions for pane B");
-    await expect(ta.getByTestId("message-input")).toHaveText(
-      "A prior panel draft survives return",
+    await expect(a.locator("[data-draft-preview]")).toContainText(
+      "Sibling thread draft remains independent",
     );
     await ta.getByRole("button", { name: "Close panel", exact: true }).click();
     await expect(tb).toContainText("Design decisions for pane B");

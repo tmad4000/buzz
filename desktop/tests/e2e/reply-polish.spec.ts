@@ -1,3 +1,4 @@
+import { waitForMockChannelHeadReady } from "../helpers/channelHeadReady";
 import { expect, test } from "@playwright/test";
 import { installMockBridge, TEST_IDENTITIES } from "../helpers/bridge";
 
@@ -16,6 +17,11 @@ test("production inline composer keeps one editor across compact, draft, popup a
       ),
     )
     .toBe(true);
+  await waitForMockChannelHeadReady(
+    page,
+    "general",
+    "9a1657ac-f7aa-5db0-b632-d8bbeb6dfb50",
+  );
   const id = "f4".repeat(32);
   await page.evaluate(
     ({ id, pubkey }) =>
@@ -142,6 +148,11 @@ test("sidebar actual send exposes a collapsed ancestry before/after acknowledgem
       ),
     )
     .toBe(true);
+  await waitForMockChannelHeadReady(
+    page,
+    "general",
+    "9a1657ac-f7aa-5db0-b632-d8bbeb6dfb50",
+  );
   const root = "c1".repeat(32),
     branch = "c2".repeat(32);
   await page.evaluate(
@@ -238,6 +249,11 @@ test("routed accepted reply confirmation opens exact collapsed target and Back p
       ),
     )
     .toBe(true);
+  await waitForMockChannelHeadReady(
+    page,
+    "general",
+    "9a1657ac-f7aa-5db0-b632-d8bbeb6dfb50",
+  );
   const root = "b1".repeat(32);
   await page.evaluate(
     ({ root, pubkey }) => {
