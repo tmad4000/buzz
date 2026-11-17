@@ -2,6 +2,7 @@
 import { useUnseenReplyEvidence } from "./useUnseenReplyEvidence";
 import { useUnseenThreadReplies } from "./useUnseenThreadReplies";
 import { UnseenRepliesButton } from "./UnseenRepliesButton";
+import { useChannelPageSurface } from "@/features/channel-page/useChannelPageSurface";
 import * as React from "react";
 import { buildContextParents } from "@/features/channels/readState/contextParentRegistry";
 import { useQueryClient } from "@tanstack/react-query";
@@ -101,6 +102,7 @@ export function ChannelScreen({
   targetMessageEvents, targetMessageId,
   ...searchTarget
 }: ChannelScreenProps) {
+  const { pageOpen, closePage, pageHeaderActions, pagePanel } = useChannelPageSurface(activeChannel, headerEndActions);
   const queryClient = useQueryClient();
   const { goHome } = useAppNavigation();
   const { activeCommunity } = useCommunities();
@@ -680,7 +682,7 @@ export function ChannelScreen({
     threadReplyTargetMessage,
   });
   const hasAuxiliaryPanel = Boolean(
-    effectiveOpenThreadHeadId ||
+    pageOpen || effectiveOpenThreadHeadId ||
       openAgentSessionPubkey ||
       profilePanelPubkey ||
       channelManagementOpen,
@@ -770,7 +772,7 @@ export function ChannelScreen({
               setExpandedThreadReplyIds(new Set());
               setEditTargetId(null);
             }} />
-          {headerEndActions}
+          {pageHeaderActions}
         </>}
         isAddBotOpen={isAddBotOpen}
         isJoining={joinChannelMutation.isPending}
@@ -792,7 +794,7 @@ export function ChannelScreen({
       activeDmPresenceStatus,
       channelHeaderChromeRef,
       currentPubkey,
-      headerEndActions,
+      pageHeaderActions,
       unseenReplies,
       unseenEvidence.pending.size,
       unseenEvidence.failed,
@@ -884,7 +886,11 @@ export function ChannelScreen({
                   canResetThreadPanelWidth={canResetThreadPanelWidth}
                   fetchOlder={fetchOlder}
                   header={channelHeader}
-                  {...{ idleAuxiliaryHeaderActions, idleAuxiliaryOverridesThread, idleAuxiliaryPanel, idleAuxiliaryTitle, hasOlderMessages, historyExhausted }}
+                  {...{ hasOlderMessages, historyExhausted }}
+                  idleAuxiliaryHeaderActions={pageOpen ? undefined : idleAuxiliaryHeaderActions}
+                  idleAuxiliaryOverridesThread={pageOpen || idleAuxiliaryOverridesThread}
+                  idleAuxiliaryPanel={pageOpen ? pagePanel : idleAuxiliaryPanel}
+                  idleAuxiliaryTitle={pageOpen ? "Page" : idleAuxiliaryTitle}
                   {...{ onAddFiles }}
                   onAddAgent={handleOpenAddBot}
                   onBrowseChannels={openBrowseChannels}
@@ -940,7 +946,7 @@ export function ChannelScreen({
                       ? handleBackFromAgentSession
                       : undefined
                   }
-                  {...{ onCloseIdleAuxiliaryPanel }}
+                  onCloseIdleAuxiliaryPanel={pageOpen ? closePage : onCloseIdleAuxiliaryPanel}
                   onCloseChannelManagement={handleCloseChannelManagement}
                   onCloseThread={handleCloseThread}
                   onDelete={

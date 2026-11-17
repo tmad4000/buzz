@@ -11,6 +11,7 @@ pub mod messages;
 pub mod moderation;
 pub mod notes;
 pub mod pack;
+pub mod page;
 pub mod patches;
 pub mod pr;
 pub mod project_channel;
