@@ -1,4 +1,6 @@
 import * as React from "react";
+import { buildFlatTimelineEntries } from "@/features/messages/lib/flatTimeline";
+import { useTimelineView } from "./TimelineViewContext";
 import {
   isChannelCreatedSystemMessage,
   isWelcomeSetupSystemMessage,
@@ -22,6 +24,7 @@ export function useChannelPaneMessages({
   profiles,
   threadSummaries,
 }: ChannelPaneMessagesOptions) {
+  const { mode } = useTimelineView();
   const visibleMessages = React.useMemo(() => {
     const withoutWelcomeSetup = isWelcomeExperienceChannel(activeChannel)
       ? messages.filter((message) => !isWelcomeSetupSystemMessage(message))
@@ -36,15 +39,15 @@ export function useChannelPaneMessages({
 
   const mainTimelineEntries = React.useMemo(
     () =>
-      isHuddleTranscript
-        ? visibleMessages.map((message) => ({ message, summary: null }))
+      isHuddleTranscript || mode === "timeline"
+        ? buildFlatTimelineEntries(visibleMessages)
         : buildMainTimelineEntries(
             visibleMessages,
             new Set(),
             threadSummaries,
             profiles,
           ),
-    [isHuddleTranscript, profiles, threadSummaries, visibleMessages],
+    [isHuddleTranscript, mode, profiles, threadSummaries, visibleMessages],
   );
 
   const recentMentionPubkeys = React.useMemo(

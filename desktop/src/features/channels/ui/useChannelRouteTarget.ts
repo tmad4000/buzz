@@ -5,7 +5,8 @@ import { isBroadcastReply } from "@/features/messages/lib/threading";
 import type { Channel } from "@/shared/api/types";
 import type { PanelValueSetter } from "./useChannelPanelHistoryState";
 
-function getThreadRouteTarget(
+/** Resolve the root and ancestor expansion path for an exact reply jump. */
+export function getThreadRouteTarget(
   targetMessage: TimelineMessage,
   messageById: ReadonlyMap<string, TimelineMessage>,
 ): { expandedReplyIds: Set<string>; threadHeadId: string } | null {
