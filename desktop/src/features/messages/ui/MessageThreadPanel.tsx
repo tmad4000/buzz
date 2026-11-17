@@ -317,7 +317,10 @@ export function MessageThreadPanel({
   );
   const sidebar = useUnreadSidebarThread({
     enabled: isSidebar,
+    channelId,
+    currentPubkey,
     root: threadHeadId,
+    pending: threadRepliesPending || threadRepliesError,
     messages: sidebarMessages,
     isUnread: isMessageUnreadById,
     scrollTargetId,

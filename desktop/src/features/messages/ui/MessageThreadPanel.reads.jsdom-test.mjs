@@ -58,6 +58,7 @@ test("read callbacks contain only committed rows and never descendants hidden by
   Object.assign(globalThis, {
     window: dom.window,
     document: dom.window.document,
+    localStorage: dom.window.localStorage,
     HTMLElement: dom.window.HTMLElement,
     IS_REACT_ACT_ENVIRONMENT: true,
     CSS: { escape: (value) => value },
@@ -125,6 +126,7 @@ test("read callbacks contain only committed rows and never descendants hidden by
       React.createElement(MessageThreadPanel, {
         ...props,
         isMessageUnreadById: unread,
+        channelId: "unread-channel",
         threadRepliesPending: true,
       }),
     ),
@@ -136,6 +138,7 @@ test("read callbacks contain only committed rows and never descendants hidden by
       React.createElement(MessageThreadPanel, {
         ...props,
         isMessageUnreadById: unread,
+        channelId: "unread-channel",
         threadRepliesPending: false,
       }),
     ),
