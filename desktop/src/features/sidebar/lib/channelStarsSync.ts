@@ -140,6 +140,7 @@ export class ChannelStarSyncManager {
 
   private async fetchOwnBlobBeforePublish(
     store: ChannelStarStore,
+    conversion = false,
   ): Promise<ChannelStarStore> {
     try {
       const events = await relayClient.fetchEvents({
@@ -148,15 +149,27 @@ export class ChannelStarSyncManager {
         "#d": [D_TAG],
         limit: 1,
       });
-      if (events.length === 0 || events[0].pubkey !== this.pubkey) return store;
+      if (events.length === 0) {
+        if (conversion && this.lastRemoteCreatedAt > 0)
+          throw new Error("Cannot verify absence of previously observed stars");
+        return store;
+      }
+      if (events[0].pubkey !== this.pubkey) {
+        if (conversion) throw new Error("Unexpected stars author");
+        return store;
+      }
       const event = events[0];
       // Record the raw head before decrypt on the pre-publish path too.
       this.recordRemoteHead(event.created_at);
       const remote = await decryptAndParse(event);
-      if (!remote) return store;
+      if (!remote) {
+        if (conversion) throw new Error("Cannot read existing stars");
+        return store;
+      }
       this.remember(remote.store);
       return store;
-    } catch {
+    } catch (error) {
+      if (conversion) throw error;
       return store;
     }
   }
@@ -211,7 +224,7 @@ export class ChannelStarSyncManager {
       if (this.pendingStore === store) this.pendingStore = null;
     };
     try {
-      const pre = await this.fetchOwnBlobBeforePublish(store);
+      const pre = await this.fetchOwnBlobBeforePublish(store, conversion);
       const merged = this.remoteStore
         ? mergeStores(pre, this.remoteStore, conversion)
         : pre;
