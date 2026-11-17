@@ -244,3 +244,50 @@ test("large inline threads reveal bounded batches", async ({ page }) => {
     inline.getByText("Engineering reply 54", { exact: true }),
   ).toBeVisible();
 });
+
+test("inline channel rows retain search match and active result highlighting", async ({
+  page,
+}) => {
+  await installMockBridge(page);
+  await page.goto("/");
+  await page.getByTestId("channel-general").click();
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        window.__BUZZ_E2E_HAS_MOCK_LIVE_SUBSCRIPTION__?.({
+          channelName: "general",
+        }),
+      ),
+    )
+    .toBe(true);
+  const needle = "InlineSearchNeedle";
+  const root = await page.evaluate(
+    (content) =>
+      window.__BUZZ_E2E_EMIT_MOCK_MESSAGE__!({
+        channelName: "general",
+        content,
+        createdAt: Math.floor(Date.now() / 1000) + 10,
+      }),
+    needle,
+  );
+  await page.keyboard.press("ControlOrMeta+f");
+  await page.getByTestId("search-dialog-input").fill(needle);
+  const result = page
+    .getByTestId("search-results")
+    .getByRole("option")
+    .filter({ hasText: needle });
+  await expect(result).toBeVisible();
+  await result.click();
+  const row = page
+    .getByTestId("message-timeline")
+    .locator(`[data-message-id="${root.id}"]`);
+  await expect(row.locator("mark")).toHaveText(needle);
+  await expect
+    .poll(() =>
+      row.evaluate((element) =>
+        Boolean(element.closest('[class*="before:bg-primary"]')),
+      ),
+    )
+    .toBe(true);
+  await page.screenshot({ path: `${shots}/inline-search.png` });
+});
