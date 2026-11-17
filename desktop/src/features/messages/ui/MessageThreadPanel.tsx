@@ -417,7 +417,7 @@ export function MessageThreadPanel({
   useVisibleThreadReplies(
     threadBodyRef,
     visibleReadRows,
-    hasStoredDisclosure ? onSidebarRepliesRevealed : undefined,
+    onSidebarRepliesRevealed,
     threadHeadId ?? "",
     `${channelId}:${currentPubkey}:${threadHeadId}`,
   );

@@ -429,6 +429,8 @@ export function AppShell() {
   );
 
   const {
+    getThreadReplySeenAt,
+    markThreadReplySeen,
     getThreadReadAt,
     markThreadRead,
     getMessageReadAt,
@@ -736,6 +738,8 @@ export function AppShell() {
               setIsChannelManagementOpen(true);
             },
             getChannelReadAt,
+            getThreadReplySeenAt,
+            markThreadReplySeen,
             getThreadReadAt,
             markThreadRead,
             getMessageReadAt,
