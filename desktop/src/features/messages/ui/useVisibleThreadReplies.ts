@@ -37,44 +37,88 @@ export function useVisibleThreadReplies(
         .map((message) => [message.id, message]),
     );
     let alive = true;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (!alive || !canRead() || sent.current.scope !== scope) return;
-        const revealed: TimelineMessage[] = [];
-        for (const entry of entries) {
-          const node = entry.target as HTMLElement;
+    let generation = 0;
+    let observer: IntersectionObserver | null = null;
+    const coverageSelector = '[hidden], [inert], [aria-hidden="true"]';
+    const observeBodies = () => {
+      observer?.disconnect();
+      const visit = ++generation;
+      if (
+        !alive ||
+        !canRead() ||
+        !root.isConnected ||
+        root.closest(coverageSelector)
+      )
+        return;
+      observer = new IntersectionObserver(
+        (entries) => {
           if (
-            !entry.isIntersecting ||
-            !node.isConnected ||
-            !root.contains(node) ||
-            node.closest('[hidden], [inert], [aria-hidden="true"]') !== null ||
-            node.getClientRects().length === 0
+            !alive ||
+            visit !== generation ||
+            !canRead() ||
+            sent.current.scope !== scope
           )
-            continue;
-          const id = node.closest<HTMLElement>('[data-testid="message-row"]')
-            ?.dataset.messageId;
-          const message = id ? eligible.get(id) : undefined;
-          if (message && !sent.current.ids.has(message.id)) {
-            sent.current.ids.add(message.id);
-            revealed.push(message);
+            return;
+          const revealed: TimelineMessage[] = [];
+          for (const entry of entries) {
+            const node = entry.target as HTMLElement;
+            if (
+              !entry.isIntersecting ||
+              !node.isConnected ||
+              !root.contains(node) ||
+              node.closest('[hidden], [inert], [aria-hidden="true"]') !==
+                null ||
+              node.getClientRects().length === 0
+            )
+              continue;
+            const id = node.closest<HTMLElement>('[data-testid="message-row"]')
+              ?.dataset.messageId;
+            const message = id ? eligible.get(id) : undefined;
+            if (message && !sent.current.ids.has(message.id)) {
+              sent.current.ids.add(message.id);
+              revealed.push(message);
+            }
           }
+          if (revealed.length) onReveal(revealed, rootId);
+        },
+        { threshold: 0.01 },
+      );
+      for (const row of root.querySelectorAll<HTMLElement>(
+        '[data-testid="message-row"][data-message-id]',
+      ))
+        if (eligible.has(row.dataset.messageId ?? "")) {
+          const body = row.querySelector<HTMLElement>(
+            '[data-testid="message-body"]',
+          );
+          if (body) observer.observe(body);
         }
-        if (revealed.length) onReveal(revealed, rootId);
-      },
-      { threshold: 0.01 },
-    );
-    for (const row of root.querySelectorAll<HTMLElement>(
-      '[data-testid="message-row"][data-message-id]',
-    ))
-      if (eligible.has(row.dataset.messageId ?? "")) {
-        const body = row.querySelector<HTMLElement>(
-          '[data-testid="message-body"]',
-        );
-        if (body) observer.observe(body);
-      }
+    };
+    // Coverage changes do not change geometry. Fresh observe() calls request
+    // initial intersection entries after uncover, without waiting for a scroll.
+    const coverage =
+      typeof MutationObserver === "undefined"
+        ? null
+        : new MutationObserver(observeBodies);
+    coverage?.observe(root, {
+      attributes: true,
+      subtree: true,
+      attributeFilter: ["hidden", "inert", "aria-hidden"],
+    });
+    for (
+      let ancestor = root.parentElement;
+      ancestor;
+      ancestor = ancestor.parentElement
+    )
+      coverage?.observe(ancestor, {
+        attributes: true,
+        attributeFilter: ["hidden", "inert", "aria-hidden"],
+      });
+    observeBodies();
     return () => {
       alive = false;
-      observer.disconnect();
+      generation += 1;
+      coverage?.disconnect();
+      observer?.disconnect();
     };
   }, [container, messages, onReveal, rootId, scope, admitted, canRead]);
 }

@@ -229,8 +229,14 @@ test("duplicate visibility writes canonical markers once, retains sibling entry 
       1,
       "covered bodies cannot read despite a queued intersecting entry",
     );
-    b.removeAttribute("inert");
-    await emit(activeB, ["late"]);
+    await act(async () => b.removeAttribute("inert"));
+    const resumedB = observer("b");
+    assert.notEqual(
+      resumedB,
+      activeB,
+      "uncover re-observes bodies instead of waiting for old geometric events",
+    );
+    await emit(resumedB, ["late"]);
     await render("b", late, ["visible", "offscreen", "late"], ["late"]);
     assert.deepEqual(
       writes,
