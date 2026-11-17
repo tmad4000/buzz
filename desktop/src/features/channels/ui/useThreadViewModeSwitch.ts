@@ -1,7 +1,8 @@
 import * as React from "react";
+import { useConversationControlScope } from "@/features/conversations/ConversationViewContext";
 
 import {
-  setThreadViewMode,
+  useSetThreadViewMode,
   type ThreadViewMode,
 } from "@/features/channels/lib/threadViewModePreference";
 
@@ -62,6 +63,11 @@ export function useThreadViewModeSwitch({
   onExternalTargetResolved,
   onModeChange,
 }: ThreadViewModeSwitchOptions) {
+  const { canHandle, query } = useConversationControlScope();
+  const setThreadViewMode = useSetThreadViewMode();
+  const latestThreadHead = React.useRef(activeThreadHeadId);
+  latestThreadHead.current = activeThreadHeadId;
+  const focusRequest = React.useRef(0);
   const [layoutScrollTarget, setLayoutScrollTarget] =
     React.useState<LayoutScrollTarget | null>(null);
   const layoutScrollTargetId = getScopedLayoutScrollTargetId({
@@ -77,9 +83,9 @@ export function useThreadViewModeSwitch({
 
   const changeThreadViewMode = React.useCallback(
     (mode: ThreadViewMode, restoreFocus: boolean) => {
-      const body = document.querySelector<HTMLElement>(
-        '[data-testid="message-thread-body"]',
-      );
+      if (!canHandle()) return;
+      const request = ++focusRequest.current;
+      const body = query('[data-testid="message-thread-body"]');
       const anchorId = findTopVisibleThreadMessageId(body);
 
       setLayoutScrollTarget(
@@ -91,17 +97,20 @@ export function useThreadViewModeSwitch({
       setThreadViewMode(mode);
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-          document
-            .querySelector<HTMLElement>(
-              restoreFocus
-                ? '[data-testid="thread-view-mode-toggle"]'
-                : '[data-testid="message-thread-body"]',
-            )
-            ?.focus({ preventScroll: true });
+          if (
+            request !== focusRequest.current ||
+            latestThreadHead.current !== activeThreadHeadId
+          )
+            return;
+          query(
+            restoreFocus
+              ? '[data-testid="thread-view-mode-toggle"]'
+              : '[data-testid="message-thread-body"]',
+          )?.focus({ preventScroll: true });
         });
       });
     },
-    [activeThreadHeadId, onModeChange],
+    [activeThreadHeadId, canHandle, onModeChange, query, setThreadViewMode],
   );
 
   const resolveScrollTarget = React.useCallback(

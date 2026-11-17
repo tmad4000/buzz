@@ -1,6 +1,10 @@
 import * as React from "react";
 import { ChannelScreen } from "@/features/channels/ui/ChannelScreen";
 import type { ChannelScreenProps } from "@/features/channels/ui/ChannelScreen.types";
+import {
+  ThreadViewModeScopeProvider,
+  type ThreadViewMode,
+} from "@/features/channels/lib/threadViewModePreference";
 import { MainInsetProvider } from "@/shared/layout/MainInsetContext";
 import {
   HistorySearchScopeProvider,
@@ -16,6 +20,8 @@ export type ConversationViewHostProps = {
   visible: boolean;
   label: string;
   initialPanelState?: HistorySearchValues;
+  initialThreadViewMode?: ThreadViewMode;
+  onThreadViewModeChange?: (mode: ThreadViewMode) => void;
   onPanelNavigate?: HistorySearchScope["applyPatch"];
   onFocusView: (viewInstanceId: string) => void;
   channel: ChannelScreenProps;
@@ -28,6 +34,8 @@ export function ConversationViewHost({
   visible,
   label,
   initialPanelState,
+  initialThreadViewMode,
+  onThreadViewModeChange,
   onPanelNavigate,
   onFocusView,
   channel,
@@ -39,7 +47,7 @@ export function ConversationViewHost({
     );
   const insetRef = React.useRef<HTMLDivElement>(null);
   const admission = React.useMemo(
-    () => ({ viewInstanceId, focused, visible }),
+    () => ({ viewInstanceId, focused, visible, rootRef: insetRef }),
     [viewInstanceId, focused, visible],
   );
   const focusView = () => onFocusView(viewInstanceId);
@@ -61,7 +69,12 @@ export function ConversationViewHost({
             initialValues={initialPanelState}
             onNavigate={onPanelNavigate}
           >
-            <ChannelScreen {...channel} />
+            <ThreadViewModeScopeProvider
+              initialMode={initialThreadViewMode}
+              onChange={onThreadViewModeChange}
+            >
+              <ChannelScreen {...channel} />
+            </ThreadViewModeScopeProvider>
           </HistorySearchScopeProvider>
         </MainInsetProvider>
       </ConversationViewContext.Provider>

@@ -24,6 +24,39 @@ const listeners = new Set<() => void>();
 
 let threadViewMode = readStoredThreadViewMode();
 
+type ViewModeScope = {
+  mode: ThreadViewMode;
+  setMode: (mode: ThreadViewMode) => void;
+};
+export const ThreadViewModeScopeContext =
+  React.createContext<ViewModeScope | null>(null);
+
+/** Each conversation seeds from the device preference, then changes independently. */
+export function ThreadViewModeScopeProvider({
+  children,
+  initialMode,
+  onChange,
+}: {
+  children: React.ReactNode;
+  initialMode?: ThreadViewMode;
+  onChange?: (mode: ThreadViewMode) => void;
+}) {
+  const [mode, updateMode] = React.useState(initialMode ?? getThreadViewMode);
+  const setMode = React.useCallback(
+    (next: ThreadViewMode) => {
+      updateMode(next);
+      onChange?.(next);
+    },
+    [onChange],
+  );
+  const scope = React.useMemo(() => ({ mode, setMode }), [mode, setMode]);
+  return React.createElement(
+    ThreadViewModeScopeContext.Provider,
+    { value: scope },
+    children,
+  );
+}
+
 function parseThreadViewMode(value: string | null | undefined): ThreadViewMode {
   return value === "focus" || value === "split"
     ? value
@@ -75,5 +108,17 @@ export function setThreadViewMode(mode: ThreadViewMode): void {
 
 /** How threads should open in a channel: as a focus drawer or a split pane. */
 export function useThreadViewMode(): ThreadViewMode {
-  return React.useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+  const scope = React.useContext(ThreadViewModeScopeContext);
+  const preference = React.useSyncExternalStore(
+    subscribe,
+    getSnapshot,
+    getServerSnapshot,
+  );
+  return scope?.mode ?? preference;
+}
+
+export function useSetThreadViewMode(): (mode: ThreadViewMode) => void {
+  return (
+    React.useContext(ThreadViewModeScopeContext)?.setMode ?? setThreadViewMode
+  );
 }

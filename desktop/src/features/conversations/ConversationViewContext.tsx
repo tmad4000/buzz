@@ -4,11 +4,57 @@ export type ConversationViewAdmission = {
   viewInstanceId: string;
   focused: boolean;
   visible: boolean;
+  rootRef?: React.RefObject<HTMLElement | null>;
 };
 
 /** Presentation identity and admission, separate from the canonical chat resource. */
 export const ConversationViewContext =
   React.createContext<ConversationViewAdmission | null>(null);
+
+/** Scope keyboard actions and deferred DOM lookups to their owning view. */
+export function useConversationControlScope() {
+  const view = React.useContext(ConversationViewContext);
+  const active = view === null || (view.focused && view.visible);
+  const current = React.useRef({ active, view });
+  current.current = { active, view };
+  const mounted = React.useRef(true);
+  React.useLayoutEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+  const canHandle = React.useCallback(
+    () =>
+      mounted.current &&
+      current.current.active &&
+      (current.current.view === null || documentVisible()),
+    [],
+  );
+  const canRestoreFocus = React.useCallback(() => {
+    const owner = current.current.view;
+    return (
+      owner === null ||
+      (current.current.active &&
+        documentVisible() &&
+        Boolean(owner.rootRef?.current?.isConnected))
+    );
+  }, []);
+  const query = React.useCallback(
+    (selector: string) => {
+      if (!canHandle()) return null;
+      const owner = current.current.view;
+      // A scoped view without a connected root must never fall through to a sibling.
+      if (!owner) return document.querySelector<HTMLElement>(selector);
+      const root = owner.rootRef?.current;
+      return root?.isConnected
+        ? root.querySelector<HTMLElement>(selector)
+        : null;
+    },
+    [canHandle],
+  );
+  return { active, canHandle, canRestoreFocus, query };
+}
 
 function documentVisible() {
   return (
