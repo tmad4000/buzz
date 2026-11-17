@@ -504,7 +504,7 @@ export function useChannelUnreadState({
   const markSidebarRepliesRead = React.useCallback(
     (messages: TimelineMessage[], rootId = openThreadHeadId) => {
       if (!canRead() || !rootId || isThreadMuted(rootId)) return;
-      for (const message of messages) {
+      for (const message of archive.filterUnarchived(messages, rootId)) {
         if (rootId === openThreadHeadId) captureDividerReadState(message.id);
         if ((getMessageReadAt(message.id) ?? 0) < message.createdAt)
           markMessageRead(message.id, message.createdAt);
@@ -512,6 +512,7 @@ export function useChannelUnreadState({
     },
     [
       canRead,
+      archive.filterUnarchived,
       captureDividerReadState,
       getMessageReadAt,
       markMessageRead,

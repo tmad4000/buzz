@@ -237,7 +237,7 @@ test("archived replies disappear from unseen candidates while their observation 
   assert.equal(items.length, 3, "projection does not mutate canonical data");
 });
 
-test("on-open and expansion legacy paths never acknowledge an archived reply; actual-body callback still can", async () => {
+test("on-open, expansion and actual-body callbacks never acknowledge archived replies; ordinary bodies remain admitted", async () => {
   const { useChannelUnreadState } = await import(
     "@/features/channels/ui/useChannelUnreadState.ts"
   );
@@ -294,8 +294,16 @@ test("on-open and expansion legacy paths never acknowledge an archived reply; ac
     );
     assert.deepEqual(
       read,
-      [["q", 11]],
-      "observer callback remains the committed-body authority",
+      [],
+      "even a shown archived body must not be acknowledged",
+    );
+    await React.act(async () =>
+      unread.markSidebarRepliesRead([{ ...messages[1], id: "ordinary" }], "r"),
+    );
+    assert.deepEqual(
+      read,
+      [["ordinary", 11]],
+      "nonarchived admitted body still acknowledges",
     );
   } finally {
     if (descriptor)
@@ -401,4 +409,41 @@ test("archive observer adapter excludes archived bodies, fences captured callbac
     "scope epoch resets the existing observer's sent-ID set, so a previously excluded body can be observed after unarchive",
   );
   assert.deepEqual(cmds, [], "adapter itself never writes read or seen state");
+});
+
+test("captured archive acknowledgement guards retire on account/relay switch and unmount", async () => {
+  let scoped;
+  function ScopeProbe() {
+    scoped = useArchive();
+    return null;
+  }
+  qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const frame = (pubkey, relayUrl) =>
+    h(
+      QueryClientProvider,
+      { client: qc },
+      h(
+        ArchiveProvider,
+        { pubkey, relayUrl, channels: [{ id: "c", isMember: true }] },
+        h(ScopeProbe),
+      ),
+    );
+  const view = render(frame("a".repeat(64), "wss://archive.test"));
+  await waitFor(() => assert.equal(scoped.ready, true));
+  const capturedAccount = scoped.filterUnarchived;
+  assert.deepEqual(capturedAccount([root]), [root]);
+  view.rerender(frame("b".repeat(64), "wss://archive.test"));
+  await waitFor(() => assert.equal(scoped.ready, true));
+  assert.deepEqual(
+    capturedAccount([root]),
+    [],
+    "retired account callback cannot read old ready engine",
+  );
+  const capturedRelay = scoped.filterUnarchived;
+  view.rerender(frame("b".repeat(64), "wss://other.test"));
+  await waitFor(() => assert.equal(scoped.ready, true));
+  assert.deepEqual(capturedRelay([root]), []);
+  const capturedUnmount = scoped.filterUnarchived;
+  view.unmount();
+  assert.deepEqual(capturedUnmount([root]), []);
 });

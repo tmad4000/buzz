@@ -239,7 +239,8 @@ export function ArchiveProvider({
       revision: snapshot.revision,
       records: snapshot.records,
       filterUnarchived: (messages, rootId) => {
-        const live = current?.get();
+        if (!current || admission.current?.owner !== current) return [];
+        const live = current.get();
         return live?.ready
           ? excludeArchivedReplies(messages, live.records, rootId)
           : [];
