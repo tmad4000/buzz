@@ -307,14 +307,7 @@ test("channel navigation dismisses picker and uses only destination channel's ro
   await expect(main.getByTestId("message-input")).toContainText(
     "GENERAL_ONLY private draft stays here",
   );
-  expect(
-    await page.evaluate(
-      () =>
-        (window.__BUZZ_E2E_COMMAND_PAYLOADS__ ?? []).filter(
-          (x) => x.command === "send_channel_message",
-        ).length,
-    ),
-  ).toBe(0);
+  expect(await published(page)).toEqual([]);
 });
 
 test("DM routing stays scoped and failed durable admission keeps draft for explicit retry", async ({
@@ -496,15 +489,18 @@ test("DM committed publish failure keeps the queued reply and explicit Retry del
     .toBe(1);
   await expect(queued).toHaveAttribute("data-outbox-id", rowId ?? "");
   await expect(editor).toHaveText("Newer DM draft must survive queue Retry");
-  expect((await published(page)).length).toBe(1);
+  const heldAttempts = await published(page);
+  expect(heldAttempts).toHaveLength(2);
+  expect(heldAttempts[1].id).toBe(rejected.id);
+  expect(heldAttempts[1].content).toBe("Committed DM reply remains queued");
+  expect(threadTags(heldAttempts[1])).toEqual([["e", root, "", "reply"]]);
+  await expect(queued).toBeVisible();
+  await expect(page.getByTestId("routed-send-notice")).toHaveCount(0);
   expect(
     await page.evaluate(() => window.__BUZZ_E2E_HOLD_OUTBOX_PUBLISH__?.(false)),
   ).toBe(1);
   await expect.poll(async () => (await published(page)).length).toBe(2);
-  const attempts = await published(page);
-  expect(attempts[1].id).toBe(rejected.id);
-  expect(attempts[1].content).toBe("Committed DM reply remains queued");
-  expect(threadTags(attempts[1])).toEqual([["e", root, "", "reply"]]);
+  expect(await published(page)).toEqual(heldAttempts);
   await expect(queued).toHaveCount(0);
   await expect(
     panel
