@@ -10,10 +10,28 @@ export type SplitAxis = "horizontal" | "vertical";
 export type PanelKey = Exclude<ChannelSearchKey, "autoSend">;
 export type PanelState = Partial<Record<PanelKey, string | null>>;
 export type ScrollAnchor = { messageId: string; offset: number };
+/** Explicit view-local choices only; automatic Smart/open state is visit-local. */
+export type ViewPreferences = {
+  timelineMode?: "threads" | "timeline";
+  threadMode?: "focus" | "split";
+  preferredThreadWidth?: number;
+};
+export function copyViewPreferences(value: ViewPreferences): ViewPreferences {
+  return {
+    ...(value.timelineMode === undefined
+      ? {}
+      : { timelineMode: value.timelineMode }),
+    ...(value.threadMode === undefined ? {} : { threadMode: value.threadMode }),
+    ...(value.preferredThreadWidth === undefined
+      ? {}
+      : { preferredThreadWidth: value.preferredThreadWidth }),
+  };
+}
 export type ConversationView = {
   id: string;
   channelId: string;
   panelState: PanelState;
+  preferences?: ViewPreferences;
   timelineAnchor: ScrollAnchor | null;
   threadAnchor: ScrollAnchor | null;
 };
@@ -59,6 +77,9 @@ export function createConversationView(
     id: ids("view"),
     channelId,
     panelState: copyPanelState(seed?.panelState ?? {}),
+    ...(seed?.preferences
+      ? { preferences: copyViewPreferences(seed.preferences) }
+      : {}),
     timelineAnchor: seed?.timelineAnchor ? { ...seed.timelineAnchor } : null,
     threadAnchor: seed?.threadAnchor ? { ...seed.threadAnchor } : null,
   };
@@ -292,7 +313,7 @@ export function navigateView(
   channelId: string,
   presentation?: Pick<
     ConversationView,
-    "panelState" | "timelineAnchor" | "threadAnchor"
+    "panelState" | "timelineAnchor" | "threadAnchor" | "preferences"
   >,
 ): ConversationLayout {
   if (!Object.hasOwn(layout.views, viewId)) return layout;
@@ -300,6 +321,9 @@ export function navigateView(
     id: viewId,
     channelId,
     panelState: copyPanelState(presentation?.panelState ?? {}),
+    ...(presentation?.preferences
+      ? { preferences: copyViewPreferences(presentation.preferences) }
+      : {}),
     timelineAnchor: presentation?.timelineAnchor
       ? { ...presentation.timelineAnchor }
       : null,
@@ -316,7 +340,10 @@ export function updateViewPresentation(
   viewId: string,
   expectedChannelId: string,
   patch: Partial<
-    Pick<ConversationView, "panelState" | "timelineAnchor" | "threadAnchor">
+    Pick<
+      ConversationView,
+      "panelState" | "timelineAnchor" | "threadAnchor" | "preferences"
+    >
   >,
 ): ConversationLayout {
   const view = Object.hasOwn(layout.views, viewId)
@@ -326,6 +353,14 @@ export function updateViewPresentation(
   const next = {
     ...view,
     ...patch,
+    ...(patch.preferences
+      ? {
+          preferences: copyViewPreferences({
+            ...view.preferences,
+            ...patch.preferences,
+          }),
+        }
+      : {}),
     panelState: patch.panelState
       ? copyPanelState({ ...view.panelState, ...patch.panelState })
       : view.panelState,

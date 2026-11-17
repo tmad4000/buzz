@@ -33,6 +33,7 @@ import {
 } from "@/features/conversations/layout/model";
 import { ConversationLayoutController } from "@/features/conversations/layout/controller";
 import { layoutStorageKey } from "@/features/conversations/layout/storage";
+import { bindVisitPreferences } from "@/features/conversations/layout/visitPreferences";
 import { ConversationViewHost } from "@/features/conversations/ConversationViewHost";
 import { ConversationDraftEditorsProvider } from "@/features/conversations/ConversationDraftEditors";
 import { HuddleProvider } from "@/features/huddle/HuddleContext";
@@ -384,6 +385,7 @@ function LayoutBody() {
             return (
               <PerViewShell id={view.id}>
                 <ConversationViewHost
+                  {...bindVisitPreferences(controller, view)}
                   viewInstanceId={view.id}
                   focused={focused}
                   visible={visible}
