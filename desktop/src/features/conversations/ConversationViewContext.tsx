@@ -33,11 +33,16 @@ export function useConversationControlScope() {
   );
   const canRestoreFocus = React.useCallback(() => {
     const owner = current.current.view;
+    const root = owner?.rootRef?.current;
+    // This child may already be unmounted: its context snapshot no longer
+    // follows sibling focus. The still-mounted host publishes live admission.
     return (
       owner === null ||
       (current.current.active &&
         documentVisible() &&
-        Boolean(owner.rootRef?.current?.isConnected))
+        root?.isConnected === true &&
+        !root.hidden &&
+        root.dataset.focusedConversation === "true")
     );
   }, []);
   const query = React.useCallback(

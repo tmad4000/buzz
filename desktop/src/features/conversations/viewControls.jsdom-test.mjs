@@ -48,23 +48,27 @@ async function harness(run) {
       id,
     );
   }
-  function Host({ id, focused, visible }) {
+  function Host({ id, focused, visible, probeA }) {
     const rootRef = React.useRef(null);
     return React.createElement(
       "section",
-      { ref: rootRef },
+      {
+        ref: rootRef,
+        hidden: !visible,
+        "data-focused-conversation": focused || undefined,
+      },
       React.createElement(
         ConversationViewContext.Provider,
         { value: { viewInstanceId: id, focused, visible, rootRef } },
         React.createElement(
           ThreadViewModeScopeProvider,
           { initialMode: "split" },
-          React.createElement(Probe, { id }),
+          id !== "a" || probeA ? React.createElement(Probe, { id }) : null,
         ),
       ),
     );
   }
-  const render = async (focused, visible = true) =>
+  const render = async (focused, visible = true, probeA = true) =>
     act(() =>
       root.render(
         ["a", "b"].map((id) =>
@@ -73,6 +77,7 @@ async function harness(run) {
             id,
             focused: id === focused,
             visible,
+            probeA,
           }),
         ),
       ),
@@ -143,4 +148,28 @@ test("thread presentation mode is independent per duplicate view and does not ov
     assert.equal(getThreadViewMode(), preference);
     await act(() => setThreadViewMode("focus"));
     assert.equal(api.b.mode, "split");
+  }));
+
+test("closing drawer restoration reads live host focus after child teardown and before deferred focus", async () =>
+  harness(async ({ api, render }) => {
+    const restore = api.a.canRestoreFocus;
+    assert.equal(restore(), true);
+    await render("a", true, false);
+    assert.equal(
+      restore(),
+      true,
+      "closing child can restore inside its still-active host",
+    );
+    await render("b", true, false);
+    assert.equal(
+      restore(),
+      false,
+      "unmounted child cannot reclaim focus after sibling activation",
+    );
+    await render("a", false, false);
+    assert.equal(
+      restore(),
+      false,
+      "unmounted child cannot restore into compact-hidden host",
+    );
   }));
