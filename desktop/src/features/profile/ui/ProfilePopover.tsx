@@ -258,7 +258,8 @@ export function ProfilePopover({
               <button
                 className={MENU_ITEM_CLASS}
                 data-testid="profile-popover-send-feedback"
-                onClick={() => {
+                onClick={(event) => {
+                  event.stopPropagation();
                   closePopover();
                   window.requestAnimationFrame(() => {
                     onSendFeedback();
@@ -267,7 +268,12 @@ export function ProfilePopover({
                 role="menuitem"
                 type="button"
               >
-                <span className="flex-1">Send feedback</span>
+                <span className="flex-1">
+                  <span className="block">Send feedback</span>
+                  <span className="block text-2xs text-muted-foreground">
+                    Feedback is public
+                  </span>
+                </span>
               </button>
             ) : null}
 

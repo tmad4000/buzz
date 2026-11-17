@@ -30,38 +30,23 @@ test("formatTimeWithoutDayPeriod removes AM/PM suffixes", () => {
   assert.equal(formatTimeWithoutDayPeriod("16:20"), "16:20");
 });
 
-test("formatThreadSummaryLastReplyTime expands relative units", () => {
+test("formatThreadSummaryLastReplyTime uses compact relative units", () => {
   const now = localUnixSeconds(2026, 4, 19);
 
   assert.equal(formatThreadSummaryLastReplyTime(now - 30, now), "just now");
-  assert.equal(formatThreadSummaryLastReplyTime(now - 60, now), "1 minute ago");
-  assert.equal(
-    formatThreadSummaryLastReplyTime(now - 180, now),
-    "3 minutes ago",
-  );
-  assert.equal(
-    formatThreadSummaryLastReplyTime(now - 3_600, now),
-    "1 hour ago",
-  );
-  assert.equal(
-    formatThreadSummaryLastReplyTime(now - 10_800, now),
-    "3 hours ago",
-  );
-  assert.equal(
-    formatThreadSummaryLastReplyTime(now - 86_400, now),
-    "1 day ago",
-  );
-  assert.equal(
-    formatThreadSummaryLastReplyTime(now - 345_600, now),
-    "4 days ago",
-  );
+  assert.equal(formatThreadSummaryLastReplyTime(now - 60, now), "1m ago");
+  assert.equal(formatThreadSummaryLastReplyTime(now - 180, now), "3m ago");
+  assert.equal(formatThreadSummaryLastReplyTime(now - 3_600, now), "1h ago");
+  assert.equal(formatThreadSummaryLastReplyTime(now - 10_800, now), "3h ago");
+  assert.equal(formatThreadSummaryLastReplyTime(now - 86_400, now), "1d ago");
+  assert.equal(formatThreadSummaryLastReplyTime(now - 345_600, now), "4d ago");
 });
 
 test("formatThreadSummaryLastReplyTime dates older replies without an ordinal", () => {
   const now = localUnixSeconds(2026, 5, 15);
   const replyAt = localUnixSeconds(2026, 4, 19);
 
-  assert.equal(formatThreadSummaryLastReplyTime(replyAt, now), "on May 19");
+  assert.equal(formatThreadSummaryLastReplyTime(replyAt, now), "May 19");
 });
 
 test("startOfLocalDaySeconds collapses a day's timestamps to one value", () => {
