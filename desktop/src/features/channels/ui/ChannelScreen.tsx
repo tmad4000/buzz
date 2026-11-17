@@ -46,7 +46,6 @@ import { buildMessageComposerEditTarget } from "@/features/messages/lib/draftMen
 import { formatTimelineMessages } from "@/features/messages/lib/formatTimelineMessages";
 import { DeleteMessageConfirmDialog } from "@/features/messages/ui/DeleteMessageConfirmDialog";
 import {
-  getThreadReference,
   isThreadReply,
 } from "@/features/messages/lib/threading";
 import { hasPersistedHydratedChannel } from "@/features/messages/lib/channelHeadCache";
@@ -54,6 +53,10 @@ import { resolveTimelineQueryLoadingState } from "@/features/messages/lib/timeli
 import { useFetchOlderMessages } from "@/features/messages/useFetchOlderMessages";
 import { useIndependentThreadPanel } from "@/features/messages/useIndependentThreadPanel";
 import { useThreadReplies } from "@/features/messages/useThreadReplies";
+import { useChannelThreadLinks } from "@/features/messages/useChannelThreadLinks";
+import { applyThreadLinkPresentation, mergeThreadLinkEvents, threadLinkRelaySummaries } from "@/features/messages/lib/applyThreadLinkPresentation";
+import { latestOrdinaryTopLevel } from "@/features/messages/lib/threadLinkReadFrontier";
+import { ThreadOrganizationContext, ThreadOrganizationNotice } from "@/features/messages/ui/ThreadOrganization";
 import { useChannelTyping } from "@/features/messages/useChannelTyping";
 import type { TimelineMessage } from "@/features/messages/types";
 import { useUsersBatchQuery } from "@/features/profile/hooks";
@@ -207,17 +210,18 @@ export function ChannelScreen({
     threadScrollTargetId,
   );
   useChannelSubscription(activeChannel);
+  const organizationScope = React.useMemo(() => {
+    if (!activeCommunity?.relayUrl || !activeChannel?.isMember || activeChannel.channelType === "forum" || isHuddleTranscript) return null;
+    const communityUrl = new URL(activeCommunity.relayUrl);
+    communityUrl.protocol = communityUrl.protocol === "wss:" ? "https:" : "http:";
+    return { communityUrl: communityUrl.toString(), channelId: activeChannel.id, relaySelfPubkey };
+  }, [activeCommunity?.relayUrl, activeChannel?.id, activeChannel?.isMember, activeChannel?.channelType, isHuddleTranscript, relaySelfPubkey]);
+  const organizationKey = organizationScope ? JSON.stringify([activeCommunity?.id, organizationScope, currentPubkey]) : null;
+  const organization = useChannelThreadLinks(organizationScope, organizationKey, currentPubkey);
+
   const { fetchOlder, hasOlderMessages, historyExhausted, isFetchingOlder } =
     useFetchOlderMessages(activeChannel);
-  const latestActiveMessage = React.useMemo(() => {
-    const messages = messagesQuery.data;
-    if (!messages) return null;
-    for (let index = messages.length - 1; index >= 0; index -= 1) {
-      if (getThreadReference(messages[index].tags).parentId === null)
-        return messages[index];
-    }
-    return null;
-  }, [messagesQuery.data]);
+  const latestActiveMessage = React.useMemo(() => latestOrdinaryTopLevel(messagesQuery.data, organization.rejectedIds), [messagesQuery.data, organization.rejectedIds]);
   const activeReadAt = latestActiveMessage
     ? new Date(latestActiveMessage.created_at * 1_000).toISOString()
     : null;
@@ -274,6 +278,11 @@ export function ChannelScreen({
     resolvedMessages,
   });
   const threadReplyEvents = threadRepliesQuery.data ?? EMPTY_RELAY_EVENTS;
+  const presentationEvents = React.useMemo(() => organization.snapshot?.projection.status === "complete"
+    ? mergeThreadLinkEvents(organization.snapshot.events, resolvedMessages)
+    : resolvedMessages, [organization.snapshot, resolvedMessages]);
+  const presentationSummaries = React.useMemo(() => threadLinkRelaySummaries(threadSummaries, organization.snapshot), [threadSummaries, organization.snapshot]);
+
   const {
     entranceMessageId: welcomeEntranceMessageId,
     handleEntranceComplete: handleWelcomeEntranceComplete,
@@ -283,7 +292,7 @@ export function ChannelScreen({
     threadReplyEvents,
   );
   const messageEventProfilePubkeys = useMessageEventProfilePubkeys(
-    resolvedMessages,
+    presentationEvents,
     threadReplyEvents,
     relaySelfPubkey,
   );
@@ -402,8 +411,8 @@ export function ChannelScreen({
   }, [managedAgentsQuery.data, personasQuery.data]);
   const timelineMessages = React.useMemo(
     () =>
-      formatTimelineMessages(
-        resolvedMessages,
+      applyThreadLinkPresentation(formatTimelineMessages(
+        presentationEvents,
         activeChannel,
         currentPubkey,
         currentProfile?.avatarUrl ?? null,
@@ -413,7 +422,7 @@ export function ChannelScreen({
         respondToLookup,
         relaySelfPubkey,
         messageOwnerProfiles,
-      ),
+      ), organization.snapshot),
     [
       activeChannel,
       channelMembers,
@@ -424,13 +433,15 @@ export function ChannelScreen({
       personaLookup,
       relaySelfPubkey,
       respondToLookup,
-      resolvedMessages,
+      presentationEvents,
+      organization.snapshot,
     ],
   );
   const threadPanelData = useIndependentThreadPanel({
     activeChannel,
-    channelEvents: resolvedMessages,
+    channelEvents: presentationEvents,
     threadReplyEvents,
+    organization: organization.snapshot,
     rootId: effectiveOpenThreadHeadId,
     replyTargetId: threadReplyTargetId,
     expandedReplyIds: expandedThreadReplyIds,
@@ -782,6 +793,7 @@ export function ChannelScreen({
     ],
   );
   return (
+    <ThreadOrganizationContext.Provider value={organization}>
     <AgentSessionProvider onOpenAgentSession={handleOpenAgentSession}>
       <ProfilePanelProvider onOpenProfilePanel={handleOpenProfilePanel}>
         <WelcomeAgentCreateDialog
@@ -810,6 +822,7 @@ export function ChannelScreen({
           className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
           ref={channelContentRef}
         >
+          <ThreadOrganizationNotice />
           {activeChannel ? (
             activeChannel.channelType === "forum" ? (
               searchForwarding.renderSearchAwareForum(
@@ -885,7 +898,7 @@ export function ChannelScreen({
                   isSinglePanelView={isSinglePanelView}
                   isTimelineError={messagesQuery.isError} isTimelineLoading={isTimelineLoading}
                   onRetryTimeline={() => void messagesQuery.refetch()} messages={timelineMessages}
-                  threadSummaries={threadSummaries}
+                  threadSummaries={presentationSummaries}
                   huddleThreadRepliesError={huddleThreadRepliesError}
                   onRetryHuddleThreadReplies={onRetryHuddleThreadReplies}
                   onCancelEdit={handleCancelEdit}
@@ -994,5 +1007,6 @@ export function ChannelScreen({
         />
       </ProfilePanelProvider>
     </AgentSessionProvider>
+    </ThreadOrganizationContext.Provider>
   );
 }

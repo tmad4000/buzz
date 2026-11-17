@@ -202,3 +202,7 @@ Then exercise main timeline, inline and side-panel rendering, canonical sends,
 counts, unread, edits/deletions, cold history, reconnect and restart. Verify
 the fork UI only after root reviews the DM mapping. Keep the PR draft until
 the repository's agent exercise and human test requirements are satisfied.
+
+The separate [desktop runtime integration](thread-links-ui.md) documents bounded
+backfill, native-subthread union, presentation-only rendering, audit/undo and
+platform verification limits.

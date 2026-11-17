@@ -253,3 +253,51 @@ test("a suspended scope render cannot redirect the committed thread's toggle", a
   );
   await app.close();
 });
+
+test("explicit choices follow original event IDs into a new presentation root and back after restart", async () => {
+  localStorage.clear();
+  let app = mount();
+  await app.render();
+  await act(async () => latest.toggle(messages[1]));
+  assert.equal(latest.expanded.has("branch"), false);
+  const moved = {
+    ...base,
+    root: "new-root",
+    messages: [
+      msg("new-root"),
+      ...messages.map((message) => ({
+        ...message,
+        parentId: message.id === "root" ? "new-root" : message.parentId,
+        rootId: "new-root",
+        canonicalParentId: message.parentId,
+        canonicalRootId: "root",
+        ...(message.id === "root"
+          ? { threadOrganization: { annotationId: "move", operation: "link" } }
+          : {}),
+      })),
+    ],
+  };
+  await app.render(moved);
+  assert.equal(
+    latest.expanded.has("branch"),
+    false,
+    "moving a branch preserves collapse",
+  );
+  await app.close();
+  app = mount();
+  await app.render(moved);
+  assert.equal(
+    latest.expanded.has("branch"),
+    false,
+    "moved view survives restart",
+  );
+  await act(async () => latest.toggle(moved.messages[2]));
+  assert.equal(latest.expanded.has("branch"), true);
+  await app.render(base);
+  assert.equal(
+    latest.expanded.has("branch"),
+    true,
+    "explicit change in moved view follows original event on unlink",
+  );
+  await app.close();
+});

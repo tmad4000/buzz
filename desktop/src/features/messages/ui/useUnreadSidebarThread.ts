@@ -21,13 +21,19 @@ type Reveal = { external: string | null; id: string | null; handled: boolean };
 
 type State = {
   key: string | null;
+  seed: string;
   branches: ThreadExpansion;
   newIds: Set<string>;
   reveal: Reveal;
 };
-const empty = (key: string | null): State => ({
+const empty = (
+  key: string | null,
+  seed: string,
+  branches = loadThreadExpansion(key),
+): State => ({
   key,
-  branches: loadThreadExpansion(key),
+  seed,
+  branches,
   newIds: new Set(),
   reveal: { external: null, id: null, handled: true },
 });
@@ -55,11 +61,57 @@ export function useUnreadSidebarThread({
   const key = enabled
     ? threadExpansionKey(community, currentPubkey, channelId, root)
     : null;
-  const [saved, setSaved] = React.useState<State>(() => empty(key));
-  const state = React.useMemo(
-    () => (saved.key === key ? saved : empty(key)),
-    [saved, key],
+  // Manual branch choices follow the original event ID across organization.
+  // Keep the original per-root snapshots as well, so unlink is reversible.
+  const choicesKey = key
+    ? `buzz-thread-manual-expansion.v1:${JSON.stringify([community, currentPubkey ?? null, channelId])}`
+    : null;
+  const canonicalRoots = [
+    ...new Set(
+      messages
+        .map(
+          (message) =>
+            message.canonicalRootId ??
+            (message.threadOrganization ? message.id : null),
+        )
+        .filter((id): id is string => !!id && id !== root),
+    ),
+  ].sort();
+  const seed = JSON.stringify([key, canonicalRoots]);
+  const seedBranches = (base: ThreadExpansion) => {
+    const merged = new Map(base);
+    const native = new Map(
+      canonicalRoots.map((nativeRoot) => [
+        nativeRoot,
+        loadThreadExpansion(
+          threadExpansionKey(community, currentPubkey, channelId, nativeRoot),
+        ),
+      ]),
+    );
+    for (const message of messages) {
+      const nativeRoot =
+        message.canonicalRootId ??
+        (message.threadOrganization ? message.id : null);
+      const choice = nativeRoot
+        ? native.get(nativeRoot)?.get(message.id)
+        : undefined;
+      if (choice !== undefined) merged.set(message.id, choice);
+    }
+    for (const [id, choice] of loadThreadExpansion(choicesKey))
+      merged.set(id, choice);
+    return merged;
+  };
+  const [saved, setSaved] = React.useState<State>(() =>
+    empty(key, seed, seedBranches(loadThreadExpansion(key))),
   );
+  // Seed only on a committed scope/union change; re-rendering may not undo a
+  // fresh explicit toggle or reset the stable unread/reveal snapshot.
+  const state =
+    saved.key === key && saved.seed === seed
+      ? saved
+      : saved.key === key
+        ? { ...saved, seed, branches: seedBranches(saved.branches) }
+        : empty(key, seed, seedBranches(loadThreadExpansion(key)));
   const index = React.useMemo(
     () => buildThreadPanelIndex(messages),
     [messages],
@@ -108,8 +160,8 @@ export function useUnreadSidebarThread({
   const stableNewIds =
     newIds.size === state.newIds.size ? state.newIds : newIds;
   const view = React.useMemo(
-    () => ({ key, branches, newIds: stableNewIds, reveal }),
-    [key, branches, stableNewIds, reveal],
+    () => ({ key, seed, branches, newIds: stableNewIds, reveal }),
+    [key, seed, branches, stableNewIds, reveal],
   );
   const live = React.useRef(view);
   React.useLayoutEffect(() => {
@@ -119,6 +171,7 @@ export function useUnreadSidebarThread({
     if (!enabled || !key || live.current !== view) return;
     if (
       saved.key === key &&
+      saved.seed === seed &&
       state.branches === view.branches &&
       state.newIds === view.newIds &&
       state.reveal === view.reveal
@@ -127,7 +180,7 @@ export function useUnreadSidebarThread({
     setSaved(view);
     if (state.branches !== view.branches)
       saveThreadExpansion(key, view.branches);
-  }, [enabled, key, saved.key, state, view]);
+  }, [enabled, key, seed, saved.key, saved.seed, state, view]);
   const expanded = new Set(
     [...branches].filter(([, open]) => open).map(([id]) => id),
   );
@@ -161,6 +214,12 @@ export function useUnreadSidebarThread({
   const toggle = (message: TimelineMessage) => {
     const next = new Map(live.current.branches);
     next.set(message.id, !(next.get(message.id) ?? expanded.has(message.id)));
+    if (live.current.key !== key) return;
+    if (choicesKey) {
+      const manual = new Map(loadThreadExpansion(choicesKey));
+      manual.set(message.id, next.get(message.id) as boolean);
+      saveThreadExpansion(choicesKey, manual);
+    }
     // The user's toggle also cancels any older pending automatic reveal.
     commit(next, { ...live.current.reveal, handled: true });
   };
