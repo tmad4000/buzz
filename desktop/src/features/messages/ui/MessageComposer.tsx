@@ -66,6 +66,7 @@ import { prepareBackgroundLinkPreviews } from "@/features/messages/lib/linkPrevi
 import { useComposerLinkPreviews } from "./useComposerLinkPreviews";
 import { useAddressedAgentMentionRestore } from "./useAddressedAgentMentionRestore";
 import { scheduleSettleGatedAutoSubmit } from "./messageComposerAutoSubmit";
+import { SendToThreadPicker } from "./SendToThreadPicker";
 import type { MessageComposerProps } from "./MessageComposer.types";
 function MessageComposerImpl({
   audienceContext = null,
@@ -98,6 +99,7 @@ function MessageComposerImpl({
   showBackgroundUploadProgress = true,
   showTopBorder = false,
   toolbarExtraActions,
+  threadRoutingEntries,
   typingParentEventId = null,
   typingRootEventId = null,
 }: MessageComposerProps) {
@@ -551,147 +553,157 @@ function MessageComposerImpl({
     onOpenPicker: mentionPicker.openMentionPicker,
     onToggle: toggleAlwaysAddressAgent,
   });
-  const submitMessage = React.useCallback(async () => {
-    const trimmed = syncComposerContentFromEditor().trim();
-    // Edit mode
-    if (editTargetRef.current && onEditSaveRef.current) {
-      // A live recording must be finished or discarded explicitly; never let an
-      // edit save snapshot text while a voice note is mid-capture (the editor's
-      // Enter shortcut bypasses the toolbar's Finish/Discard controls).
-      if (isEditSubmissionLocked || voiceNote.statusRef.current !== "idle") {
+  const submitMessage = React.useCallback(
+    async (id?: string | null) => {
+      const trimmed = syncComposerContentFromEditor().trim();
+      // Edit mode
+      if (editTargetRef.current && onEditSaveRef.current) {
+        // A live recording must be finished or discarded explicitly; never let an
+        // edit save snapshot text while a voice note is mid-capture (the editor's
+        // Enter shortcut bypasses the toolbar's Finish/Discard controls).
+        if (isEditSubmissionLocked || voiceNote.statusRef.current !== "idle") {
+          return;
+        }
+        // An edit extracts from the same mention map a pasted identity binds
+        // into, so wait on any check still deciding. Bounded internally.
+        await mentions.settlePendingMentionBindings();
+        // Empty edits delete the message through handleEditSave.
+        await submitMessageEdit({
+          content: trimmed,
+          editTargetId: editTargetRef.current.id,
+          customEmoji,
+          originalContent: editTargetRef.current.body,
+          ownerPubkey: ownerPubkeyRef.current,
+          editTarget: editTargetRef.current,
+          getMentionRefs: mentions.getDraftMentionRefs,
+          pendingImeta: media.pendingImetaRef.current,
+          queuedAttachments: media.queuedAttachmentsRef.current,
+          spoileredAttachmentUrls,
+          extractMentionPubkeys: extractMentionPubkeysRef.current,
+          save: onEditSaveRef.current,
+          clearComposer: () => {
+            setComposerContent("");
+            richText.clearContent();
+            media.setPendingImeta([]);
+            media.clearQueuedAttachments();
+            setSpoileredAttachmentUrls(new Set());
+            mentions.clearMentions();
+            channelLinks.clearChannels();
+            emojiAutocomplete.clearEmojis();
+            setIsEmojiPickerOpen(false);
+          },
+          restoreComposer: (draft) => {
+            setComposerContent(draft.content);
+            richText.setContent(draft.content);
+            media.setPendingImeta(draft.pendingImeta);
+            media.restoreQueuedAttachments(draft.queuedAttachments);
+            setSpoileredAttachmentUrls(draft.spoileredAttachmentUrls);
+          },
+          restoreMentionRefs: mentions.restoreDraftMentionRefs,
+          revalidateMentionPubkeys: mentions.revalidateMentionPubkeys,
+          shouldRestoreComposer: () => canRestoreEditDraftRef.current,
+          setDeferredUploadPending: setDeferredEditPending,
+          setUploadError: (message) =>
+            media.setUploadState({ status: "error", message }),
+        });
         return;
       }
-      // An edit extracts from the same mention map a pasted identity binds
-      // into, so wait on any check still deciding. Bounded internally.
-      await mentions.settlePendingMentionBindings();
-      // Empty edits delete the message through handleEditSave.
-      await submitMessageEdit({
-        content: trimmed,
-        editTargetId: editTargetRef.current.id,
-        customEmoji,
-        originalContent: editTargetRef.current.body,
-        ownerPubkey: ownerPubkeyRef.current,
-        editTarget: editTargetRef.current,
-        getMentionRefs: mentions.getDraftMentionRefs,
-        pendingImeta: media.pendingImetaRef.current,
-        queuedAttachments: media.queuedAttachmentsRef.current,
-        spoileredAttachmentUrls,
-        extractMentionPubkeys: extractMentionPubkeysRef.current,
-        save: onEditSaveRef.current,
-        clearComposer: () => {
-          setComposerContent("");
-          richText.clearContent();
-          media.setPendingImeta([]);
-          media.clearQueuedAttachments();
-          setSpoileredAttachmentUrls(new Set());
-          mentions.clearMentions();
-          channelLinks.clearChannels();
-          emojiAutocomplete.clearEmojis();
-          setIsEmojiPickerOpen(false);
-        },
-        restoreComposer: (draft) => {
-          setComposerContent(draft.content);
-          richText.setContent(draft.content);
-          media.setPendingImeta(draft.pendingImeta);
-          media.restoreQueuedAttachments(draft.queuedAttachments);
-          setSpoileredAttachmentUrls(draft.spoileredAttachmentUrls);
-        },
-        restoreMentionRefs: mentions.restoreDraftMentionRefs,
-        revalidateMentionPubkeys: mentions.revalidateMentionPubkeys,
-        shouldRestoreComposer: () => canRestoreEditDraftRef.current,
-        setDeferredUploadPending: setDeferredEditPending,
-        setUploadError: (message) =>
-          media.setUploadState({ status: "error", message }),
-      });
-      return;
-    }
-    // Normal send
-    const currentPendingImeta = media.pendingImetaRef.current;
-    const currentQueuedAttachments = media.queuedAttachmentsRef.current;
-    const hasMedia =
-      currentPendingImeta.length > 0 || currentQueuedAttachments.length > 0;
-    if (
-      (!trimmed && !hasMedia) ||
-      disabledRef.current ||
-      voiceNote.statusRef.current !== "idle" ||
-      isSendingRef.current ||
-      isSubmitLockedRef.current ||
-      isUploadingRef.current ||
-      mentionSendFlow.isPreparingMentionSend
-    ) {
-      return;
-    }
-    const capturedThreadContext = onCaptureSendContext?.() ?? null;
-    if (
-      capturedThreadContext !== null &&
-      !capturedThreadContext.parentEventId
-    ) {
-      return;
-    }
-    isSubmitLockedRef.current = true;
-    setIsSubmitLocked(true);
-    onPreparingMentionSendChange?.(true);
-    try {
-      const preparedLinkPreviews = getReadyLinkPreviewTags().some(
-        (tag) => tag[1] === "none",
-      )
-        ? null
-        : prepareBackgroundLinkPreviews(getLiveLinkPreviewCandidates());
-      await mentionSendFlow.sendMessageWithMentionFlow({
-        addressedAgentPubkeys: persistentAudience.pubkeys,
-        capturedChannelId: channelId,
-        capturedThreadContext,
-        pendingImeta: currentPendingImeta,
-        queuedAttachments: currentQueuedAttachments,
-        linkPreviewTags: preparedLinkPreviews ? [] : getReadyLinkPreviewTags(),
-        preparedLinkPreviews,
-        sentDraftKey: resolveSentDraftKey(
-          effectiveDraftKeyRef.current,
-          drafts.loadDraft,
-        ),
-        recoveryDraftKey: effectiveDraftKey,
-        spoileredAttachmentUrls,
-        trimmed,
-      });
-    } finally {
-      isSubmitLockedRef.current = false;
-      setIsSubmitLocked(false);
-      onPreparingMentionSendChange?.(false);
-    }
-  }, [
-    channelId,
-    channelLinks.clearChannels,
-    customEmoji,
-    drafts.loadDraft,
-    emojiAutocomplete.clearEmojis,
-    getLiveLinkPreviewCandidates,
-    getReadyLinkPreviewTags,
-    media.clearQueuedAttachments,
-    media.pendingImetaRef,
-    media.queuedAttachmentsRef,
-    media.restoreQueuedAttachments,
-    media.setPendingImeta,
-    media.setUploadState,
-    mentionSendFlow.isPreparingMentionSend,
-    mentionSendFlow.sendMessageWithMentionFlow,
-    mentions.clearMentions,
-    richText.clearContent,
-    richText.setContent,
-    setComposerContent,
-    setSpoileredAttachmentUrls,
-    spoileredAttachmentUrls,
-    syncComposerContentFromEditor,
-    onCaptureSendContext,
-    onPreparingMentionSendChange,
-    persistentAudience.pubkeys,
-    isEditSubmissionLocked,
-    effectiveDraftKey,
-    mentions.getDraftMentionRefs,
-    mentions.restoreDraftMentionRefs,
-    mentions.revalidateMentionPubkeys,
-    mentions.settlePendingMentionBindings,
-    voiceNote.statusRef,
-  ]);
+      // Normal send
+      const currentPendingImeta = media.pendingImetaRef.current;
+      const currentQueuedAttachments = media.queuedAttachmentsRef.current;
+      const hasMedia =
+        currentPendingImeta.length > 0 || currentQueuedAttachments.length > 0;
+      if (
+        (!trimmed && !hasMedia) ||
+        disabledRef.current ||
+        voiceNote.statusRef.current !== "idle" ||
+        isSendingRef.current ||
+        isSubmitLockedRef.current ||
+        isUploadingRef.current ||
+        mentionSendFlow.isPreparingMentionSend
+      ) {
+        return;
+      }
+      const capturedThreadContext =
+        id === undefined
+          ? (onCaptureSendContext?.() ?? null)
+          : id === null
+            ? null
+            : { parentEventId: id, threadHeadId: id };
+      if (
+        capturedThreadContext !== null &&
+        !capturedThreadContext.parentEventId
+      ) {
+        return;
+      }
+      isSubmitLockedRef.current = true;
+      setIsSubmitLocked(true);
+      onPreparingMentionSendChange?.(true);
+      try {
+        const preparedLinkPreviews = getReadyLinkPreviewTags().some(
+          (tag) => tag[1] === "none",
+        )
+          ? null
+          : prepareBackgroundLinkPreviews(getLiveLinkPreviewCandidates());
+        await mentionSendFlow.sendMessageWithMentionFlow({
+          addressedAgentPubkeys: persistentAudience.pubkeys,
+          capturedChannelId: channelId,
+          capturedThreadContext,
+          pendingImeta: currentPendingImeta,
+          queuedAttachments: currentQueuedAttachments,
+          linkPreviewTags: preparedLinkPreviews
+            ? []
+            : getReadyLinkPreviewTags(),
+          preparedLinkPreviews,
+          sentDraftKey: resolveSentDraftKey(
+            effectiveDraftKeyRef.current,
+            drafts.loadDraft,
+          ),
+          recoveryDraftKey: effectiveDraftKey,
+          spoileredAttachmentUrls,
+          trimmed,
+        });
+      } finally {
+        isSubmitLockedRef.current = false;
+        setIsSubmitLocked(false);
+        onPreparingMentionSendChange?.(false);
+      }
+    },
+    [
+      channelId,
+      channelLinks.clearChannels,
+      customEmoji,
+      drafts.loadDraft,
+      emojiAutocomplete.clearEmojis,
+      getLiveLinkPreviewCandidates,
+      getReadyLinkPreviewTags,
+      media.clearQueuedAttachments,
+      media.pendingImetaRef,
+      media.queuedAttachmentsRef,
+      media.restoreQueuedAttachments,
+      media.setPendingImeta,
+      media.setUploadState,
+      mentionSendFlow.isPreparingMentionSend,
+      mentionSendFlow.sendMessageWithMentionFlow,
+      mentions.clearMentions,
+      richText.clearContent,
+      richText.setContent,
+      setComposerContent,
+      setSpoileredAttachmentUrls,
+      spoileredAttachmentUrls,
+      syncComposerContentFromEditor,
+      onCaptureSendContext,
+      onPreparingMentionSendChange,
+      persistentAudience.pubkeys,
+      isEditSubmissionLocked,
+      effectiveDraftKey,
+      mentions.getDraftMentionRefs,
+      mentions.restoreDraftMentionRefs,
+      mentions.revalidateMentionPubkeys,
+      mentions.settlePendingMentionBindings,
+      voiceNote.statusRef,
+    ],
+  );
   submitMessageRef.current = submitMessage;
   // Draft auto-submit runs once after persisted editor state loads.
   const onAutoSubmitCompleteRef = React.useRef(onAutoSubmitComplete);
@@ -960,7 +972,22 @@ function MessageComposerImpl({
               layoutMode={layoutMode}
               composerDisabled={composerDisabled}
               editor={richText.editor}
-              extraActions={toolbarExtraActions}
+              extraActions={
+                <>
+                  {toolbarExtraActions}
+                  {threadRoutingEntries && editTarget == null ? (
+                    <SendToThreadPicker
+                      key={`${channelId}:${effectiveDraftKey}`}
+                      entries={threadRoutingEntries}
+                      disabled={sendDisabled || isSubmitLocked || isSending}
+                      getDraft={syncComposerContentFromEditor}
+                      onPick={(id) => {
+                        void submitMessage(id);
+                      }}
+                    />
+                  ) : null}
+                </>
+              }
               formattingDisabled={composerDisabled}
               gifMediaController={media}
               isEmojiPickerOpen={isEmojiPickerOpen}
