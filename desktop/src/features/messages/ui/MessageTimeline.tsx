@@ -496,15 +496,19 @@ const MessageTimelineBase = React.forwardRef<
               messages.map((m) => m.id),
             )
           : null,
-      restoreReadingPosition: (snapshot) =>
-        activeScrollContainerRef.current
-          ? restoreReadingPosition(
-              activeScrollContainerRef.current,
-              snapshot,
-              messages.map((m) => m.id),
-              (id) => timelineVirtualizerApi?.scrollToMessage(id) ?? false,
-            )
-          : undefined,
+      restoreReadingPosition: (snapshot) => {
+        const container = activeScrollContainerRef.current;
+        if (!container) return;
+        // Restoring a mounted row bypasses scrollToMessage's cancellation.
+        // Reading restoration owns the viewport before any physical movement.
+        timelineVirtualizerApi?.cancelBottomIntent();
+        return restoreReadingPosition(
+          container,
+          snapshot,
+          messages.map((m) => m.id),
+          (id) => timelineVirtualizerApi?.scrollToMessage(id) ?? false,
+        );
+      },
       scrollToBottomOnNextUpdate: prepareForOwnMessage,
       settleAtBottom: settleAtBottomAfterLayout,
     }),

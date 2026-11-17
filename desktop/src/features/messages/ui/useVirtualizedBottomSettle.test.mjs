@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { readFileSync } from "node:fs";
+import ts from "typescript";
+import { restoreReadingPosition } from "./timelineReadingPosition.ts";
 
 class EventTargetShim {
   listeners = new Map();
@@ -352,4 +355,101 @@ test("typing and editable navigation keys preserve bottom intent", async () => {
   flushAnimationFrames();
   assert.equal(writes.length, 2);
   await act(async () => root.unmount());
+});
+
+test("public mounted-row restoration retires bottom intent before measurement churn", async () => {
+  const source = ts.createSourceFile(
+    "MessageTimeline.tsx",
+    readFileSync(new URL("./MessageTimeline.tsx", import.meta.url), "utf8"),
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TSX,
+  );
+  let restore;
+  const visit = (node) => {
+    if (
+      ts.isPropertyAssignment(node) &&
+      node.name.getText(source) === "restoreReadingPosition"
+    )
+      restore = node.initializer.getText(source);
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  assert.ok(
+    restore,
+    "execute the actual production public restoration adapter",
+  );
+  const bind = new Function(
+    "activeScrollContainerRef",
+    "timelineVirtualizerApi",
+    "messages",
+    "restoreReadingPosition",
+    ts.transpile(`const restore = ${restore}; return restore;`, {
+      target: ts.ScriptTarget.ES2022,
+    }),
+  );
+  const { content, refs, root, scroller, writes } = await mountHarness();
+  try {
+    scroller.isConnected = true;
+    scroller.scrollHeight = 1200;
+    scroller.clientHeight = 400;
+    scroller.scrollTop = 800;
+    const row = new ElementShim();
+    row.dataset.messageId = "target";
+    row.getBoundingClientRect = () => ({
+      top: 500 - scroller.scrollTop,
+      bottom: 540 - scroller.scrollTop,
+      height: 40,
+    });
+    scroller.querySelectorAll = () => [row];
+    scroller.contains = (node) => node === row;
+    refs.api.current.settle();
+    const observer = resizeObservers.find((entry) =>
+      entry.targets?.includes(content),
+    );
+    observer.callback(); // A pending bottom correction must also be canceled.
+    const pins = writes.length;
+    const restorePublic = bind(
+      { current: scroller },
+      {
+        cancelBottomIntent: refs.api.current.cancel,
+        scrollToMessage() {
+          throw new Error("mounted row must not require index realization");
+        },
+      },
+      [{ id: "target" }],
+      restoreReadingPosition,
+    );
+    const stop = restorePublic({
+      id: "target",
+      offset: 100,
+      pixel: 400,
+      neighbors: [],
+    });
+    for (let n = 0; n < 5; n++) flushAnimationFrames();
+    assert.equal(
+      scroller.scrollTop,
+      400,
+      "restoration reaches the saved reading position",
+    );
+    assert.equal(row.getBoundingClientRect().top, 100);
+    for (let n = 0; n < 12; n++) {
+      scroller.scrollHeight += 16;
+      observer.callback();
+      flushAnimationFrames();
+    }
+    assert.equal(
+      writes.length,
+      pins,
+      "measurement churn cannot re-pin the restored reader to the tail",
+    );
+    assert.equal(
+      row.getBoundingClientRect().top,
+      100,
+      "restored row stays at its viewport Y",
+    );
+    stop();
+  } finally {
+    await act(async () => root.unmount());
+  }
 });
