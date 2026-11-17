@@ -13,6 +13,7 @@ import {
   updateViewPresentation,
   type ConversationLayout,
   type ConversationView,
+  type PanelState,
   type CreateId,
   type SplitAxis,
 } from "./model";
@@ -197,6 +198,7 @@ export class ConversationLayoutController {
     viewId: string,
     channelId: string,
     presentation?: Parameters<typeof navigateView>[3],
+    routePanelState?: PanelState,
   ) {
     if (!this.current() || !this.options.canOpen(channelId)) return false;
     const layout = this.snapshot.layout;
@@ -210,8 +212,14 @@ export class ConversationLayoutController {
       return false;
     // Only admitted navigation may change recency or evict another remembered chat.
     this.presentations.remember(outgoing);
-    const restored =
-      presentation ?? this.presentations.recall(viewId, channelId);
+    let restored = presentation ?? this.presentations.recall(viewId, channelId);
+    if (routePanelState !== undefined)
+      restored = {
+        timelineAnchor: null,
+        threadAnchor: null,
+        ...restored,
+        panelState: routePanelState,
+      };
     // Fence A -> B -> A callbacks, which a channel-ID-only comparison cannot distinguish.
     this.visits.set(viewId, (this.visits.get(viewId) ?? 0) + 1);
     const pane = listPanes(layout.root).find(
@@ -231,12 +239,14 @@ export class ConversationLayoutController {
     visibleViewIds,
     recentViewIds,
     presentation,
+    panelState,
   }: {
     channelId: string;
     intent: ConversationRouteIntent;
     visibleViewIds: ReadonlySet<string>;
     recentViewIds: readonly string[];
     presentation?: Parameters<typeof navigateView>[3];
+    panelState?: PanelState;
   }): string | null {
     if (
       !this.current() ||
@@ -257,7 +267,7 @@ export class ConversationLayoutController {
       recentViewIds,
       intent,
     });
-    return target && this.navigate(target, channelId, presentation)
+    return target && this.navigate(target, channelId, presentation, panelState)
       ? target
       : null;
   }

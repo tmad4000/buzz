@@ -1,5 +1,6 @@
 import { CHANNEL_SEARCH_KEYS } from "../channels/ui/channelSearchKeys.ts";
 import type { ConversationView } from "./layout/model";
+import type { PanelState } from "./layout/model";
 
 const HISTORY_KEY = "buzzConversationView";
 type ViewHistoryState = {
@@ -7,6 +8,32 @@ type ViewHistoryState = {
   scopeKey: string;
   viewInstanceId: string;
 };
+
+export function conversationPanelStateFromSearch(
+  search: Record<string, unknown>,
+): PanelState {
+  const panel: PanelState = {};
+  for (const key of CHANNEL_SEARCH_KEYS) {
+    if (key === "autoSend") continue;
+    const value = search[key];
+    if (typeof value === "string" && value.length > 0) panel[key] = value;
+  }
+  return panel;
+}
+
+export function sameConversationPanelRoute(
+  a: Record<string, unknown>,
+  b: Record<string, unknown>,
+): boolean {
+  return CHANNEL_SEARCH_KEYS.every((key) => {
+    if (key === "autoSend") return true;
+    const value = (source: Record<string, unknown>) =>
+      typeof source[key] === "string" && source[key].length > 0
+        ? source[key]
+        : null;
+    return value(a) === value(b);
+  });
+}
 
 /** Private instance identity belongs only in history state, never copied URLs. */
 export function conversationRouteProjection(
