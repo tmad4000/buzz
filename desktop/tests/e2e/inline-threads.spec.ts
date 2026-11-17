@@ -5,6 +5,185 @@ import { installMockBridge, TEST_IDENTITIES } from "../helpers/bridge";
 
 const shots =
   process.env.BUZZ_INLINE_SCREENSHOTS ?? "test-results/inline-threads";
+test("held durable inline publish preserves queue height, anchor and real nested Reply hit testing", async ({
+  page,
+}, info) => {
+  await installMockBridge(page);
+  await page.goto("/");
+  await page.getByTestId("channel-general").click();
+  await waitForMockChannelHeadReady(
+    page,
+    "general",
+    "9a1657ac-f7aa-5db0-b632-d8bbeb6dfb50",
+  );
+  await page.keyboard.press("ControlOrMeta+,");
+  await page.getByTestId("settings-nav-appearance").click();
+  await page.getByTestId("thread-display-channels-collapsed").click();
+  await page.getByTestId("thread-display-replies-expanded").click();
+  await page.getByTestId("settings-back-to-app").click();
+  await page.getByTestId("channel-random").click();
+  await page.getByTestId("channel-general").click();
+  await waitForMockChannelHeadReady(
+    page,
+    "general",
+    "9a1657ac-f7aa-5db0-b632-d8bbeb6dfb50",
+  );
+  const root = "f1".repeat(32),
+    child = "f2".repeat(32),
+    other = "f3".repeat(32);
+  await page.evaluate(
+    ({ root, child, other, pubkey }) => {
+      const emit = window.__BUZZ_E2E_EMIT_MOCK_MESSAGE__;
+      if (!emit) throw new Error("Missing mock emitter");
+      const createdAt = Math.floor(Date.now() / 1000) + 30;
+      const messages: [string, string, string?][] = [
+        [root, "Held inline root", undefined],
+        [child, "Held inline nested target", root],
+        ["f4".repeat(32), "Existing nested reply", child],
+        [other, "Independent panel root", undefined],
+        ["f5".repeat(32), "Independent panel reply", other],
+      ];
+      messages.forEach(([id, content, parentEventId], index) => {
+        emit({
+          id,
+          content,
+          parentEventId,
+          pubkey,
+          channelName: "general",
+          createdAt: createdAt + index,
+        });
+      });
+    },
+    { root, child, other, pubkey: TEST_IDENTITIES.bob.pubkey },
+  );
+  const inline = page.locator(
+    `[data-testid="inline-thread"][data-thread-head-id="${root}"]`,
+  );
+  await page
+    .locator(
+      `[data-testid="message-thread-summary"][data-thread-head-id="${root}"]`,
+    )
+    .click();
+  await expect(inline).toContainText("Existing nested reply");
+  await page
+    .locator(
+      `[data-testid="open-thread-side-panel"][data-thread-head-id="${other}"]`,
+    )
+    .click();
+  const editor = inline.getByTestId("message-input");
+  await editor.fill("Held pending inline reply");
+  await page.evaluate(() => window.__BUZZ_E2E_HOLD_OUTBOX_PUBLISH__?.(true));
+  try {
+    await inline.getByTestId("send-message").click();
+    await expect
+      .poll(() =>
+        page.evaluate(() => window.__BUZZ_E2E_HELD_OUTBOX_PUBLISHES__?.()),
+      )
+      .toBe(1);
+    await expect(editor).toBeEmpty();
+    const queued = inline
+      .getByRole("article", { name: "Queued message" })
+      .filter({
+        has: page.getByText("Held pending inline reply", { exact: true }),
+      });
+    await expect(queued).toHaveCount(1);
+    await expect(queued).toBeVisible();
+    const target = inline.locator(`[data-message-id="${child}"]`);
+    await target.hover();
+    const before = await target.boundingBox();
+    if (!before) throw new Error("Missing visible nested Reply target");
+    const beforeInline = await inline.boundingBox();
+    if (!beforeInline) throw new Error("Missing inline layout box");
+    const height = beforeInline.height;
+    const timeline = page.getByTestId("message-timeline");
+    const estimates = Number(
+      await timeline.getAttribute("data-virtua-estimate-call-count"),
+    );
+    const scroll = await timeline.evaluate((element) => element.scrollTop);
+    // A real pointer click must succeed while delivery and the queue row are held.
+    await inline.getByTestId(`reply-message-${child}`).click({ timeout: 5000 });
+    await expect(queued).toBeVisible();
+    await expect
+      .poll(() =>
+        page.evaluate(() => window.__BUZZ_E2E_HELD_OUTBOX_PUBLISHES__?.()),
+      )
+      .toBe(1);
+    const samples = await target.evaluate(async (element) => {
+      const scroller = element.closest('[data-testid="message-timeline"]');
+      if (!(scroller instanceof HTMLElement))
+        throw new Error("Missing timeline owner");
+      const rows = [];
+      for (let frame = 0; frame < 12; frame++) {
+        await new Promise<void>((resolve) =>
+          requestAnimationFrame(() => resolve()),
+        );
+        rows.push({
+          top: element.getBoundingClientRect().top,
+          scrollTop: scroller.scrollTop,
+          estimateCalls: Number(scroller.dataset.virtuaEstimateCallCount),
+        });
+      }
+      return rows;
+    });
+    await info.attach("held-inline-layout-samples", {
+      body: JSON.stringify({ before, height, estimates, scroll, samples }),
+      contentType: "application/json",
+    });
+    expect(
+      Math.max(...samples.map((row) => row.top)) -
+        Math.min(...samples.map((row) => row.top)),
+    ).toBeLessThanOrEqual(1);
+    expect(
+      Math.max(...samples.map((row) => row.scrollTop)) -
+        Math.min(...samples.map((row) => row.scrollTop)),
+    ).toBeLessThanOrEqual(1);
+    expect(samples.at(-1)?.estimateCalls).toBe(samples[0].estimateCalls);
+    const afterInline = await inline.boundingBox();
+    if (!afterInline) throw new Error("Inline layout disappeared during click");
+    expect(Math.abs(afterInline.height - height)).toBeLessThanOrEqual(1);
+    expect(
+      Math.abs(samples[samples.length - 1].top - before.y),
+    ).toBeLessThanOrEqual(1);
+    expect(
+      Math.abs(samples[samples.length - 1].scrollTop - scroll),
+    ).toBeLessThanOrEqual(1);
+    expect(
+      await page.evaluate(() =>
+        window.__BUZZ_E2E_HOLD_OUTBOX_PUBLISH__?.(false),
+      ),
+    ).toBe(1);
+    const pendingBody = inline
+      .getByTestId("message-body")
+      .filter({ hasText: /^Held pending inline reply$/ });
+    await expect(pendingBody).toBeVisible();
+    await expect(queued).toHaveCount(0);
+    await editor.fill("Nested send after held publish");
+    await inline.getByTestId("send-message").click();
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          (window.__BUZZ_E2E_COMMAND_PAYLOADS__ ?? [])
+            .filter((call) => call.command === "publish_queued_message")
+            .map(
+              (call) =>
+                (call.payload as { event: { tags: string[][] } }).event.tags,
+            ),
+        ),
+      )
+      .toContainEqual(
+        expect.arrayContaining([
+          ["e", root, "", "root"],
+          ["e", child, "", "reply"],
+        ]),
+      );
+    await expect(page.getByTestId("message-thread-panel")).toContainText(
+      "Independent panel root",
+    );
+  } finally {
+    await page.evaluate(() => window.__BUZZ_E2E_HOLD_OUTBOX_PUBLISH__?.(false));
+  }
+});
+
 test("inline replies, scoped sends, saved expansion and side panel coexist", async ({
   page,
 }) => {
