@@ -15,6 +15,7 @@ type WorkspaceConfig = {
 };
 export type ConversationWorkspaceSession = {
   scopeKey: string;
+  scope: Readonly<LayoutScope>;
   controller: ConversationLayoutController;
   guards: ConversationViewGuards;
   flush: () => void;
@@ -110,6 +111,7 @@ export function useConversationWorkspace({
         });
         return {
           scopeKey: wantedKey as string,
+          scope: Object.freeze({ ...current.scope }),
           controller,
           guards,
           flush: controller.flush,

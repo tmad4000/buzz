@@ -15,7 +15,7 @@ type Props = {
   session: ConversationWorkspaceSession;
   snapshot: LayoutControllerSnapshot;
   active: boolean;
-  /** Return only already-authorized existing stream/DM resources. */
+  /** Return authorized existing stream/DM resources; project homes, forums and huddle routes stay outside this surface. */
   resolveConversation: (channelId: string) => DraggedConversation | null;
   /** Reuse ChannelRouteScreen preparation, with a resource/visit key owned here. */
   renderRoute: (
@@ -203,30 +203,59 @@ export function ConversationWorkspaceSurface({
                 <React.Fragment
                   key={JSON.stringify([view.id, view.channelId, visit])}
                 >
-                  {renderRoute(view, (channel) => (
-                    <ConversationViewHost
-                      {...bindVisitPreferences(controller, view)}
-                      viewInstanceId={view.id}
-                      focused={hasFocus}
-                      visible={visible}
-                      interactive={active}
-                      label={available.label}
-                      initialPanelState={view.panelState}
-                      onPanelNavigate={(patch) => {
-                        if (!canHandle()) return;
-                        if (
-                          controller.update(view.id, view.channelId, visit, {
-                            panelState: patch,
-                          }) &&
-                          controller.getSnapshot().layout.focusedPaneId ===
-                            pane.id
-                        )
-                          announceFocus(false);
-                      }}
-                      onFocusView={() => focusPane(pane.id)}
-                      channel={{ ...channel, headerEndActions }}
-                    />
-                  ))}
+                  {renderRoute(view, (channel) => {
+                    if (
+                      channel.activeChannel?.id !== view.channelId ||
+                      channel.currentIdentity?.pubkey !==
+                        session.scope.identityPubkey
+                    ) {
+                      return (
+                        <section
+                          className="flex h-full min-w-0 flex-col p-4"
+                          aria-label={available.label}
+                          onPointerDownCapture={() => focusPane(pane.id)}
+                          onFocusCapture={() => focusPane(pane.id)}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <h2 className="text-sm font-medium">
+                              {available.label}
+                            </h2>
+                            {headerEndActions}
+                          </div>
+                          <p
+                            role="status"
+                            className="mt-3 text-sm text-muted-foreground"
+                          >
+                            Loading conversation…
+                          </p>
+                        </section>
+                      );
+                    }
+                    return (
+                      <ConversationViewHost
+                        {...bindVisitPreferences(controller, view)}
+                        viewInstanceId={view.id}
+                        focused={hasFocus}
+                        visible={visible}
+                        interactive={active}
+                        label={available.label}
+                        initialPanelState={view.panelState}
+                        onPanelNavigate={(patch) => {
+                          if (!canHandle()) return;
+                          if (
+                            controller.update(view.id, view.channelId, visit, {
+                              panelState: patch,
+                            }) &&
+                            controller.getSnapshot().layout.focusedPaneId ===
+                              pane.id
+                          )
+                            announceFocus(false);
+                        }}
+                        onFocusView={() => focusPane(pane.id)}
+                        channel={{ ...channel, headerEndActions }}
+                      />
+                    );
+                  })}
                 </React.Fragment>
               );
             }}
