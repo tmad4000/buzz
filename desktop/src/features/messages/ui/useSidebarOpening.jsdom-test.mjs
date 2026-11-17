@@ -231,3 +231,22 @@ test("older never-observed reply below a seen frontier remains unfolded and unse
   assert.equal(latest.opening.firstUnseen, "first");
   await app.close();
 });
+
+test("organized sidebar folds consult original native exact observation markers", async () => {
+  localStorage.clear();
+  const app = mount();
+  const messages = [
+    root,
+    { ...msg("native-C", 10), canonicalRootId: null },
+    { ...msg("native-D", 20, "native-C"), canonicalRootId: "native-C" },
+  ];
+  await app.render({
+    messages,
+    seenAt: (native, id) =>
+      native === "native-C" && ["native-C", "native-D"].includes(id)
+        ? 20
+        : null,
+  });
+  assert.equal(latest.opening.firstUnseen, undefined);
+  await app.close();
+});

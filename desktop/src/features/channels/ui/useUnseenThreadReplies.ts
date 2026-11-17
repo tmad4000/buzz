@@ -1,3 +1,4 @@
+import { canonicalThreadRootId } from "@/features/messages/lib/applyThreadLinkPresentation";
 import * as React from "react";
 import { useConversationReadAdmission } from "@/features/conversations/ConversationViewContext";
 import { unseenRepliesByRoot } from "../lib/unseenReplies";
@@ -48,7 +49,10 @@ export function useUnseenThreadReplies({
       if (!canRead()) return;
       markRead(messages, rootId);
       for (const message of messages) {
-        const canonicalRoot = message.rootId ?? rootId;
+        const canonicalRoot =
+          message.canonicalRootId !== undefined
+            ? canonicalThreadRootId(message)
+            : (message.rootId ?? rootId);
         if (
           canonicalRoot &&
           message.pubkey !== currentPubkey &&

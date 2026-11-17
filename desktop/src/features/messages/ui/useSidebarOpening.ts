@@ -1,3 +1,4 @@
+import { canonicalThreadRootId } from "../lib/applyThreadLinkPresentation";
 import * as React from "react";
 import type { TimelineMessage } from "../types";
 import type { MainTimelineEntry } from "../lib/threadPanel";
@@ -62,7 +63,16 @@ export function useSidebarOpening({
   );
   const key = (m: TimelineMessage) => m.renderKey ?? m.id;
   const isSeen = (m: TimelineMessage) =>
-    Boolean(root && ready && (seenAt(root, m.id) ?? -1) >= m.createdAt);
+    Boolean(
+      root &&
+        ready &&
+        (seenAt(
+          m.canonicalRootId !== undefined
+            ? canonicalThreadRootId(m)
+            : (m.rootId ?? root),
+          m.id,
+        ) ?? -1) >= m.createdAt,
+    );
   const unseen = ordered.filter(
     (m) => !m.pending && m.pubkey !== reader && !isSeen(m),
   );

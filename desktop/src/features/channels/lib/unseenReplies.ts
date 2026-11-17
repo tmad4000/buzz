@@ -1,3 +1,4 @@
+import { canonicalThreadRootId } from "@/features/messages/lib/applyThreadLinkPresentation";
 import { isConversationalUnreadKind } from "@/shared/constants/kinds";
 import type { TimelineMessage } from "@/features/messages/types";
 
@@ -24,7 +25,11 @@ export function unseenRepliesByRoot(
     )
       continue;
     ids.add(message.id);
-    if ((seenAt(rootId, message.id) ?? -1) >= message.createdAt) continue;
+    if (
+      (seenAt(canonicalThreadRootId(message), message.id) ?? -1) >=
+      message.createdAt
+    )
+      continue;
     const replies = roots.get(rootId) ?? [];
     replies.push(message);
     roots.set(rootId, replies);

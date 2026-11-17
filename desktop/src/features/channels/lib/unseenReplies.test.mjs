@@ -69,3 +69,33 @@ test("unseen badges share exact observation evidence with sidebar folding", asyn
     ["older", "stale"],
   );
 });
+
+test("organization groups unseen replies by presentation but retains native exact-marker keys", () => {
+  const messages = [
+    reply("native-C", { canonicalRootId: null }),
+    reply("native-D", { canonicalRootId: "native-C", parentId: "native-C" }),
+  ];
+  const markers = new Map([
+    ["native-C:native-C", 20],
+    ["native-C:native-D", 20],
+  ]);
+  assert.equal(
+    unseenRepliesByRoot(
+      messages,
+      "me",
+      (root, id) => markers.get(`${root}:${id}`) ?? null,
+    ).size,
+    0,
+  );
+  markers.delete("native-C:native-D");
+  assert.deepEqual(
+    unseenRepliesByRoot(
+      messages,
+      "me",
+      (root, id) => markers.get(`${root}:${id}`) ?? null,
+    )
+      .get("root")
+      .map((m) => m.id),
+    ["native-D"],
+  );
+});
