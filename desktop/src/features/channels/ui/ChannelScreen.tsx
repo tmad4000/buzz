@@ -713,9 +713,10 @@ export function ChannelScreen({
     activeChannel?.channelType !== "forum" &&
     hasAuxiliaryPanel;
   const shouldCompactHeaderActions =
-    hasAuxiliaryPanel &&
     channelContentWidthPx > 0 &&
-    (conversationView !== null || channelContentWidthPx < 760);
+    (conversationView
+      ? hasAuxiliaryPanel || channelContentWidthPx < 760
+      : hasAuxiliaryPanel && channelContentWidthPx < 760);
   const channelHeaderChromeRef = useMeasuredCssVariable({
     targetRef: mainInsetRef,
     ...channelContentTopPaddingMeasurement,

@@ -152,6 +152,38 @@ const shots = process.env.BUZZ_TIMELINE_PANE_SCREENSHOTS;
         path: path.join(shots, "timeline-and-thread.png"),
       });
     }
+    await page.setViewportSize({ width: 1024, height: 1100 });
+    await expect(orderA).toBeVisible();
+    await expect(a.getByTestId("chat-title")).toBeVisible();
+    assert.ok(
+      (await a.getByTestId("chat-title").boundingBox()).width >= 40,
+      "narrow Timeline keeps its conversation title",
+    );
+    await expect(
+      b.getByTestId("message-thread-panel").getByTestId("message-input"),
+    ).toHaveText("B draft survives A Timeline");
+    const bounds = await b.boundingBox();
+    const panel = await b.getByTestId("message-thread-panel").boundingBox();
+    assert.ok(
+      panel.x >= bounds.x - 1 &&
+        panel.x + panel.width <= bounds.x + bounds.width + 1,
+      "narrow thread stays within sibling leaf",
+    );
+    if (shots)
+      await page.screenshot({
+        path: path.join(shots, "timeline-and-thread-1024.png"),
+      });
+    await page.setViewportSize({ width: 1800, height: 1100 });
+    assert.equal(
+      await page.evaluate(
+        () =>
+          window.timelineSiblingEditor ===
+          document.querySelector(
+            '[data-conversation-view="b"] [data-testid="message-thread-panel"] [data-testid="message-input"]',
+          ),
+      ),
+      true,
+    );
     await a
       .locator('[title="Open this reply in Threads"]')
       .filter({ hasText: "Release plan for pane A" })
