@@ -20,6 +20,7 @@ const MarkdownIt = requireFromTiptap("markdown-it");
 const CHANNEL_ID = "9a1657ac-f7aa-5db0-b632-d8bbeb6dfb50";
 const MESSAGE_ID = "root-event";
 const HREF = `buzz://message?channel=${CHANNEL_ID}&id=${MESSAGE_ID}`;
+const CANONICAL_HREF = HREF.replace("buzz://", "buzz-ideaflow://");
 const CHANNEL_HREF = `buzz://channel/${CHANNEL_ID}`;
 const CHANNEL_MESSAGE_ID = "a".repeat(64);
 const CHANNEL_MESSAGE_HREF = `buzz://channel/${CHANNEL_ID}/${CHANNEL_MESSAGE_ID}`;
@@ -37,7 +38,7 @@ test("resolves a composer preview and canonicalizes the underlying href", () => 
       HREF.replace("buzz://", "BUZZ://"),
       (channelId) => (channelId === CHANNEL_ID ? "general" : undefined),
     ),
-    { channelName: "general", href: HREF },
+    { channelName: "general", href: CANONICAL_HREF },
   );
 });
 
@@ -64,7 +65,7 @@ test("resolves channel and entity links as composer chips", () => {
     ),
     {
       channelName: "general",
-      href: `buzz://message?channel=${CHANNEL_ID}&id=${CHANNEL_MESSAGE_ID}`,
+      href: `buzz-ideaflow://message?channel=${CHANNEL_ID}&id=${CHANNEL_MESSAGE_ID}`,
     },
   );
   assert.deepEqual(
@@ -89,13 +90,13 @@ const EXACT_LINK_PASTE_ACCEPTED_CASES = [
     "<https://example.com/docs?q=1>",
     "https://example.com/docs?q=1",
   ],
-  ["exact message", HREF, HREF],
-  ["wrapped message", `<${HREF}>`, HREF],
+  ["exact message", HREF, CANONICAL_HREF],
+  ["wrapped message", `<${HREF}>`, CANONICAL_HREF],
   ["channel", CHANNEL_HREF, CHANNEL_HREF],
   [
     "channel message",
     CHANNEL_MESSAGE_HREF,
-    `buzz://message?channel=${CHANNEL_ID}&id=${CHANNEL_MESSAGE_ID}`,
+    `buzz-ideaflow://message?channel=${CHANNEL_ID}&id=${CHANNEL_MESSAGE_ID}`,
   ],
   ["repo", REPO_HREF, REPO_HREF],
   ["project", PROJECT_HREF, PROJECT_HREF],
@@ -115,7 +116,7 @@ test("exact link paste canonicalizes Buzz links", () => {
       `BUZZ://channel/${CHANNEL_ID.toUpperCase()}/${CHANNEL_MESSAGE_ID.toUpperCase()}`,
     ),
     {
-      href: `buzz://message?channel=${CHANNEL_ID}&id=${CHANNEL_MESSAGE_ID}`,
+      href: `buzz-ideaflow://message?channel=${CHANNEL_ID}&id=${CHANNEL_MESSAGE_ID}`,
     },
   );
 });
@@ -146,7 +147,7 @@ for (const [label, input, expectedHref] of [
   [
     "canonical Buzz link",
     CHANNEL_MESSAGE_HREF,
-    `buzz://message?channel=${CHANNEL_ID}&id=${CHANNEL_MESSAGE_ID}`,
+    `buzz-ideaflow://message?channel=${CHANNEL_ID}&id=${CHANNEL_MESSAGE_ID}`,
   ],
   ["scheme-less host", "www.example.com", "http://www.example.com"],
   ["bare host with path", "example.com/docs", "http://example.com/docs"],
@@ -286,7 +287,7 @@ test("paste handler canonicalizes Buzz links over selected text", () => {
   assert.deepEqual(toPlainJson(view.state.doc).content[0].content[0].marks, [
     {
       attrs: {
-        href: `buzz://message?channel=${CHANNEL_ID}&id=${CHANNEL_MESSAGE_ID}`,
+        href: `buzz-ideaflow://message?channel=${CHANNEL_ID}&id=${CHANNEL_MESSAGE_ID}`,
       },
       type: "link",
     },
@@ -518,7 +519,10 @@ test("markdown parsing materializes a bare message link in composer content", ()
 
   assert.equal(rule(state, false), true);
   assert.equal(state.pos, 4 + HREF.length);
-  assert.deepEqual(token.meta, { channelName: "general", href: HREF });
+  assert.deepEqual(token.meta, {
+    channelName: "general",
+    href: CANONICAL_HREF,
+  });
 });
 
 test("real markdown-it parsing materializes a restored message link", () => {
@@ -531,7 +535,10 @@ test("real markdown-it parsing materializes a restored message link", () => {
   const html = md.renderInline(`See ${HREF}.`);
   assert.match(html, /See <span data-composer-buzz-link=""/);
   assert.match(html, /data-channel-name="general"/);
-  assert.match(html, /data-href="buzz:\/\/message\?channel=.*&amp;id=/);
+  assert.match(
+    html,
+    /data-href="buzz-ideaflow:\/\/message\?channel=.*&amp;id=/,
+  );
 });
 
 test("real markdown-it parsing materializes mixed Buzz permalink chips", () => {
@@ -577,7 +584,10 @@ test("markdown parsing resumes after markdown-it consumes the buzz prefix", () =
   assert.equal(rule(state, false), true);
   assert.equal(state.pending, "See ");
   assert.equal(state.pos, state.src.length);
-  assert.deepEqual(token.meta, { channelName: "general", href: HREF });
+  assert.deepEqual(token.meta, {
+    channelName: "general",
+    href: CANONICAL_HREF,
+  });
 });
 
 test("markdown parsing stops message links before emphasis delimiters", () => {
@@ -594,7 +604,10 @@ test("markdown parsing stops message links before emphasis delimiters", () => {
 
   assert.equal(rule(state, false), true);
   assert.equal(state.pos, HREF.length);
-  assert.deepEqual(token.meta, { channelName: "general", href: HREF });
+  assert.deepEqual(token.meta, {
+    channelName: "general",
+    href: CANONICAL_HREF,
+  });
 });
 
 function renderedChipLabel(rendered) {
@@ -603,7 +616,7 @@ function renderedChipLabel(rendered) {
 
 test("composer node uses the sent-message chip presentation", () => {
   const node = {
-    attrs: { channelName: "general", href: HREF },
+    attrs: { channelName: "general", href: CANONICAL_HREF },
   };
   const rendered = globalThis.structuredClone(
     // TipTap invokes renderHTML with the extension instance as `this`.
@@ -637,7 +650,7 @@ test("composer node truncates and preserves grapheme-safe leading fragments", ()
   const longRendered = render.call(
     { options: { resolveChannelName: () => undefined } },
     {
-      node: { attrs: { channelName: longName, href: HREF } },
+      node: { attrs: { channelName: longName, href: CANONICAL_HREF } },
       HTMLAttributes: {},
     },
   );
@@ -652,7 +665,7 @@ test("composer node truncates and preserves grapheme-safe leading fragments", ()
     const rendered = render.call(
       { options: { resolveChannelName: () => undefined } },
       {
-        node: { attrs: { channelName: label, href: HREF } },
+        node: { attrs: { channelName: label, href: CANONICAL_HREF } },
         HTMLAttributes: {},
       },
     );
@@ -705,10 +718,28 @@ test("composer node renders channel and entity chip presentations", () => {
 test("markdown rendering stores identity in attributes, not visible id text", () => {
   const { md } = captureMarkdownRule();
   const render = md.renderer.rules.buzz_composer_message_link;
-  const html = render([{ meta: { channelName: "general", href: HREF } }], 0);
+  const html = render(
+    [{ meta: { channelName: "general", href: CANONICAL_HREF } }],
+    0,
+  );
 
   assert.match(html, /data-composer-buzz-link=""/);
   assert.match(html, /data-channel-name="general"/);
-  assert.match(html, /data-href="buzz:\/\/message\?channel=.*&amp;id=/);
+  assert.match(
+    html,
+    /data-href="buzz-ideaflow:\/\/message\?channel=.*&amp;id=/,
+  );
   assert.doesNotMatch(html, />[^<]*root-event/);
+});
+
+test("restoring a generated fork message link materializes the same chip as a legacy link", () => {
+  for (const href of [HREF, CANONICAL_HREF]) {
+    const md = new MarkdownIt();
+    registerComposerMessageLinkMarkdownIt(md, {
+      resolveChannelName: () => "general",
+    });
+    const html = md.renderInline(`See ${href}.`);
+    assert.match(html, /data-composer-buzz-link=""/);
+    assert.match(html, /data-href="buzz-ideaflow:\/\/message\?channel=/);
+  }
 });
