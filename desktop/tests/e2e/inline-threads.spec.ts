@@ -741,7 +741,7 @@ test("incoming replies above and below a scrolled reader preserve anchor, focuse
       snapshots,
       orderBeforePosition,
       orderAfterPosition,
-      positionedOffset,
+      jumpPlacement,
       setupSamples,
     }),
     contentType: "application/json",
