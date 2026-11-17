@@ -73,6 +73,8 @@ type TimelineMessageListProps = {
    *  rows, so without the relay map every summary row unmounts mid-scrollback. */
   threadSummaries?: ReadonlyMap<string, ChannelWindowThreadSummary>;
   messages: TimelineMessage[];
+  /** Current reply evidence for summaries; never changes rendered body membership. */
+  summaryMessages?: TimelineMessage[];
   onDelete?: (message: TimelineMessage) => void;
   onEdit?: (message: TimelineMessage) => void;
   onMarkUnread?: (message: TimelineMessage) => void;
@@ -147,6 +149,7 @@ export const TimelineMessageList = React.memo(function TimelineMessageList({
   messageFooters,
   mainEntries,
   threadSummaries,
+  summaryMessages,
   messages,
   onDelete,
   onEdit,
@@ -189,8 +192,9 @@ export const TimelineMessageList = React.memo(function TimelineMessageList({
             undefined,
             threadSummaries,
             profiles,
+            summaryMessages,
           )),
-    [mainEntries, messages, mode, profiles, threadSummaries],
+    [mainEntries, messages, mode, profiles, threadSummaries, summaryMessages],
   );
   // Contexts are memoized per message id so MessageRow/Markdown memo
   // comparisons hold across unrelated timeline re-renders (typing
