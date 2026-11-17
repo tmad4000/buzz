@@ -49,8 +49,8 @@ export const isEmptyTree = (node: Tree): boolean =>
     (child) => child === undefined || (!isReg(child) && isEmptyTree(child)),
   );
 
-/** A register imported from a meta-less local cache (stamp 1); any remote beats it. */
-const isCachePlaceholder = (reg: Reg) => reg[0] === 1 && reg[1] === LEGACY_DEV;
+/** Defaults (stamp 0) and meta-less local caches (stamp 1); any remote beats them. */
+const isCachePlaceholder = (reg: Reg) => reg[0] <= 1 && reg[1] === LEGACY_DEV;
 
 /**
  * Merges `b` into `a`. With `onlyMissing`, `b` only fills leaves `a` lacks or

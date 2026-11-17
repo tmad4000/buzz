@@ -45,6 +45,7 @@ mod relay_admission;
 mod reset;
 mod secret_store;
 mod shutdown;
+mod sidebar_section_defaults;
 mod team_catalog;
 mod templates;
 mod terminal_runtime;
@@ -629,6 +630,7 @@ pub fn run() {
             create_auth_event,
             nip44_encrypt_to_self,
             nip44_decrypt_from_self,
+            load_sidebar_section_defaults,
             get_channels,
             get_open_channel_directory,
             create_channel,

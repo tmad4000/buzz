@@ -19,6 +19,7 @@ import {
   ProfileAvatarWithStatus,
   scaleProfileAvatarStatusGeometry,
 } from "@/features/profile/ui/ProfileAvatarWithStatus";
+import type { ChannelSection } from "@/features/sidebar/lib/useChannelSections";
 import type { Channel, PresenceStatus } from "@/shared/api/types";
 import { cn } from "@/shared/lib/cn";
 import { useNow } from "@/shared/lib/useNow";
@@ -397,6 +398,11 @@ export function SidebarSection({
   onMuteChannel,
   onUnmuteChannel,
   sectionActionsOpen,
+  sections,
+  assignments,
+  onAssignChannel,
+  onUnassignChannel,
+  onCreateSectionForChannel,
 }: {
   action?: React.ReactNode;
   activeWorkingByChannelId?: ReadonlyMap<string, ActiveChannelTurnSummary>;
@@ -424,6 +430,11 @@ export function SidebarSection({
   onMuteChannel?: (channelId: string) => void;
   onUnmuteChannel?: (channelId: string) => void;
   sectionActionsOpen?: boolean;
+  sections?: ChannelSection[];
+  assignments?: Record<string, string>;
+  onAssignChannel?: (channelId: string, sectionId: string) => void;
+  onUnassignChannel?: (channelId: string) => void;
+  onCreateSectionForChannel?: (channelId: string) => void;
 }) {
   if (items.length === 0 && !action && !emptyState) {
     return null;
@@ -532,6 +543,11 @@ export function SidebarSection({
                     <ContextMenuContent>
                       <ChannelContextMenuItems
                         channel={channel}
+                        sections={sections}
+                        assignments={assignments}
+                        onAssignChannel={onAssignChannel}
+                        onUnassignChannel={onUnassignChannel}
+                        onCreateSectionForChannel={onCreateSectionForChannel}
                         hasUnread={unreadChannelIds.has(channel.id)}
                         isMuted={mutedChannelIds?.has(channel.id)}
                         onMarkChannelRead={onMarkChannelRead}
