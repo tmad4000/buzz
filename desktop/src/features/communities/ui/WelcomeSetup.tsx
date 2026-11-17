@@ -1,3 +1,4 @@
+import { AppStamp } from "@/features/settings/AppStamp";
 import * as React from "react";
 import { Check, Copy } from "lucide-react";
 
@@ -118,7 +119,7 @@ export function WelcomeSetup({
 
   return (
     <div
-      className="buzz-onboarding-neutral-theme buzz-startup-shell flex h-dvh items-start justify-center overflow-y-auto bg-background px-4 pb-36 pt-[106px] text-foreground"
+      className="buzz-onboarding-neutral-theme buzz-startup-shell flex h-dvh flex-col items-center justify-center overflow-y-auto bg-background px-4 pb-36 pt-[106px] text-foreground"
       data-system-color-scheme={systemColorScheme}
       data-testid="welcome-setup"
     >
@@ -327,6 +328,9 @@ export function WelcomeSetup({
           ) : null}
         </div>
       </OnboardingFooterProvider>
+      <footer className="shrink-0 px-4 pb-3">
+        <AppStamp />
+      </footer>
     </div>
   );
 }

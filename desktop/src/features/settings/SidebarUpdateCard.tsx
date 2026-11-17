@@ -99,14 +99,14 @@ export function SidebarUpdateCard({ onDismiss }: SidebarUpdateCardProps) {
       <SidebarCompactActionCard
         actionAriaLabel="Download update from GitHub"
         actionTestId="sidebar-update-download-github"
-        description={`v${status.version} available — download from GitHub. Switch to AppImage for automatic updates.`}
+        description={`v${status.version} — install the new build, then restart.`}
         dismissLabel="Dismiss update notification"
         icon={<ExternalLink aria-hidden="true" className="h-5 w-5" />}
         iconKey="manual"
         onAction={() => void openUrl(status.releaseUrl)}
         onDismiss={onDismiss}
         testId="sidebar-update-card-manual"
-        title="Update available"
+        title="New Buzz Ideaflow version available"
       />
     );
   }
