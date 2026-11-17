@@ -35,7 +35,7 @@ test("encrypted observation snapshot merges on another client without channel/re
   assert.equal(resolveThreadReplySeenAt("root", "seen", own), 200);
   assert.equal(
     resolveThreadReplySeenAt("root", "same-second-unseen", own),
-    199,
+    null,
   );
   assert.equal(resolveThreadReplySeenAt("other-root", "reply", own), null);
   assert.equal(
@@ -46,4 +46,18 @@ test("encrypted observation snapshot merges on another client without channel/re
     ).size,
     0,
   );
+});
+
+test("a newer observed body never covers an older unobserved or pruned reply", () => {
+  const markers = new Map([
+    [threadSeenKey("root"), 200],
+    [threadReplySeenKey("root", "newer"), 200],
+    [threadReplySeenKey("root", "stale"), 90],
+  ]);
+  const own = (key) => markers.get(key) ?? null;
+  assert.equal(resolveThreadReplySeenAt("root", "older", own), null);
+  assert.equal(resolveThreadReplySeenAt("root", "stale", own), 90);
+  assert.equal(resolveThreadReplySeenAt("root", "newer", own), 200);
+  markers.delete(threadReplySeenKey("root", "newer"));
+  assert.equal(resolveThreadReplySeenAt("root", "newer", own), null);
 });

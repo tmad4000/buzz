@@ -25,13 +25,15 @@ mounted channel scope. It does not acknowledge any reply by fetching it.
 Observation uses the existing self-encrypted, signed, per-user NIP-RS transport:
 
 - `thread:seen:v1:<canonical-root>`: newest actually observed reply author time.
-- `msg:seen:v1:<canonical-root>:<reply>`: exact observed reply evidence for ties.
+- `msg:seen:v1:<canonical-root>:<reply>`: exact observed body evidence for each reply.
 
 These opaque context keys have no channel parent, so opening or marking a channel
-read never advances them. A same-second sibling remains new unless its own body
-was observed. `N new` means replies newer than the last observed thread frontier,
-plus unobserved ties; it is not a checklist of every individually reviewed answer.
-Author-time/backdated arrivals follow the existing read-state ordering contract.
+read never advances them. A reply is seen only when its exact marker is at least
+its creation time. The newest-observed thread frontier is progress metadata and
+never substitutes for an individual body observation, including older/backdated
+replies and same-second siblings. `N new` and sidebar earlier-reply folding use
+the same exact evidence. Missing/pruned markers remain unknown/unseen, leaving
+more content open conservatively.
 Updated desktop/web clients share these markers; native mobile observation UI and
 writer parity are follow-up work. Existing mobile Activity/Inbox remains unchanged.
 

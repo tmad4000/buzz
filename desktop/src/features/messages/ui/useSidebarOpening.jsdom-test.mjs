@@ -200,3 +200,34 @@ test("explicit positioning completes the visit and pending target identity survi
   assert.equal(latest.opening.openingTarget, "accepted");
   await own.close();
 });
+
+test("older never-observed reply below a seen frontier remains unfolded and unseen", async () => {
+  const { resolveThreadReplySeenAt, threadSeenKey, threadReplySeenKey } =
+    await import("../../channels/readState/threadReplySeen.ts");
+  const markers = new Map([
+    [threadSeenKey("root"), 200],
+    [threadReplySeenKey("root", "newer"), 200],
+    [threadReplySeenKey("root", "stale"), 90],
+  ]);
+  const seenAt = (root, id) =>
+    resolveThreadReplySeenAt(root, id, (key) => markers.get(key) ?? null);
+  const app = mount();
+  await app.render({
+    messages: [
+      root,
+      msg("first", 1),
+      msg("older", 100),
+      msg("stale", 101),
+      msg("newer", 200),
+    ],
+    seenAt,
+  });
+  assert.ok(bodies().includes("older"));
+  assert.ok(
+    bodies().includes("stale"),
+    "exact timestamp below creation is not positive evidence",
+  );
+  assert.equal(latest.projection.runs.size, 0);
+  assert.equal(latest.opening.firstUnseen, "first");
+  await app.close();
+});
