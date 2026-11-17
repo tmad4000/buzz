@@ -48,6 +48,7 @@ export function verifyThreadLinkAuxiliary(events: RelayEvent[]) {
   }
 }
 
+/** Shared production worker entry, also exercised by signed-module tests. */
 export function runThreadLinkWork(request: ThreadLinkWorkerRequest) {
   if (request.type === "parse") {
     return request.annotations.flatMap((event) => {

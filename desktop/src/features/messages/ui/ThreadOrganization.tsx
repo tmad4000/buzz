@@ -3,9 +3,11 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/shared/ui/popover";
 import type { TimelineMessage } from "../types";
 import type { ChannelThreadLinks } from "../useChannelThreadLinks";
 
+/** Mounted channel audit/undo state shared by timeline and sidebar rows. */
 export const ThreadOrganizationContext =
   React.createContext<ChannelThreadLinks | null>(null);
 
+/** Expose verification failures, conflicts and durable pending undo receipts. */
 export function ThreadOrganizationNotice() {
   const organization = React.useContext(ThreadOrganizationContext);
   if (!organization) return null;

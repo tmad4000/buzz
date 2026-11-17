@@ -221,7 +221,7 @@ export function ChannelScreen({
 
   const { fetchOlder, hasOlderMessages, historyExhausted, isFetchingOlder } =
     useFetchOlderMessages(activeChannel);
-  const latestActiveMessage = React.useMemo(() => latestOrdinaryTopLevel(messagesQuery.data, organization.rejectedIds), [messagesQuery.data, organization.rejectedIds]);
+  const latestActiveMessage = React.useMemo(() => latestOrdinaryTopLevel(messagesQuery.data, organizationScope ? organization.rejectedIds : null), [messagesQuery.data, organizationScope, organization.rejectedIds]);
   const activeReadAt = latestActiveMessage
     ? new Date(latestActiveMessage.created_at * 1_000).toISOString()
     : null;

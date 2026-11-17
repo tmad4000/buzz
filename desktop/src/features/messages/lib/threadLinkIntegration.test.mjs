@@ -341,6 +341,11 @@ test("only unresolved/accepted controls hold back the read frontier; signed spoo
     markerOnly.id,
     "marker-only signed spam cannot suppress ordinary read eligibility",
   );
+  assert.equal(
+    latestOrdinaryTopLevel(events, null).id,
+    markerOnly.id,
+    "disabled organization scopes retain ordinary behavior",
+  );
   assert.ok(
     applyThreadLinkPresentation(formatTimelineMessages(events), snapshot).some(
       (m) => m.id === markerOnly.id,

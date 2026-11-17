@@ -2,6 +2,7 @@ import { setLocalStorageItemWithRecovery } from "@/shared/lib/localStorageQuota"
 import type { ThreadLinkUndoRecord } from "./threadLinkUndo";
 
 const PREFIX = "buzz-thread-link-undo.v1:";
+/** Exact community/identity/channel/message/head journal address. */
 export function threadLinkUndoKey(
   scopeKey: string,
   child: string,
@@ -9,6 +10,7 @@ export function threadLinkUndoKey(
 ) {
   return PREFIX + JSON.stringify([scopeKey, child, previous]);
 }
+/** Load a durable signed receipt; malformed receipts fail closed. */
 export function loadThreadLinkUndo(key: string): ThreadLinkUndoRecord | null {
   const raw = window.localStorage.getItem(key);
   if (!raw) return null;
@@ -35,9 +37,11 @@ export function loadThreadLinkUndo(key: string): ThreadLinkUndoRecord | null {
     throw Error("Undo receipt is unreadable; retained for inspection");
   return candidate as ThreadLinkUndoRecord;
 }
+/** Persist before publish; false prevents the network write. */
 export function saveThreadLinkUndo(key: string, record: ThreadLinkUndoRecord) {
   return setLocalStorageItemWithRecovery(key, JSON.stringify(record));
 }
+/** Enumerate bounded pending receipts for this exact mounted scope. */
 export function pendingThreadLinkUndos(
   scopeKey: string,
 ): ThreadLinkUndoRecord[] {
