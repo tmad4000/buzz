@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:buzz/features/channels/channel.dart';
 import 'package:buzz/features/channels/channel_detail_page.dart';
 import 'package:buzz/features/channels/channel_management_provider.dart';
@@ -75,6 +76,8 @@ class _Observer extends NavigatorObserver {
 class _Session extends RelaySessionNotifier {
   final filters = <NostrFilter>[];
   List<NostrEvent> hits = [];
+  int failures = 0;
+  Completer<List<NostrEvent>>? pending;
   @override
   SessionState build() => const SessionState(status: SessionStatus.connected);
   @override
@@ -83,7 +86,12 @@ class _Session extends RelaySessionNotifier {
     Duration timeout = const Duration(seconds: 8),
   }) async {
     filters.add(filter);
-    return filter.search == null ? [] : hits;
+    if (filter.search == null) return [];
+    if (failures > 0) {
+      failures--;
+      throw StateError('synthetic relay failure detail');
+    }
+    return pending == null ? hits : pending!.future;
   }
 }
 
@@ -99,11 +107,12 @@ void main() {
     ),
     double scale = 1,
     Channel? channel,
+    List<DirectoryUser> directoryUsers = const [],
   }) async {
     final actions = _Actions();
     when(
       () => actions.searchUsers(any(), limit: any(named: 'limit')),
-    ).thenAnswer((_) async => []);
+    ).thenAnswer((_) async => directoryUsers);
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -341,6 +350,81 @@ void main() {
       await tester.pump();
       expect(find.text('Thread could not be opened'), findsOneWidget);
       expect(observer.routes.length, routeCount);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+  testWidgets(
+    'scoped relay failure is unavailable not empty, retries once with same h scope and can recover to true empty',
+    (tester) async {
+      final session = _Session()..failures = 1;
+      await mount(tester, session);
+      await tester.enterText(find.byType(TextField), 'unavailable');
+      await tester.pump(const Duration(milliseconds: 301));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('search-message-error')), findsOneWidget);
+      expect(find.byKey(const Key('search-no-results-state')), findsNothing);
+      expect(
+        find.textContaining('synthetic relay failure detail'),
+        findsNothing,
+      );
+      await tester.pump(const Duration(seconds: 5));
+      expect(
+        session.filters.where((filter) => filter.search != null),
+        hasLength(1),
+      );
+      session.pending = Completer<List<NostrEvent>>();
+      await tester.tap(find.byKey(const Key('search-retry-messages')));
+      await tester.tap(find.byKey(const Key('search-retry-messages')));
+      await tester.pump();
+      expect(
+        session.filters.where((filter) => filter.search != null),
+        hasLength(2),
+      );
+      expect(session.filters.last.toJson()['#h'], ['channel-a']);
+      expect(session.filters.last.search, 'unavailable');
+      expect(
+        tester
+            .widget<TextButton>(find.byKey(const Key('search-retry-messages')))
+            .onPressed,
+        isNull,
+      );
+      session.pending!.complete([]);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('search-message-error')), findsNothing);
+      expect(find.byKey(const Key('search-no-results-state')), findsOneWidget);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+  testWidgets(
+    'global message retry preserves successful people and channels and hides transport detail',
+    (tester) async {
+      final session = _Session()..failures = 1;
+      await mount(
+        tester,
+        session,
+        page: const SearchPage(),
+        directoryUsers: const [
+          DirectoryUser(pubkey: 'available', displayName: 'Available person'),
+        ],
+      );
+      await tester.enterText(find.byType(TextField), 'design');
+      await tester.pump(const Duration(milliseconds: 301));
+      await tester.pumpAndSettle();
+      expect(find.text('Available person'), findsOneWidget);
+      expect(find.text('design'), findsOneWidget);
+      expect(find.byKey(const Key('search-message-error')), findsOneWidget);
+      expect(find.byKey(const Key('search-no-results-state')), findsNothing);
+      session.pending = Completer<List<NostrEvent>>();
+      await tester.tap(find.byKey(const Key('search-retry-messages')));
+      await tester.pump();
+      expect(find.text('Available person'), findsOneWidget);
+      expect(find.text('design'), findsOneWidget);
+      expect(session.filters.last.tags, isEmpty);
+      session.pending!.complete([]);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('search-message-error')), findsNothing);
+      expect(find.text('Available person'), findsOneWidget);
+      expect(find.text('design'), findsOneWidget);
       await tester.pumpWidget(const SizedBox.shrink());
     },
   );

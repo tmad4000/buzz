@@ -33,6 +33,7 @@ import 'search_provider.dart';
 
 part 'search_page/message_tile.dart';
 part 'search_page/scope_bar.dart';
+part 'search_page/message_error.dart';
 
 enum _SearchFilter { all, messages, channels, people }
 
@@ -521,6 +522,9 @@ class SearchPage extends HookConsumerWidget {
                         filter: activeFilter.value,
                         currentPubkey: currentPubkey,
                         onRecentSearchSelected: runRecentSearch,
+                        onRetryMessages: ref
+                            .read(provider.notifier)
+                            .retryMessages,
                       ),
                     ),
                   ],
@@ -539,12 +543,14 @@ class _SearchBody extends ConsumerWidget {
   final _SearchFilter filter;
   final String? currentPubkey;
   final ValueChanged<String> onRecentSearchSelected;
+  final VoidCallback onRetryMessages;
 
   const _SearchBody({
     required this.state,
     required this.filter,
     required this.currentPubkey,
     required this.onRecentSearchSelected,
+    required this.onRetryMessages,
   });
 
   @override
@@ -593,13 +599,14 @@ class _SearchBody extends ConsumerWidget {
         filter == _SearchFilter.all || filter == _SearchFilter.messages;
 
     final hasAnyResults =
-        state.channelResults.isNotEmpty ||
-        state.userResults.isNotEmpty ||
-        state.messageResults.isNotEmpty;
+        (showChannels && state.channelResults.isNotEmpty) ||
+        (showPeople && state.userResults.isNotEmpty) ||
+        (showMessages && state.messageResults.isNotEmpty);
+    final messageSearchFailed = showMessages && state.error != null;
     void recordResultSelection() =>
         ref.read(recentSearchesProvider.notifier).record(state.query);
 
-    if (!state.isLoading && !hasAnyResults) {
+    if (!state.isLoading && !hasAnyResults && !messageSearchFailed) {
       return Padding(
         key: const Key('search-no-results-state'),
         padding: EdgeInsets.only(
@@ -625,6 +632,11 @@ class _SearchBody extends ConsumerWidget {
             MediaQuery.viewInsetsOf(context).bottom,
       ),
       children: [
+        if (messageSearchFailed)
+          _MessageSearchError(
+            onRetry: onRetryMessages,
+            retrying: state.isLoading,
+          ),
         if (showChannels && state.channelResults.isNotEmpty)
           _ChannelsSection(
             channels: state.channelResults,

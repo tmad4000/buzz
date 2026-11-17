@@ -273,4 +273,69 @@ void main() {
       });
     },
   );
+  test(
+    'late directory success preserves message failure and bounded retry retains successful directory results',
+    () {
+      fakeAsync((clock) {
+        final f = _Fixture();
+        clock.flushMicrotasks();
+        f.global.search('same');
+        clock.elapse(const Duration(milliseconds: 300));
+        f.session.requests[0].completeError(
+          StateError('synthetic relay failure'),
+        );
+        clock.flushMicrotasks();
+        final error = f.container.read(searchProvider).error;
+        expect(error, isNotNull);
+        f.users[0].complete([const DirectoryUser(pubkey: 'available')]);
+        clock.flushMicrotasks();
+        expect(f.container.read(searchProvider).error, error);
+        f.global.retryMessages();
+        f.global.retryMessages();
+        expect(f.session.filters, hasLength(2));
+        expect(f.users, hasLength(1));
+        expect(
+          f.container.read(searchProvider).userResults.single.pubkey,
+          'available',
+        );
+        expect(f.container.read(searchProvider).error, error);
+        f.session.requests[1].complete([]);
+        clock.flushMicrotasks();
+        expect(f.container.read(searchProvider).error, isNull);
+        expect(
+          f.container.read(searchProvider).userResults.single.pubkey,
+          'available',
+        );
+      });
+    },
+  );
+  test(
+    'retry retains exact h scope and stale retry completion cannot overwrite a new scope',
+    () {
+      fakeAsync((clock) {
+        final f = _Fixture();
+        clock.flushMicrotasks();
+        f.scoped.retryMessages();
+        expect(f.session.filters, isEmpty);
+        f.scoped.search('same');
+        clock.elapse(const Duration(milliseconds: 300));
+        f.session.requests[0].completeError(StateError('synthetic failure'));
+        clock.flushMicrotasks();
+        f.scoped.retryMessages();
+        f.scoped.retryMessages();
+        expect(f.session.filters, hasLength(2));
+        expect(f.session.filters[1].toJson()['#h'], ['channel-a']);
+        f.scoped.setChannelScope('channel-b');
+        clock.elapse(const Duration(milliseconds: 300));
+        f.session.requests[1].complete([_event('stale-retry-a', 'channel-a')]);
+        clock.flushMicrotasks();
+        expect(f.state.messageResults, isEmpty);
+        expect(f.state.channelId, 'channel-b');
+        f.session.requests[2].complete([_event('new-b', 'channel-b')]);
+        clock.flushMicrotasks();
+        expect(f.state.messageResults.single.eventId, 'new-b');
+        expect(f.state.error, isNull);
+      });
+    },
+  );
 }

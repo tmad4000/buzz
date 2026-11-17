@@ -6,6 +6,8 @@ Every channel header offers **Search this channel**. It opens an independent sea
 
 Each open channel-search route owns its state, including when two routes refer to the same channel. Debounced work is cancelled and in-flight results/errors are invalidated by request generation across query, scope, community/identity changes and disposal. The existing transport has no request-abort API; stale completions are ignored rather than claimed cancelled at the wire. A community/identity change clears query, results and old channel scope.
 
+Message-search failure is visibly unavailable, not a successful empty result. Manual **Retry messages** retains query, channel scope and any successful directory results, prevents concurrent/automatic retries, and clears the failure only after a successful message read. Technical transport details are not rendered in the product.
+
 Stream results navigate to the exact message and canonical thread root, using the existing NIP-10 parser and channel deep-link hydration. Forum comments open their parent post; the current forum page has no exact-comment scroll/highlight API, and a comment missing its thread reference fails visibly. Broadcast replies open at channel level. Opening a result does not create shared task status.
 
 ## Remaining Inbox coverage

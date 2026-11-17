@@ -84,6 +84,7 @@ class SearchState {
     List<Channel>? channelResults,
     bool? isLoading,
     String? error,
+    bool clearError = false,
   }) => SearchState(
     query: query ?? this.query,
     channelId: channelId,
@@ -91,7 +92,7 @@ class SearchState {
     userResults: userResults ?? this.userResults,
     channelResults: channelResults ?? this.channelResults,
     isLoading: isLoading ?? this.isLoading,
-    error: error ?? this.error,
+    error: clearError ? null : error ?? this.error,
   );
 }
 
@@ -205,7 +206,11 @@ class SearchNotifier extends Notifier<SearchState> {
           .toList();
 
       if (!_isCurrent(query, channelId, generation)) return;
-      state = state.copyWith(messageResults: hits, isLoading: false);
+      state = state.copyWith(
+        messageResults: hits,
+        isLoading: false,
+        clearError: true,
+      );
     } catch (e) {
       if (!_isCurrent(query, channelId, generation)) return;
       state = state.copyWith(isLoading: false, error: e.toString());
@@ -242,6 +247,16 @@ class SearchNotifier extends Notifier<SearchState> {
     _debounce?.cancel();
     _generation++;
     state = SearchState.initial(channelId: state.channelId);
+  }
+
+  /// Retry only the failed message source. Directory results and this route's
+  /// query/scope remain intact; no automatic loop or concurrent retry is added.
+  void retryMessages() {
+    if (state.error == null || state.isLoading || state.query.isEmpty) return;
+    final query = state.query;
+    final channelId = state.channelId;
+    state = state.copyWith(isLoading: true);
+    unawaited(_searchMessages(query, channelId, _generation));
   }
 
   void setChannelScope(String? channelId) {
