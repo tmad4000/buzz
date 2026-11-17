@@ -1,3 +1,4 @@
+import { IdleAuxiliaryPanel } from "./IdleAuxiliaryPanel";
 import * as React from "react";
 
 import {
@@ -18,6 +19,9 @@ type ForumChannelContentProps = {
   channel: Channel;
   currentPubkey?: string;
   header: React.ReactNode;
+  pagePanel?: React.ReactNode;
+  onClosePage?: () => void;
+  pageSinglePanel?: boolean;
   onClosePost: () => void;
   onCloseProfilePanel: () => void;
   onOpenDm?: (pubkeys: string[]) => Promise<void> | void;
@@ -58,6 +62,9 @@ export function ForumChannelContent({
   channel,
   currentPubkey,
   header,
+  pagePanel,
+  onClosePage,
+  pageSinglePanel = false,
   onClosePost,
   onCloseProfilePanel,
   onOpenDm,
@@ -82,7 +89,11 @@ export function ForumChannelContent({
       <div className="flex min-h-0 min-w-0 flex-1 flex-row overflow-hidden">
         <section
           aria-label="Forum posts"
-          className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+          className={
+            pagePanel && pageSinglePanel
+              ? "hidden"
+              : "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+          }
         >
           <React.Suspense fallback={<ViewLoadingFallback kind="forum" />}>
             <ForumView
@@ -97,7 +108,20 @@ export function ForumChannelContent({
             />
           </React.Suspense>
         </section>
-        {profilePanelPubkey ? (
+        {pagePanel && onClosePage ? (
+          <IdleAuxiliaryPanel
+            canResetWidth={canResetPanelWidth}
+            isSinglePanelView={pageSinglePanel}
+            onClose={onClosePage}
+            onResetWidth={onResetPanelWidth}
+            onResizeStart={onPanelResizeStart}
+            title="Page"
+            useSplitAuxiliaryPane={!pageSinglePanel}
+            widthPx={panelWidthPx}
+          >
+            {pagePanel}
+          </IdleAuxiliaryPanel>
+        ) : profilePanelPubkey ? (
           <RightAuxiliaryPane
             canResetWidth={canResetPanelWidth}
             onResetWidth={onResetPanelWidth}

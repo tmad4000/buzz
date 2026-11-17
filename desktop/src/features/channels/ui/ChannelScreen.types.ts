@@ -1,3 +1,4 @@
+import type { PageLeaveGuardRegistrar } from "@/features/channel-page/pageLeaveGuard";
 import type { ReactNode } from "react";
 
 import type {
@@ -24,6 +25,8 @@ export type ChannelScreenProps = {
   idleAuxiliaryOverridesThread?: boolean;
   idleAuxiliaryTitle?: string;
   headerEndActions?: ReactNode;
+  /** Bind to this view instance, including background pane close/replace. */
+  registerPageLeaveGuard?: PageLeaveGuardRegistrar;
   onAddFiles?: () => void;
   onCloseIdleAuxiliaryPanel?: () => void;
   onCloseForumPost: () => void;
