@@ -1,3 +1,4 @@
+import type { PageLeaveGuardRegistrar } from "./pageLeaveGuard";
 import { usePageAuthors } from "./usePageAuthors";
 import * as React from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -14,10 +15,12 @@ export function ChannelPage({
   channelId,
   canEdit,
   onClose,
+  registerLeaveGuard,
 }: {
   channelId: string;
   canEdit: boolean;
   onClose?: () => void;
+  registerLeaveGuard?: PageLeaveGuardRegistrar;
 }) {
   const editorId = React.useId();
   const [head, setHead] = React.useState<RelayEvent | null>(null);
@@ -32,6 +35,16 @@ export function ChannelPage({
   const [writeError, setWriteError] = React.useState("");
   const [draft, setDraft] = React.useState<string | null>(null);
   const [saving, setSaving] = React.useState(false);
+  const [leaveBlocked, setLeaveBlocked] = React.useState(false);
+  const draftRef = React.useRef<string | null>(null);
+  const baselineRef = React.useRef<string | null>(null);
+  const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+  const mounted = React.useRef(false);
+  const updateDraft = React.useCallback((value: string | null) => {
+    draftRef.current = value;
+    setDraft(value);
+    setLeaveBlocked(false);
+  }, []);
   const [external, setExternal] = React.useState<string | null>(null);
   const [tick, setTick] = React.useState(0);
   const frame = React.useRef<HTMLIFrameElement>(null);
@@ -39,17 +52,35 @@ export function ChannelPage({
   const channelGeneration = React.useRef(0);
   const savingVersion = React.useRef<number | null>(null);
   const profile = useUserProfileQuery(head?.pubkey).data;
+  const requirePageEditResolution = React.useCallback(() => {
+    if (!mounted.current) return false;
+    const dirty =
+      draftRef.current !== null && draftRef.current !== baselineRef.current;
+    if (!dirty && savingVersion.current !== channelGeneration.current)
+      return true;
+    setLeaveBlocked(true);
+    textareaRef.current?.focus();
+    return false;
+  }, []);
+  React.useLayoutEffect(() => {
+    mounted.current = true;
+    const unregister = registerLeaveGuard?.(requirePageEditResolution);
+    return () => {
+      mounted.current = false;
+      unregister?.();
+    };
+  }, [registerLeaveGuard, requirePageEditResolution]);
   // biome-ignore lint/correctness/useExhaustiveDependencies: channelId is the editor reset boundary.
   React.useEffect(() => {
     channelGeneration.current++;
-    setDraft(null);
+    updateDraft(null);
     setSaving(false);
     setExternal(null);
     setWriteError("");
     return () => {
       channelGeneration.current++;
     };
-  }, [channelId]);
+  }, [channelId, updateDraft]);
   React.useEffect(() => {
     const timer = setInterval(() => setTick((t) => t + 1), 30000);
     return () => clearInterval(timer);
@@ -142,19 +173,26 @@ export function ChannelPage({
   }, []);
   const save = async () => {
     const version = channelGeneration.current;
-    if (draft === null || savingVersion.current === version || !canEdit) return;
+    if (
+      draftRef.current === null ||
+      savingVersion.current === version ||
+      !canEdit
+    )
+      return;
     savingVersion.current = version;
     setSaving(true);
     setWriteError("");
     try {
-      validatePage(draft);
-      const event = await setPage(channelId, draft, head?.created_at);
+      const content = draftRef.current;
+      if (content === null) return;
+      validatePage(content);
+      const event = await setPage(channelId, content, head?.created_at);
       if (channelGeneration.current !== version) return;
       if (!(await refresh()).includes(event.pubkey))
         throw new Error("Page author is no longer a channel member");
       if (channelGeneration.current === version) {
         setHead((old) => pageHead(old ? [old, event] : [event], channelId));
-        setDraft(null);
+        updateDraft(null);
       }
     } catch (error) {
       if (channelGeneration.current === version) setWriteError(String(error));
@@ -182,22 +220,36 @@ export function ChannelPage({
           <Button
             size="sm"
             variant="outline"
-            onClick={() =>
-              setDraft(
+            onClick={() => {
+              const initial =
                 html ??
-                  "<!doctype html><html><body><h1>Page</h1></body></html>",
-              )
-            }
+                "<!doctype html><html><body><h1>Page</h1></body></html>";
+              baselineRef.current = initial;
+              updateDraft(initial);
+            }}
           >
             {head ? "Edit HTML" : "Create Page"}
           </Button>
         ) : null}
         {onClose ? (
-          <Button size="sm" variant="ghost" onClick={onClose}>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              if (requirePageEditResolution()) onClose();
+            }}
+          >
             Close
           </Button>
         ) : null}
       </div>
+      {leaveBlocked ? (
+        <p role="status" className="text-sm text-muted-foreground">
+          {saving
+            ? "Page is saving. Wait for it to finish before closing or replacing this pane."
+            : "Save or cancel your Page edits before closing or replacing this pane."}
+        </p>
+      ) : null}
       {writeError || error || membershipError ? (
         <p role="alert" className="text-sm text-destructive">
           {writeError || error || membershipError}
@@ -216,10 +268,11 @@ export function ChannelPage({
             Self-contained HTML · 512 KiB maximum
           </label>
           <textarea
+            ref={textareaRef}
             id={editorId}
             className="min-h-80 flex-1 rounded border bg-background p-3 font-mono text-sm"
             value={draft}
-            onChange={(e) => setDraft(e.target.value)}
+            onChange={(e) => updateDraft(e.target.value)}
             disabled={saving}
           />
           <div className="flex gap-2">
@@ -229,7 +282,7 @@ export function ChannelPage({
             <Button
               variant="outline"
               disabled={saving}
-              onClick={() => setDraft(null)}
+              onClick={() => updateDraft(null)}
             >
               Cancel
             </Button>
