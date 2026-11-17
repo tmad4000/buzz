@@ -44,6 +44,7 @@ mod relay;
 mod relay_admission;
 mod reset;
 mod secret_store;
+mod setup_broker;
 mod setup_links;
 mod shutdown;
 mod team_catalog;
@@ -549,6 +550,8 @@ pub fn run() {
             setup_links::ideaflow_setup_links_enabled,
             setup_links::take_pending_setup_link,
             setup_links::acknowledge_pending_setup_link,
+            setup_broker::setup_broker_public_key,
+            setup_broker::setup_broker_request,
             start_builderlab_login,
             cancel_builderlab_login,
             get_builderlab_auth,

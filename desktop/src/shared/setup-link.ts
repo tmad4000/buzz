@@ -165,6 +165,140 @@ export async function setupAdmission(
   };
 }
 
+function exactFields(
+  value: unknown,
+  fields: string[],
+): value is Record<string, unknown> {
+  return Boolean(
+    value &&
+      typeof value === "object" &&
+      !Array.isArray(value) &&
+      Object.keys(value).length === fields.length &&
+      fields.every((field) => Object.hasOwn(value, field)),
+  );
+}
+
+function canonicalToken(value: unknown): value is string {
+  try {
+    return (
+      typeof value === "string" &&
+      /^[A-Za-z0-9_-]{43}$/.test(value) &&
+      decode(value).length === 32
+    );
+  } catch {
+    return false;
+  }
+}
+
+/** Open only the fixed ID review page with an exact public descriptor. Secrets never enter its URL. */
+export function setupReviewUrl(
+  request: Awaited<ReturnType<typeof setupAdmission>>,
+): string {
+  try {
+    if (
+      !exactFields(request, [
+        "code",
+        "clientId",
+        "deviceLabel",
+        "devicePublicKey",
+        "pkceChallenge",
+        "nonce",
+        "attemptId",
+        "signature",
+      ])
+    )
+      throw Error();
+    const key = request.devicePublicKey;
+    if (
+      !exactFields(key, ["kty", "crv", "x", "y"]) ||
+      key.kty !== "EC" ||
+      key.crv !== "P-256" ||
+      !canonicalToken(key.x) ||
+      !canonicalToken(key.y)
+    )
+      throw Error();
+    if (
+      ![
+        request.code,
+        request.pkceChallenge,
+        request.nonce,
+        request.attemptId,
+      ].every(canonicalToken) ||
+      typeof request.clientId !== "string" ||
+      typeof request.deviceLabel !== "string" ||
+      typeof request.signature !== "string" ||
+      !/^[^\p{C}]{1,80}$/u.test(request.clientId) ||
+      !/^[^\p{C}]{1,80}$/u.test(request.deviceLabel) ||
+      !/^[A-Za-z0-9_-]{86}$/.test(request.signature) ||
+      decode(request.signature).length !== 64
+    )
+      throw Error();
+    const publicRequest = {
+      code: request.code,
+      clientId: request.clientId,
+      deviceLabel: request.deviceLabel,
+      devicePublicKey: { kty: key.kty, crv: key.crv, x: key.x, y: key.y },
+      pkceChallenge: request.pkceChallenge,
+      nonce: request.nonce,
+      attemptId: request.attemptId,
+      signature: request.signature,
+    };
+    const fragment = base64url(encoder.encode(JSON.stringify(publicRequest)));
+    if (fragment.length > 4096) throw Error();
+    return `https://id.ideaflow.app/setup/receive#h=${fragment}`;
+  } catch {
+    throw Error("setup_unavailable");
+  }
+}
+
+/** The receiving-app ID check, separate from the existing Buzz SAS security confirmation. */
+export async function setupConfirmationCode(
+  attempt: SetupAttempt,
+): Promise<string> {
+  return (
+    await digest(
+      JSON.stringify(["sas", attempt.id, attempt.nonce, attempt.thumbprint]),
+    )
+  )
+    .slice(0, 10)
+    .toUpperCase();
+}
+
+/** Poll or resume with a device proof, never an ID access token. */
+export async function setupPollRequest(
+  attempt: SetupAttempt,
+  operation: "authorization" | "resume" = "authorization",
+) {
+  if (operation !== "authorization" && operation !== "resume")
+    throw Error("setup_unavailable");
+  return {
+    attemptId: attempt.id,
+    signature: await signSetupProof(attempt, operation, attempt.nonce),
+  };
+}
+
+/** Send this private exchange body only to the fixed broker POST transport, never a URL or log. */
+export async function setupExchangeRequest(
+  attempt: SetupAttempt,
+  authorizationCode: string,
+) {
+  if (
+    !canonicalToken(authorizationCode) ||
+    !/^[A-Za-z0-9._~-]{43,128}$/.test(attempt.pkceVerifier)
+  )
+    throw Error("setup_unavailable");
+  return {
+    attemptId: attempt.id,
+    authorizationCode,
+    pkceVerifier: attempt.pkceVerifier,
+    signature: await signSetupProof(
+      attempt,
+      "exchange",
+      await digest(JSON.stringify([authorizationCode, attempt.pkceVerifier])),
+    ),
+  };
+}
+
 type SetupEnvelope = {
   version: number;
   ephemeralKey: JsonWebKey;
@@ -301,4 +435,45 @@ export async function openSetupEnvelope(
     // Never attach a URL, key, authorization code, plaintext or crypto exception to this error.
     throw Error("setup_unavailable");
   }
+}
+
+/** Validate a signed authorization response before constructing its single-use exchange request. */
+export async function openSetupAuthorization(
+  attempt: SetupAttempt,
+  envelope: SetupEnvelope,
+  trustedSigningKey: JsonWebKey,
+  now = Date.now(),
+): Promise<{ authorizationCode: string; expiresAt: string }> {
+  const value = await openSetupEnvelope(
+    attempt,
+    envelope,
+    `authorization:${attempt.id}`,
+    trustedSigningKey,
+  );
+  if (
+    !exactFields(value, [
+      "grantId",
+      "deviceThumbprint",
+      "authorizationCode",
+      "attemptId",
+      "expiresAt",
+    ]) ||
+    value.attemptId !== attempt.id ||
+    !canonicalToken(value.authorizationCode) ||
+    typeof value.expiresAt !== "string"
+  )
+    throw Error("setup_unavailable");
+  const deadline = Date.parse(value.expiresAt);
+  // One minute of local clock skew; the broker independently enforces its original ten-minute deadline.
+  if (
+    !Number.isFinite(now) ||
+    !Number.isFinite(deadline) ||
+    deadline <= now ||
+    deadline > now + 660000
+  )
+    throw Error("setup_unavailable");
+  return {
+    authorizationCode: value.authorizationCode,
+    expiresAt: value.expiresAt,
+  };
 }
