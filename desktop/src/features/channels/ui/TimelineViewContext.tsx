@@ -20,15 +20,52 @@ const CHANNEL_ORDER_OPTIONS: readonly {
 export const timelinePreferenceKey = (scope: string, channelId: string) =>
   `buzz.channelView.v1:${encodeURIComponent(scope)}:${channelId}`;
 
+type ChannelModeScope = {
+  mode: ChannelViewMode;
+  changeMode: (mode: ChannelViewMode) => void;
+};
+const ChannelModeScopeContext = React.createContext<ChannelModeScope | null>(
+  null,
+);
+
+/** Mounted by an owning conversation visit; legacy routes retain their device key. */
+export function ChannelModeScopeProvider({
+  children,
+  initialMode,
+  onChange,
+}: {
+  children: React.ReactNode;
+  initialMode?: ChannelViewMode;
+  onChange?: (mode: ChannelViewMode) => void;
+}) {
+  const [mode, setMode] = React.useState<ChannelViewMode>(
+    initialMode ?? "threads",
+  );
+  const changeMode = React.useCallback(
+    (next: ChannelViewMode) => {
+      setMode(next);
+      onChange?.(next);
+    },
+    [onChange],
+  );
+  const value = React.useMemo(() => ({ mode, changeMode }), [mode, changeMode]);
+  return (
+    <ChannelModeScopeContext.Provider value={value}>
+      {children}
+    </ChannelModeScopeContext.Provider>
+  );
+}
+
 /** A local view preference; never changes signed message or thread data. */
 export function useChannelViewMode(scope: string, channelId: string | null) {
+  const owner = React.useContext(ChannelModeScopeContext);
   const key = timelinePreferenceKey(scope, channelId ?? "none");
   const [preferences, setPreferences] = React.useState<
     Record<string, ChannelViewMode>
   >({});
   let stored: ChannelViewMode = "threads";
   try {
-    if (globalThis.localStorage?.getItem(key) === "timeline")
+    if (!owner && globalThis.localStorage?.getItem(key) === "timeline")
       stored = "timeline";
   } catch {
     /* In-memory switching still works when storage is unavailable. */
@@ -36,6 +73,10 @@ export function useChannelViewMode(scope: string, channelId: string | null) {
   const mode = preferences[key] ?? stored;
   const changeMode = React.useCallback(
     (next: ChannelViewMode) => {
+      if (owner) {
+        owner.changeMode(next);
+        return;
+      }
       setPreferences((previous) => ({ ...previous, [key]: next }));
       try {
         globalThis.localStorage?.setItem(key, next);
@@ -43,9 +84,9 @@ export function useChannelViewMode(scope: string, channelId: string | null) {
         /* Best effort. */
       }
     },
-    [key],
+    [key, owner],
   );
-  return { mode, changeMode };
+  return { mode: owner?.mode ?? mode, changeMode };
 }
 
 type TimelineView = {

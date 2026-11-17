@@ -27,12 +27,15 @@ export const conversationViewSchema = z
     id: identifier,
     channelId: identifier,
     panelState: z.object(panelShape).strict(),
-    preferences: z.object({
-      timelineMode: z.enum(["threads", "timeline"]).optional(),
-      threadMode: z.enum(["focus", "split"]).optional(),
-      // Preferred width is projected against the live leaf; never persist its clamp.
-      preferredThreadWidth: z.number().finite().min(320).max(4096).optional(),
-    }).strict().optional(),
+    preferences: z
+      .object({
+        timelineMode: z.enum(["threads", "timeline"]).optional(),
+        threadMode: z.enum(["focus", "split"]).optional(),
+        // Preferred width is projected against the live leaf; never persist its clamp.
+        preferredThreadWidth: z.number().finite().min(320).max(4096).optional(),
+      })
+      .strict()
+      .optional(),
     timelineAnchor: anchor,
     threadAnchor: anchor,
   })

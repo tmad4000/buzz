@@ -168,14 +168,21 @@ test("geometry uses content minima, mobile compact admission and stable normaliz
   assert.equal(clampDividerRatio(0.5, 727, 360, 360), null);
 });
 
-
 test("navigation and fresh duplicate copy explicit preferences without sharing mutable state", () => {
-  const {initial: layout, ids} = setup();
+  const { initial: layout, ids } = setup();
   const viewId = Object.keys(layout.views)[0];
   const changed = updateViewPresentation(layout, viewId, "same-chat", {
-    preferences: {timelineMode:"timeline",threadMode:"focus",preferredThreadWidth:600},
+    preferences: {
+      timelineMode: "timeline",
+      threadMode: "focus",
+      preferredThreadWidth: 600,
+    },
   });
-  const duplicate = createConversationView("same-chat", ids, changed.views[viewId]);
+  const duplicate = createConversationView(
+    "same-chat",
+    ids,
+    changed.views[viewId],
+  );
   duplicate.preferences.timelineMode = "threads";
   assert.equal(changed.views[viewId].preferences.timelineMode, "timeline");
   const outgoing = changed.views[viewId];

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { ConversationLayoutController } from "./controller.ts";
+import { bindVisitPreferences } from "./visitPreferences.ts";
 import { listPanes } from "./model.ts";
 import { layoutStorageKey } from "./storage.ts";
 import { visitCacheStorageKey } from "./visitCacheStorage.ts";
@@ -475,4 +476,44 @@ test("debounce persists the latest ratio once; disposal flushes once and rejects
   assert.equal(controller.focus(panes(controller)[0].id), false);
   await new Promise((resolve) => setTimeout(resolve, 15));
   assert.equal(writes.length, count + 2);
+});
+
+test("bound view preferences merge simultaneous choices and reject retired visit callbacks", () => {
+  const { controller } = setup();
+  const first = Object.values(controller.getSnapshot().layout.views)[0];
+  const bound = bindVisitPreferences(controller, first);
+  bound.onTimelineModeChange("timeline");
+  bound.onThreadViewModeChange("focus");
+  bound.onThreadPanelWidthChange(650);
+  assert.deepEqual(
+    controller.getSnapshot().layout.views[first.id].preferences,
+    {
+      timelineMode: "timeline",
+      threadMode: "focus",
+      preferredThreadWidth: 650,
+    },
+  );
+  assert.equal(controller.navigate(first.id, "dm"), true);
+  bound.onThreadPanelWidthChange(900);
+  assert.equal(
+    controller.getSnapshot().layout.views[first.id].preferences,
+    undefined,
+  );
+  assert.equal(controller.navigate(first.id, "chat"), true);
+  const returned = controller.getSnapshot().layout.views[first.id];
+  assert.deepEqual(returned.preferences, {
+    timelineMode: "timeline",
+    threadMode: "focus",
+    preferredThreadWidth: 650,
+  });
+  assert.notEqual(
+    bindVisitPreferences(controller, returned).presentationVisitKey,
+    bound.presentationVisitKey,
+  );
+  bound.onThreadViewModeChange("split");
+  assert.equal(
+    controller.getSnapshot().layout.views[first.id].preferences.threadMode,
+    "focus",
+  );
+  controller.dispose();
 });

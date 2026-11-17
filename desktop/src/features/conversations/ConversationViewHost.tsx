@@ -1,3 +1,7 @@
+import {
+  ChannelModeScopeProvider,
+  type ChannelViewMode,
+} from "@/features/channels/ui/TimelineViewContext";
 import * as React from "react";
 import { ChannelScreen } from "@/features/channels/ui/ChannelScreen";
 import type { ChannelScreenProps } from "@/features/channels/ui/ChannelScreen.types";
@@ -22,6 +26,9 @@ export type ConversationViewHostProps = {
   visible: boolean;
   label: string;
   initialPanelState?: HistorySearchValues;
+  presentationVisitKey?: string;
+  initialTimelineMode?: ChannelViewMode;
+  onTimelineModeChange?: (mode: ChannelViewMode) => void;
   initialThreadViewMode?: ThreadViewMode;
   onThreadViewModeChange?: (mode: ThreadViewMode) => void;
   initialThreadPanelWidthPx?: number;
@@ -38,6 +45,9 @@ export function ConversationViewHost({
   visible,
   label,
   initialPanelState,
+  presentationVisitKey,
+  initialTimelineMode,
+  onTimelineModeChange,
   initialThreadViewMode,
   onThreadViewModeChange,
   initialThreadPanelWidthPx,
@@ -78,6 +88,9 @@ export function ConversationViewHost({
       <ConversationViewContext.Provider value={admission}>
         <MainInsetProvider mainInsetRef={insetRef}>
           <ThreadViewModeScopeProvider
+            key={
+              presentationVisitKey ?? channel.activeChannel?.id ?? "unavailable"
+            }
             initialMode={initialThreadViewMode}
             onChange={onThreadViewModeChange}
           >
@@ -90,7 +103,12 @@ export function ConversationViewHost({
                 initialValues={initialPanelState}
                 onNavigate={onPanelNavigate}
               >
-                <ChannelScreen {...channel} />
+                <ChannelModeScopeProvider
+                  initialMode={initialTimelineMode}
+                  onChange={onTimelineModeChange}
+                >
+                  <ChannelScreen {...channel} />
+                </ChannelModeScopeProvider>
               </HistorySearchScopeProvider>
             </ThreadPanelWidthScopeProvider>
           </ThreadViewModeScopeProvider>

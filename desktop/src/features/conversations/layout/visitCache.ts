@@ -1,4 +1,8 @@
-import { copyPanelState, copyViewPreferences, type ConversationView } from "./model";
+import {
+  copyPanelState,
+  copyViewPreferences,
+  type ConversationView,
+} from "./model";
 import { z } from "zod";
 import { conversationViewSchema, MAX_LAYOUT_BYTES } from "./schema";
 
@@ -48,7 +52,9 @@ export type VisitPresentation = Pick<
 function copy(presentation: VisitPresentation): VisitPresentation {
   return {
     panelState: copyPanelState(presentation.panelState),
-    ...(presentation.preferences ? { preferences: copyViewPreferences(presentation.preferences) } : {}),
+    ...(presentation.preferences
+      ? { preferences: copyViewPreferences(presentation.preferences) }
+      : {}),
     timelineAnchor: presentation.timelineAnchor
       ? { ...presentation.timelineAnchor }
       : null,
