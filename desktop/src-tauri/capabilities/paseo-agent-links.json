@@ -1,0 +1,16 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "paseo-agent-links",
+  "description": "Open canonical Paseo agent sessions from the main conversation window",
+  "windows": ["main"],
+  "permissions": [
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [
+        {
+          "url": "paseo://h/srv_*/agent/????????-????-????-????-????????????"
+        }
+      ]
+    }
+  ]
+}
