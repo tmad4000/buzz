@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildIndependentThreadPanel } from "./independentThreadPanel.ts";
+import {
+  buildIndependentThreadPanel,
+  mergeOwnInlineThreadLocalEvents,
+  mergeOwnThreadLocalEvents,
+} from "./independentThreadPanel.ts";
 
 const ROOT_ID = "6".repeat(64);
 const EDIT_ID = "9".repeat(64);
@@ -11,6 +15,83 @@ const AUX_DELETION_ID = "e".repeat(64);
 const REACTION_ID = "b".repeat(64);
 const AUTHOR = "f".repeat(64);
 const CHANNEL = "chan-uuid";
+
+test("inline durable admission leaves legacy optimistic replies to their query", () => {
+  const legacy = {
+    ...contentEvent("optimistic-local", "legacy pending", [
+      ["e", ROOT_ID, "", "reply"],
+    ]),
+    pending: true,
+    localKey: "optimistic-local",
+  };
+  assert.deepEqual(
+    mergeOwnInlineThreadLocalEvents([legacy], [], ROOT_ID, AUTHOR),
+    [],
+    "legacy inline rows do not appear before the authoritative thread page",
+  );
+  assert.deepEqual(
+    mergeOwnThreadLocalEvents([legacy], [], ROOT_ID, AUTHOR),
+    [legacy],
+    "the sidebar retains its existing optimistic projection",
+  );
+  const accepted = { ...legacy, id: REPLY_ID, pending: false };
+  delete accepted.localKey;
+  assert.deepEqual(
+    mergeOwnInlineThreadLocalEvents([legacy], [accepted], ROOT_ID, AUTHOR),
+    [accepted],
+  );
+});
+
+test("inline durable identity survives pending, fast ACK, query convergence and removal", () => {
+  const pending = {
+    ...contentEvent("outbox-local:uuid", "queued body", [
+      ["e", ROOT_ID, "", "reply"],
+      ["client_msg_id", "uuid"],
+    ]),
+    pending: true,
+    localKey: "outbox-local:uuid",
+    localSendIntent: {
+      id: "uuid",
+      viewInstanceId: "visit:capture",
+      threadRootId: ROOT_ID,
+    },
+  };
+  assert.deepEqual(
+    mergeOwnInlineThreadLocalEvents([pending], [], ROOT_ID, AUTHOR),
+    [pending],
+  );
+  const raw = {
+    ...pending,
+    id: REPLY_ID,
+    content: "canonical body",
+    pending: false,
+  };
+  delete raw.localKey;
+  delete raw.localSendIntent;
+  const [accepted] = mergeOwnInlineThreadLocalEvents(
+    [pending],
+    [raw],
+    ROOT_ID,
+    AUTHOR,
+  );
+  assert.equal(accepted.id, REPLY_ID);
+  assert.equal(accepted.content, "canonical body");
+  assert.equal(accepted.pending, false);
+  assert.equal(accepted.localKey, pending.localKey);
+  assert.deepEqual(accepted.localSendIntent, pending.localSendIntent);
+  assert.deepEqual(
+    mergeOwnInlineThreadLocalEvents([accepted], [raw], ROOT_ID, AUTHOR),
+    [accepted],
+  );
+  assert.deepEqual(
+    mergeOwnInlineThreadLocalEvents([], [], ROOT_ID, AUTHOR),
+    [],
+  );
+  assert.deepEqual(
+    mergeOwnInlineThreadLocalEvents([pending], [], ROOT_ID, "other"),
+    [],
+  );
+});
 
 function contentEvent(id, content, extraTags = []) {
   return {

@@ -53,6 +53,26 @@ function headAuxEventsFromChannelWindow(
   return [...directAux, ...deletionsOfAux];
 }
 
+/** Inline threads admit durable rows without changing legacy query ownership. */
+export function mergeOwnInlineThreadLocalEvents(
+  channelEvents: RelayEvent[],
+  replyEvents: RelayEvent[],
+  rootId: string,
+  currentPubkey?: string,
+) {
+  return mergeOwnThreadLocalEvents(
+    channelEvents.filter(
+      (event) =>
+        event.localKey?.startsWith("outbox-local:") ||
+        event.localKey?.startsWith("outbox:") ||
+        event.localSendIntent != null,
+    ),
+    replyEvents,
+    rootId,
+    currentPubkey,
+  );
+}
+
 /** Reuse the channel cache's owned local echoes in independently fetched views. */
 export function mergeOwnThreadLocalEvents(
   channelEvents: RelayEvent[],

@@ -9,7 +9,7 @@ import { useUsersBatchQuery } from "@/features/profile/hooks";
 import type { RelayEvent } from "@/shared/api/types";
 import { formatTimelineMessages } from "../lib/formatTimelineMessages";
 import { channelMessagesKey, sortMessages } from "../lib/messageQueryKeys";
-import { mergeOwnThreadLocalEvents } from "../lib/independentThreadPanel";
+import { mergeOwnInlineThreadLocalEvents } from "../lib/independentThreadPanel";
 import {
   smartThreadDecision,
   type ThreadDisplayPolicy,
@@ -55,7 +55,7 @@ export function useInlineThreadData(
     () =>
       enabled
         ? sortMessages(
-            mergeOwnThreadLocalEvents(
+            mergeOwnInlineThreadLocalEvents(
               local,
               query.data?.pages.flatMap((page) => page.events) ?? EMPTY_EVENTS,
               canonicalRoot,
