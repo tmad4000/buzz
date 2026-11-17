@@ -929,6 +929,12 @@ function MessageComposerImpl({
   return (
     <>
       <footer
+        data-composer-target-id={
+          replyTarget?.id ??
+          typingParentEventId ??
+          typingRootEventId ??
+          undefined
+        }
         className={cn(
           "relative z-10 shrink-0 bg-transparent px-4 pb-2 pt-0",
           showTopBorder ? "border-t border-border/40 pt-3" : "",

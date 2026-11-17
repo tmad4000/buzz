@@ -4,6 +4,7 @@ import {
   captureVirtualizedReadingAnchor,
   hasVirtualizedReadingInput,
   isNearVirtualizedBottom,
+  preferredVirtualizedReadingRow,
   restoreVirtualizedReadingAnchor,
   type VirtualizedReadingAnchor,
 } from "./virtualizedReadingAnchor";
@@ -41,6 +42,7 @@ export function useVirtualizedBottomSettle(
   const anchorRef = React.useRef<VirtualizedReadingAnchor | null>(null);
   const navigationOwnsPositionRef = React.useRef(false);
   const correctedScrollTopRef = React.useRef<number | null>(null);
+  const readerScrollPendingRef = React.useRef(false);
   const getScroller = React.useCallback(() => {
     const node = hostRef.current?.firstElementChild;
     return node instanceof HTMLDivElement ? node : null;
@@ -70,10 +72,17 @@ export function useVirtualizedBottomSettle(
     if (reading) {
       bottomIntentRef.current = false;
       cancelFrame();
-      anchorRef.current ??= captureVirtualizedReadingAnchor(
-        scroller,
-        hoveredRowRef.current,
-      );
+      const preferred =
+        preferredVirtualizedReadingRow(scroller) ?? hoveredRowRef.current;
+      if (
+        !anchorRef.current ||
+        (preferred && anchorRef.current.row !== preferred)
+      ) {
+        anchorRef.current = captureVirtualizedReadingAnchor(
+          scroller,
+          preferred,
+        );
+      }
     } else if (bottomIntentRef.current) {
       return false;
     } else if (!anchorRef.current && !isNearVirtualizedBottom(scroller)) {
@@ -168,6 +177,7 @@ export function useVirtualizedBottomSettle(
       bottomIntentRef.current = false;
       navigationOwnsPositionRef.current = false;
       hoveredRowRef.current = null;
+      readerScrollPendingRef.current = true;
       anchorRef.current = captureVirtualizedReadingAnchor(scroller);
       cancelFrame();
       onReadingIntentChangeRef.current?.(false);
@@ -184,8 +194,12 @@ export function useVirtualizedBottomSettle(
           ? event.target.closest<HTMLElement>("[data-message-id]")
           : null;
       if (row && scroller.contains(row)) {
-        if (hoveredRowRef.current !== row)
-          anchorRef.current = captureVirtualizedReadingAnchor(scroller, row);
+        const preferred = preferredVirtualizedReadingRow(scroller) ?? row;
+        if (anchorRef.current?.row !== preferred)
+          anchorRef.current = captureVirtualizedReadingAnchor(
+            scroller,
+            preferred,
+          );
         hoveredRowRef.current = row;
         bottomIntentRef.current = false;
         cancelFrame();
@@ -221,6 +235,16 @@ export function useVirtualizedBottomSettle(
     const scroll = () => {
       if (correctedScrollTopRef.current === scroller.scrollTop) {
         correctedScrollTopRef.current = null;
+        readerScrollPendingRef.current = false;
+        return;
+      }
+      if (readerScrollPendingRef.current) {
+        readerScrollPendingRef.current = false;
+        anchorRef.current = captureVirtualizedReadingAnchor(
+          scroller,
+          preferredVirtualizedReadingRow(scroller),
+        );
+        resumeIfIdleAtBottom();
         return;
       }
       if (!bottomIntentRef.current && !hasReadingInteraction(scroller)) {
