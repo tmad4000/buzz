@@ -5,6 +5,9 @@ import 'package:buzz/features/activity/activity_page.dart';
 import 'package:buzz/features/activity/activity_provider.dart';
 import 'package:buzz/features/activity/compose_drafts_provider.dart';
 import 'package:buzz/features/activity/feed_item.dart';
+import 'package:buzz/features/activity/thread_inbox_provider.dart';
+import 'package:buzz/features/activity/thread_inbox_state.dart';
+import 'package:buzz/features/forum/forum_thread_page.dart';
 import 'package:buzz/features/activity/inbox_item.dart';
 import 'package:buzz/features/activity/reminders_provider.dart';
 import 'package:buzz/features/channels/channel.dart';
@@ -28,6 +31,8 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:hooks_riverpod/misc.dart';
 import 'package:buzz/shared/theme/buzz_icons.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+part 'activity_thread_inbox_cases.dart';
 
 void main() {
   final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
@@ -128,10 +133,13 @@ void main() {
     List<Reminder> reminders = const [],
     Set<String> knownAgentPubkeys = const {},
     List<Override> overrides = const [],
+    List<NavigatorObserver> observers = const [],
   }) async {
     SharedPreferences.setMockInitialValues({});
     final prefs = await SharedPreferences.getInstance();
     return ProviderScope(
+      // Synthetic source failures stay settled until an explicit test retry.
+      retry: (_, _) => null,
       overrides: [
         savedPrefsProvider.overrideWithValue(prefs),
         activityProvider.overrideWith(
@@ -155,6 +163,7 @@ void main() {
       ],
       child: MaterialApp(
         theme: AppTheme.light(),
+        navigatorObservers: observers,
         builder: (context, child) => MediaQuery(
           data: MediaQuery.of(
             context,
@@ -165,6 +174,8 @@ void main() {
       ),
     );
   }
+
+  _threadInboxWidgetCases(buildTestable);
 
   testWidgets('shows loading skeleton while feed loads', (tester) async {
     await tester.pumpWidget(
@@ -795,7 +806,7 @@ void main() {
       find.byType(ChannelDetailPage),
     );
     expect(page.channel.id, 'ch1');
-    expect(page.initialThreadRootId, 'parent-reply');
+    expect(page.initialThreadRootId, 'thread-root');
     expect(page.initialMessageId, 'reply-event');
     expect(
       page.initialThreadRouteBehavior,

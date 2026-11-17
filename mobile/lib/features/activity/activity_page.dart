@@ -24,6 +24,7 @@ import '../../shared/widgets/message_author_meta.dart';
 import '../../shared/widgets/modal_presentation.dart';
 import '../channels/channel.dart';
 import '../channels/channel_detail_page.dart';
+import '../forum/forum_thread_page.dart';
 import '../channels/channel_identity_names_provider.dart';
 import '../channels/channel_management_provider.dart';
 import '../channels/channels_provider.dart';
@@ -39,7 +40,11 @@ import 'dm_resurface.dart';
 import 'inbox_item.dart';
 import 'inbox_local_state_provider.dart';
 import 'inbox_read_state.dart';
+import 'main_inbox_coverage.dart';
 import 'reminders_provider.dart';
+import 'thread_inbox_provider.dart';
+import 'thread_inbox_state.dart';
+import 'thread_inbox_coverage.dart';
 
 part 'activity_page/header_actions.dart';
 part 'activity_page/inbox_row.dart';
@@ -75,9 +80,15 @@ class ActivityPage extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final feedAsync = ref.watch(activityProvider);
+    final threadSource = ref.watch(threadInboxProvider);
     final channelsAsync = ref.watch(channelsProvider);
     final filter = useState(InboxFilter.all);
+    final showThreadCoverage =
+        filter.value == InboxFilter.all ||
+        filter.value == InboxFilter.thread ||
+        filter.value == InboxFilter.activity;
     final unreadOnly = useState(false);
+    final mainRetrying = useState(false);
     final scrollController = useScrollController();
     final reducedMotion = MediaQuery.disableAnimationsOf(context);
     useEffect(() {
@@ -256,11 +267,30 @@ class ActivityPage extends HookConsumerWidget {
       final readAt = resolveInboxItemReadAt(item, markerOf: markerOf);
       final target = item.deepLinkTarget(readAt);
       final thread = threadReferenceOf(target.tags);
-      final threadRootId = isBroadcastReply(target.tags)
-          ? null
-          : thread.parentId;
+      final threadRootId = isBroadcastReply(target.tags) ? null : thread.rootId;
 
       if (!context.mounted) return;
+      if (target.kind == 45001 || target.kind == 45003) {
+        final postId = target.kind == 45001 ? target.id : thread.rootId;
+        if (postId == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Thread could not be opened')),
+          );
+          return;
+        }
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => ForumThreadPage(
+              channelId: resolvedChannel.id,
+              postEventId: postId,
+              currentPubkey: myPk,
+              isMember: resolvedChannel.isMember,
+              isArchived: resolvedChannel.isArchived,
+            ),
+          ),
+        );
+        return;
+      }
       Navigator.of(context).push(
         MaterialPageRoute<void>(
           builder: (_) => ChannelDetailPage(
@@ -325,9 +355,22 @@ class ActivityPage extends HookConsumerWidget {
       );
     }
 
+    Future<void> retryMainFeed() async {
+      if (mainRetrying.value) return;
+      mainRetrying.value = true;
+      try {
+        await ref.read(activityProvider.notifier).refresh();
+      } catch (_) {
+        // Keep the existing generic unavailable state.
+      } finally {
+        if (context.mounted) mainRetrying.value = false;
+      }
+    }
+
     Future<void> refresh() async {
       await Future.wait([
         ref.read(activityProvider.notifier).refresh(),
+        ref.read(threadInboxProvider.notifier).refresh(),
         ref.read(remindersProvider.notifier).refresh(),
       ]);
     }
@@ -354,6 +397,13 @@ class ActivityPage extends HookConsumerWidget {
       body = _ErrorView(onRetry: refresh);
     } else if (!hasLoadedOnce.value && allItems.isEmpty) {
       body = _LoadingSkeleton(scrollController: scrollController);
+    } else if (visibleItems.isEmpty &&
+        (feedAsync.hasError ||
+            feedAsync.isLoading ||
+            showThreadCoverage &&
+                threadSource.hasInterest &&
+                threadSource.phase != ThreadInboxPhase.ready)) {
+      body = const Center(child: Text('No other Inbox items loaded.'));
     } else if (visibleItems.isEmpty) {
       body = _EmptyFilterState(
         filter: filter.value,
@@ -376,6 +426,14 @@ class ActivityPage extends HookConsumerWidget {
           controller: scrollController,
           slivers: [
             SliverToBoxAdapter(child: SizedBox(height: topSectionHeight)),
+            SliverToBoxAdapter(
+              child: MainInboxCoverage(
+                retrying: mainRetrying.value,
+                onRetry: retryMainFeed,
+              ),
+            ),
+            if (showThreadCoverage)
+              const SliverToBoxAdapter(child: ThreadInboxCoverage()),
             DecoratedSliver(
               decoration: BoxDecoration(
                 color: context.colors.surface,
@@ -489,7 +547,17 @@ class ActivityPage extends HookConsumerWidget {
             ? body
             : Padding(
                 padding: EdgeInsets.only(top: topSectionHeight),
-                child: body,
+                child: Column(
+                  children: [
+                    if (allItems.isNotEmpty)
+                      MainInboxCoverage(
+                        retrying: mainRetrying.value,
+                        onRetry: retryMainFeed,
+                      ),
+                    if (showThreadCoverage) const ThreadInboxCoverage(),
+                    Expanded(child: body),
+                  ],
+                ),
               ),
       ),
     );

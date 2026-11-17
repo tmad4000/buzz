@@ -10,6 +10,7 @@ import '../channels/channels_provider.dart';
 import 'dm_resurface.dart';
 import 'feed_item.dart';
 import 'inbox_item.dart';
+import 'thread_inbox_provider.dart';
 
 typedef DmResurfaceAction = Future<String> Function(List<String> pubkeys);
 
@@ -656,11 +657,14 @@ final activityProvider =
 /// group by DM channel so one conversation renders as one row.
 final inboxItemsProvider = Provider<List<InboxItem>>((ref) {
   final feed = ref.watch(activityProvider).value;
-  if (feed == null) return const [];
+  final threads = ref.watch(threadInboxProvider);
   final dmChannelIds = {
     for (final channel
         in ref.watch(channelsProvider).asData?.value ?? const <Channel>[])
       if (channel.isDm) channel.id,
   };
-  return buildInboxItems(feed.all, isDmChannel: dmChannelIds.contains);
+  return buildInboxItems(
+    mergeInboxSources(feed?.all ?? const [], threads.items),
+    isDmChannel: dmChannelIds.contains,
+  );
 });

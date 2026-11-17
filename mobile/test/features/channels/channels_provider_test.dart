@@ -12,6 +12,7 @@ import 'package:buzz/shared/read_state/read_state_provider.dart';
 part 'channels_provider_live_cases.dart';
 part 'channels_provider_terminal_cases.dart';
 part 'channels_provider_readiness_cases.dart';
+part 'channels_provider_interest_cases.dart';
 
 /// Tests for [ChannelsNotifier] in the pure-Nostr world.
 ///
@@ -27,6 +28,7 @@ part 'channels_provider_readiness_cases.dart';
 /// events on demand.
 void main() {
   _unreadReadinessCases();
+  _threadInterestCases();
   const myPk = 'me';
 
   test(
