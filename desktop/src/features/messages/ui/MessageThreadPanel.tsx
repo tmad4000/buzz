@@ -1,10 +1,15 @@
+import { useThreadRowWindow } from "./useThreadRowWindow";
+import { useVisibleThreadReplies } from "./useVisibleThreadReplies";
+import { ThreadWindowRange } from "./ThreadWindowRange";
+import { useThreadDisplayPolicy } from "./useThreadDisplayPolicy";
 import { sidebarVisualMessage } from "@/features/messages/lib/unreadSidebar";
 import {
   getThreadReplyIndentRem,
   THREAD_REPLY_BODY_OFFSET_REM,
 } from "@/features/messages/lib/threadTreeLayout";
 import { useUnreadSidebarThread } from "./useUnreadSidebarThread";
-import { formatThreadSummaryLastReplyTime } from "@/features/messages/lib/dateFormatters";
+import { CollapsedThreadSummary } from "./CollapsedThreadSummary";
+import { useThreadDisclosureFocus } from "./useThreadDisclosureFocus";
 import * as React from "react";
 import { ArrowDown } from "lucide-react";
 
@@ -257,18 +262,76 @@ export function MessageThreadPanel({
     [threadHeadId],
   );
 
+  const composerReplyTarget =
+    replyTargetMessage && threadHead && replyTargetMessage.id !== threadHead.id
+      ? {
+          author: replyTargetMessage.author,
+          body: replyTargetMessage.body,
+          id: replyTargetMessage.id,
+        }
+      : null;
+
+  const [pendingJump, setPendingJump] = React.useState<{
+    root: string;
+    id: string;
+  } | null>(null);
+  const isSidebar =
+    !isHuddleTranscript &&
+    !isFocusMode &&
+    !isSinglePanelView &&
+    allThreadMessages !== undefined;
+  const hasStoredDisclosure =
+    !isHuddleTranscript && allThreadMessages !== undefined;
+  const sidebarMessages = React.useMemo(
+    () =>
+      allThreadMessages ?? [
+        ...(threadHead ? [threadHead] : []),
+        ...threadReplies.map((e) => e.message),
+      ],
+    [allThreadMessages, threadHead, threadReplies],
+  );
+  const displayPolicy = useThreadDisplayPolicy(
+    currentPubkey,
+    `${channelId}:${threadHeadId}`,
+  );
+  const sidebar = useUnreadSidebarThread({
+    enabled: hasStoredDisclosure,
+    initialMode: displayPolicy.replies,
+    channelId,
+    currentPubkey,
+    root: threadHeadId,
+    pending: threadRepliesPending || threadRepliesError,
+    messages: sidebarMessages,
+    isUnread: isMessageUnreadById,
+    scrollTargetId,
+  });
+  const {
+    expanded: sidebarExpanded,
+    newIds,
+    toggle: toggleSidebarBranch,
+  } = sidebar;
+  useThreadDisclosureFocus({
+    scope: `${channelId}:${currentPubkey}:${threadHeadId}`,
+    root: hasStoredDisclosure ? threadHeadId : null,
+    regions: [threadBodyRef],
+    messages: sidebar.index.messageById,
+    expanded: sidebarExpanded,
+  });
   const collapseThreadHeadReplies = React.useCallback(() => {
     if (!threadHeadId) {
       return;
     }
 
     setHoveredCollapseBranchId(null);
-    setCollapsedThreadHeadId(threadHeadId);
-  }, [threadHeadId]);
+    if (hasStoredDisclosure) sidebar.setExpanded(threadHeadId, false);
+    else setCollapsedThreadHeadId(threadHeadId);
+  }, [threadHeadId, hasStoredDisclosure, sidebar.setExpanded]);
   const expandThreadHeadReplies = React.useCallback(() => {
     setHoveredCollapseBranchId(null);
-    setCollapsedThreadHeadId(null);
-  }, []);
+    if (hasStoredDisclosure && threadHeadId)
+      sidebar.setExpanded(threadHeadId, true);
+    else setCollapsedThreadHeadId(null);
+  }, [hasStoredDisclosure, threadHeadId, sidebar.setExpanded]);
   const handleCollapseBranchHoverChange = React.useCallback(
     (message: TimelineMessage, hovered: boolean) => {
       setHoveredCollapseBranchId((current) => {
@@ -283,6 +346,10 @@ export function MessageThreadPanel({
   );
   const handleCollapseDepthGuide = React.useCallback(
     (message: TimelineMessage) => {
+      if (hasStoredDisclosure) {
+        sidebar.setExpanded(message.id, false);
+        return;
+      }
       if (message.id === threadHeadId) {
         collapseThreadHeadReplies();
         return;
@@ -290,52 +357,32 @@ export function MessageThreadPanel({
 
       onExpandReplies(message);
     },
-    [collapseThreadHeadReplies, onExpandReplies, threadHeadId],
+    [
+      collapseThreadHeadReplies,
+      onExpandReplies,
+      threadHeadId,
+      hasStoredDisclosure,
+      sidebar.setExpanded,
+    ],
   );
 
-  const composerReplyTarget =
-    replyTargetMessage && threadHead && replyTargetMessage.id !== threadHead.id
-      ? {
-          author: replyTargetMessage.author,
-          body: replyTargetMessage.body,
-          id: replyTargetMessage.id,
-        }
-      : null;
-
-  const isSidebar =
-    !isHuddleTranscript &&
-    !isFocusMode &&
-    !isSinglePanelView &&
-    allThreadMessages !== undefined;
-  const sidebarMessages = React.useMemo(
-    () =>
-      allThreadMessages ?? [
-        ...(threadHead ? [threadHead] : []),
-        ...threadReplies.map((e) => e.message),
-      ],
-    [allThreadMessages, threadHead, threadReplies],
-  );
-  const sidebar = useUnreadSidebarThread({
-    enabled: isSidebar,
-    channelId,
-    currentPubkey,
-    root: threadHeadId,
-    pending: threadRepliesPending || threadRepliesError,
-    messages: sidebarMessages,
-    isUnread: isMessageUnreadById,
-    scrollTargetId,
-  });
-  const {
-    expanded: sidebarExpanded,
-    newIds,
-    toggle: toggleSidebarBranch,
-  } = sidebar;
-  const effectiveReplies = isSidebar ? sidebar.entries : threadReplies;
-  const deferredThreadReplies = React.useDeferredValue(
+  const effectiveReplies = hasStoredDisclosure
+    ? sidebar.entries
+    : threadReplies;
+  const rowWindow = useThreadRowWindow(
     effectiveReplies,
+    `${channelId}:${currentPubkey}:${threadHeadId}`,
+    hasStoredDisclosure,
+    threadRepliesPending,
+    sidebar.firstNewId,
+    pendingJump?.root === threadHeadId ? pendingJump.id : scrollTargetId,
+  );
+
+  const deferredThreadReplies = React.useDeferredValue(
+    rowWindow.entries,
     EMPTY_THREAD_REPLIES,
   );
-  const isRepliesPending = deferredThreadReplies !== effectiveReplies;
+  const isRepliesPending = deferredThreadReplies !== rowWindow.entries;
   const scrollTargetIsVisibleReply = React.useMemo(
     () =>
       scrollTargetId !== null &&
@@ -345,39 +392,33 @@ export function MessageThreadPanel({
       ),
     [deferredThreadReplies, scrollTargetId, threadHeadId],
   );
-  const isThreadHeadRepliesCollapsed =
-    (isSidebar
-      ? !sidebarExpanded.has(threadHeadId ?? "")
-      : collapsedThreadHeadId === threadHeadId) && !scrollTargetIsVisibleReply;
+  const isThreadHeadRepliesCollapsed = hasStoredDisclosure
+    ? !sidebarExpanded.has(threadHeadId ?? "")
+    : collapsedThreadHeadId === threadHeadId && !scrollTargetIsVisibleReply;
 
-  React.useEffect(() => {
-    if (
-      !isSidebar ||
-      isThreadHeadRepliesCollapsed ||
-      isRepliesPending ||
-      threadRepliesPending ||
-      threadRepliesError
-    )
-      return;
-    // A deferred projection is not evidence of display. Only committed rows
-    // that the reply region actually painted may advance the read markers.
-    const displayed = deferredThreadReplies
-      .filter((entry) =>
-        threadBodyRef.current?.querySelector(
-          `[data-message-id="${CSS.escape(entry.message.id)}"]`,
-        ),
-      )
-      .map((entry) => entry.message);
-    if (displayed.length) onSidebarRepliesRevealed?.(displayed);
-  }, [
-    isSidebar,
-    isThreadHeadRepliesCollapsed,
-    isRepliesPending,
-    deferredThreadReplies,
-    threadRepliesPending,
-    threadRepliesError,
-    onSidebarRepliesRevealed,
-  ]);
+  const visibleReadRows = React.useMemo(
+    () =>
+      !isThreadHeadRepliesCollapsed &&
+      !isRepliesPending &&
+      !threadRepliesPending &&
+      !threadRepliesError
+        ? deferredThreadReplies.map((entry) => entry.message)
+        : EMPTY_THREAD_REPLIES.map((entry) => entry.message),
+    [
+      isThreadHeadRepliesCollapsed,
+      isRepliesPending,
+      threadRepliesPending,
+      threadRepliesError,
+      deferredThreadReplies,
+    ],
+  );
+  useVisibleThreadReplies(
+    threadBodyRef,
+    visibleReadRows,
+    hasStoredDisclosure ? onSidebarRepliesRevealed : undefined,
+    threadHeadId ?? "",
+    `${channelId}:${currentPubkey}:${threadHeadId}`,
+  );
   React.useLayoutEffect(() => {
     if (scrollTargetIsVisibleReply && collapsedThreadHeadId === threadHeadId) {
       setCollapsedThreadHeadId(null);
@@ -396,11 +437,8 @@ export function MessageThreadPanel({
       return null;
     }
 
-    return buildThreadSummaryFromVisibleEntries(
-      threadHeadId,
-      deferredThreadReplies,
-    );
-  }, [deferredThreadReplies, threadHeadId]);
+    return buildThreadSummaryFromVisibleEntries(threadHeadId, effectiveReplies);
+  }, [effectiveReplies, threadHeadId]);
   const visibleThreadHeadSummary = isThreadHeadRepliesCollapsed
     ? threadHeadSummary
     : null;
@@ -574,10 +612,6 @@ export function MessageThreadPanel({
     threadHead,
     onSendToChannel,
   );
-  const [pendingJump, setPendingJump] = React.useState<{
-    root: string;
-    id: string;
-  } | null>(null);
   // biome-ignore lint/correctness/useExhaustiveDependencies: committed/deferred rows trigger a retry until the revealed target exists in the DOM.
   React.useLayoutEffect(() => {
     if (!pendingJump || pendingJump.root !== threadHeadId) return;
@@ -602,31 +636,17 @@ export function MessageThreadPanel({
   const compactSummary = (
     message: TimelineMessage,
     summary: NonNullable<MainTimelineEntry["summary"]>,
-  ) => {
-    const latestAuthor = sidebar.index.descendantStatsByMessageId.get(
-      message.id,
-    )?.recentParticipantsNewestFirst[0]?.author;
-    return (
-      <button
-        type="button"
-        aria-expanded="false"
-        data-testid="sidebar-read-branch"
-        data-thread-head-id={message.id}
-        className="block h-8 truncate rounded text-left text-xs text-muted-foreground hover:bg-muted focus-visible:ring-2"
-        style={{
-          marginInlineStart: `${getThreadReplyIndentRem(Math.min(2, message.depth)) + THREAD_REPLY_BODY_OFFSET_REM}rem`,
-          maxWidth: `calc(100% - ${getThreadReplyIndentRem(Math.min(2, message.depth)) + THREAD_REPLY_BODY_OFFSET_REM}rem)`,
-        }}
-        onClick={() => toggleSidebarBranch(message)}
-      >
-        {summary.replyCount} {summary.replyCount === 1 ? "reply" : "replies"} ·
-        last {latestAuthor ?? summary.participants.at(-1)?.author ?? "reply"}{" "}
-        {summary.lastReplyAt
-          ? formatThreadSummaryLastReplyTime(summary.lastReplyAt)
-          : ""}
-      </button>
-    );
-  };
+  ) => (
+    <CollapsedThreadSummary
+      message={message}
+      summary={summary}
+      latestAuthor={
+        sidebar.index.descendantStatsByMessageId.get(message.id)
+          ?.recentParticipantsNewestFirst[0]?.author
+      }
+      onToggle={toggleSidebarBranch}
+    />
+  );
   const firstNewId = sidebar.firstNewId;
   const jumpToUnread = () => {
     if (!firstNewId || !threadHeadId) return;
@@ -719,13 +739,14 @@ export function MessageThreadPanel({
           </div>
         )}
 
-        {isSidebar &&
+        {hasStoredDisclosure &&
         sidebarExpanded.has(threadHead.id) &&
         deferredThreadReplies.length > 0 ? (
           <button
             type="button"
             aria-expanded="true"
             className="ml-4 h-7 text-xs text-muted-foreground"
+            data-thread-head-id={threadHead.id}
             onClick={() => toggleSidebarBranch(threadHead)}
           >
             Hide replies
@@ -759,6 +780,13 @@ export function MessageThreadPanel({
           className={cn(THREAD_PANEL_MESSAGE_GUTTER_CLASS, "pb-3 pt-0")}
           data-testid="message-thread-replies"
         >
+          {!isThreadHeadRepliesCollapsed ? (
+            <ThreadWindowRange
+              direction="earlier"
+              count={rowWindow.earlier}
+              onShow={rowWindow.showEarlier}
+            />
+          ) : null}
           <ThreadReplyRegion
             isPending={threadRepliesPending}
             isError={threadRepliesError}
@@ -785,6 +813,7 @@ export function MessageThreadPanel({
                     compactSummary(threadHead, visibleThreadHeadSummary)
                   ) : (
                     <MessageThreadSummaryRow
+                      expanded={hasStoredDisclosure ? false : undefined}
                       depth={threadHead.depth}
                       message={threadHead}
                       onOpenThread={expandThreadHeadReplies}
@@ -889,7 +918,7 @@ export function MessageThreadPanel({
                             shouldShowThreadBranchGuides &&
                             connectsToVisibleChild &&
                             !entry.summary
-                              ? isSidebar
+                              ? hasStoredDisclosure
                                 ? toggleSidebarBranch
                                 : onExpandReplies
                               : undefined
@@ -936,7 +965,7 @@ export function MessageThreadPanel({
                             entry.message.id,
                           )}
                         />
-                        {isSidebar &&
+                        {hasStoredDisclosure &&
                         sidebarExpanded.has(entry.message.id) &&
                         sidebarMessages.some(
                           (m) => m.parentId === entry.message.id,
@@ -960,6 +989,7 @@ export function MessageThreadPanel({
                             compactSummary(entry.message, entry.summary)
                           ) : (
                             <MessageThreadSummaryRow
+                              expanded={hasStoredDisclosure ? false : undefined}
                               collapseDepthGuideActions={
                                 collapseDepthGuideActions
                               }
@@ -975,7 +1005,11 @@ export function MessageThreadPanel({
                               onCollapseDepthGuideHoverChange={
                                 handleCollapseBranchHoverChange
                               }
-                              onOpenThread={onExpandReplies}
+                              onOpenThread={
+                                hasStoredDisclosure
+                                  ? toggleSidebarBranch
+                                  : onExpandReplies
+                              }
                               summary={entry.summary}
                               summaryIndentOffsetRem={
                                 THREAD_PANEL_SUMMARY_INDENT_OFFSET_REM
@@ -994,6 +1028,18 @@ export function MessageThreadPanel({
               )
             }
           />
+          {!isThreadHeadRepliesCollapsed ? (
+            <ThreadWindowRange
+              direction="later"
+              count={rowWindow.later}
+              onShow={rowWindow.showLater}
+            />
+          ) : null}
+          {sidebar.preferenceError ? (
+            <p role="status" className="px-3 text-xs text-muted-foreground">
+              View preference could not be saved; this choice is session-only.
+            </p>
+          ) : null}
         </div>
       </div>
     </AuxiliaryPanelBody>
