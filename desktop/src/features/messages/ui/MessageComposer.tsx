@@ -128,6 +128,7 @@ function MessageComposerImpl({
     setIsFormattingOpen(pressed);
   }, []);
   const presentation = React.useContext(DraftEditorPresentationContext);
+  const conversationView = React.useContext(ConversationViewContext);
   const presentationRef = React.useRef(presentation);
   presentationRef.current = presentation;
   const drafts = useDrafts();
@@ -455,6 +456,27 @@ function MessageComposerImpl({
     if (!replyTarget || composerDisabled) return;
     richText.focusPreserve();
   }, [composerDisabled, replyTarget, richText.focusPreserve]);
+  const canFocusConversation =
+    conversationView === null ||
+    (conversationView.focused && conversationView.visible);
+  // Explicit Take over may focus the restored editor; ordinary pane mounts do not.
+  React.useLayoutEffect(() => {
+    if (
+      !canFocusConversation ||
+      document.visibilityState !== "visible" ||
+      !document.hasFocus()
+    ) {
+      presentation?.takeFocus();
+      return;
+    }
+    if (
+      !richText.editor ||
+      richText.editor.isDestroyed ||
+      !richText.editor.view.dom.isConnected
+    )
+      return;
+    if (presentation?.takeFocus()) richText.focus();
+  }, [presentation, richText.editor, richText.focus, canFocusConversation]);
   useComposerAutofocus(richText.focus, effectiveDraftKey, composerDisabled);
   const applyAutocompleteEdit = React.useCallback(
     (edit: AutocompleteEdit) => {
@@ -1050,6 +1072,7 @@ function MessageComposerWithOwnership(props: MessageComposerProps) {
       viewInstanceId={view.viewInstanceId}
       draftKey={draftKey}
       onAttachmentAcceptanceChange={props.onAttachmentAcceptanceChange}
+      containerClassName={props.containerClassName}
     >
       {composer}
     </ConversationComposerOwnership>

@@ -13,12 +13,14 @@ export function ConversationComposerOwnership({
   draftKey,
   viewInstanceId,
   onAttachmentAcceptanceChange,
+  containerClassName,
 }: {
   children: React.ReactNode;
   coordinator: DraftEditorCoordinator;
   draftKey: string;
   viewInstanceId: string;
   onAttachmentAcceptanceChange?: (accepts: boolean) => void;
+  containerClassName?: string;
 }) {
   const drafts = useDrafts();
   useDraftsSnapshot();
@@ -36,6 +38,7 @@ export function ConversationComposerOwnership({
       viewInstanceId={viewInstanceId}
       savedPreview={savedPreview}
       onEditingChange={handleEditingChange}
+      previewContainerClassName={containerClassName}
     >
       {children}
     </DraftEditorBoundary>

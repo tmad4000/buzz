@@ -100,6 +100,8 @@ const expect = baseExpect.configure({ timeout: 30000 });
     await expect(b.getByTestId("message-input")).toHaveText(
       "Shared draft before takeover",
     );
+    await expect(b.getByTestId("message-input")).toBeFocused();
+    await page.screenshot({ path: path.join(shots, "immediate-takeover.png") });
     await expect(a.getByTestId("message-input")).toHaveCount(0);
     await expect(a.locator("[data-draft-preview]")).toContainText(
       "Shared draft before takeover",
@@ -137,6 +139,15 @@ const expect = baseExpect.configure({ timeout: 30000 });
       coverage.reads.length > 0 && coverage.reads.every((r) => r.view === "b"),
     );
     assert.equal((await sends()).length, 2);
+    await expect(b.getByTestId("message-input")).toHaveText(
+      "Shared draft before takeover",
+    );
+    await page.evaluate(
+      () =>
+        new Promise((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(resolve)),
+        ),
+    );
     await page.screenshot({ path: path.join(shots, "after-takeover.png") });
     assert.deepEqual(errors, []);
     assert.deepEqual(fatalConsole, []);
