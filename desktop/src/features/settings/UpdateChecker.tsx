@@ -13,7 +13,7 @@ export function UpdateChecker() {
     <section className="min-w-0" data-testid="settings-updates">
       <SettingsSectionHeader
         title="Software Updates"
-        description="Keep Buzz up to date with the latest features and fixes."
+        description="Keep Buzz Ideaflow up to date with the latest features and fixes."
       />
 
       <SettingsOptionGroup title="Update status">
@@ -69,8 +69,8 @@ export function UpdateChecker() {
                 className="text-sm font-normal text-muted-foreground/70"
                 data-settings-subcopy
               >
-                Automatic updates aren't available on this build. Download the
-                latest release manually.
+                No published Buzz Ideaflow build is available. Check again
+                later.
               </p>
             </div>
             <Button variant="outline" size="sm" onClick={checkForUpdate}>
@@ -89,9 +89,7 @@ export function UpdateChecker() {
                 className="text-sm font-normal text-muted-foreground/70"
                 data-settings-subcopy
               >
-                In-app updates aren't supported on this Linux package. Download
-                the new version from GitHub.{" "}
-                <span>Switch to the AppImage build for automatic updates.</span>
+                Download the Buzz Ideaflow build, then restart after installing.
               </p>
             </div>
             <Button size="sm" onClick={() => void openUrl(status.releaseUrl)}>
