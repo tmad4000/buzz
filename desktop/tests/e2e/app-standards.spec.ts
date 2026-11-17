@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { installMockBridge } from "../helpers/bridge";
-import { openSettings } from "../helpers/settings";
+import { openProfileMenu, openSettings } from "../helpers/settings";
 import fs from "node:fs";
 const shots =
   process.env.BUZZ_STANDARDS_SCREENSHOTS ?? "test-results/app-standards";
@@ -84,6 +84,17 @@ test("fresh theme follows the OS and feedback loads only after its own menu acti
   await page.emulateMedia({ colorScheme: "light" });
   await page.goto("/");
   await page.getByTestId("channel-general").click();
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() =>
+          window.__BUZZ_E2E_HAS_MOCK_LIVE_SUBSCRIPTION__?.({
+            channelName: "general",
+          }),
+        ),
+      { timeout: 30000 },
+    )
+    .toBe(true);
   await expect(page).toHaveTitle("general · Buzz Ideaflow");
   await expect(page.locator('meta[property="og:title"]')).toHaveAttribute(
     "content",
@@ -93,8 +104,8 @@ test("fresh theme follows the OS and feedback loads only after its own menu acti
   await page.emulateMedia({ colorScheme: "dark" });
   await expect(page.locator("html")).toHaveClass(/dark/);
   expect(requests).toEqual([]);
-  await page.getByTestId("open-settings").click();
-  await page.getByText("Send feedback", { exact: true }).click();
+  await openProfileMenu(page);
+  await page.getByTestId("profile-popover-send-feedback").click();
   const loader = page.locator(
     'script[src="https://worldissuetracker.com/widget/wit-feedback.js"]',
   );
