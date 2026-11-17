@@ -192,3 +192,47 @@ test("navigation and fresh duplicate copy explicit preferences without sharing m
   returned.views[viewId].preferences.preferredThreadWidth = 700;
   assert.equal(outgoing.preferences.preferredThreadWidth, 600);
 });
+
+test("duplicate and navigation detach explicit snapshots while retaining manual collapse", () => {
+  const { initial, view, ids } = setup();
+  const source = updateViewPresentation(initial, view.id, "same-chat", {
+    explicitExpansion: {
+      legacySeeded: true,
+      entries: [
+        [
+          "root",
+          [
+            ["open", true],
+            ["closed", false],
+          ],
+        ],
+      ],
+    },
+  });
+  const duplicate = createConversationView(
+    "same-chat",
+    ids,
+    source.views[view.id],
+  );
+  duplicate.explicitExpansion.entries[0][1][0][1] = false;
+  assert.equal(
+    source.views[view.id].explicitExpansion.entries[0][1][0][1],
+    true,
+  );
+  const away = navigateView(source, view.id, "dm");
+  assert.equal(away.views[view.id].explicitExpansion, undefined);
+  const returned = navigateView(
+    away,
+    view.id,
+    "same-chat",
+    source.views[view.id],
+  );
+  assert.equal(
+    returned.views[view.id].explicitExpansion.entries[0][1][1][1],
+    false,
+  );
+  assert.notEqual(
+    returned.views[view.id].explicitExpansion,
+    source.views[view.id].explicitExpansion,
+  );
+});

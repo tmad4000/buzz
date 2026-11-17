@@ -76,3 +76,23 @@ test("atomic snapshot round trip retains explicit false and rejects malformed en
   assert.deepEqual([...loadThreadExpansion("key")], [["good", false]]);
   assert.equal(loadThreadExpansion(null).size, 0);
 });
+
+test("view-scoped manual expansion keys isolate duplicates without changing legacy resource keys", () => {
+  const legacy = threadExpansionKey("community", "identity", "channel", "root");
+  const a = threadExpansionKey("community", "identity", "channel", "root", "a");
+  const b = threadExpansionKey("community", "identity", "channel", "root", "b");
+  assert.equal(
+    legacy,
+    'buzz-thread-expansion.v1:["community","identity","channel","root"]',
+  );
+  assert.notEqual(a, b);
+  assert.notEqual(a, legacy);
+  assert.equal(
+    a,
+    threadExpansionKey("community", "identity", "channel", "root", "a"),
+  );
+  assert.equal(
+    threadExpansionKey("community", "identity", null, "root", "a"),
+    null,
+  );
+});

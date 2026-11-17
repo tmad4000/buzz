@@ -15,10 +15,13 @@ export function threadExpansionKey(
   identity: string | undefined,
   channel: string | null,
   root: string | null,
+  viewInstanceId?: string,
 ): string | null {
-  return channel && root
-    ? `buzz-thread-expansion.v1:${JSON.stringify([community, identity ?? null, channel, root])}`
-    : null;
+  if (!channel || !root) return null;
+  const resource = [community, identity ?? null, channel, root];
+  return viewInstanceId === undefined
+    ? `buzz-thread-expansion.v1:${JSON.stringify(resource)}`
+    : `buzz-thread-expansion.v2:${JSON.stringify([...resource, viewInstanceId])}`;
 }
 
 /** Missing preferences are initialized once; saved choices always win. */

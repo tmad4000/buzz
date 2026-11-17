@@ -1,3 +1,4 @@
+import { ConversationViewContext } from "@/features/conversations/ConversationViewContext";
 import { loadActiveCommunityId } from "@/features/communities/communityStorage";
 import * as React from "react";
 import type { ThreadDisplayPolicy } from "../lib/threadDisplayPolicy";
@@ -29,10 +30,16 @@ export function InlineAutoExpansionProvider({
   children: React.ReactNode;
 }) {
   const policy = useThreadDisplayPolicy(currentPubkey, scope);
+  const view = React.useContext(ConversationViewContext);
   const community = React.useMemo(loadActiveCommunityId, []);
   const dataScope = React.useMemo(
-    () => JSON.stringify([community, currentPubkey ?? null, scope]),
-    [community, currentPubkey, scope],
+    () =>
+      JSON.stringify(
+        view
+          ? [community, currentPubkey ?? null, scope, view.viewInstanceId]
+          : [community, currentPubkey ?? null, scope],
+      ),
+    [community, currentPubkey, scope, view?.viewInstanceId],
   );
   const [registry, setRegistry] = React.useState<Map<string, Candidate>>(
     () => new Map(),

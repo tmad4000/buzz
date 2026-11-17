@@ -517,3 +517,26 @@ test("bound view preferences merge simultaneous choices and reject retired visit
   );
   controller.dispose();
 });
+
+test("legacy expansion ownership remains with the first view and is never reassigned after close", () => {
+  const { controller } = setup();
+  const first = Object.values(controller.getSnapshot().layout.views)[0];
+  assert.equal(first.legacyExpansionOwner, true);
+  split(controller);
+  const second = Object.values(controller.getSnapshot().layout.views).find(
+    (view) => view.id !== first.id,
+  );
+  assert.equal(second.legacyExpansionOwner, false);
+  const firstPane = panes(controller).find(
+    (pane) => pane.viewInstanceId === first.id,
+  );
+  assert.equal(controller.close(firstPane.id), true);
+  const remaining = Object.values(controller.getSnapshot().layout.views)[0];
+  assert.equal(remaining.legacyExpansionOwner, false);
+  assert.equal(controller.navigate(remaining.id, "dm"), true);
+  assert.equal(
+    controller.getSnapshot().layout.views[remaining.id].legacyExpansionOwner,
+    false,
+  );
+  controller.dispose();
+});

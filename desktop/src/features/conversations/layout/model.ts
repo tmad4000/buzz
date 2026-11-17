@@ -1,3 +1,7 @@
+import {
+  copyExplicitExpansion,
+  type ExplicitExpansionSnapshot,
+} from "./explicitExpansion";
 // Tree shape and normalized-size operations adapted from Paseo, Apache-2.0.
 // Copyright (c) 2025-present Mohamed Boudra. See docs/conversation-layout-provenance.md.
 import {
@@ -32,6 +36,8 @@ export type ConversationView = {
   channelId: string;
   panelState: PanelState;
   preferences?: ViewPreferences;
+  explicitExpansion?: ExplicitExpansionSnapshot;
+  legacyExpansionOwner?: boolean;
   timelineAnchor: ScrollAnchor | null;
   threadAnchor: ScrollAnchor | null;
 };
@@ -76,7 +82,11 @@ export function createConversationView(
   return {
     id: ids("view"),
     channelId,
+    legacyExpansionOwner: false,
     panelState: copyPanelState(seed?.panelState ?? {}),
+    ...(seed?.explicitExpansion
+      ? { explicitExpansion: copyExplicitExpansion(seed.explicitExpansion) }
+      : {}),
     ...(seed?.preferences
       ? { preferences: copyViewPreferences(seed.preferences) }
       : {}),
@@ -313,14 +323,28 @@ export function navigateView(
   channelId: string,
   presentation?: Pick<
     ConversationView,
-    "panelState" | "timelineAnchor" | "threadAnchor" | "preferences"
+    | "panelState"
+    | "timelineAnchor"
+    | "threadAnchor"
+    | "preferences"
+    | "explicitExpansion"
   >,
 ): ConversationLayout {
   if (!Object.hasOwn(layout.views, viewId)) return layout;
   const next: ConversationView = {
     id: viewId,
     channelId,
+    ...(layout.views[viewId].legacyExpansionOwner === undefined
+      ? {}
+      : { legacyExpansionOwner: layout.views[viewId].legacyExpansionOwner }),
     panelState: copyPanelState(presentation?.panelState ?? {}),
+    ...(presentation?.explicitExpansion
+      ? {
+          explicitExpansion: copyExplicitExpansion(
+            presentation.explicitExpansion,
+          ),
+        }
+      : {}),
     ...(presentation?.preferences
       ? { preferences: copyViewPreferences(presentation.preferences) }
       : {}),
@@ -342,7 +366,11 @@ export function updateViewPresentation(
   patch: Partial<
     Pick<
       ConversationView,
-      "panelState" | "timelineAnchor" | "threadAnchor" | "preferences"
+      | "panelState"
+      | "timelineAnchor"
+      | "threadAnchor"
+      | "preferences"
+      | "explicitExpansion"
     >
   >,
 ): ConversationLayout {
@@ -353,6 +381,9 @@ export function updateViewPresentation(
   const next = {
     ...view,
     ...patch,
+    ...(patch.explicitExpansion
+      ? { explicitExpansion: copyExplicitExpansion(patch.explicitExpansion) }
+      : {}),
     ...(patch.preferences
       ? {
           preferences: copyViewPreferences({

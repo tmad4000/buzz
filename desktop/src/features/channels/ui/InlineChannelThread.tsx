@@ -1,3 +1,5 @@
+import { useThreadExpansionStorage } from "@/features/messages/ui/ThreadExpansionScope";
+import { ConversationViewContext } from "@/features/conversations/ConversationViewContext";
 import * as React from "react";
 import { useThreadDisclosureFocus } from "@/features/messages/ui/useThreadDisclosureFocus";
 import { PanelRight, ChevronDown, ChevronRight } from "lucide-react";
@@ -5,8 +7,6 @@ import { loadActiveCommunityId } from "@/features/communities/communityStorage";
 import type { UserProfileLookup } from "@/features/profile/lib/identity";
 import type { TimelineThreadSummary } from "@/features/messages/lib/threadPanel";
 import {
-  loadThreadExpansion,
-  saveThreadExpansion,
   threadExpansionKey,
   THREAD_EXPANSION_CHANGED,
   type ThreadExpansionChange,
@@ -52,14 +52,16 @@ export type InlineChannelThreadProps = {
 type Props = InlineChannelThreadProps;
 export function InlineChannelThread(props: Props) {
   const community = React.useMemo(loadActiveCommunityId, []);
-  const key = `${threadExpansionKey(community, props.currentPubkey, props.channel.id, props.root.id)}:inline`;
+  const view = React.useContext(ConversationViewContext);
+  const key = `${threadExpansionKey(community, props.currentPubkey, props.channel.id, props.root.id, view?.viewInstanceId)}:inline`;
   return <ScopedInlineThread key={key} {...props} storageKey={key} />;
 }
 function ScopedInlineThread(props: Props & { storageKey: string }) {
   const { root, summary, storageKey, onOpenThread, unreadCount } = props;
   const auto = useInlineAutoExpansion();
+  const storage = useThreadExpansionStorage();
   const [choice, setChoice] = React.useState(() =>
-    loadThreadExpansion(storageKey).get(root.id),
+    storage.load(storageKey).get(root.id),
   );
   const [storageFailed, setStorageFailed] = React.useState(false);
   const [snapshot, setSnapshot] = React.useState<{
@@ -161,10 +163,7 @@ function ScopedInlineThread(props: Props & { storageKey: string }) {
   ]);
   const toggle = () => {
     const next = !expanded;
-    const persisted = saveThreadExpansion(
-      storageKey,
-      new Map([[root.id, next]]),
-    );
+    const persisted = storage.save(storageKey, new Map([[root.id, next]]));
     setChoice(next);
     setStorageFailed(!persisted);
     if (next) data.thread.setExpanded(root.id, true);

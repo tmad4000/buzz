@@ -81,6 +81,26 @@ export class ConversationLayoutController {
       recovery: restored.status,
       message: restored.status === "unavailable" ? SESSION_ONLY_MESSAGE : null,
     };
+    // Upgrade old layouts once. Never transfer this role when its view closes.
+    const existingViews = Object.values(this.snapshot.layout.views);
+    if (
+      !restored.layout ||
+      existingViews.every((view) => view.legacyExpansionOwner === undefined)
+    ) {
+      const firstId = listPanes(this.snapshot.layout.root)[0]?.viewInstanceId;
+      this.snapshot = {
+        ...this.snapshot,
+        layout: {
+          ...this.snapshot.layout,
+          views: Object.fromEntries(
+            existingViews.map((view) => [
+              view.id,
+              { ...view, legacyExpansionOwner: view.id === firstId },
+            ]),
+          ),
+        },
+      };
+    }
     this.presentations = restoreVisitCache(options.storage, this.options.scope);
     this.presentations.retain(new Set(Object.keys(this.snapshot.layout.views)));
     // Inaccessible saved targets remain placeholders; restoration does not fetch or navigate them.

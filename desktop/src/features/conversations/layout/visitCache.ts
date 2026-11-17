@@ -1,3 +1,4 @@
+import { copyExplicitExpansion } from "./explicitExpansion";
 import {
   copyPanelState,
   copyViewPreferences,
@@ -46,12 +47,23 @@ export function parseVisitCache(raw: string) {
 }
 export type VisitPresentation = Pick<
   ConversationView,
-  "panelState" | "timelineAnchor" | "threadAnchor" | "preferences"
+  | "panelState"
+  | "timelineAnchor"
+  | "threadAnchor"
+  | "preferences"
+  | "explicitExpansion"
 >;
 
 function copy(presentation: VisitPresentation): VisitPresentation {
   return {
     panelState: copyPanelState(presentation.panelState),
+    ...(presentation.explicitExpansion
+      ? {
+          explicitExpansion: copyExplicitExpansion(
+            presentation.explicitExpansion,
+          ),
+        }
+      : {}),
     ...(presentation.preferences
       ? { preferences: copyViewPreferences(presentation.preferences) }
       : {}),
