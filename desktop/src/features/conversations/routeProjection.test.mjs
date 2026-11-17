@@ -3,6 +3,8 @@ import test from "node:test";
 import {
   conversationHistoryViewId,
   conversationRouteProjection,
+  conversationPanelStateFromSearch,
+  sameConversationPanelRoute,
 } from "./routeProjection.ts";
 
 const view = {
@@ -16,6 +18,22 @@ const view = {
     viewInstanceId: "never-in-url",
   },
 };
+
+test("incoming search normalizes absent panels without retaining commands or unknown fields", () => {
+  assert.deepEqual(conversationPanelStateFromSearch(view.panelState), {
+    messageId: "reply",
+    thread: "root",
+  });
+  assert.equal(
+    sameConversationPanelRoute(view.panelState, {
+      messageId: "reply",
+      thread: "root",
+      profile: "",
+    }),
+    true,
+  );
+  assert.equal(sameConversationPanelRoute({ thread: "old" }, {}), false);
+});
 
 test("projection uses canonical resource/panel IDs and excludes commands and private IDs", () => {
   const projection = conversationRouteProjection(view, "scope", true);

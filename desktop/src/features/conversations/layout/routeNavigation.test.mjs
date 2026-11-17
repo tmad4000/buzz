@@ -110,3 +110,33 @@ test("closed history target falls back to active view without restoring the spli
     controller.dispose();
   }
 });
+
+test("route panel replacement retains this visit's explicit choices and remembered anchors", () => {
+  const { controller, a, route } = setup();
+  try {
+    controller.update(a, "chat", controller.visitToken(a), {
+      panelState: { thread: "old", profile: "old-profile" },
+      preferences: { timelineMode: "timeline", preferredThreadWidth: 420 },
+      timelineAnchor: { messageId: "anchor", offset: 21 },
+    });
+    assert.equal(
+      route(
+        "chat",
+        { kind: "external", channelId: "chat" },
+        {
+          panelState: { thread: "new" },
+        },
+      ),
+      a,
+    );
+    const view = controller.getSnapshot().layout.views[a];
+    assert.deepEqual(view.panelState, { thread: "new" });
+    assert.deepEqual(view.preferences, {
+      timelineMode: "timeline",
+      preferredThreadWidth: 420,
+    });
+    assert.deepEqual(view.timelineAnchor, { messageId: "anchor", offset: 21 });
+  } finally {
+    controller.dispose();
+  }
+});
