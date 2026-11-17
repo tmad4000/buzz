@@ -116,6 +116,16 @@ test("production Page merges live edits over late history, isolates scope, sandb
   ]);
   assert.equal(published.content, "<h1>other</h1>");
   assert.match(document.querySelector("iframe").srcdoc, /Concurrent edit/);
+  const firstStamp = published.created_at;
+  const realNow = Date.now;
+  Date.now = () => firstStamp * 1000;
+  await click("Edit HTML");
+  await click("Save Page");
+  assert.ok(
+    published.created_at > firstStamp + 1,
+    "second save advances beyond known live head even if history is stale",
+  );
+  Date.now = realNow;
   // Script messages never open a browser automatically; unknown frames are ignored.
   await act(async () =>
     window.dispatchEvent(

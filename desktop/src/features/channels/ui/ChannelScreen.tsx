@@ -812,6 +812,7 @@ export function ChannelScreen({
                 canResetPanelWidth={canResetThreadPanelWidth} channel={activeChannel}
                 currentPubkey={currentPubkey}
                 header={channelHeader}
+                pagePanel={pageOpen ? pagePanel : undefined} onClosePage={closePage} pageSinglePanel={isNarrowPanelViewport}
                 onClosePost={onCloseForumPost} onCloseProfilePanel={handleCloseProfilePanel}
                 onOpenDm={handleOpenDm}
                 onOpenProfilePanel={handleOpenProfilePanel}
