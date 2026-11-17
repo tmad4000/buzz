@@ -1,0 +1,130 @@
+import assert from "node:assert/strict";
+import test, { beforeEach } from "node:test";
+import {
+  isJacobSidebarScope,
+  decodeSidebarDefaults,
+} from "./jacobChannelSectionDefaults.ts";
+import { SECTIONS_LANE, projectSections } from "./channelSectionsSync.ts";
+import { LaneStore, decodeDoc, encodeDoc } from "./sidebarLaneStore.ts";
+import { setRegs, mergeTrees } from "./sidebarLwwMap.ts";
+
+const PK = "3eb6491e9fecd5e2c0221f76b79685a1478b591bf90ea155f5352ebe12672e1f";
+const RELAY = "wss://jprojects.communities.buzz.xyz";
+// Synthetic fixture only: real channel IDs live solely in the encrypted seed.
+const payload = JSON.stringify({
+  version: 1,
+  sections: [
+    { id: "projects", name: "Projects", order: 0 },
+    { id: "paseo", name: "Paseo", order: 1 },
+  ],
+  assignments: { project: "projects", dm: "paseo" },
+});
+const storage = new Map();
+globalThis.window ??= {};
+window.localStorage = {
+  getItem: (k) => storage.get(k) ?? null,
+  setItem: (k, v) => storage.set(k, v),
+  removeItem: (k) => storage.delete(k),
+};
+beforeEach(() => storage.clear());
+const device = () => new LaneStore(SECTIONS_LANE, PK, RELAY);
+const seed = (store) =>
+  store.transact((prev) => mergeTrees(decodeSidebarDefaults(payload), prev));
+
+test("private bootstrap is enabled only for Jacob's exact community", () => {
+  for (const pk of [
+    PK,
+    "38ba46f41d56ff5c71cfbfb856d00b209e6216a218260d2a30c4f1b712bdd1cb",
+    "f".repeat(64),
+    undefined,
+  ]) {
+    for (const relay of [RELAY, `${RELAY}/`, "wss://other.test", undefined]) {
+      assert.equal(
+        isJacobSidebarScope(pk, relay),
+        pk === PK && Boolean(relay?.startsWith(RELAY)),
+      );
+    }
+  }
+});
+
+test("seed persists and survives the actual sync codec without new IDs/stamps on reload", () => {
+  const store = device();
+  seed(store);
+  const first = store.get();
+  const reloaded = device();
+  seed(reloaded);
+  assert.deepEqual(reloaded.get(), first);
+  assert.deepEqual(
+    decodeDoc(SECTIONS_LANE, encodeDoc(SECTIONS_LANE, first), Date.now()).tree,
+    first,
+  );
+});
+
+test("remote changes beat defaults on fresh device in either merge order", () => {
+  const first = device();
+  seed(first);
+  first.transact((tree) =>
+    setRegs(tree, [
+      [["s", "projects", "live"], false],
+      [["s", "paseo", "name"], "Personal"],
+      [["a", "dm"], null],
+    ]),
+  );
+  const edited = first.get();
+  storage.clear();
+  const second = device();
+  seed(second);
+  const seeded = second.get();
+  second.merge(edited);
+  assert.deepEqual(second.get(), mergeTrees(edited, seeded));
+  assert.equal(
+    projectSections(second.get()).sections.some((s) => s.name === "Projects"),
+    false,
+  );
+  assert.equal(projectSections(second.get()).sections[0].name, "Personal");
+  assert.equal(projectSections(second.get()).assignments.dm, undefined);
+  seed(second);
+  assert.deepEqual(device().get(), second.get());
+});
+
+test("existing legacy assignments win over the baseline", () => {
+  storage.set(
+    SECTIONS_LANE.storageKey(PK, RELAY),
+    JSON.stringify({
+      version: 1,
+      sections: [{ id: "mine", name: "Personal", order: 0 }],
+      assignments: { dm: "mine" },
+    }),
+  );
+  const store = device();
+  seed(store);
+  assert.equal(projectSections(store.get()).assignments.dm, "mine");
+});
+
+test("invalid/oversized bootstraps propagate an import error", () => {
+  assert.throws(() => decodeSidebarDefaults("invalid"));
+  assert.throws(() => decodeSidebarDefaults('{"version":99}'));
+});
+
+test("a delayed legacy relay head overrides bootstrap placeholders", () => {
+  const store = device();
+  seed(store);
+  const remote = decodeDoc(
+    SECTIONS_LANE,
+    {
+      version: 1,
+      sections: [
+        { id: "projects", name: "Renamed remotely", order: 0 },
+        { id: "mine", name: "Personal", order: 1 },
+      ],
+      assignments: { dm: "mine" },
+    },
+    200000,
+  );
+  store.merge(remote.tree, remote.legacy);
+  assert.equal(projectSections(store.get()).assignments.dm, "mine");
+  assert.equal(
+    projectSections(store.get()).sections.find((s) => s.id === "projects").name,
+    "Renamed remotely",
+  );
+});
