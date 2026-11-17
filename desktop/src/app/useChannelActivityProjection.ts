@@ -1,3 +1,8 @@
+import {
+  resolveThreadReplySeenAt,
+  threadSeenKey,
+  threadReplySeenKey,
+} from "@/features/channels/readState/threadReplySeen";
 import * as React from "react";
 
 import { useThreadActivityFeedItems } from "@/app/useThreadActivityFeedItems";
@@ -49,6 +54,19 @@ export function useChannelActivityProjection({
   threadActivityItems,
   mutedRootIds,
 }: UseChannelActivityProjectionOptions) {
+  const getThreadReplySeenAt = React.useCallback(
+    (rootId: string, replyId: string) =>
+      resolveThreadReplySeenAt(rootId, replyId, getOwnReadAt),
+    [getOwnReadAt],
+  );
+  const markThreadReplySeen = React.useCallback(
+    (rootId: string, replyId: string, timestamp: number) => {
+      const at = new Date(timestamp * 1_000).toISOString();
+      markChannelRead(threadReplySeenKey(rootId, replyId), at);
+      markChannelRead(threadSeenKey(rootId), at);
+    },
+    [markChannelRead],
+  );
   const getThreadReadAt = React.useCallback(
     (rootId: string, channelId?: string | null) => {
       const threadReadAt = getOwnReadAt(`thread:${rootId}`);
@@ -132,6 +150,8 @@ export function useChannelActivityProjection({
   );
 
   return {
+    getThreadReplySeenAt,
+    markThreadReplySeen,
     getThreadReadAt,
     markThreadRead,
     getMessageReadAt,
