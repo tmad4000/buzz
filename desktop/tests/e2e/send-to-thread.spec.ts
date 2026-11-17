@@ -237,7 +237,9 @@ test("explicit keyboard routing, cancel and new-message fallback preserve inline
   await expect(originOverlay).toHaveCount(1);
   const queuedAnnouncement = originOverlay
     .getByRole("article", { name: "Queued message" })
-    .filter({ hasText: "A separate announcement" });
+    .filter({
+      has: page.getByText("A separate announcement", { exact: true }),
+    });
   await expect(queuedAnnouncement).toHaveCount(1);
   await expect(queuedAnnouncement).toBeVisible();
   const announcement = page
