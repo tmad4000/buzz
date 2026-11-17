@@ -132,7 +132,7 @@ export function ChannelScreenHeader({
     terminalButton || channelActions ? (
       <div className="flex items-center gap-1">
         {activeChannel && activeChannel.channelType !== "forum" ? (
-          <ChannelOrderSetting />
+          <ChannelOrderSetting compact={actionsVariant === "compact"} />
         ) : null}
         {terminalButton}
         {channelActions}

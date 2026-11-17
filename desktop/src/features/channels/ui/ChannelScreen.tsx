@@ -1,5 +1,6 @@
 // biome-ignore-all format: line-count ratchet requires compact forwarding in this legacy component
 import { ConversationViewContext } from "@/features/conversations/ConversationViewContext";
+import { ConversationViewGuardsContext } from "@/features/conversations/ConversationViewGuards";
 import { CONVERSATION_THREAD_DOCK_WIDTH_PX } from "@/shared/layout/conversationThreadLayout";
 import { useUnseenReplyEvidence } from "./useUnseenReplyEvidence";
 import { useUnseenThreadReplies } from "./useUnseenThreadReplies";
@@ -106,6 +107,7 @@ export function ChannelScreen({
   ...searchTarget
 }: ChannelScreenProps) {
   const conversationView = React.useContext(ConversationViewContext);
+  const conversationGuards = React.useContext(ConversationViewGuardsContext);
   const { pageOpen, closePage, pageHeaderActions, pagePanel } = useChannelPageSurface(activeChannel, headerEndActions);
   const queryClient = useQueryClient();
   const { goHome } = useAppNavigation();
@@ -178,7 +180,7 @@ export function ChannelScreen({
   const currentPubkey = currentIdentity?.pubkey;
   const activeChannelId = activeChannel?.id ?? null;
   const isHuddleTranscript = useIsHuddleTranscript(activeChannelId);
-  const view = useChannelViewMode(activeCommunity?.relayUrl ?? "", activeChannelId);
+  const view = useChannelViewMode(conversationView ? JSON.stringify([activeCommunity?.id, currentPubkey, conversationView.viewInstanceId]) : activeCommunity?.relayUrl ?? "", activeChannelId);
   const flatTimeline = view.mode === "timeline" && !isHuddleTranscript && activeChannel?.channelType !== "forum";
   const relaySelfPubkey = useRelaySelfQuery(activeChannel !== null).data;
   const requireThreadEditResolutionRef = React.useRef<() => boolean>(
@@ -713,7 +715,7 @@ export function ChannelScreen({
   const shouldCompactHeaderActions =
     hasAuxiliaryPanel &&
     channelContentWidthPx > 0 &&
-    channelContentWidthPx < 760;
+    (conversationView !== null || channelContentWidthPx < 760);
   const channelHeaderChromeRef = useMeasuredCssVariable({
     targetRef: mainInsetRef,
     ...channelContentTopPaddingMeasurement,
@@ -821,13 +823,17 @@ export function ChannelScreen({
     ],
   );
   const timelineMessageById = React.useMemo(() => new Map(timelineMessages.map((message) => [message.id, message])), [timelineMessages]);
+  const canChangeChannelView = React.useCallback(() => {
+    if (conversationView && (!activeCommunity?.id || !currentPubkey || conversationGuards?.allow(conversationView.viewInstanceId) === false)) return false;
+    return requireThreadEditResolution();
+  }, [conversationView, conversationGuards, activeCommunity?.id, currentPubkey, requireThreadEditResolution]);
   const changeChannelView = React.useCallback((mode: "threads" | "timeline") => {
-    if (!requireThreadEditResolution()) return;
+    if (mode === view.mode || !canChangeChannelView()) return;
     if (mode === "timeline") handleCloseThread();
     view.changeMode(mode);
-  }, [handleCloseThread, requireThreadEditResolution, view.changeMode]);
+  }, [handleCloseThread, canChangeChannelView, view.mode, view.changeMode]);
   const openTimelineReply = React.useCallback((message: TimelineMessage) => {
-    if (!requireThreadEditResolution()) return;
+    if (!canChangeChannelView()) return;
     view.changeMode("threads");
     handleCloseAgentSession();
     setChannelManagementOpen(false);
@@ -838,7 +844,7 @@ export function ChannelScreen({
     setThreadReplyTargetId(message.id);
     setThreadScrollTargetId(message.id);
     setExpandedThreadReplyIds(getThreadRouteTarget(message, timelineMessageById)?.expandedReplyIds ?? new Set());
-  }, [handleCloseAgentSession, requireThreadEditResolution, setChannelManagementOpen, setOpenThreadHeadId, setProfilePanelPubkey, timelineMessageById, view.changeMode]);
+  }, [handleCloseAgentSession, canChangeChannelView, setChannelManagementOpen, setOpenThreadHeadId, setProfilePanelPubkey, timelineMessageById, view.changeMode]);
   const timelineView = React.useMemo(() => ({ mode: view.mode, changeMode: changeChannelView, messagesById: timelineMessageById, loadingReplies: threadRepliesLoading, openReply: openTimelineReply }), [view.mode, changeChannelView, timelineMessageById, threadRepliesLoading, openTimelineReply]);
   return (
     <TimelineViewContext.Provider value={timelineView}>
