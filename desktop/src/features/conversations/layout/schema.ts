@@ -22,7 +22,7 @@ const anchor = z
   .object({ messageId: identifier, offset: z.number().finite() })
   .strict()
   .nullable();
-const view = z
+export const conversationViewSchema = z
   .object({
     id: identifier,
     channelId: identifier,
@@ -56,7 +56,7 @@ const schema = z
     version: z.literal(1),
     root: node,
     focusedPaneId: identifier,
-    views: z.record(identifier, view),
+    views: z.record(identifier, conversationViewSchema),
   })
   .strict();
 

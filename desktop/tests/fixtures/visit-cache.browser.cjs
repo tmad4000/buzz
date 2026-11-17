@@ -17,7 +17,7 @@ if (!origin) throw new Error("Set BUZZ_HOST_FIXTURE_ORIGIN");
     const errors = [];
     page.on("pageerror", (error) => errors.push(error.message));
     await page.goto(
-      `${origin}/tests/fixtures/full-conversation-hosts.html?layout=1`,
+      `${origin}/tests/fixtures/full-conversation-hosts.html?layout=1${process.env.BUZZ_VISIT_PERSISTENCE ? "&persistVisits=1" : ""}`,
     );
     const a = page.locator("[data-conversation-view=a]");
     const b = page.locator("[data-conversation-view=b]");
@@ -79,6 +79,33 @@ if (!origin) throw new Error("Set BUZZ_HOST_FIXTURE_ORIGIN");
     const views = await page.evaluate(() => window.layoutSnapshot().views);
     assert.equal(views.a.panelState.thread, "1".repeat(64));
     assert.equal(views.b.panelState.thread, "2".repeat(64));
+    if (process.env.BUZZ_VISIT_PERSISTENCE) {
+      assert.equal(
+        await page.evaluate((dm) => window.requestPaneNavigate("a", dm), dm),
+        true,
+      );
+      await page.reload();
+      await expect(b.getByTestId("message-thread-panel")).toContainText(
+        "Design decisions for pane B",
+      );
+      assert.equal(
+        await page.evaluate(() => window.layoutSnapshot().views.a.channelId),
+        dm,
+      );
+      assert.equal(
+        await page.evaluate(
+          (id) => window.requestPaneNavigate("a", id),
+          original,
+        ),
+        true,
+      );
+      await expect(a.getByTestId("message-thread-panel")).toContainText(
+        "Release plan for pane A",
+      );
+      console.log(
+        "PASS scoped localStorage restores layout and separate visit cache after a real browser reload.",
+      );
+    }
     assert.equal(
       await page.evaluate(
         () =>

@@ -17,7 +17,8 @@ import {
   type SplitAxis,
 } from "./model";
 import { canSplit, type Size } from "./geometry";
-import { ConversationVisitCache } from "./visitCache";
+import type { ConversationVisitCache } from "./visitCache";
+import { restoreVisitCache, saveVisitCache } from "./visitCacheStorage";
 import {
   restoreLayout,
   saveLayout,
@@ -56,7 +57,7 @@ export class ConversationLayoutController {
   private dirty = false;
   private revision = 0;
   private visits = new Map<string, number>();
-  private presentations = new ConversationVisitCache();
+  private presentations: ConversationVisitCache;
   private ids: CreateId;
   private options: Options;
 
@@ -80,6 +81,8 @@ export class ConversationLayoutController {
       recovery: restored.status,
       message: restored.status === "unavailable" ? SESSION_ONLY_MESSAGE : null,
     };
+    this.presentations = restoreVisitCache(options.storage, this.options.scope);
+    this.presentations.retain(new Set(Object.keys(this.snapshot.layout.views)));
     // Inaccessible saved targets remain placeholders; restoration does not fetch or navigate them.
     for (const view of Object.values(this.snapshot.layout.views))
       this.visits.set(view.id, 0);
@@ -306,8 +309,15 @@ export class ConversationLayoutController {
       this.options.scope,
       this.snapshot.layout,
     );
-    const messageChanged = result.message !== this.snapshot.message;
-    this.snapshot = { ...this.snapshot, message: result.message };
+    const cacheSaved = saveVisitCache(
+      this.options.storage,
+      this.options.scope,
+      this.presentations,
+    );
+    const message =
+      result.message ?? (cacheSaved ? null : SESSION_ONLY_MESSAGE);
+    const messageChanged = message !== this.snapshot.message;
+    this.snapshot = { ...this.snapshot, message };
     if (messageChanged) this.publish();
   };
   dispose() {
