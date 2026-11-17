@@ -86,12 +86,29 @@ const expect = baseExpect.configure({ timeout: 30000 });
     await page.keyboard.press("Escape");
     await expect(menu).toHaveCount(0);
     assert.equal((await sends()).length, 0, "Escape cannot send");
+    // Capture the lock transition before clicking: a sibling focus round-trip
+    // can outlast the mocked publish, so current state alone is timing-dependent.
+    await mainA.evaluate((form) => {
+      window.hostRoutingLockStates = [];
+      window.hostRoutingLockObserver = new MutationObserver(() => {
+        window.hostRoutingLockStates.push(
+          form.getAttribute("data-submit-locked"),
+        );
+      });
+      window.hostRoutingLockObserver.observe(form, {
+        attributes: true,
+        attributeFilter: ["data-submit-locked"],
+      });
+    });
     await mainA.getByTestId("send-to-thread").click();
     await menu.locator(`[data-thread-destination="${"1".repeat(64)}"]`).click();
     await tb.getByTestId("message-input").focus();
-    await expect(mainA).toHaveAttribute("data-submit-locked", "true");
+    await expect
+      .poll(() => page.evaluate(() => window.hostRoutingLockStates))
+      .toContain("true");
     await expect(mainA.getByTestId("message-input")).toBeEmpty();
     await expect(mainA).toHaveAttribute("data-submit-locked", "false");
+    await page.evaluate(() => window.hostRoutingLockObserver.disconnect());
     assert.equal((await sends()).length, 1);
     const first = (await sends())[0];
     assert.equal(first.parentEventId, "1".repeat(64));
@@ -189,7 +206,10 @@ const expect = baseExpect.configure({ timeout: 30000 });
     await mainB.getByTestId("send-to-thread").click();
     await menu.locator(`[data-thread-destination="${"1".repeat(64)}"]`).click();
     await expect(
-      a.getByRole("button", { name: "Take over", exact: true }),
+      a
+        .locator("[data-draft-preview]")
+        .filter({ hasText: "Shared draft survives picker takeover" })
+        .getByRole("button", { name: "Take over", exact: true }),
     ).toBeDisabled();
     await expect(
       page.getByText("routing integration offline", { exact: false }),
@@ -199,7 +219,10 @@ const expect = baseExpect.configure({ timeout: 30000 });
     );
     await expect(mainB).toContainText("routing-receipt.pdf");
     await expect(
-      a.getByRole("button", { name: "Take over", exact: true }),
+      a
+        .locator("[data-draft-preview]")
+        .filter({ hasText: "Shared draft survives picker takeover" })
+        .getByRole("button", { name: "Take over", exact: true }),
     ).toBeEnabled();
     assert.equal(
       (await sends()).length,

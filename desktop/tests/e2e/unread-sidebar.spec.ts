@@ -96,6 +96,12 @@ test("unread sidebar branches and bounded nesting", async ({ page }) => {
     });
   } else {
     await expect(panel.locator(`[data-message-id="${deep.id}"]`)).toBeVisible();
+    // Smart now opens short read branches too. This persistence regression
+    // starts with an explicitly collapsed read branch and an open unread path.
+    const readHide = panel.locator(
+      `[data-testid="sidebar-hide-branch"][data-thread-head-id="${read.id}"]`,
+    );
+    if (await readHide.count()) await readHide.click();
     await expect(
       panel.getByTestId("sidebar-read-branch").filter({ hasText: "1 reply" }),
     ).toBeVisible();
