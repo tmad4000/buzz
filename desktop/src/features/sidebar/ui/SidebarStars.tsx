@@ -4,7 +4,7 @@ import { cn } from "@/shared/lib/cn";
 
 export type SidebarStarActions = {
   ids: ReadonlySet<string>;
-  star: (id: string | readonly string[]) => void;
+  star: (id: string | readonly string[]) => undefined | Promise<boolean>;
   unstar: (id: string) => void;
 };
 const StarContext = createContext<SidebarStarActions | null>(null);
