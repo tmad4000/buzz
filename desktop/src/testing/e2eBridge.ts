@@ -1584,6 +1584,8 @@ declare global {
      * cancel the in-flight promise for the cold anchor specifically.
      * Set to undefined/null to disable deferral.
      */
+    __BUZZ_E2E_HOLD_OUTBOX_PUBLISH__?: (hold: boolean) => number;
+    __BUZZ_E2E_HELD_OUTBOX_PUBLISHES__?: () => number;
     __BUZZ_E2E_DEFER_GET_EVENT__?: string | null;
     /** Flush all deferred `get_event` calls for the target ID.  Each queued
      *  request is resolved (or rejected) immediately.  Returns the number of
@@ -1765,6 +1767,8 @@ let profileReadsReleased = false;
 // sides of the hold in one page: profiles resolved normally first (so one paste
 // verifies instantly from local state), then the relay lookup pinned open (so a
 // second paste of the same label is provably still deciding).
+let holdOutboxPublish = false;
+let heldOutboxPublishes: Array<() => void> = [];
 let holdUsersBatch = false;
 let heldUsersBatchReleases: Array<() => void> = [];
 // Starts currently held behind `startManagedAgentDelayMs`, releasable early
@@ -11481,6 +11485,15 @@ export function maybeInstallE2eTauriMocks() {
   deferredThreadRepliesQueue = [];
   deferredProfileReadQueue = [];
   profileReadsReleased = false;
+  holdOutboxPublish = false;
+  heldOutboxPublishes = [];
+  window.__BUZZ_E2E_HOLD_OUTBOX_PUBLISH__ = (hold) => {
+    holdOutboxPublish = hold;
+    const queued = hold ? [] : heldOutboxPublishes.splice(0);
+    for (const release of queued) release();
+    return queued.length;
+  };
+  window.__BUZZ_E2E_HELD_OUTBOX_PUBLISHES__ = () => heldOutboxPublishes.length;
   holdUsersBatch = false;
   heldUsersBatchReleases = [];
   cancelledMediaUploadIds = new Set<string>();
@@ -14568,6 +14581,11 @@ export function maybeInstallE2eTauriMocks() {
         return null;
       }
       case "publish_queued_message": {
+        if (holdOutboxPublish) {
+          await new Promise<void>((resolve) =>
+            heldOutboxPublishes.push(resolve),
+          );
+        }
         const args = payload as {
           event: RelayEvent;
           expectedRelayUrl: string;

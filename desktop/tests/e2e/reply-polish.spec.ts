@@ -136,106 +136,145 @@ test("header full version and read-only provenance survive narrow/zoom layouts",
   await page.screenshot({ path: info.outputPath("header-narrow-200.png") });
 });
 
-test("sidebar actual send exposes a collapsed ancestry before/after acknowledgement and read/refetch", async ({
-  page,
-}) => {
-  await installMockBridge(page, { sendMessageDelayMs: 6000 });
-  await page.goto("/");
-  await page.getByTestId("channel-general").click();
-  await expect
-    .poll(() =>
-      page.evaluate(() =>
-        window.__BUZZ_E2E_HAS_MOCK_LIVE_SUBSCRIPTION__?.({
-          channelName: "general",
-        }),
-      ),
-    )
-    .toBe(true);
-  await waitForMockChannelHeadReady(
+for (const surface of ["sidebar", "inline"] as const) {
+  test(`${surface} durable actual send exposes collapsed ancestry before/after held acknowledgement and refetch`, async ({
     page,
-    "general",
-    "9a1657ac-f7aa-5db0-b632-d8bbeb6dfb50",
-  );
-  const root = "c1".repeat(32),
-    branch = "c2".repeat(32);
-  await page.evaluate(
-    ({ root, branch, pubkey }) => {
-      for (const [id, content, parentEventId] of [
-        [root, "Own reply sidebar root", undefined],
-        [branch, "Nested reply target", root],
-        ["c3".repeat(32), "Other author deep reply", branch],
-      ])
-        window.__BUZZ_E2E_EMIT_MOCK_MESSAGE__?.({
-          id: id ?? "",
-          content: content ?? "",
-          parentEventId,
-          pubkey,
-          channelName: "general",
-          createdAt: Math.floor(Date.now() / 1000) + 10,
-        });
-    },
-    { root, branch, pubkey: TEST_IDENTITIES.bob.pubkey },
-  );
-  await page
-    .locator(
-      `[data-testid="open-thread-side-panel"][data-thread-head-id="${root}"]`,
-    )
-    .click();
-  const panel = page.getByTestId("message-thread-panel");
-  const branchToggle = panel.locator(
-    `button[data-thread-head-id="${branch}"][aria-expanded="false"]`,
-  );
-  if (await branchToggle.count()) await branchToggle.click();
-  await panel.locator(`[data-message-id="${branch}"]`).hover();
-  await panel.getByTestId(`reply-message-${branch}`).click();
-  const editor = panel.getByTestId("message-input");
-  await editor.fill("Own sidebar fresh reply body");
-  await panel
-    .locator(
-      `[data-testid="sidebar-hide-branch"][data-thread-head-id="${branch}"]`,
-    )
-    .click();
-  await expect(panel).not.toContainText("Other author deep reply");
-  await panel.getByTestId("send-message").click();
-  await expect(
-    panel
+  }) => {
+    await installMockBridge(page);
+    await page.goto("/");
+    await page.getByTestId("channel-general").click();
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          window.__BUZZ_E2E_HAS_MOCK_LIVE_SUBSCRIPTION__?.({
+            channelName: "general",
+          }),
+        ),
+      )
+      .toBe(true);
+    await waitForMockChannelHeadReady(
+      page,
+      "general",
+      "9a1657ac-f7aa-5db0-b632-d8bbeb6dfb50",
+    );
+    const root = "c1".repeat(32),
+      branch = "c2".repeat(32);
+    await page.evaluate(
+      ({ root, branch, pubkey }) => {
+        for (const [id, content, parentEventId] of [
+          [root, "Own reply sidebar root", undefined],
+          [branch, "Nested reply target", root],
+          ["c3".repeat(32), "Other author deep reply", branch],
+        ])
+          window.__BUZZ_E2E_EMIT_MOCK_MESSAGE__?.({
+            id: id ?? "",
+            content: content ?? "",
+            parentEventId,
+            pubkey,
+            channelName: "general",
+            createdAt: Math.floor(Date.now() / 1000) + 10,
+          });
+      },
+      { root, branch, pubkey: TEST_IDENTITIES.bob.pubkey },
+    );
+    if (surface === "sidebar") {
+      await page
+        .locator(
+          `[data-testid="open-thread-side-panel"][data-thread-head-id="${root}"]`,
+        )
+        .click();
+    } else {
+      await page
+        .locator(
+          `[data-testid="message-thread-summary"][data-thread-head-id="${root}"]`,
+        )
+        .click();
+    }
+    const panel =
+      surface === "sidebar"
+        ? page.getByTestId("message-thread-panel")
+        : page.locator(
+            `[data-testid="inline-thread"][data-thread-head-id="${root}"]`,
+          );
+    const branchToggle = panel.locator(
+      `button[data-thread-head-id="${branch}"][aria-expanded="false"]`,
+    );
+    if (await branchToggle.count()) await branchToggle.click();
+    await panel.locator(`[data-message-id="${branch}"]`).hover();
+    await panel.getByTestId(`reply-message-${branch}`).click();
+    const editor = panel.getByTestId("message-input");
+    await editor.fill("Own sidebar fresh reply body");
+    await panel
+      .locator(
+        `[data-testid="${surface === "sidebar" ? "sidebar-hide-branch" : "inline-branch-toggle"}"][data-thread-head-id="${branch}"]${surface === "inline" ? '[aria-expanded="true"]' : ""}`,
+      )
+      .click();
+    await expect(panel).not.toContainText("Other author deep reply");
+    await page.evaluate(() => window.__BUZZ_E2E_HOLD_OUTBOX_PUBLISH__?.(true));
+    await panel.getByTestId("send-message").click();
+    await expect
+      .poll(() =>
+        page.evaluate(() => window.__BUZZ_E2E_HELD_OUTBOX_PUBLISHES__?.()),
+      )
+      .toBe(1);
+    await expect(
+      panel
+        .getByTestId("message-body")
+        .filter({ hasText: "Own sidebar fresh reply body" }),
+    ).toBeVisible({ timeout: 5000 });
+    await expect(editor).toBeEmpty();
+    const pendingBody = panel
       .getByTestId("message-body")
-      .filter({ hasText: "Own sidebar fresh reply body" }),
-  ).toBeVisible({ timeout: 5000 });
-  await expect(editor).toBeEmpty();
-  await expect
-    .poll(() =>
-      page.evaluate(
-        () =>
-          (window.__BUZZ_E2E_COMMAND_PAYLOADS__ ?? []).filter(
-            (e) => e.command === "send_channel_message",
-          ).length,
+      .filter({ hasText: "Own sidebar fresh reply body" });
+    const row = pendingBody.locator("xpath=ancestor::*[@data-message-id][1]");
+    const pendingId = await row.getAttribute("data-message-id");
+    expect(pendingId).toBeTruthy();
+    await row.evaluate((element) => {
+      (element as HTMLElement).dataset.durableIdentity = "retained";
+    });
+    expect(
+      await page.evaluate(() =>
+        window.__BUZZ_E2E_HOLD_OUTBOX_PUBLISH__?.(false),
       ),
-    )
-    .toBeGreaterThan(0);
-  await expect(
-    panel
-      .getByTestId("message-body")
-      .filter({ hasText: "Own sidebar fresh reply body" }),
-  ).toBeVisible();
-  await page.evaluate(() =>
-    window.__BUZZ_E2E_QUERY_CLIENT__?.invalidateQueries(),
-  );
-  await expect(
-    panel
-      .getByTestId("message-body")
-      .filter({ hasText: "Own sidebar fresh reply body" }),
-  ).toBeVisible();
-  await panel
-    .locator(
-      `[data-testid="sidebar-hide-branch"][data-thread-head-id="${branch}"]`,
-    )
-    .click();
-  await page.evaluate(() =>
-    window.__BUZZ_E2E_QUERY_CLIENT__?.invalidateQueries(),
-  );
-  await expect(panel).not.toContainText("Own sidebar fresh reply body");
-});
+    ).toBe(1);
+    await expect
+      .poll(() => row.getAttribute("data-message-id"))
+      .not.toBe(pendingId);
+    await expect(row).toHaveAttribute("data-durable-identity", "retained");
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () =>
+            (window.__BUZZ_E2E_COMMAND_PAYLOADS__ ?? []).filter(
+              (e) => e.command === "send_channel_message",
+            ).length,
+        ),
+      )
+      .toBeGreaterThan(0);
+    await expect(
+      panel
+        .getByTestId("message-body")
+        .filter({ hasText: "Own sidebar fresh reply body" }),
+    ).toBeVisible();
+    await page.evaluate(() =>
+      window.__BUZZ_E2E_QUERY_CLIENT__?.invalidateQueries(),
+    );
+    await expect(
+      panel
+        .getByTestId("message-body")
+        .filter({ hasText: "Own sidebar fresh reply body" }),
+    ).toBeVisible();
+    await panel
+      .locator(
+        `[data-testid="${surface === "sidebar" ? "sidebar-hide-branch" : "inline-branch-toggle"}"][data-thread-head-id="${branch}"]${surface === "inline" ? '[aria-expanded="true"]' : ""}`,
+      )
+      .click();
+    await page.evaluate(() =>
+      window.__BUZZ_E2E_QUERY_CLIENT__?.invalidateQueries(),
+    );
+    await expect(panel).not.toContainText("Own sidebar fresh reply body");
+  });
+}
 
 test("routed accepted reply confirmation opens exact collapsed target and Back preserves newer draft without resending", async ({
   page,
