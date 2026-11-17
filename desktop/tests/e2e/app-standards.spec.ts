@@ -28,6 +28,9 @@ test("real Settings stamp matches metadata; Enter/Space stay inside; fork notice
       }),
   );
   await page.goto("/");
+  await expect(page.getByTestId("open-settings")).toBeVisible({
+    timeout: 30000,
+  });
   await expect(
     page.getByText("New Buzz Ideaflow version available", { exact: true }),
   ).toBeVisible();
