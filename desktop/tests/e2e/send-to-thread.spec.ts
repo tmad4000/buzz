@@ -147,7 +147,11 @@ test("explicit keyboard routing, cancel and new-message fallback preserve inline
     .filter({ has: page.getByTestId("send-to-thread") });
   const editor = main.getByTestId("message-input");
   const count = async () => (await published(page)).length;
-  const lastSend = async () => (await published(page)).at(-1)!;
+  const lastSend = async () => {
+    const sent = (await published(page)).at(-1);
+    if (!sent) throw new Error("No queued signed publish recorded");
+    return sent;
+  };
   await expect(main.getByTestId("send-to-thread")).toBeDisabled();
   await editor.fill("Signed release rollback checklist");
   const before = await count();
