@@ -535,22 +535,19 @@ test("incoming replies above and below a scrolled reader preserve anchor, focuse
     return result;
   };
   await waitForStableLayout("seeded");
-  // Use the same hash-route message navigation exercised by scroll-history:
-  // targetMessageId realizes the virtual row and cancels bottom intent through
-  // scrollToMessageImperative. No direct scroll writes or private hook reset.
-  await page.evaluate((messageId) => {
-    const hash = window.location.hash.replace(/^#/, "") || "/";
-    const [path, query = ""] = hash.split("?");
-    const params = new URLSearchParams(query);
-    params.set("messageId", messageId);
-    window.history.pushState(
-      {},
-      "",
-      `${window.location.pathname}#${path}?${params.toString()}`,
-    );
-    window.dispatchEvent(new HashChangeEvent("hashchange"));
-    window.dispatchEvent(new PopStateEvent("popstate"));
-  }, ids.anchor);
+  // Use the existing real search-result action so navigation preserves this
+  // live view and realizes/centers the row through the shared message jump.
+  // No direct scroll writes, route mutation, or private hook reset.
+  await page.keyboard.press("ControlOrMeta+f");
+  await page.getByTestId("search-dialog-input").fill("Reader anchor message");
+  const anchorSearchResult = page
+    .getByTestId("search-results")
+    .getByRole("option")
+    .filter({ hasText: "Reader anchor message" });
+  await expect(anchorSearchResult).toHaveCount(1);
+  await expect(anchorSearchResult).toBeVisible();
+  await anchorSearchResult.click();
+  await expect(page.getByTestId("search-dialog-input")).toBeHidden();
   const captureJumpPlacement = () =>
     anchor.evaluate((element) => {
       const scroller = element.closest('[data-testid="message-timeline"]');
