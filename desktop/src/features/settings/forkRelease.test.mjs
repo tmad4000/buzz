@@ -43,3 +43,38 @@ test("fork release selection compares numbered builds, ignores upstream, drafts,
   assert.ok(newerForkRelease([valid], "0.5.28-ideaflow.4", "MacIntel"));
   assert.equal(newerForkRelease([], "0.5.28-ideaflow.4"), null);
 });
+
+test("notarized macOS fork zip is eligible, arbitrary zip is not", () => {
+  const tag = "buzz-ideaflow-v0.5.28-ideaflow.5";
+  assert.ok(
+    newerForkRelease(
+      [
+        release(tag, {
+          assets: [{ name: "Buzz-Ideaflow-0.5.28-ideaflow.5-macos-arm64.zip" }],
+        }),
+      ],
+      "0.5.28-ideaflow.4",
+      "MacIntel",
+    ),
+  );
+  assert.equal(
+    newerForkRelease(
+      [release(tag, { assets: [{ name: "source.zip" }] })],
+      "0.5.28-ideaflow.4",
+      "MacIntel",
+    ),
+    null,
+  );
+  assert.equal(
+    newerForkRelease(
+      [
+        release(tag, {
+          assets: [{ name: "Buzz-Ideaflow-0.5.28-ideaflow.5-macos-arm64.zip" }],
+        }),
+      ],
+      "0.5.28-ideaflow.4",
+      "Linux x86_64",
+    ),
+    null,
+  );
+});
