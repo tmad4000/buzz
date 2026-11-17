@@ -18,16 +18,11 @@ import {
   createConversationView,
   createSingleLayout,
   splitPane,
-  swapPanes,
-  resizeGroup,
   focusPane,
-  closePane,
-  orientGroup,
   listPanes,
-  updateViewPresentation,
-  navigateView,
-  type ConversationLayout,
 } from "@/features/conversations/layout/model";
+import { ConversationLayoutController } from "@/features/conversations/layout/controller";
+import { layoutStorageKey } from "@/features/conversations/layout/storage";
 import { ConversationViewHost } from "@/features/conversations/ConversationViewHost";
 import { ConversationDraftEditorsProvider } from "@/features/conversations/ConversationDraftEditors";
 import { HuddleProvider } from "@/features/huddle/HuddleContext";
@@ -174,7 +169,34 @@ function LayoutBody() {
     sequence: number;
   }>();
   const focusSequence = React.useRef(0);
-  const [layout, setLayout] = React.useState(() => {
+  const [controller] = React.useState(() => {
+    const scope = {
+      communityId: "fixture",
+      identityPubkey: identity.pubkey,
+      windowSlot: "main",
+    };
+    const entries = new Map<string, string>();
+    const makeController = (layout: ReturnType<typeof createSingleLayout>) => {
+      entries.set(layoutStorageKey(scope), JSON.stringify(layout));
+      return new ConversationLayoutController({
+        scope,
+        storage: {
+          getItem: (key) => entries.get(key) ?? null,
+          setItem: (key, value) => {
+            entries.set(key, value);
+          },
+        },
+        initialChannelId: channel?.id ?? "missing",
+        isCurrentScope: () => true,
+        canOpen: (id) =>
+          fixtureChannels.some(
+            (value) =>
+              value.id === id &&
+              (value.channelType === "stream" || value.channelType === "dm"),
+          ),
+        canLeave: () => true,
+      });
+    };
     const view = {
       ...createConversationView(channel?.id ?? "missing"),
       id: "a",
@@ -182,23 +204,44 @@ function LayoutBody() {
     };
     const initial = createSingleLayout(view, (kind) => `${kind}-a`);
     if (dragFixture || new URLSearchParams(location.search).has("single"))
-      return initial;
-    return focusPane(
-      splitPane(
-        initial,
+      return makeController(initial);
+    return makeController(
+      focusPane(
+        splitPane(
+          initial,
+          initial.root.id,
+          {
+            ...createConversationView(view.channelId),
+            id: "b",
+            panelState: { thread: rootB },
+          },
+          "horizontal",
+          (kind) => `${kind}-b`,
+        ),
         initial.root.id,
-        {
-          ...createConversationView(view.channelId),
-          id: "b",
-          panelState: { thread: rootB },
-        },
-        "horizontal",
-        (kind) => `${kind}-b`,
       ),
-      initial.root.id,
     );
   });
-  const lastSplit = React.useRef<ConversationLayout | null>(null);
+  const state = React.useSyncExternalStore(
+    controller.subscribe,
+    controller.getSnapshot,
+  );
+  const layout = state.layout;
+  React.useEffect(() => () => controller.dispose(), [controller]);
+  const surfaceRef = React.useRef<HTMLDivElement>(null);
+  const bounds = () =>
+    surfaceRef.current?.getBoundingClientRect() ?? { width: 0, height: 0 };
+  const requestHeader = () => {
+    const next = controller.getSnapshot().layout;
+    const pane = listPanes(next.root).find(
+      (value) => value.id === next.focusedPaneId,
+    );
+    if (pane)
+      setFocusRequest({
+        viewId: pane.viewInstanceId,
+        sequence: ++focusSequence.current,
+      });
+  };
   harnessWindow.layoutSnapshot = () => layout;
   return (
     <div className="flex h-full min-h-0 min-w-0">
@@ -208,7 +251,7 @@ function LayoutBody() {
           onEvent={(event) => harnessWindow.dragEvents?.push(event)}
         />
       )}
-      <div className="min-h-0 min-w-0 flex-1">
+      <div ref={surfaceRef} className="min-h-0 min-w-0 flex-1">
         <ConversationLayoutSurface
           dragTarget={
             dragFixture
@@ -231,51 +274,17 @@ function LayoutBody() {
                       : null;
                   },
                   onOpen: (drop) => {
-                    const target = listPanes(layout.root).find(
-                      (pane) => pane.id === drop.paneId,
-                    );
-                    if (!target) return;
-                    const source = layout.views[target.viewInstanceId];
-                    const incoming = drop.replace
-                      ? null
-                      : createConversationView(
-                          drop.channelId,
-                          undefined,
-                          source.channelId === drop.channelId
-                            ? source
-                            : undefined,
-                        );
                     harnessWindow.dragEvents?.push({ type: "canvas", ...drop });
-                    setLayout((current) => {
-                      const pane = listPanes(current.root).find(
-                        (value) => value.id === drop.paneId,
-                      );
-                      if (
-                        !pane ||
-                        current.views[pane.viewInstanceId].channelId !==
-                          source.channelId
+                    if (
+                      controller.open(
+                        drop.paneId,
+                        drop.channelId,
+                        drop.edge === "right" ? "horizontal" : "vertical",
+                        bounds(),
+                        window.innerWidth,
                       )
-                        return current;
-                      return incoming
-                        ? splitPane(
-                            current,
-                            pane.id,
-                            incoming,
-                            drop.edge === "right" ? "horizontal" : "vertical",
-                          )
-                        : focusPane(
-                            navigateView(
-                              current,
-                              pane.viewInstanceId,
-                              drop.channelId,
-                            ),
-                            pane.id,
-                          );
-                    });
-                    setFocusRequest({
-                      viewId: incoming?.id ?? source.id,
-                      sequence: ++focusSequence.current,
-                    });
+                    )
+                      requestHeader();
                   },
                 }
               : undefined
@@ -289,102 +298,70 @@ function LayoutBody() {
                 : "Existing DM"
               : `General ${view.id}`
           }
-          onFocusPane={(id) => setLayout((current) => focusPane(current, id))}
-          onResize={(id, sizes) =>
-            setLayout((current) => resizeGroup(current, id, sizes))
-          }
-          canRestore={lastSplit.current !== null}
+          onFocusPane={(id) => controller.focus(id)}
+          onResize={(id, sizes, commit) => controller.resize(id, sizes, commit)}
+          canRestore={state.canRestore}
           onCommand={(paneId, command) => {
+            const panes = listPanes(layout.root);
+            const pane = panes.find((value) => value.id === paneId);
+            if (!pane) return;
             if (command === "splitRight" || command === "splitBottom") {
-              const pane = listPanes(layout.root).find(
-                (value) => value.id === paneId,
-              );
-              if (!pane) return;
-              const source = layout.views[pane.viewInstanceId];
-              const view = createConversationView(
-                source.channelId,
-                undefined,
-                source,
-              );
-              setLayout((current) =>
-                splitPane(
-                  current,
-                  paneId,
-                  view,
-                  command === "splitRight" ? "horizontal" : "vertical",
-                ),
-              );
-              setFocusRequest({
-                viewId: view.id,
-                sequence: ++focusSequence.current,
-              });
-              return;
-            }
-            setLayout((current) => {
-              const panes = listPanes(current.root);
-
-              if (command === "swap" && panes.length === 2)
-                return swapPanes(current, panes[0].id, panes[1].id);
               if (
-                (command === "horizontal" || command === "vertical") &&
-                current.root.kind === "group"
+                controller.open(
+                  paneId,
+                  layout.views[pane.viewInstanceId].channelId,
+                  command === "splitRight" ? "horizontal" : "vertical",
+                  bounds(),
+                  window.innerWidth,
+                )
               )
-                return orientGroup(current, current.root.id, command);
-              if (command === "close") {
-                lastSplit.current = current;
-                return closePane(current, paneId);
-              }
-              if (command === "closeSplit") {
-                lastSplit.current = current;
-                return panes.reduce(
-                  (next, pane) =>
-                    pane.id === current.focusedPaneId
-                      ? next
-                      : closePane(next, pane.id),
-                  current,
-                );
-              }
-              if (command === "restore" && lastSplit.current)
-                return lastSplit.current;
-              return current;
-            });
+                requestHeader();
+            } else if (command === "swap" && panes.length === 2)
+              controller.swap(panes[0].id, panes[1].id);
+            else if (command === "horizontal" || command === "vertical")
+              controller.orient(command, bounds(), window.innerWidth);
+            else if (command === "close" || command === "closeSplit") {
+              if (controller.close(paneId, command === "closeSplit"))
+                requestHeader();
+            } else if (command === "restore") {
+              if (controller.restore()) requestHeader();
+            }
           }}
-          renderPane={({ view, pane, focused, visible, headerEndActions }) => (
-            <PerViewShell id={view.id}>
-              <ConversationViewHost
-                viewInstanceId={view.id}
-                focused={focused}
-                visible={visible}
-                label={`General ${view.id}`}
-                initialPanelState={view.panelState}
-                onPanelNavigate={(patch) =>
-                  setLayout((current) =>
-                    updateViewPresentation(current, view.id, view.channelId, {
+          renderPane={({ view, pane, focused, visible, headerEndActions }) => {
+            const visit = controller.visitToken(view.id);
+            return (
+              <PerViewShell id={view.id}>
+                <ConversationViewHost
+                  viewInstanceId={view.id}
+                  focused={focused}
+                  visible={visible}
+                  label={`General ${view.id}`}
+                  initialPanelState={view.panelState}
+                  onPanelNavigate={(patch) =>
+                    controller.update(view.id, view.channelId, visit, {
                       panelState: patch,
-                    }),
-                  )
-                }
-                onFocusView={() =>
-                  setLayout((current) => focusPane(current, pane.id))
-                }
-                channel={{
-                  activeChannel:
-                    fixtureChannels.find(
-                      (value) => value.id === view.channelId,
-                    ) ?? null,
-                  currentIdentity: identity,
-                  headerEndActions,
-                  autoSendDraftKey: channel?.id ?? null,
-                  onCloseForumPost: noop,
-                  onSelectForumPost: noop,
-                  selectedForumPostId: null,
-                  targetForumReplyId: null,
-                  targetMessageEvents: emptyEvents,
-                  targetMessageId: null,
-                }}
-              />
-            </PerViewShell>
-          )}
+                    })
+                  }
+                  onFocusView={() => controller.focus(pane.id)}
+                  channel={{
+                    activeChannel:
+                      fixtureChannels.find(
+                        (value) => value.id === view.channelId,
+                      ) ?? null,
+                    currentIdentity: identity,
+                    headerEndActions,
+                    autoSendDraftKey: channel?.id ?? null,
+                    onCloseForumPost: noop,
+                    onSelectForumPost: noop,
+                    selectedForumPostId: null,
+                    targetForumReplyId: null,
+                    targetMessageEvents: emptyEvents,
+                    targetMessageId: null,
+                  }}
+                />
+              </PerViewShell>
+            );
+          }}
         />
       </div>
     </div>
