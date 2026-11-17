@@ -1,3 +1,4 @@
+import '../../shared/utils/relative_time.dart';
 import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 
@@ -7,8 +8,6 @@ export '../../shared/utils/string_utils.dart' show shortPubkey;
 final _weekdayFormat = DateFormat('EEEE');
 final _weekdayMonthDayFormat = DateFormat('EEEE, MMMM d');
 final _monthDayYearFormat = DateFormat('MMMM d, y');
-final _shortMonthDayFormat = DateFormat('MMM d');
-final _messageTimeFormat = DateFormat('h:mm a', 'en_US');
 
 /// Days in a week, past which the weekday name stops being unambiguous.
 const _weekdayBandDays = 7;
@@ -81,58 +80,14 @@ bool isSameDay(int a, int b) {
 
 /// Returns a compact relative time string like "just now", "5m ago", "3h ago",
 /// "2d ago", or a short date for older timestamps.
-String relativeTime(int unixSeconds) {
-  final now = DateTime.now();
-  final time = DateTime.fromMillisecondsSinceEpoch(
-    unixSeconds * 1000,
-    isUtc: true,
-  ).toLocal();
-  final diff = now.difference(time);
-
-  if (diff.inMinutes < 1) return 'just now';
-  if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-  if (diff.inHours < 24) return '${diff.inHours}h ago';
-  if (diff.inDays < 7) return '${diff.inDays}d ago';
-  return '${time.month}/${time.day}/${time.year}';
-}
+String relativeTime(int unixSeconds) => relativeTimestamp(unixSeconds);
 
 /// Returns desktop-parity thread activity copy such as "just now",
 /// "3 hours ago", or "on May 19".
 String formatThreadSummaryLastReplyTime(
   int unixSeconds, {
   @visibleForTesting int? nowSeconds,
-}) {
-  nowSeconds ??= DateTime.now().millisecondsSinceEpoch ~/ 1000;
-  var diff = nowSeconds - unixSeconds;
-  if (diff < 0) diff = 0;
+}) => relativeTimestamp(unixSeconds, nowSeconds: nowSeconds);
 
-  if (diff < 60) return 'just now';
-  if (diff < 3600) return _formatAgo(diff ~/ 60, 'minute');
-  if (diff < 86400) return _formatAgo(diff ~/ 3600, 'hour');
-  if (diff < 604800) return _formatAgo(diff ~/ 86400, 'day');
-
-  final date = DateTime.fromMillisecondsSinceEpoch(
-    unixSeconds * 1000,
-    isUtc: true,
-  ).toLocal();
-  // No ordinal suffix, per the writing standard.
-  return 'on ${_shortMonthDayFormat.format(date)}';
-}
-
-String _formatAgo(int value, String unit) =>
-    '$value $unit${value == 1 ? '' : 's'} ago';
-
-/// Desktop-parity message clock time, e.g. "2:34 PM".
-///
-/// Deliberately clock-only at every band, unlike desktop's message header,
-/// which reads "Yesterday at 2:34 PM". Mobile timestamps sit inside a chat
-/// bubble on a narrow screen with the day divider a short scroll away, so this
-/// is the compact side of that split — not an oversight. Change it only
-/// alongside a layout that has room for a date.
-String formatMessageTime(int unixSeconds) {
-  final date = DateTime.fromMillisecondsSinceEpoch(
-    unixSeconds * 1000,
-    isUtc: true,
-  ).toLocal();
-  return _messageTimeFormat.format(date);
-}
+/// Compact relative-first message time; exact time belongs in the tooltip.
+String formatMessageTime(int unixSeconds) => relativeTimestamp(unixSeconds);

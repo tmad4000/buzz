@@ -5,6 +5,11 @@ repo_root=$(cd "$(dirname "$0")/.." && pwd)
 fixture=$(mktemp -d)
 trap 'rm -rf "$fixture"' EXIT
 mkdir -p "$fixture/bin" "$fixture/scripts" "$fixture/mobile/ios/Flutter"
+mkdir -p "$fixture/desktop/scripts" "$fixture/desktop/src-tauri"
+cp "$repo_root/scripts/stamp-mobile.mjs" "$fixture/scripts/"
+cp "$repo_root/desktop/scripts/build-info.mjs" "$fixture/desktop/scripts/"
+cp "$repo_root/desktop/src-tauri/tauri.conf.json" "$fixture/desktop/src-tauri/"
+cp "$repo_root/mobile/pubspec.yaml" "$fixture/mobile/"
 for recipe in mobile-dev mobile-build-android; do
   # Render with the real task runner before installing stubs: a Hermit just
   # shim can otherwise prepend the real Flutter to PATH ahead of our stub.

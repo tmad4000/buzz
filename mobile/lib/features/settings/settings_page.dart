@@ -1,3 +1,5 @@
+import 'package:url_launcher/url_launcher.dart';
+import 'app_version_stamp.dart';
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -125,6 +127,30 @@ class SettingsPage extends HookConsumerWidget {
             _ConnectionSection(
               identityRecoveryPageBuilder: identityRecoveryPageBuilder,
             ),
+            ListTile(
+              title: const Text('Send feedback'),
+              trailing: const _RowChevron(),
+              onTap: () async {
+                var opened = false;
+                try {
+                  opened = await launchUrl(
+                    Uri.parse(
+                      'https://worldissuetracker.com/tracker/buzz-ideaflow',
+                    ),
+                    mode: LaunchMode.externalApplication,
+                  );
+                } on Exception {
+                  opened = false;
+                }
+                if (!opened && context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Feedback could not open. Please retry.'),
+                    ),
+                  );
+                }
+              },
+            ),
             if (packageInfo.hasData)
               _VersionFooter(
                 version: packageInfo.data!.version,
@@ -150,12 +176,7 @@ class _VersionFooter extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.only(bottom: Grid.xs, top: Grid.xxs),
         child: Center(
-          child: Text(
-            buildNumber.isEmpty ? 'v$version' : 'v$version ($buildNumber)',
-            style: context.textTheme.bodySmall?.copyWith(
-              color: context.colors.onSurfaceVariant.withValues(alpha: 0.6),
-            ),
-          ),
+          child: AppVersionStamp(version: version, buildNumber: buildNumber),
         ),
       ),
     );

@@ -9,9 +9,9 @@ import '../../shared/theme/theme.dart';
 import '../../shared/widgets/modal_presentation.dart';
 
 const appearanceModeOptions = <({ThemeMode mode, String label, IconData icon})>[
+  (mode: ThemeMode.system, label: 'System', icon: BuzzIcons.sunMoon),
   (mode: ThemeMode.light, label: 'Light', icon: BuzzIcons.sun),
   (mode: ThemeMode.dark, label: 'Dark', icon: BuzzIcons.moon),
-  (mode: ThemeMode.system, label: 'System', icon: BuzzIcons.sunMoon),
 ];
 
 String appearanceModeLabel(ThemeMode mode) =>

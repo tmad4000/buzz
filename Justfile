@@ -973,6 +973,7 @@ mobile_dir := "mobile"
 
 # Install mobile Flutter dependencies
 mobile-install:
+    node scripts/stamp-mobile.mjs
     unset GIT_DIR GIT_WORK_TREE; cd {{mobile_dir}} && flutter pub get
 
 # Format all Dart code
@@ -1003,6 +1004,7 @@ mobile-build-android:
     #!/usr/bin/env bash
     set -euo pipefail
     ./scripts/mobile-worktree-overrides.sh
+    node scripts/stamp-mobile.mjs
     set -- build apk --debug --no-pub
     if [[ -n "${BUZZ_PUSH_GATEWAY_URL:-}" ]]; then
         set -- "$@" --dart-define="BUZZ_PUSH_GATEWAY_URL=${BUZZ_PUSH_GATEWAY_URL}"
@@ -1025,6 +1027,7 @@ mobile-dev:
     if [[ -z "$gateway_url" && -f "$overrides_file" ]]; then
         gateway_url="$(sed -nE 's/^[[:space:]]*BUZZ_PUSH_GATEWAY_URL[[:space:]]*=[[:space:]]*(.*[^[:space:]])[[:space:]]*$/\1/p' "$overrides_file" | tail -n 1 | sed 's/\$()//g')"
     fi
+    node scripts/stamp-mobile.mjs
     set -- run
     if [[ -n "$gateway_url" ]]; then
         set -- "$@" --dart-define="BUZZ_PUSH_GATEWAY_URL=${gateway_url}"
