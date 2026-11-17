@@ -19,7 +19,7 @@ use crate::{
     nostr_convert,
     relay::{
         assert_expected_relay_scope, assert_expected_signer, query_relay, submit_event,
-        submit_event_at_created_at, submit_event_with_keys_created_at,
+        submit_event_with_keys_created_at,
     },
 };
 
@@ -401,12 +401,16 @@ pub use event_batch::{get_event, get_events};
 
 // ── Writes ──────────────────────────────────────────────────────────────────
 
+mod outbox_identity;
 mod thread_ref;
 use thread_ref::{resolve_thread_ref, thread_ref};
 
 #[tauri::command]
 #[allow(clippy::too_many_arguments)]
 pub async fn send_channel_message(
+    prepare_only: Option<bool>,
+    client_message_id: Option<String>,
+    intended_created_at: Option<u64>,
     channel_id: String,
     content: String,
     parent_event_id: Option<String>,
@@ -523,8 +527,33 @@ pub async fn send_channel_message(
     // Submit through the base resolved (and scope-checked) above and the
     // identity snapshotted (and signer-checked) above — a re-resolve or key
     // re-read here would reopen the mid-command switch window.
-    let (result, created_at) =
-        submit_event_at_created_at(builder, &state, &relay_base, &signing_keys).await?;
+    let builder = if prepare_only.unwrap_or(false) {
+        let client_id = client_message_id
+            .as_deref()
+            .ok_or("queued message requires client_message_id")?;
+        let intended_at =
+            intended_created_at.ok_or("queued message requires intended_created_at")?;
+        let tags = outbox_identity::outbox_tags(client_id, intended_at)?;
+        builder.tags(tags)
+    } else {
+        builder
+    };
+    let event = builder
+        .sign_with_keys(&signing_keys)
+        .map_err(|e| format!("failed to sign event: {e}"))?;
+    let created_at = event.created_at.as_secs() as i64;
+    let event_id = if prepare_only.unwrap_or(false) {
+        event.id.to_hex()
+    } else {
+        crate::relay::submit_signed_event_at_with_keys(&event, &state, &relay_base, &signing_keys)
+            .await?
+            .event_id
+    };
+    let signed_event = if prepare_only.unwrap_or(false) {
+        Some(serde_json::to_value(&event).map_err(|e| e.to_string())?)
+    } else {
+        None
+    };
 
     let depth = match (&parent_event_id, &resolved_root) {
         (None, _) => 0,
@@ -534,7 +563,8 @@ pub async fn send_channel_message(
     };
 
     Ok(SendChannelMessageResponse {
-        event_id: result.event_id,
+        event_id,
+        signed_event,
         root_event_id: resolved_root,
         parent_event_id,
         depth,
@@ -767,6 +797,7 @@ pub async fn send_managed_agent_channel_message(
         {
             return Ok(SendChannelMessageResponse {
                 event_id: existing.id.to_hex(),
+                signed_event: None,
                 parent_event_id: thread_ref
                     .as_ref()
                     .map(|reference| reference.parent_event_id.to_hex()),
@@ -805,6 +836,7 @@ pub async fn send_managed_agent_channel_message(
 
     Ok(SendChannelMessageResponse {
         event_id: result.event_id,
+        signed_event: None,
         parent_event_id: parent_event_id.clone(),
         root_event_id: thread_ref.map(|reference| reference.root_event_id.to_hex()),
         depth: if parent_event_id.is_some() { 1 } else { 0 },
@@ -969,3 +1001,93 @@ fn feed_item_from_event(ev: &nostr::Event, category: FeedItemCategory) -> FeedIt
 #[cfg(test)]
 #[path = "messages_tests.rs"]
 mod tests;
+
+/// Publish the exact event durably prepared by the captured-context publisher.
+/// Never rebuild or re-sign it: a lost acknowledgement must retain its event id.
+#[tauri::command]
+pub async fn publish_queued_message(
+    event: Event,
+    expected_relay_url: String,
+    expected_signer_pubkey: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let relay_base = crate::relay::relay_api_base_url_with_override(&state);
+    assert_expected_relay_scope(Some(&expected_relay_url), &relay_base)?;
+    let keys = state.signing_keys()?;
+    assert_expected_signer(Some(&expected_signer_pubkey), &keys.public_key().to_hex())?;
+    if event.kind.as_u16() as u32 != buzz_core_pkg::kind::KIND_STREAM_MESSAGE {
+        return Err("outbox only publishes stream messages".into());
+    }
+    event
+        .verify()
+        .map_err(|e| format!("invalid queued event: {e}"))?;
+    crate::relay::submit_signed_event_at_with_keys(&event, &state, &relay_base, &keys).await?;
+    Ok(())
+}
+
+/// Look up every signed version committed before publication, and verify its
+/// stable client_msg_id locally. This avoids hosted-relay tag postfilter limits.
+#[tauri::command]
+pub async fn find_queued_message(
+    client_message_id: String,
+    channel_id: String,
+    signed_event_ids: Vec<String>,
+    expected_relay_url: String,
+    expected_signer_pubkey: String,
+    state: State<'_, AppState>,
+) -> Result<Option<serde_json::Value>, String> {
+    uuid::Uuid::parse_str(&client_message_id)
+        .map_err(|_| "invalid queued client_message_id".to_string())?;
+    uuid::Uuid::parse_str(&channel_id).map_err(|_| "invalid queued channel_id".to_string())?;
+    for id in &signed_event_ids {
+        EventId::from_hex(id).map_err(|_| "invalid queued signed event id".to_string())?;
+    }
+    let relay_base = crate::relay::relay_api_base_url_with_override(&state);
+    assert_expected_relay_scope(Some(&expected_relay_url), &relay_base)?;
+    let keys = state.signing_keys()?;
+    assert_expected_signer(Some(&expected_signer_pubkey), &keys.public_key().to_hex())?;
+    // Every possibly published ID is committed in the same row transaction as
+    // its signature. A virgin unsigned row cannot have reached the relay.
+    for ids in signed_event_ids.chunks(100) {
+        let events = crate::relay::query_relay_at_with_keys(
+            &state,
+            &relay_base,
+            &[serde_json::json!({
+                "ids": ids, "authors": [keys.public_key().to_hex()], "kinds": [9],
+                "#h": [channel_id], "consistency": "strong", "limit": 100,
+            })],
+            &keys,
+            None,
+        )
+        .await?;
+        for event in events {
+            if outbox_identity::matches_queued_event(
+                &event,
+                keys.public_key(),
+                &channel_id,
+                &client_message_id,
+                ids,
+            )? {
+                return Ok(Some(serde_json::json!({ "event": event })));
+            }
+        }
+        // Standard and moderator deletion receipts must not be resurrected by
+        // a fresh signature. h/author constraints would hide valid tombstones.
+        let deletions = crate::relay::query_relay_at_with_keys(
+            &state,
+            &relay_base,
+            &[serde_json::json!({
+                "kinds": [5, 9005], "#e": ids, "consistency": "strong", "limit": 1,
+            })],
+            &keys,
+            None,
+        )
+        .await?;
+        for event in deletions {
+            if outbox_identity::matches_deletion_receipt(&event, ids)? {
+                return Ok(Some(serde_json::json!({ "deleted": true })));
+            }
+        }
+    }
+    Ok(None)
+}

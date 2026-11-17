@@ -250,6 +250,8 @@ pub struct SearchResponse {
 
 #[derive(Serialize, Deserialize)]
 pub struct SendChannelMessageResponse {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub signed_event: Option<serde_json::Value>,
     pub event_id: String,
     pub parent_event_id: Option<String>,
     pub root_event_id: Option<String>,
