@@ -301,3 +301,52 @@ test("explicit choices follow original event IDs into a new presentation root an
   );
   await app.close();
 });
+
+test("toggle then depth-guide setExpanded collapse persists across restart and organization", async () => {
+  localStorage.clear();
+  let app = mount();
+  await app.render();
+  await act(async () => latest.toggle(messages[1]));
+  await act(async () => latest.toggle(messages[1]));
+  assert.equal(latest.expanded.has("branch"), true);
+  await act(async () => latest.setExpanded("branch", false));
+  assert.equal(latest.expanded.has("branch"), false);
+  await app.close();
+  app = mount();
+  await app.render();
+  assert.equal(
+    latest.expanded.has("branch"),
+    false,
+    "depth-guide collapse wins over older event-wide true",
+  );
+  const moved = {
+    ...base,
+    root: "new-root",
+    messages: [
+      msg("new-root"),
+      ...messages.map((message) => ({
+        ...message,
+        parentId: message.id === "root" ? "new-root" : message.parentId,
+        rootId: "new-root",
+        canonicalParentId: message.parentId,
+        canonicalRootId: "root",
+        ...(message.id === "root"
+          ? { threadOrganization: { annotationId: "move", operation: "link" } }
+          : {}),
+      })),
+    ],
+  };
+  await app.render(moved);
+  assert.equal(latest.expanded.has("branch"), false);
+  await app.close();
+  app = mount();
+  await app.render(moved);
+  assert.equal(
+    latest.expanded.has("branch"),
+    false,
+    "same original branch remains collapsed after moving/restarting",
+  );
+  await app.render(base);
+  assert.equal(latest.expanded.has("branch"), false);
+  await app.close();
+});

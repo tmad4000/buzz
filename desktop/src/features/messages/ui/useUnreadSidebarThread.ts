@@ -305,32 +305,40 @@ export function useUnreadSidebarThread({
     .sort(
       (a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id),
     )[0]?.id;
-  const commit = (next: ThreadExpansion, reveal: Reveal) => {
+  const commit = (
+    next: ThreadExpansion,
+    reveal: Reveal,
+    manualPersisted = true,
+  ) => {
     const current = live.current;
     if (current.key !== key) return;
     const updated = { ...current, branches: next, reveal };
     live.current = updated;
     // Persist in the interaction, before navigation or an immediate app close.
     if (current.key)
-      setPreferenceError(!saveThreadExpansion(current.key, next));
+      setPreferenceError(
+        !saveThreadExpansion(current.key, next) || !manualPersisted,
+      );
     setSaved(updated);
   };
   const setExpanded = (id: string, open: boolean) => {
+    if (live.current.key !== key) return;
     const next = new Map(live.current.branches);
     next.set(id, open);
-    commit(next, { ...live.current.reveal, handled: true });
-  };
-  const toggle = (message: TimelineMessage) => {
-    const next = new Map(live.current.branches);
-    next.set(message.id, !(next.get(message.id) ?? expanded.has(message.id)));
-    if (live.current.key !== key) return;
+    let manualPersisted = true;
     if (choicesKey) {
       const manual = new Map(loadThreadExpansion(choicesKey));
-      manual.set(message.id, next.get(message.id) as boolean);
-      saveThreadExpansion(choicesKey, manual);
+      manual.set(id, open);
+      manualPersisted = saveThreadExpansion(choicesKey, manual);
     }
     // The user's toggle also cancels any older pending automatic reveal.
-    commit(next, { ...live.current.reveal, handled: true });
+    commit(next, { ...live.current.reveal, handled: true }, manualPersisted);
+  };
+  const toggle = (message: TimelineMessage) => {
+    setExpanded(
+      message.id,
+      !(live.current.branches.get(message.id) ?? expanded.has(message.id)),
+    );
   };
   const revealMessage = (id: string) => {
     const current = live.current;

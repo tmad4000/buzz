@@ -11,7 +11,10 @@ and Jacob is in the current channel roster, including the owner role. Being
 another member, admin or owner grants no cross-author organization authority.
 The runtime reads the current roster with read-your-writes semantics before
 each snapshot; scope changes/aborts discard late results. Membership/access
-hints invalidate the snapshot. The worker still verifies original and
+hints invalidate the snapshot. In particular, kind40099 membership system
+events are delivered by the existing production channel filter and immediately
+clear/abort an in-flight grant; their text never grants authority. The next
+snapshot re-reads the roster. The worker still verifies original and
 annotation signatures before applying this policy. Unavailable membership or
 incomplete history fails closed to original positions. The original author-only
 CLI remains conservative; this client trust policy does not change signed

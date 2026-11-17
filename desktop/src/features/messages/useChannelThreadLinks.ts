@@ -1,4 +1,5 @@
 import * as React from "react";
+import { KIND_SYSTEM_MESSAGE } from "@/shared/constants/kinds";
 import { relayClient } from "@/shared/api/relayClient";
 import { getThreadReplies, signRelayEvent } from "@/shared/api/tauri";
 import { getChannelMembers } from "@/shared/api/tauriChannels";
@@ -198,7 +199,7 @@ export function useChannelThreadLinks(
     void api
       .subscribe(scope.channelId, (event) => {
         if (!current()) return;
-        if (isThreadLinkCandidate(event) || [39000, 39002].includes(event.kind))
+        if (isThreadLinkCandidate(event) || event.kind === KIND_SYSTEM_MESSAGE)
           invalidate();
         else if (hasLinks && event.kind !== 39005) {
           // Coalesce streaming bursts; no cryptography runs in the UI thread.

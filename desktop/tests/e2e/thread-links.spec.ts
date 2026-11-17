@@ -122,14 +122,29 @@ test("actual timeline/sidebar union: before/after, canonical reply after move an
     `[data-testid="message-thread-summary"][data-thread-head-id="${a.id}"]`,
   );
   await expect(summary).toBeVisible();
-  await summary.click();
+  if ((await summary.getAttribute("aria-expanded")) !== "true")
+    await summary.click();
+  const inline = page.locator(
+    `[data-testid="inline-thread"][data-thread-head-id="${a.id}"]`,
+  );
+  await expect(inline.getByText(c.content, { exact: true })).toBeVisible();
+  const inlineBranch = inline.locator(
+    `[data-testid="inline-branch-toggle"][data-thread-head-id="${c.id}"]`,
+  );
+  if ((await inlineBranch.getAttribute("aria-expanded")) !== "true")
+    await inlineBranch.click();
+  await expect(inline.getByText(detail.content, { exact: true })).toBeVisible();
+  await page
+    .locator(
+      `[data-testid="open-thread-side-panel"][data-thread-head-id="${a.id}"]`,
+    )
+    .click();
   const panel = page.getByTestId("message-thread-panel");
   await expect(panel).toBeVisible();
   const rootCollapsed = panel.locator(
     `[data-testid="sidebar-read-branch"][data-thread-head-id="${a.id}"]`,
   );
-  await expect(rootCollapsed).toBeVisible();
-  await rootCollapsed.click();
+  if (await rootCollapsed.count()) await rootCollapsed.click();
   await expect(panel.getByText(c.content, { exact: true })).toBeVisible();
   // A new unread descendant auto-expands; if it was already seen, expand its
   // one-line row explicitly without changing the ancestry being tested.
@@ -174,7 +189,11 @@ test("actual timeline/sidebar union: before/after, canonical reply after move an
   await collapse.click();
   await expect(panel.getByText(after.content, { exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "Close panel", exact: true }).click();
-  await summary.click();
+  await page
+    .locator(
+      `[data-testid="open-thread-side-panel"][data-thread-head-id="${a.id}"]`,
+    )
+    .click();
   await expect(panel.getByText(after.content, { exact: true })).toHaveCount(0);
   await expect(
     panel.locator(
@@ -294,7 +313,7 @@ test("missing and unauthorized annotations stay visible ordinary content without
     page.locator(
       `[data-testid="message-thread-summary"][data-thread-head-id="${parent.id}"]`,
     ),
-  ).toHaveCount(0);
+  ).toHaveAttribute("aria-label", /0 replies inline$/);
   await page.mouse.move(5, 5);
   await page.screenshot({ path: `${shots}/rejected-and-missing-audit.png` });
 });

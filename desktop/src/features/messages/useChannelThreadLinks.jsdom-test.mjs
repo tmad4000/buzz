@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import React, { act } from "react";
 import { createRoot } from "react-dom/client";
+import { RelayClient } from "@/shared/api/relayClientSession";
 import { useChannelThreadLinks } from "./useChannelThreadLinks.ts";
 import {
   ThreadOrganizationContext,
@@ -61,6 +62,81 @@ const flush = () =>
     await Promise.resolve();
     await Promise.resolve();
   });
+
+test("production live filter delivers membership system events and invalidates an in-flight organizer grant", async () => {
+  localStorage.clear();
+  const waiting = [];
+  let receive, filter;
+  const session = {
+    subscribe: async (f, callback) => {
+      filter = f;
+      receive = callback;
+      return () => {};
+    },
+  };
+  const api = {
+    subscribe: (channel, callback) =>
+      RelayClient.prototype.subscribeToChannelLive.call(
+        session,
+        channel,
+        callback,
+      ),
+    reconnect: () => () => {},
+    revoke: () => () => {},
+    load: (scope, signal, current) =>
+      new Promise((resolve) =>
+        waiting.push({ scope, signal, current, resolve }),
+      ),
+  };
+  const app = mount();
+  try {
+    await app.render({ scope: one, api });
+    await flush();
+    assert.ok(
+      filter.kinds.includes(40099),
+      "actual production subscription admits membership system events",
+    );
+    assert.deepEqual(filter["#h"], [one.channelId]);
+    const granted = snapshot({ ...one, jacobIsChannelMember: true });
+    granted.projection.heads.set("child", "annotation");
+    await act(async () => waiting[0].resolve(granted));
+    assert.equal(latest.snapshot, granted);
+    // Start another snapshot while the old roster still grants Jacob.
+    await act(async () => latest.refresh());
+    await flush();
+    const old = waiting[1];
+    const removal = {
+      id: "f".repeat(64),
+      kind: 40099,
+      created_at: Math.floor(Date.now() / 1000),
+      tags: [["h", one.channelId]],
+      content: "Membership changed",
+    };
+    assert.ok(filter.kinds.includes(removal.kind));
+    await act(async () => receive(removal));
+    assert.equal(
+      latest.snapshot,
+      null,
+      "old cross-author projection is withdrawn synchronously",
+    );
+    assert.equal(old.signal.aborted, true);
+    assert.equal(old.current(), false);
+    await act(async () => old.resolve(granted));
+    await flush();
+    assert.equal(
+      latest.snapshot,
+      null,
+      "late pre-removal roster cannot recommit its grant",
+    );
+    const revoked = snapshot({ ...one, jacobIsChannelMember: false });
+    await act(async () => waiting.at(-1).resolve(revoked));
+    await flush();
+    assert.equal(latest.snapshot.projection.scope.jacobIsChannelMember, false);
+    assert.equal(latest.snapshot.projection.heads.size, 0);
+  } finally {
+    await app.close();
+  }
+});
 
 test("mounted production hook subscribes before history and fences stale channel/identity completion", async () => {
   localStorage.clear();
