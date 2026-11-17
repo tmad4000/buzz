@@ -27,6 +27,7 @@ void outboxTests() {
       );
       await _expandComposer(tester);
       await tester.enterText(find.byType(TextField), 'keep until disk commit');
+      await tester.pump();
       final tap = tester
           .widget<IconButton>(
             find.widgetWithIcon(IconButton, BuzzIcons.arrowUp),
@@ -70,6 +71,7 @@ void outboxTests() {
     );
     await _expandComposer(tester);
     await tester.enterText(find.byType(TextField), 'never lose this');
+    await tester.pump();
     await tester.tap(find.byIcon(BuzzIcons.arrowUp));
     await tester.pumpAndSettle();
     expect(find.text('never lose this'), findsOneWidget);
