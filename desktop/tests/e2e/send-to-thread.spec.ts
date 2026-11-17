@@ -127,7 +127,18 @@ test("explicit keyboard routing, cancel and new-message fallback preserve inline
   await expect(menu.getByRole("menuitem").first()).toBeFocused();
   await page.keyboard.press("ArrowDown");
   await page.keyboard.press("Home");
+  await page.evaluate(() => window.__BUZZ_E2E_HOLD_OUTBOX_PUBLISH__?.(true));
   await page.keyboard.press("Enter");
+  await expect
+    .poll(() =>
+      page.evaluate(() => window.__BUZZ_E2E_HELD_OUTBOX_PUBLISHES__?.()),
+    )
+    .toBe(1);
+  await expect(editor).toBeEmpty();
+  await expect(page.getByTestId("routed-send-notice")).toHaveCount(0);
+  expect(
+    await page.evaluate(() => window.__BUZZ_E2E_HOLD_OUTBOX_PUBLISH__?.(false)),
+  ).toBe(1);
   await expect.poll(count).toBe(before + 1);
   await expect.poll(async () => (await lastSend()).parentEventId).toBe(root);
   await expect(editor).toBeEmpty();
@@ -306,8 +317,17 @@ test("DM routing stays scoped and failed publish keeps draft for explicit retry"
   fs.mkdirSync(shots, { recursive: true });
   await page.setViewportSize({ width: 1000, height: 800 });
   await page.screenshot({ path: `${shots}/dm-retry-picker.png` });
+  await page.evaluate(() => window.__BUZZ_E2E_HOLD_OUTBOX_PUBLISH__?.(true));
   await menu.getByRole("menuitem").first().click();
+  await expect
+    .poll(() =>
+      page.evaluate(() => window.__BUZZ_E2E_HELD_OUTBOX_PUBLISHES__?.()),
+    )
+    .toBe(1);
   await expect(editor).toBeEmpty();
+  expect(
+    await page.evaluate(() => window.__BUZZ_E2E_HOLD_OUTBOX_PUBLISH__?.(false)),
+  ).toBe(1);
   await expect
     .poll(() =>
       page.evaluate(() => {
