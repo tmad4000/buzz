@@ -68,16 +68,7 @@ function legacyChoices(
   return choices;
 }
 
-/** One mounted owning visit; durable explicit choices, ephemeral Smart state elsewhere. */
-export function ThreadExpansionScopeProvider({
-  children,
-  viewId,
-  channelId,
-  currentPubkey,
-  initialSnapshot,
-  seedLegacy,
-  onChange,
-}: {
+type ScopeProps = {
   children: React.ReactNode;
   viewId: string;
   channelId: string | null;
@@ -85,7 +76,32 @@ export function ThreadExpansionScopeProvider({
   initialSnapshot?: ExplicitExpansionSnapshot;
   seedLegacy?: boolean;
   onChange?: (snapshot: ExplicitExpansionSnapshot) => boolean;
-}) {
+};
+
+/** A ready identity/resource gets a fresh store even after an unavailable placeholder. */
+export function ThreadExpansionScopeProvider(props: ScopeProps) {
+  return (
+    <ThreadExpansionVisit
+      key={JSON.stringify([
+        props.viewId,
+        props.channelId,
+        props.currentPubkey ?? null,
+      ])}
+      {...props}
+    />
+  );
+}
+
+/** One mounted owning visit; durable explicit choices, ephemeral Smart state elsewhere. */
+function ThreadExpansionVisit({
+  children,
+  viewId,
+  channelId,
+  currentPubkey,
+  initialSnapshot,
+  seedLegacy,
+  onChange,
+}: ScopeProps) {
   const [initial] = React.useState(() => {
     let snapshot = initialSnapshot
       ? copyExplicitExpansion(initialSnapshot)

@@ -132,3 +132,56 @@ test("owning visit imports legacy once, shares local explicit snapshots and fenc
     else localStorage.setItem(canonical, previous);
   }
 });
+
+test("late identity readiness remounts the owning store and retires placeholder callbacks", async () => {
+  const root = createRoot(document.createElement("div"));
+  const community = loadActiveCommunityId();
+  const canonical = `buzz-thread-expansion.v1:${JSON.stringify([community, "identity", "channel", "root"])}`;
+  const key = `buzz-thread-expansion.v2:${JSON.stringify([community, "identity", "channel", "root", "a"])}`;
+  const previous = localStorage.getItem(canonical);
+  localStorage.setItem(canonical, JSON.stringify([["closed", false]]));
+  let store,
+    snapshot,
+    imports = 0;
+  function Probe() {
+    store = useThreadExpansionStorage();
+    return null;
+  }
+  const render = (currentPubkey) =>
+    act(() =>
+      root.render(
+        React.createElement(
+          ThreadExpansionScopeProvider,
+          {
+            viewId: "a",
+            channelId: "channel",
+            currentPubkey,
+            seedLegacy: true,
+            onChange: (next) => {
+              snapshot = next;
+              imports += 1;
+              return true;
+            },
+          },
+          React.createElement(Probe),
+        ),
+      ),
+    );
+  try {
+    await render(undefined);
+    const placeholder = store;
+    assert.equal(imports, 0);
+    await render("identity");
+    assert.equal(imports, 1);
+    assert.equal(snapshot.legacySeeded, true);
+    assert.equal(store.load(key).get("closed"), false);
+    assert.equal(placeholder.save(key, new Map([["closed", true]])), false);
+    await render("identity");
+    assert.equal(imports, 1, "unchanged ready visit does not import again");
+    assert.equal(store.load(key).get("closed"), false);
+  } finally {
+    await act(() => root.unmount());
+    if (previous === null) localStorage.removeItem(canonical);
+    else localStorage.setItem(canonical, previous);
+  }
+});
