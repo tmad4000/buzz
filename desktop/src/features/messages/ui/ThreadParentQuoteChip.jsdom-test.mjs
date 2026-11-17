@@ -57,13 +57,14 @@ test("thread row keeps native quote jump, accessible first line and body identit
   const parents = new Map([
     ["parent", { id: "parent", body: "Parent <first> line\nSecond line" }],
   ]);
-  const render = (value, map = parents) =>
+  const render = (value, map = parents, onJumpToThreadMessage) =>
     act(() =>
       root.render(
         React.createElement(MessageThreadRow, {
           channelId: "channel",
           message: value,
           parentMessages: map,
+          onJumpToThreadMessage,
         }),
       ),
     );
@@ -84,6 +85,27 @@ test("thread row keeps native quote jump, accessible first line and body identit
     await render({ ...message, id: "accepted", pending: false });
     assert.equal(document.querySelector("article"), body);
     assert.equal(body.dataset.messageId, "accepted");
+    const ownerCalls = [];
+    await render(
+      { ...message, id: "accepted", pending: false },
+      parents,
+      (...args) => ownerCalls.push(args),
+    );
+    await act(() => document.querySelector("button").click());
+    assert.deepEqual(ownerCalls, [["root", "parent"]]);
+    assert.equal(
+      calls.length,
+      1,
+      "owning pane handles the jump without global navigation",
+    );
+    assert.equal(document.querySelector("article"), body);
+    await render(message, parents, () => false);
+    await act(() => document.querySelector("button").click());
+    assert.equal(
+      calls.length,
+      1,
+      "a refusing owner never falls through to route navigation",
+    );
     await render({ ...message, tags: [] });
     assert.equal(document.querySelector("button"), null);
     assert.equal(document.querySelector("article"), body);

@@ -21,6 +21,7 @@ type MessageThreadTranscriptProps = {
     remove: boolean,
   ) => Promise<void>;
   profiles?: UserProfileLookup;
+  onJumpToThreadMessage?: (rootId: string, messageId: string) => void;
   renderAfterMessage?: (message: TimelineMessage) => React.ReactNode;
   testId?: string;
 };
@@ -37,6 +38,7 @@ export function MessageThreadTranscript({
   messages,
   onToggleReaction,
   profiles,
+  onJumpToThreadMessage,
   renderAfterMessage,
   testId = "message-thread-transcript",
 }: MessageThreadTranscriptProps) {
@@ -68,6 +70,7 @@ export function MessageThreadTranscript({
         <React.Fragment key={message.renderKey ?? message.id}>
           <MessageThreadRow
             parentMessages={parentMessages}
+            onJumpToThreadMessage={onJumpToThreadMessage}
             channelId={channelId}
             currentPubkey={currentPubkey}
             isContinuation={isContinuation}

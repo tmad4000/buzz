@@ -89,6 +89,7 @@ type MessageThreadPanelProps = ThreadPanelLayoutProps & {
   onMarkUnread?: (message: TimelineMessage) => void;
   onMarkRead?: (message: TimelineMessage) => void;
   onExpandReplies: (message: TimelineMessage) => void;
+  onJumpToThreadMessage?: (rootId: string, messageId: string) => void;
   onScrollTargetResolved: () => void;
   onScrollTargetSettled?: (messageId: string) => void;
   scrollTargetHighlights?: boolean;
@@ -192,6 +193,7 @@ export function MessageThreadPanel({
   onMarkUnread,
   onMarkRead,
   onExpandReplies,
+  onJumpToThreadMessage,
   onScrollTargetResolved,
   onScrollTargetSettled,
   onSelectReplyTarget,
@@ -858,6 +860,7 @@ export function MessageThreadPanel({
                         {showUnreadDivider ? <UnreadDivider /> : null}
                         <MessageThreadRow
                           parentMessages={sidebar.index.messageById}
+                          onJumpToThreadMessage={onJumpToThreadMessage}
                           highlighted={
                             entry.message.id === highlightedMessageId
                           }

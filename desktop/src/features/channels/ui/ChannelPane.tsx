@@ -139,6 +139,7 @@ export const ChannelPane = React.memo(function ChannelPane({
   onCloseThread,
   onCapturePanelReturn,
   onOpenSentReply,
+  onJumpToThreadMessage,
   onDelete,
   onEdit,
   onEditSave,
@@ -294,6 +295,7 @@ export const ChannelPane = React.memo(function ChannelPane({
           disabled={isComposerDisabled}
           isSending={isSending}
           onOpenThread={onOpenThread}
+          onJumpToThreadMessage={onJumpToThreadMessage}
           onSend={onSendInlineThreadReply}
           onToggleReaction={onToggleReaction}
           onRepliesRevealed={onSidebarRepliesRevealed}
@@ -311,6 +313,7 @@ export const ChannelPane = React.memo(function ChannelPane({
       isComposerDisabled,
       isSending,
       onOpenThread,
+      onJumpToThreadMessage,
       onSendInlineThreadReply,
       onToggleReaction,
       onSidebarRepliesRevealed,
@@ -983,6 +986,7 @@ export const ChannelPane = React.memo(function ChannelPane({
                 onMarkUnread={onMarkUnread}
                 onMarkRead={onMarkRead}
                 onExpandReplies={onExpandThreadReplies}
+                onJumpToThreadMessage={onJumpToThreadMessage}
                 onSelectReplyTarget={onSelectThreadReplyTarget}
                 onSend={onSendThreadReply}
                 onSendToChannel={
