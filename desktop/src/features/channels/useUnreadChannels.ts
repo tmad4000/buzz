@@ -148,7 +148,7 @@ export function useUnreadChannels(
     isReady: isReadStateReady,
     markContextRead,
     drainSyncedAdvances,
-    setContextParentResolver,
+    registerContextParents,
     readStateVersion,
     getOwnTimestamp,
   } = useReadState(pubkey, relayClient);
@@ -979,7 +979,7 @@ export function useUnreadChannels(
     getEffectiveTimestamp,
     getOwnTimestamp,
     readStateVersion,
-    setContextParentResolver,
+    registerContextParents,
     participatedRootIds,
     authoredRootIds,
     mentionedRootIds,
