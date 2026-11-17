@@ -1,3 +1,4 @@
+import { waitForMockChannelHeadReady } from "../helpers/channelHeadReady";
 import { expect, test } from "@playwright/test";
 import { installMockBridge, TEST_IDENTITIES } from "../helpers/bridge";
 
@@ -35,6 +36,11 @@ test("unseen summary survives channel opening and clears only on visible reply b
   await expect(page.getByTestId("message-timeline")).toContainText("Hey team", {
     timeout: 30000,
   });
+  await waitForMockChannelHeadReady(
+    page,
+    "general",
+    "9a1657ac-f7aa-5db0-b632-d8bbeb6dfb50",
+  );
   let sequence = 70000;
   let tick = Math.floor(Date.now() / 1000) + 30;
   const emit = async (content: string, parentEventId?: string) => {
@@ -107,27 +113,30 @@ test("unseen summary survives channel opening and clears only on visible reply b
   await emit("Already open thread jump target", root.id);
   await expect(summary.getByTestId("thread-unread-badge")).toBeVisible();
   const panel = page.getByTestId("message-thread-panel");
-  await panel
-    .getByRole("button", { name: "Hide replies", exact: true })
-    .first()
-    .click();
   const savedCollapse = await page.evaluate(
     (rootId) =>
       Object.entries(localStorage).filter(
         ([key]) =>
-          key.startsWith("buzz-thread-expansion.v1:") &&
-          key.includes(rootId) &&
-          !key.endsWith(":inline"),
+          key.startsWith("buzz-thread-expansion.v1:") && key.includes(rootId),
       ),
     root.id,
   );
-  expect(
-    savedCollapse.some(
-      ([, value]) => new Map(JSON.parse(value)).get(root.id) === false,
-    ),
-  ).toBe(true);
+  await panel
+    .getByRole("button", { name: "Hide replies", exact: true })
+    .first()
+    .click();
+  await expect(
+    panel
+      .getByTestId("message-body")
+      .filter({ hasText: "Already open thread jump target" }),
+  ).toHaveCount(0);
   await page.getByRole("button", { name: /Unseen replies \(/ }).click();
   await expect(page.getByTestId("message-thread-panel")).toBeVisible();
+  await expect(
+    panel
+      .getByTestId("message-body")
+      .filter({ hasText: "Already open thread jump target" }),
+  ).toBeVisible();
   await expect
     .poll(() =>
       page.evaluate(
@@ -135,8 +144,7 @@ test("unseen summary survives channel opening and clears only on visible reply b
           Object.entries(localStorage).filter(
             ([key]) =>
               key.startsWith("buzz-thread-expansion.v1:") &&
-              key.includes(rootId) &&
-              !key.endsWith(":inline"),
+              key.includes(rootId),
           ),
         root.id,
       ),
