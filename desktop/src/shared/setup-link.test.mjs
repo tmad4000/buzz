@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {
   createCipheriv,
+  createHash,
   createPrivateKey,
   createPublicKey,
   diffieHellman,
@@ -13,9 +14,14 @@ import {
 import { test } from "node:test";
 import {
   createSetupAttempt,
+  openSetupAuthorization,
   openSetupEnvelope,
   parseSetupLink,
   setupAdmission,
+  setupConfirmationCode,
+  setupExchangeRequest,
+  setupPollRequest,
+  setupReviewUrl,
   signSetupProof,
 } from "./setup-link.ts";
 
@@ -104,7 +110,7 @@ test("WebCrypto device admission matches broker P1363 proof and RFC7638 thumbpri
 });
 
 // Independent Node implementation of the broker's fixed P-256/HKDF/AES-GCM + Ed25519 envelope.
-function envelopeFor(attempt, signer, manifest) {
+function envelopeFor(attempt, signer, manifest, aadBinding = manifest) {
   const payload = Buffer.from(JSON.stringify(manifest));
   const signed = Buffer.from(
     JSON.stringify({
@@ -124,7 +130,7 @@ function envelopeFor(attempt, signer, manifest) {
   );
   const cipher = createCipheriv("aes-256-gcm", key, iv),
     aad = Buffer.from(
-      `ideaflow-setup-v1:${manifest.grantId}:${manifest.deviceThumbprint}`,
+      `ideaflow-setup-v1:${aadBinding.grantId}:${aadBinding.deviceThumbprint}`,
     );
   cipher.setAAD(aad);
   const ciphertext = Buffer.concat([cipher.update(signed), cipher.final()]);
@@ -195,4 +201,155 @@ test("envelopes require the recipient, expected grant, trusted signing key and i
     ),
     /setup_unavailable/,
   );
+});
+
+test("review URL contains only the exact public admission shape and refuses secret-bearing objects", async () => {
+  const attempt = await createSetupAttempt(),
+    request = await setupAdmission(
+      attempt,
+      randomBytes(32).toString("base64url"),
+      "synthetic-client",
+      "Synthetic phone",
+    );
+  const decode = (url) =>
+    JSON.parse(Buffer.from(new URL(url).hash.slice(3), "base64url").toString());
+  const url = new URL(setupReviewUrl(request));
+  assert.equal(
+    url.origin + url.pathname,
+    "https://id.ideaflow.app/setup/receive",
+  );
+  assert.equal(url.search, "");
+  assert.deepEqual(decode(url), request);
+  for (const bad of [
+    { ...request, pkceVerifier: attempt.pkceVerifier },
+    { ...request, privateKey: attempt.privateKey },
+    { ...request, callbackUrl: "https://evil.invalid" },
+    { ...request, clientId: undefined },
+    {
+      ...request,
+      devicePublicKey: {
+        ...request.devicePublicKey,
+        d: "private-not-permitted",
+      },
+    },
+    null,
+  ])
+    assert.throws(
+      () => setupReviewUrl(bad),
+      (error) => error.message === "setup_unavailable",
+    );
+  const inherited = Object.assign(
+    Object.create({
+      toJSON() {
+        throw Error("unsafe input serializer must not run");
+      },
+    }),
+    request,
+  );
+  assert.deepEqual(decode(setupReviewUrl(inherited)), request);
+});
+
+test("poll, resume, exchange and displayed ID code use the broker's exact device bindings", async () => {
+  const attempt = await createSetupAttempt(),
+    authorizationCode = randomBytes(32).toString("base64url"),
+    key = createPublicKey({ key: attempt.publicKey, format: "jwk" });
+  const sha = (value) => createHash("sha256").update(value).digest("base64url");
+  for (const operation of ["authorization", "resume"]) {
+    const body = await setupPollRequest(attempt, operation),
+      message = Buffer.from(
+        JSON.stringify([
+          "ideaflow-setup-v1",
+          operation,
+          attempt.id,
+          attempt.nonce,
+          attempt.thumbprint,
+          attempt.nonce,
+        ]),
+      );
+    assert.equal(
+      verify(
+        "sha256",
+        message,
+        { key, dsaEncoding: "ieee-p1363" },
+        Buffer.from(body.signature, "base64url"),
+      ),
+      true,
+    );
+    assert.deepEqual(Object.keys(body).sort(), ["attemptId", "signature"]);
+  }
+  const exchange = await setupExchangeRequest(attempt, authorizationCode),
+    binding = sha(JSON.stringify([authorizationCode, attempt.pkceVerifier]));
+  assert.equal(
+    verify(
+      "sha256",
+      Buffer.from(
+        JSON.stringify([
+          "ideaflow-setup-v1",
+          "exchange",
+          attempt.id,
+          attempt.nonce,
+          attempt.thumbprint,
+          binding,
+        ]),
+      ),
+      { key, dsaEncoding: "ieee-p1363" },
+      Buffer.from(exchange.signature, "base64url"),
+    ),
+    true,
+  );
+  assert.equal(
+    await setupConfirmationCode(attempt),
+    sha(JSON.stringify(["sas", attempt.id, attempt.nonce, attempt.thumbprint]))
+      .slice(0, 10)
+      .toUpperCase(),
+  );
+  await assert.rejects(
+    setupPollRequest(attempt, "arbitrary"),
+    /setup_unavailable/,
+  );
+  await assert.rejects(
+    setupExchangeRequest(attempt, "short"),
+    /setup_unavailable/,
+  );
+});
+
+test("authorization opening checks signed inner bindings, exact fields and a bounded live deadline", async () => {
+  const attempt = await createSetupAttempt(),
+    signer = generateKeyPairSync("ed25519"),
+    trusted = signer.publicKey.export({ format: "jwk" }),
+    now = Date.now();
+  const value = {
+    grantId: "authorization:" + attempt.id,
+    deviceThumbprint: attempt.thumbprint,
+    attemptId: attempt.id,
+    authorizationCode: randomBytes(32).toString("base64url"),
+    expiresAt: new Date(now + 30000).toISOString(),
+  };
+  assert.deepEqual(
+    await openSetupAuthorization(
+      attempt,
+      envelopeFor(attempt, signer, value),
+      trusted,
+      now,
+    ),
+    { authorizationCode: value.authorizationCode, expiresAt: value.expiresAt },
+  );
+  for (const bad of [
+    { ...value, attemptId: "wrong" },
+    { ...value, grantId: "authorization:wrong" },
+    { ...value, deviceThumbprint: "wrong" },
+    { ...value, privilegedCommand: "not permitted" },
+    { ...value, expiresAt: new Date(now - 1).toISOString() },
+    { ...value, expiresAt: new Date(now + 720000).toISOString() },
+    { ...value, authorizationCode: value.authorizationCode.slice(0, 42) + "R" },
+  ])
+    await assert.rejects(
+      openSetupAuthorization(
+        attempt,
+        envelopeFor(attempt, signer, bad, value),
+        trusted,
+        now,
+      ),
+      (error) => error.message === "setup_unavailable",
+    );
 });
