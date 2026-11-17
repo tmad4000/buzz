@@ -6,6 +6,10 @@ import { useUnseenThreadReplies } from "./useUnseenThreadReplies.ts";
 import { ConversationViewContext } from "@/features/conversations/ConversationViewContext";
 test("admitted organized bodies write native exact keys while hidden views write nothing", async () => {
   const old = document.hasFocus;
+  Object.defineProperty(document, "visibilityState", {
+    configurable: true,
+    get: () => "visible",
+  });
   document.hasFocus = () => true;
   const node = document.createElement("div");
   document.body.append(node);

@@ -133,7 +133,12 @@ export function useUnreadSidebarThread({
     return merged;
   };
   const [saved, setSaved] = React.useState<State>(() =>
-    empty(key, seed, seedBranches(visitOnly ? new Map() : loadThreadExpansion(key)), initialMode),
+    empty(
+      key,
+      seed,
+      seedBranches(visitOnly ? new Map() : loadThreadExpansion(key)),
+      initialMode,
+    ),
   );
   // Seed only on a committed scope/union change; re-rendering may not undo a
   // fresh explicit toggle or reset the stable unread/reveal snapshot.
@@ -142,7 +147,12 @@ export function useUnreadSidebarThread({
       ? saved
       : saved.key === key
         ? { ...saved, seed, branches: seedBranches(saved.branches) }
-        : empty(key, seed, seedBranches(visitOnly ? new Map() : loadThreadExpansion(key)), initialMode);
+        : empty(
+            key,
+            seed,
+            seedBranches(visitOnly ? new Map() : loadThreadExpansion(key)),
+            initialMode,
+          );
   const index = React.useMemo(
     () => indexOverride ?? buildThreadPanelIndex(messages),
     [messages, indexOverride],
@@ -480,10 +490,7 @@ export function useUnreadSidebarThread({
     );
   };
   const toggle = (message: TimelineMessage) => {
-    setExpanded(
-      message.id,
-      !(live.current.branches.get(message.id) ?? expanded.has(message.id)),
-    );
+    setExpanded(message.id, !expanded.has(message.id));
   };
   const revealMessage = (id: string) => {
     const current = live.current;
