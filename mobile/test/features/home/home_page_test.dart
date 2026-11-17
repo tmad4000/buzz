@@ -82,7 +82,7 @@ void main() {
       find.descendant(of: bar, matching: find.byIcon(BuzzIcons.inbox300)),
       findsOneWidget,
     );
-    expect(find.bySemanticsLabel('Activity, unread'), findsOneWidget);
+    expect(find.bySemanticsLabel('Inbox, unread'), findsOneWidget);
     expect(find.descendant(of: bar, matching: find.byType(Text)), findsNothing);
     final launcherGlass = find.byKey(const ValueKey('quick-actions-ios-glass'));
     expect(launcherGlass, findsOneWidget);
@@ -123,14 +123,14 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
     expect(tester.getSize(launcherGlass), const Size.square(56));
-    await tester.tap(find.byTooltip('Activity'));
+    await tester.tap(find.byTooltip('Inbox'));
     await tester.pump(const Duration(milliseconds: 250));
     await tester.pump();
     expect(
       find.descendant(of: bar, matching: find.byIcon(BuzzIcons.inbox500)),
       findsOneWidget,
     );
-    expect(find.bySemanticsLabel('Activity, unread'), findsNothing);
+    expect(find.bySemanticsLabel('Inbox, unread'), findsNothing);
     final semantics = tester.ensureSemantics();
     expect(find.byType(SearchPage), findsNothing);
     expect(
@@ -167,10 +167,10 @@ void main() {
 
     expect(find.byKey(const ValueKey('home-ios-glass-tabs')), findsNothing);
     expect(find.text('Home'), findsNothing);
-    expect(find.text('Activity'), findsNothing);
+    expect(find.text('Inbox'), findsNothing);
     expect(find.text('Search'), findsNothing);
     expect(find.bySemanticsLabel('Home'), findsOneWidget);
-    expect(find.bySemanticsLabel('Activity'), findsOneWidget);
+    expect(find.bySemanticsLabel('Inbox'), findsOneWidget);
     expect(find.bySemanticsLabel('Search'), findsOneWidget);
 
     final quickAction = find.byTooltip('Create or start conversation');
@@ -345,12 +345,12 @@ void main() {
     await tester.pump();
     expect(hapticCalls, isEmpty);
 
-    await tester.tap(find.byTooltip('Activity'));
+    await tester.tap(find.byTooltip('Inbox'));
     await tester.pump();
     expect(hapticCalls, hasLength(1));
     expect(hapticCalls.single.arguments, 'HapticFeedbackType.selectionClick');
 
-    await tester.tap(find.byTooltip('Activity'));
+    await tester.tap(find.byTooltip('Inbox'));
     await tester.pump();
     expect(hapticCalls, hasLength(1));
 
@@ -398,7 +398,7 @@ void main() {
     );
     expect(badge.constraints?.maxWidth, 12);
     expect(badge.constraints?.maxHeight, 12);
-    expect(find.bySemanticsLabel('Activity, unread'), findsOneWidget);
+    expect(find.bySemanticsLabel('Inbox, unread'), findsOneWidget);
     AnimatedScale unreadDotScale() => tester.widget<AnimatedScale>(
       find.byKey(const ValueKey('activity-tab-unread-dot-scale')),
     );
@@ -406,7 +406,7 @@ void main() {
     expect(unreadDotScale().alignment, const Alignment(-0.5, 0.5));
     expect(unreadDotScale().duration, const Duration(milliseconds: 220));
 
-    await tester.tap(find.byTooltip('Activity'));
+    await tester.tap(find.byTooltip('Inbox'));
     await tester.pump();
 
     expect(
@@ -414,7 +414,7 @@ void main() {
       findsOneWidget,
     );
     expect(unreadDotScale().scale, 0);
-    expect(find.bySemanticsLabel('Activity, unread'), findsNothing);
+    expect(find.bySemanticsLabel('Inbox, unread'), findsNothing);
 
     await tester.tap(find.byTooltip('Home'));
     await tester.pump();
@@ -450,7 +450,7 @@ void main() {
     expect(bodyOpacity().opacity, closeTo(1, 0.001));
     expect(appBarOpacity().opacity, closeTo(1, 0.001));
 
-    await tester.tap(find.byTooltip('Activity'));
+    await tester.tap(find.byTooltip('Inbox'));
     await tester.pump();
 
     expect(bodyOffset(), closeTo(24, 0.001));
@@ -496,7 +496,7 @@ void main() {
     await tester.pumpWidget(await buildHome(disableAnimations: true));
     await tester.pump();
 
-    await tester.tap(find.byTooltip('Activity'));
+    await tester.tap(find.byTooltip('Inbox'));
     await tester.pump();
 
     final bodyTransform = tester.widget<Transform>(
@@ -537,7 +537,7 @@ void main() {
     expect(scale(), closeTo(1, 0.001));
     expect(opacity(), closeTo(1, 0.001));
 
-    await tester.tap(find.byTooltip('Activity'));
+    await tester.tap(find.byTooltip('Inbox'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 110));
 

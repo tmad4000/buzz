@@ -12,3 +12,4 @@ export 'relay_rate_limit_gate.dart';
 export 'relay_session.dart';
 export 'relay_socket.dart';
 export 'signed_event_relay.dart';
+export 'thread_reference.dart';

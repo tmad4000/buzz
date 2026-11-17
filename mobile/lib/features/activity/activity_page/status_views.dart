@@ -135,7 +135,7 @@ class _EmptyFilterState extends StatelessWidget {
         'No recent channel activity',
       ),
       InboxFilter.agentActivity => (BuzzIcons.bot, 'No agent updates'),
-      _ => (BuzzIcons.bell, 'No activity yet'),
+      _ => (BuzzIcons.bell, 'Inbox is empty'),
     };
     return _EmptySurface(icon: icon, message: message);
   }
@@ -159,7 +159,7 @@ class _ErrorView extends StatelessWidget {
           ),
           const SizedBox(height: Grid.xxs),
           Text(
-            'Failed to load activity',
+            'Failed to load inbox',
             style: context.textTheme.bodyMedium?.copyWith(
               color: context.colors.onSurfaceVariant,
             ),

@@ -31,6 +31,7 @@ import '../../shared/widgets/message_author_meta.dart';
 import '../../shared/widgets/skeleton.dart';
 import '../profile/presence_cache_provider.dart';
 import '../profile/profile_provider.dart';
+import '../search/search_page.dart';
 import '../../shared/profile/user_cache_provider.dart';
 import '../../shared/profile/user_profile.dart';
 import '../forum/forum_posts_view.dart';
@@ -609,6 +610,26 @@ class ChannelDetailPage extends HookConsumerWidget {
           .threadSummaries,
     );
 
+    void openChannelSearch() {
+      final label =
+          dmHeader?.label ??
+          resolveDmChannelDisplayLabel(
+            resolvedChannel,
+            currentPubkey: currentPubkey,
+          );
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => SearchPage(
+            channelId: resolvedChannel.id,
+            channelName: resolvedChannel.isDm
+                ? label
+                : '#${resolvedChannel.name}',
+            showBackButton: true,
+          ),
+        ),
+      );
+    }
+
     return FrostedScaffold(
       resizeToAvoidBottomInset:
           !usesFixedAndroidImeViewport || resolvedChannel.isForum,
@@ -641,6 +662,11 @@ class ChannelDetailPage extends HookConsumerWidget {
         },
         onNativeTitlePressed: openChannelDetails,
         nativeActions: [
+          IosNavigationAction(
+            label: 'Search this channel',
+            symbol: 'magnifyingglass',
+            onPressed: openChannelSearch,
+          ),
           if (resolvedChannel.isDm ? showsHuddleAction : showsComposer)
             _huddleNavigationAction(context, ref, resolvedChannel, [
               ...messagesState.value ?? const [],
@@ -659,6 +685,11 @@ class ChannelDetailPage extends HookConsumerWidget {
           onTap: openChannelDetails,
         ),
         actions: [
+          IconButton(
+            tooltip: 'Search this channel',
+            icon: const Icon(BuzzIcons.search300),
+            onPressed: openChannelSearch,
+          ),
           if (resolvedChannel.isDm ? showsHuddleAction : showsComposer)
             _HuddleButton(
               channel: resolvedChannel,
