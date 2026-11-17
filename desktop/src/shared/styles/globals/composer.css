@@ -319,3 +319,22 @@
   overflow: visible;
   opacity: 1;
 }
+
+/* Keep the same editor mounted; compact mode only changes presentation. */
+[data-compact="true"] .rich-text-composer .tiptap {
+  min-height: 1.25rem;
+  padding-block: 0;
+}
+.app-version-chrome {
+  container-type: inline-size;
+}
+@container (max-width: 70rem) {
+  .header-version-age {
+    display: none;
+  }
+}
+@container (max-width: 48rem) {
+  .header-update-label {
+    display: none;
+  }
+}

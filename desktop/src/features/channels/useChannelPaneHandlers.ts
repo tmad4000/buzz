@@ -310,15 +310,15 @@ export function useChannelPaneHandlers({
       } | null,
       forceRest?: boolean,
     ) => {
-      await sendMutateRef.current({
+      return await sendMutateRef.current({
         content,
         mentionPubkeys,
         mediaTags,
         channelId: channelId ?? undefined,
         parentEventId: threadContext?.parentEventId ?? undefined,
+        threadHeadId: threadContext?.threadHeadId,
         forceRest,
       });
-      if (threadContext?.parentEventId) toast.success("Sent to thread");
     },
     [],
   );
@@ -413,6 +413,7 @@ export function useChannelPaneHandlers({
         content,
         mentionPubkeys,
         parentEventId,
+        threadHeadId: activeThreadHeadId,
         mediaTags,
         channelId: channelId ?? undefined,
         forceRest,

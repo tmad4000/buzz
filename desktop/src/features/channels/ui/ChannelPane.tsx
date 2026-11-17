@@ -1,3 +1,4 @@
+import { useRoutedSendReturn } from "./useRoutedSendReturn";
 import { InlineAutoExpansionProvider } from "@/features/messages/ui/InlineAutoExpansion";
 import { InlineChannelThread } from "./InlineChannelThread";
 import type { ThreadSummaryRenderer } from "@/features/messages/ui/TimelineMessageRow";
@@ -135,6 +136,8 @@ export const ChannelPane = React.memo(function ChannelPane({
   onBrowseChannels,
   onCreateChannel,
   onCloseThread,
+  onCapturePanelReturn,
+  onOpenSentReply,
   onDelete,
   onEdit,
   onEditSave,
@@ -182,6 +185,7 @@ export const ChannelPane = React.memo(function ChannelPane({
   threadHeadMessage,
   threadMessages,
   threadMessagesPending = false,
+  threadMessagesComplete = true,
   threadMessagesError = false,
   onRetryThreadReplies,
   threadPanelWidthPx,
@@ -342,8 +346,9 @@ export const ChannelPane = React.memo(function ChannelPane({
         isActiveWelcomeChannel &&
         (containsWelcomePersonaMention(content) ||
           mentionsKnownAgent(mentionPubkeys, knownAgentPubkeys));
-      messageTimelineRef.current?.scrollToBottomOnNextUpdate();
-      await onSendMessage(
+      if (!threadContext?.parentEventId)
+        messageTimelineRef.current?.scrollToBottomOnNextUpdate();
+      const published = await onSendMessage(
         content,
         mentionPubkeys,
         mediaTags,
@@ -362,6 +367,7 @@ export const ChannelPane = React.memo(function ChannelPane({
       if (shouldCompleteWelcomeBanner) {
         completeWelcomeComposerBanner();
       }
+      return published;
     },
     [
       activeChannelId,
@@ -612,9 +618,25 @@ export const ChannelPane = React.memo(function ChannelPane({
           </IdleAuxiliaryPanel>,
         )
       : null;
+  const routedSend = useRoutedSendReturn({
+    channelId: activeChannelId,
+    channelName: activeChannel?.name ?? "channel",
+    entries: mainTimelineEntries,
+    timeline: messageTimelineRef,
+    onOpenThread,
+    onCloseThread,
+    previousThread: threadHeadMessage,
+    capturePanelReturn: onCapturePanelReturn,
+    onOpenSentReply,
+  });
   const threadHeaderLeading = useSplitAuxiliaryPane ? (
-    <ThreadViewModeToggle onChange={changeThreadViewMode} />
-  ) : undefined;
+    <>
+      {routedSend.backAction}
+      <ThreadViewModeToggle onChange={changeThreadViewMode} />
+    </>
+  ) : (
+    routedSend.backAction
+  );
   const threadLayoutProps = getThreadPanelLayout({
     headerLeading: threadHeaderLeading,
     isFocusDrawer: useFocusThreadDrawer,
@@ -819,6 +841,9 @@ export const ChannelPane = React.memo(function ChannelPane({
                   ) : null}
                   {timeoutActive ? <ComposerTimeoutBanner /> : null}
                   <ComposerDockBackdrop gutterClassName="inset-x-5" />
+                  {routedSend.notice ? (
+                    <div className="px-5">{routedSend.notice}</div>
+                  ) : null}
                   <MessageComposer
                     channelId={activeChannel?.id ?? null}
                     channelName={activeChannel?.name ?? "channel"}
@@ -843,6 +868,7 @@ export const ChannelPane = React.memo(function ChannelPane({
                     }
                     onSend={handleSendMessage}
                     threadRoutingEntries={mainTimelineEntries}
+                    onCaptureRoutedSend={routedSend.captureSend}
                     {...{ profiles, recentMentionPubkeys: recentMentions }}
                     showBackgroundUploadProgress={false}
                     placeholder={
@@ -955,6 +981,7 @@ export const ChannelPane = React.memo(function ChannelPane({
                 allThreadMessages={threadAllMessages}
                 onSidebarRepliesRevealed={onSidebarRepliesRevealed}
                 threadRepliesPending={threadMessagesPending}
+                threadRepliesComplete={threadMessagesComplete}
                 threadRepliesError={threadMessagesError}
                 onRetryThreadReplies={onRetryThreadReplies}
                 threadUnreadCount={threadUnreadCounts?.get(

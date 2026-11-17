@@ -1,4 +1,7 @@
 // biome-ignore-all format: line-count ratchet requires compact forwarding in this legacy component
+import { useUnseenReplyEvidence } from "./useUnseenReplyEvidence";
+import { useUnseenThreadReplies } from "./useUnseenThreadReplies";
+import { UnseenRepliesButton } from "./UnseenRepliesButton";
 import * as React from "react";
 import { buildContextParents } from "@/features/channels/readState/contextParentRegistry";
 import { useQueryClient } from "@tanstack/react-query";
@@ -108,6 +111,8 @@ export function ChannelScreen({
     getChannelReadAt,
     getMessageReadAt,
     markMessageRead,
+    getThreadReplyObservedAt,
+    markThreadReplySeen,
     registerContextParents,
     openBrowseChannels,
     openCreateChannel,
@@ -121,6 +126,7 @@ export function ChannelScreen({
   } = useAppShell();
   const {
     channelManagementOpen,
+    capturePanelReturn,
     clearAutoSend,
     clearMessageRouteTarget,
     openAgentSessionChannelId,
@@ -447,7 +453,6 @@ export function ChannelScreen({
     threadFirstUnreadReplyId,
     threadReplyTargetMessage,
     threadReplyUnreadCounts,
-    threadUnreadCounts,
     unreadCount,
   } = useChannelUnreadState({
     activeChannelId,
@@ -465,6 +470,13 @@ export function ChannelScreen({
     markMessageRead,
     isThreadMuted,
     readStateVersion,
+  });
+  const unseenEvidence = useUnseenReplyEvidence(activeChannelId, currentPubkey, threadSummaries);
+  const unseenEvidenceMessages = React.useMemo(() => [...timelineMessages, ...unseenEvidence.messages], [timelineMessages, unseenEvidence.messages]);
+  const { unseenReplies, threadUnseenCounts, markVisibleReplies } = useUnseenThreadReplies({
+    timelineMessages: unseenEvidenceMessages, panelMessages: threadPanelData.messages, currentPubkey,
+    getSeenAt: getThreadReplyObservedAt, markSeen: markThreadReplySeen,
+    markRead: markSidebarRepliesRead, readStateVersion,
   });
   const editTargetMessage = React.useMemo(
     () =>
@@ -742,7 +754,24 @@ export function ChannelScreen({
         activeDmHeaderParticipants={activeDmHeaderParticipants}
         activeDmPresenceStatus={activeDmPresenceStatus}
         chromeWrapperRef={channelHeaderChromeRef}
-        {...{ currentPubkey, headerEndActions }}
+        currentPubkey={currentPubkey}
+        headerEndActions={<>
+          <UnseenRepliesButton replies={unseenReplies} currentRoot={effectiveOpenThreadHeadId}
+            checking={unseenEvidence.pending.size > 0} failed={unseenEvidence.failed} onRetry={() => void unseenEvidence.retry()}
+            onOpen={(rootId, replyId) => {
+              if (!requireThreadEditResolution()) return;
+              handleCloseAgentSession();
+              setProfilePanelPubkey(null);
+              setChannelManagementOpen(false);
+              setOptimisticOpenThreadHeadId(rootId);
+              setOpenThreadHeadId(rootId);
+              setThreadReplyTargetId(rootId);
+              setThreadScrollTargetId(replyId);
+              setExpandedThreadReplyIds(new Set());
+              setEditTargetId(null);
+            }} />
+          {headerEndActions}
+        </>}
         isAddBotOpen={isAddBotOpen}
         isJoining={joinChannelMutation.isPending}
         onAddBotOpenChange={setIsAddBotOpen}
@@ -764,6 +793,16 @@ export function ChannelScreen({
       channelHeaderChromeRef,
       currentPubkey,
       headerEndActions,
+      unseenReplies,
+      unseenEvidence.pending.size,
+      unseenEvidence.failed,
+      unseenEvidence.retry,
+      effectiveOpenThreadHeadId,
+      handleCloseAgentSession,
+      setProfilePanelPubkey,
+      setChannelManagementOpen,
+      requireThreadEditResolution,
+      setOpenThreadHeadId,
       isAddBotOpen,
       joinChannelMutation.isPending,
       joinChannelMutation.mutateAsync,
@@ -919,6 +958,29 @@ export function ChannelScreen({
                   onOpenProfilePanel={handleOpenProfilePanel}
                   onResetThreadPanelWidth={handleThreadPanelWidthReset}
                   onCloseProfilePanel={handleCloseProfilePanel}
+                  onCapturePanelReturn={() => {
+                    if (!requireThreadEditResolution()) return;
+                    const restore = capturePanelReturn();
+                    return () => {
+                      if (!requireThreadEditResolution()) return false;
+                      restore();
+                      setOptimisticOpenThreadHeadId(undefined);
+                      setThreadReplyTargetId(threadReplyTargetId);
+                      setThreadScrollTargetId(threadScrollTargetId);
+                      setExpandedThreadReplyIds(new Set(expandedThreadReplyIds));
+                      return true;
+                    };
+                  }}
+                  onOpenSentReply={(root, messageId) => {
+                    if (!requireThreadEditResolution()) return;
+                    setOpenAgentSessionPubkey(null);
+                    setProfilePanelPubkey(null);
+                    setChannelManagementOpen(false);
+                    setOptimisticOpenThreadHeadId(root.id);
+                    setOpenThreadHeadId(root.id);
+                    setThreadReplyTargetId(root.id);
+                    setThreadScrollTargetId(messageId);
+                  }}
                   onOpenThread={handleOpenThreadAndCloseAgentSession}
                   onSelectThreadReplyTarget={handleSelectThreadReplyTarget}
                   onSendMessage={handleSendMessage}
@@ -950,10 +1012,11 @@ export function ChannelScreen({
                   unreadCount={unreadCount}
                   targetMessageId={mainTimelineTargetMessageId}
                   threadAllMessages={displayedThreadAllMessages}
-                  onSidebarRepliesRevealed={markSidebarRepliesRead}
+                  onSidebarRepliesRevealed={markVisibleReplies}
                   threadHeadMessage={displayedThreadHeadMessage}
                   threadMessages={displayedThreadMessages}
                   threadMessagesPending={threadRepliesQuery.isPending}
+                  threadMessagesComplete={threadRepliesQuery.isSuccess && !threadRepliesQuery.isFetching}
                   threadMessagesError={threadRepliesQuery.isError}
                   onRetryThreadReplies={() => {
                     void threadRepliesQuery.refetch();
@@ -962,7 +1025,7 @@ export function ChannelScreen({
                   threadTypingPubkeys={threadTypingPubkeys}
                   threadReplyTargetMessage={displayedThreadReplyTargetMessage}
                   threadScrollTargetId={threadScrollTargetId}
-                  threadUnreadCounts={threadUnreadCounts}
+                  threadUnreadCounts={threadUnseenCounts}
                   threadReplyUnreadCounts={threadReplyUnreadCounts}
                   threadFirstUnreadReplyId={displayedThreadFirstUnreadReplyId}
                   isJoining={joinChannelMutation.isPending}

@@ -184,3 +184,81 @@ test("does not resurrect a deleted head reaction carried in the channel window",
   const result = head([root, reaction, deletion], []);
   assert.equal(result?.reactions, undefined);
 });
+
+test("sidebar projection includes only this user's scoped local echo through optimistic ack and query convergence", () => {
+  const root = contentEvent(ROOT_ID, "root");
+  const branch = contentEvent(REPLY_ID, "branch", [
+    ["e", ROOT_ID, "", "reply"],
+  ]);
+  const pending = {
+    ...contentEvent("optimistic-local", "fresh own body", [
+      ["e", ROOT_ID, "", "root"],
+      ["e", REPLY_ID, "", "reply"],
+    ]),
+    pending: true,
+    localKey: "optimistic-local",
+  };
+  const project = (channel, replies) =>
+    buildIndependentThreadPanel(
+      channel,
+      replies,
+      ROOT_ID,
+      ROOT_ID,
+      new Set([ROOT_ID, REPLY_ID]),
+      null,
+      AUTHOR,
+      null,
+      undefined,
+      undefined,
+      new Map(),
+      new Map(),
+      null,
+      undefined,
+    );
+  const unrelated = {
+    ...pending,
+    id: "elsewhere",
+    tags: [["e", "other-root", "", "reply"]],
+  };
+  const otherAuthor = {
+    ...pending,
+    id: "other-author",
+    pubkey: "1".repeat(64),
+  };
+  const first = project([root, pending, unrelated, otherAuthor], [branch]);
+  assert.ok(first.messages.some((m) => m.id === pending.id && m.pending));
+  assert.equal(
+    first.messages.some(
+      (m) => m.id === unrelated.id || m.id === otherAuthor.id,
+    ),
+    false,
+  );
+  const ack = { ...pending, id: "accepted-id", pending: false };
+  const second = project([root, ack], [branch]);
+  assert.ok(
+    second.visibleReplies.some(
+      (e) =>
+        e.message.id === ack.id && e.message.renderKey === pending.localKey,
+    ),
+  );
+  const rawServerAck = { ...ack, content: "canonical server body" };
+  delete rawServerAck.localKey;
+  delete rawServerAck.pending;
+  const converged = project([root, ack], [branch, rawServerAck]);
+  assert.equal(converged.messages.filter((m) => m.id === ack.id).length, 1);
+  const row = converged.messages.find((m) => m.id === ack.id);
+  assert.equal(
+    row.renderKey,
+    pending.localKey,
+    "raw query convergence cannot remount the acknowledged row",
+  );
+  assert.equal(
+    row.body,
+    "canonical server body",
+    "server content remains authoritative",
+  );
+  assert.equal(
+    first.messages.find((m) => m.id === pending.id).renderKey,
+    row.renderKey,
+  );
+});

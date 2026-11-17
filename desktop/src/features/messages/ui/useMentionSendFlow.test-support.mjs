@@ -53,6 +53,7 @@ function load(name, stubs) {
     {
       exports,
       AbortController,
+      queueMicrotask,
       Error,
       Map,
       Set,

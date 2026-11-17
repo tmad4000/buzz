@@ -1,3 +1,4 @@
+import { waitForMockChannelHeadReady } from "../helpers/channelHeadReady";
 import { expect, test } from "@playwright/test";
 import fs from "node:fs";
 import { installMockBridge, TEST_IDENTITIES } from "../helpers/bridge";
@@ -28,6 +29,11 @@ test("inline replies, scoped sends, saved expansion and side panel coexist", asy
         ),
       )
       .toBe(true);
+    await waitForMockChannelHeadReady(
+      page,
+      "general",
+      "9a1657ac-f7aa-5db0-b632-d8bbeb6dfb50",
+    );
   };
   await page.goto("/");
   await ready();
@@ -135,7 +141,7 @@ test("inline replies, scoped sends, saved expansion and side panel coexist", asy
 
   // The same inline path can create the first reply, without opening a panel.
   await toggle(fresh.id).click();
-  await expect(inline(fresh.id)).toContainText("No replies yet.");
+  await expect(inline(fresh.id)).not.toContainText("No replies yet.");
   await inline(fresh.id)
     .getByTestId("message-input")
     .fill("First reply from the channel");
@@ -207,6 +213,11 @@ test("large inline threads reveal bounded batches", async ({ page }) => {
       ),
     )
     .toBe(true);
+  await waitForMockChannelHeadReady(
+    page,
+    "general",
+    "9a1657ac-f7aa-5db0-b632-d8bbeb6dfb50",
+  );
   const rootId = (3000).toString(16).padStart(64, "0");
   await page.evaluate(
     ({ rootId, pubkey }) => {
@@ -270,6 +281,11 @@ test("inline channel rows retain search match and active result highlighting", a
       ),
     )
     .toBe(true);
+  await waitForMockChannelHeadReady(
+    page,
+    "general",
+    "9a1657ac-f7aa-5db0-b632-d8bbeb6dfb50",
+  );
   const needle = "InlineSearchNeedle";
   const root = await page.evaluate(
     (content) =>

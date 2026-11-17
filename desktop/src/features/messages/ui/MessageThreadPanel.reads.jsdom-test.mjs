@@ -11,7 +11,7 @@ const reactURL = new URL(
 const modules = {
   "./MessageComposer": "export const MessageComposer=()=>null;",
   "./MessageThreadRow":
-    'export const MessageThreadRow=({message})=>React.createElement("div",{"data-message-id":message.id,"data-testid":"message-row"},message.body,React.createElement("button",{"data-reply-action":message.id},"Reply"));',
+    'export const MessageThreadRow=({message})=>React.createElement("div",{"data-message-id":message.id,"data-testid":"message-row"},React.createElement("div",{"data-testid":"message-body"},message.body),React.createElement("button",{"data-reply-action":message.id},"Reply"));',
   "./MessageThreadSummaryRow":
     'export const MessageThreadSummaryRow=({message,onOpenThread,expanded})=>React.createElement("button",{"data-thread-head-id":message.id,"aria-expanded":expanded,onClick:()=>onOpenThread(message)},"Read replies");',
   "./MessageThreadPanelSkeleton":
@@ -55,7 +55,10 @@ registerHooks({
   },
 });
 test("read callbacks contain only committed rows and never descendants hidden by a collapsed root", async () => {
-  const dom = new JSDOM('<div id="root"></div>', { url: "http://localhost" });
+  const dom = new JSDOM('<div id="root"></div>', {
+    url: "http://localhost",
+    pretendToBeVisual: true,
+  });
   Object.assign(globalThis, {
     window: dom.window,
     document: dom.window.document,
@@ -64,6 +67,7 @@ test("read callbacks contain only committed rows and never descendants hidden by
     IS_REACT_ACT_ENVIRONMENT: true,
     CSS: { escape: (value) => value },
   });
+  document.hasFocus = () => true;
   const originalObserver = globalThis.IntersectionObserver;
   globalThis.IntersectionObserver = class {
     disconnected = false;
@@ -146,6 +150,16 @@ test("read callbacks contain only committed rows and never descendants hidden by
       }),
     ),
   );
+  assert.ok(
+    document.querySelector('[data-message-id="branch"]'),
+    "new sidebar visit ignores legacy root collapse",
+  );
+  await act(() =>
+    document
+      .querySelector('button[data-thread-head-id="root"][aria-expanded="true"]')
+      .click(),
+  );
+  calls.length = 0;
   assert.equal(document.querySelector('[data-message-id="branch"]'), null);
   assert.deepEqual(calls, []);
   const unread = (id) => id === "deep";

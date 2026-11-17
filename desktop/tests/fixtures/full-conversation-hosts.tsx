@@ -50,7 +50,7 @@ window.__BUZZ_E2E__ = {
   mode: "mock",
   mock: new URLSearchParams(location.search).has("routing")
     ? {
-        sendMessageDelayMs: 1200,
+        sendMessageDelayMs: 6000,
         deferredComposerUploads: true,
         uploadDescriptors: [
           {
@@ -151,6 +151,7 @@ function Screen() {
       ...fallback,
       registerContextParents: read.registerContextParents,
       readStateVersion: read.readStateVersion,
+      threadReplySeenReady: read.isReady,
       getChannelReadAt: read.getEffectiveTimestamp,
       getMessageReadAt: (id: string) => read.getEffectiveTimestamp(`msg:${id}`),
       markChannelRead: (id: string, at?: string | null) => {
@@ -165,6 +166,7 @@ function Screen() {
       read.readStateVersion,
       read.getEffectiveTimestamp,
       read.seedContextRead,
+      read.isReady,
     ],
   );
   return (

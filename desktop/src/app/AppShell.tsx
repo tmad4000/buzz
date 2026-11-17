@@ -401,6 +401,7 @@ export function AppShell() {
     unreadChannelNotificationCount,
     getEffectiveTimestamp: getChannelReadAt,
     getOwnTimestamp: getOwnReadAt,
+    threadReplySeenReady,
     readStateVersion,
     registerContextParents,
     participatedRootIds,
@@ -429,6 +430,9 @@ export function AppShell() {
   );
 
   const {
+    getThreadReplySeenAt,
+    getThreadReplyObservedAt,
+    markThreadReplySeen,
     getThreadReadAt,
     markThreadRead,
     getMessageReadAt,
@@ -736,6 +740,10 @@ export function AppShell() {
               setIsChannelManagementOpen(true);
             },
             getChannelReadAt,
+            getThreadReplySeenAt,
+            getThreadReplyObservedAt,
+            threadReplySeenReady,
+            markThreadReplySeen,
             getThreadReadAt,
             markThreadRead,
             getMessageReadAt,
