@@ -1,3 +1,5 @@
+import { PaseoResendStatus } from "./ResendToPaseo";
+import { MessageEditStamp } from "./MessageEditStamp";
 import * as React from "react";
 import { AlertTriangle } from "lucide-react";
 import {
@@ -58,7 +60,6 @@ import {
 import { MessageTimestamp } from "./MessageTimestamp";
 import { SentFromThreadLine } from "./SentFromThreadLine";
 import { WaveMessageAttachment } from "./WaveMessageAttachment";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 import { useMessageAgentAddressPrefix } from "./MessageAgentAddressPrefix";
 const DiffMessage = React.lazy(() => import("./DiffMessage"));
 const DiffMessageExpanded = React.lazy(() => import("./DiffMessageExpanded"));
@@ -620,13 +621,9 @@ export const MessageRow = React.memo(
               Sending…
             </p>
           ) : null}
+          <PaseoResendStatus channelId={channelId} message={message} />
           {message.edited ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <p className="text-muted-foreground/70">(edited)</p>
-              </TooltipTrigger>
-              <TooltipContent>This message has been edited</TooltipContent>
-            </Tooltip>
+            <MessageEditStamp editedAt={message.editedAt} />
           ) : null}
         </>
       ) : null;
@@ -956,6 +953,8 @@ export const MessageRow = React.memo(
     prev.message.kind === next.message.kind &&
     prev.message.pending === next.message.pending &&
     prev.message.edited === next.message.edited &&
+    prev.message.editedAt === next.message.editedAt &&
+    prev.message.editEventId === next.message.editEventId &&
     // Value comparisons, not identity: these arrays are rebuilt with fresh
     // identities on every ingest/refetch even when unchanged — identity
     // checks made every row re-render on every streamed event in an open

@@ -262,7 +262,7 @@ export function formatTimelineMessages(
   // the original (`h`, `p` mentions, etc.) stay untouched.
   const editsByTargetId = new Map<
     string,
-    { content: string; tags: string[][]; createdAt: number }
+    { id: string; content: string; tags: string[][]; createdAt: number }
   >();
   for (const event of events) {
     if (
@@ -288,8 +288,13 @@ export function formatTimelineMessages(
     }
 
     const existing = editsByTargetId.get(targetId);
-    if (!existing || event.created_at > existing.createdAt) {
+    if (
+      !existing ||
+      event.created_at > existing.createdAt ||
+      (event.created_at === existing.createdAt && event.id > existing.id)
+    ) {
       editsByTargetId.set(targetId, {
+        id: event.id,
         content: event.content,
         tags: event.tags,
         createdAt: event.created_at,
@@ -510,6 +515,8 @@ export function formatTimelineMessages(
       accent: currentPubkey === authorPubkey,
       pending: event.pending,
       edited: edit !== undefined,
+      editedAt: edit?.createdAt,
+      editEventId: edit?.id,
       kind: event.kind,
       // When edited, swap the original event's imeta tags for the edit's
       // imeta tags. All non-imeta tags on the original are preserved.

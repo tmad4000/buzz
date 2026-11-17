@@ -1294,6 +1294,7 @@ declare global {
     __BUZZ_E2E_WEBVIEW_ZOOM__?: number;
     __BUZZ_E2E_HAS_MOCK_LIVE_SUBSCRIPTION__?: (input: {
       channelName: string;
+      channelId?: string;
       kind?: number;
       exactChannel?: boolean;
     }) => boolean;
@@ -1315,6 +1316,7 @@ declare global {
     }) => void;
     __BUZZ_E2E_EMIT_MOCK_MESSAGE__?: (input: {
       channelName: string;
+      channelId?: string;
       content: string;
       parentEventId?: string | null;
       pubkey?: string;
@@ -11642,6 +11644,7 @@ export function maybeInstallE2eTauriMocks() {
   };
   window.__BUZZ_E2E_EMIT_MOCK_MESSAGE__ = ({
     channelName,
+    channelId,
     content,
     parentEventId,
     pubkey,
@@ -11652,8 +11655,8 @@ export function maybeInstallE2eTauriMocks() {
     pending,
     id,
   }) => {
-    const channel = mockChannels.find(
-      (candidate) => candidate.name === channelName,
+    const channel = mockChannels.find((candidate) =>
+      channelId ? candidate.id === channelId : candidate.name === channelName,
     );
     if (!channel) {
       throw new Error(`Mock channel ${channelName} not found.`);
@@ -11715,11 +11718,12 @@ export function maybeInstallE2eTauriMocks() {
   };
   window.__BUZZ_E2E_HAS_MOCK_LIVE_SUBSCRIPTION__ = ({
     channelName,
+    channelId,
     kind,
     exactChannel,
   }) => {
-    const channel = mockChannels.find(
-      (candidate) => candidate.name === channelName,
+    const channel = mockChannels.find((candidate) =>
+      channelId ? candidate.id === channelId : candidate.name === channelName,
     );
     if (!channel) {
       throw new Error(`Mock channel ${channelName} not found.`);

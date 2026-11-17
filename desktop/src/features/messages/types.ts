@@ -16,6 +16,9 @@ export type TimelineMessage = {
   /** Stable local key used to avoid remounting optimistic rows on send ack. */
   renderKey?: string;
   createdAt: number;
+  /** Latest authorized edit event, retained separately from the original message. */
+  editedAt?: number;
+  editEventId?: string;
   pubkey?: string;
   /**
    * Raw signer pubkey (`event.pubkey`), normalized to lowercase hex.
