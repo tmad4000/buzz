@@ -2,7 +2,8 @@ import { expect, test } from "@playwright/test";
 import { installMockBridge } from "../helpers/bridge";
 import { openSettings } from "../helpers/settings";
 import fs from "node:fs";
-const shots = process.env.BUZZ_STANDARDS_SCREENSHOTS ?? "test-results/app-standards";
+const shots =
+  process.env.BUZZ_STANDARDS_SCREENSHOTS ?? "test-results/app-standards";
 test("real Settings stamp matches metadata; Enter/Space stay inside; fork notice is isolated", async ({
   page,
 }) => {

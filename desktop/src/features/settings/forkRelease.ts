@@ -56,8 +56,7 @@ export function newerForkRelease(
           typeof a.name === "string" &&
           (installer.test(a.name) ||
             ((platform === "all" || /mac/i.test(platform)) &&
-              a.name ===
-                macZip)),
+              a.name === macZip)),
       )
     )
       continue;
