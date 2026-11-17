@@ -153,14 +153,20 @@ test("native capability only grants the main window's canonical agent route", ()
     fs.readFileSync(new URL("paseo-agent-links.json", directory), "utf8"),
   );
   assert.deepEqual(capability.windows, ["main"]);
-  assert.deepEqual(capability.permissions, [
-    {
-      identifier: "opener:allow-open-url",
-      allow: [
-        { url: "paseo://h/srv_*/agent/????????-????-????-????-????????????" },
-      ],
-    },
-  ]);
+  assert.equal(capability.permissions.length, 1);
+  const permission = capability.permissions[0];
+  assert.equal(permission.identifier, "opener:allow-open-url");
+  const servers = ["srv_KIFHQ_zsBnI2", "srv_uvq8mbWTDr9Y", "srv_xmGYpGqxNnXR"];
+  assert.equal(permission.allow.length, 3);
+  for (const [index, entry] of permission.allow.entries()) {
+    // Native glob has no variable-length wildcard: only fixed hosts and 32 hex slots.
+    assert.equal(entry.url.includes("*"), false);
+    assert.equal(entry.url.includes("?"), false);
+    const uuidGlob = [8, 4, 4, 4, 12]
+      .map((n) => "[0-9a-f]".repeat(n))
+      .join("-");
+    assert.equal(entry.url, `paseo://h/${servers[index]}/agent/${uuidGlob}`);
+  }
   const defaults = JSON.parse(
     fs.readFileSync(new URL("default.json", directory), "utf8"),
   );
