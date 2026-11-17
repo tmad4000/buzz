@@ -41,6 +41,10 @@ export type UseMentionSendFlowOptions = {
       threadContext?: {
         parentEventId: string | null;
         threadHeadId: string | null;
+        localSendOrigin?: Omit<
+          import("@/shared/api/types").LocalSendIntent,
+          "id"
+        >;
       } | null,
       forceRest?: boolean,
       outbox?: import("../outbox/types").OutboxSubmission,

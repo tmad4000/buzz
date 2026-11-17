@@ -78,6 +78,7 @@ export type PendingNonMemberMentionSend = {
   capturedThreadContext: {
     parentEventId: string | null;
     threadHeadId: string | null;
+    localSendOrigin?: Omit<import("@/shared/api/types").LocalSendIntent, "id">;
   } | null;
   trimmed: string;
   mentionPubkeys: string[];

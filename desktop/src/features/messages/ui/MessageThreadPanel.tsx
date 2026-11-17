@@ -255,14 +255,6 @@ export function MessageThreadPanel({
   const replyTargetMessageRef = React.useRef(replyTargetMessage);
   replyTargetMessageRef.current = replyTargetMessage;
 
-  const onCaptureSendContext = React.useCallback(
-    () => ({
-      parentEventId: replyTargetMessageRef.current?.id ?? threadHeadId,
-      threadHeadId,
-    }),
-    [threadHeadId],
-  );
-
   const composerReplyTarget =
     replyTargetMessage && threadHead && replyTargetMessage.id !== threadHead.id
       ? {
@@ -330,6 +322,14 @@ export function MessageThreadPanel({
     isUnread: isMessageUnreadById,
     scrollTargetId,
   });
+  const onCaptureSendContext = React.useCallback(
+    () => ({
+      parentEventId: replyTargetMessageRef.current?.id ?? threadHeadId,
+      threadHeadId,
+      localSendOrigin: sidebar.captureOwnSendOrigin(),
+    }),
+    [threadHeadId, sidebar.captureOwnSendOrigin],
+  );
   const {
     expanded: sidebarExpanded,
     newIds,

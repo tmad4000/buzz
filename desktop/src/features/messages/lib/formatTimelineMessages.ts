@@ -478,6 +478,7 @@ export function formatTimelineMessages(
     return {
       id: event.id,
       renderKey: event.localKey ?? event.id,
+      localSendIntent: event.localSendIntent,
       createdAt: event.created_at,
       pubkey: authorPubkey,
       signerPubkey: normalizePubkey(event.pubkey),

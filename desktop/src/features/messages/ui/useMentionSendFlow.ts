@@ -627,6 +627,8 @@ export function useMentionSendFlow({
                 ? {
                     attachments: draft.queuedAttachments,
                     scope: draft.outboxScope,
+                    localSendOrigin:
+                      draft.capturedThreadContext?.localSendOrigin,
                     onSuperseded: () => {
                       supersededInOutbox = true;
                     },
