@@ -44,7 +44,8 @@ import {
   useHomeFeedNotifications,
   useHomeFeedNotificationState,
 } from "@/features/notifications/hooks";
-import { PreventSleepProvider } from "@/features/agents/usePreventSleep";
+import { AppHostHealthFrame } from "@/app/AppHostHealthFrame";
+import { PaseoHostBanner } from "@/features/presence/ui/PaseoHostProvider";
 import { requestOpenCreateAgent } from "@/features/agents/openCreateAgentEvent";
 import { useAgentsDataRefresh } from "@/features/agents/lib/useAgentsDataRefresh";
 import { useManagedAgentRuntimeReconciliation } from "@/features/agents/useManagedAgentRuntimeReconciliation";
@@ -712,7 +713,10 @@ export function AppShell() {
     selectedView,
   });
   return (
-    <PreventSleepProvider>
+    <AppHostHealthFrame
+      pubkey={deferredPubkey}
+      relayUrl={communitiesHook.activeCommunity?.relayUrl}
+    >
       {!isHuddleRoom ? (
         <AppShellTrayMenu
           channels={channels}
@@ -788,6 +792,7 @@ export function AppShell() {
             >
               <AppProfilePanelProvider>
                 <AppWorkflowEditorOverlayProvider>
+                  <PaseoHostBanner />
                   {!settingsOpen && !isHuddleRoom ? (
                     <AppTopChrome
                       canGoBack={canGoBack}
@@ -1011,6 +1016,6 @@ export function AppShell() {
           </AppHuddleShell>
         </AppShellProvider>
       </ChannelNavigationProvider>
-    </PreventSleepProvider>
+    </AppHostHealthFrame>
   );
 }

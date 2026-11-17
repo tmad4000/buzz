@@ -1,3 +1,8 @@
+import { usePaseoHostHealth } from "@/shared/context/PaseoHostContext";
+import {
+  isPaseoWorkingReaction,
+  PASEO_HOST_PUBKEY,
+} from "@/features/presence/lib/paseoHostHealth";
 import { SmilePlus } from "lucide-react";
 import * as React from "react";
 
@@ -412,8 +417,16 @@ function ReactionPill({
     [reaction.emoji, registerPill],
   );
 
+  const { offlineSince } = usePaseoHostHealth();
+  const stale = offlineSince !== null && isPaseoWorkingReaction(reaction);
   const pillClasses = cn(
     REACTION_PILL_BASE_CLASSES,
+    stale && "border-dashed",
+    stale &&
+      reaction.users.every(
+        (user) => user.pubkey.toLowerCase() === PASEO_HOST_PUBKEY,
+      ) &&
+      "opacity-50",
     "min-w-12 justify-center gap-1.5 px-2",
     reaction.reactedByCurrentUser
       ? "border-primary/40 bg-primary/10 text-primary"
@@ -444,7 +457,9 @@ function ReactionPill({
       <button
         aria-label={`Toggle ${reaction.emoji} reaction`}
         aria-pressed={reaction.reactedByCurrentUser}
-        title={displayName}
+        title={
+          stale ? `${displayName}: Paseo stale (host offline)` : displayName
+        }
         className={pillClasses}
         disabled={!canToggle || pending}
         onClick={handleClick}
@@ -485,7 +500,9 @@ function ReactionPill({
           <button
             aria-label={`Toggle ${reaction.emoji} reaction`}
             aria-pressed={reaction.reactedByCurrentUser}
-            title={displayName}
+            title={
+              stale ? `${displayName}: Paseo stale (host offline)` : displayName
+            }
             className={pillClasses}
             disabled={!canToggle || pending}
             onClick={handleClick}
@@ -500,6 +517,11 @@ function ReactionPill({
                   : REACTION_NATIVE_GLYPH_CLASSES
               }
             />
+            {stale ? (
+              <span className="text-xs opacity-50">
+                Paseo: stale (host offline)
+              </span>
+            ) : null}
             <AnimatedCount
               className={
                 reaction.emojiUrl
