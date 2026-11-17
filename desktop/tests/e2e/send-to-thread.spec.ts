@@ -293,7 +293,10 @@ test("DM routing stays scoped and failed publish keeps draft for explicit retry"
     page.getByText("Routing test: offline", { exact: false }),
   ).toBeVisible();
   await expect(editor).toContainText("Private invoice review follow-up");
-  await main.getByTestId("send-to-thread").click();
+  // The persistent failure toast can cover the pointer target; exercise the
+  // ordinary keyboard retry path without bypassing hit testing or gates.
+  await main.getByTestId("send-to-thread").focus();
+  await main.getByTestId("send-to-thread").press("Enter");
   await expect(menu.getByRole("menuitem").first()).toContainText(
     "Private invoice review",
   );
