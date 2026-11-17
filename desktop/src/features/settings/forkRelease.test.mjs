@@ -44,37 +44,34 @@ test("fork release selection compares numbered builds, ignores upstream, drafts,
   assert.equal(newerForkRelease([], "0.5.28-ideaflow.4"), null);
 });
 
-test("notarized macOS fork zip is eligible, arbitrary zip is not", () => {
+test("only exact version-matching arm64/x64 fork ZIPs are eligible on Mac", () => {
   const tag = "buzz-ideaflow-v0.5.28-ideaflow.5";
-  assert.ok(
-    newerForkRelease(
-      [
-        release(tag, {
-          assets: [{ name: "Buzz-Ideaflow-0.5.28-ideaflow.5-macos-arm64.zip" }],
-        }),
-      ],
-      "0.5.28-ideaflow.4",
-      "MacIntel",
-    ),
-  );
-  assert.equal(
-    newerForkRelease(
-      [release(tag, { assets: [{ name: "source.zip" }] })],
-      "0.5.28-ideaflow.4",
-      "MacIntel",
-    ),
-    null,
-  );
-  assert.equal(
-    newerForkRelease(
-      [
-        release(tag, {
-          assets: [{ name: "Buzz-Ideaflow-0.5.28-ideaflow.5-macos-arm64.zip" }],
-        }),
-      ],
-      "0.5.28-ideaflow.4",
-      "Linux x86_64",
-    ),
-    null,
-  );
+  const candidate = (name) => [release(tag, { assets: [{ name }] })];
+  for (const arch of ["arm64", "x64"]) {
+    const name = `Buzz-Ideaflow-0.5.28-ideaflow.5-macos-${arch}.zip`;
+    assert.deepEqual(
+      newerForkRelease(candidate(name), "0.5.28-ideaflow.4", "MacIntel"),
+      {
+        version: "0.5.28-ideaflow.5",
+        releaseUrl: `https://github.com/tmad4000/buzz/releases/tag/${tag}`,
+      },
+    );
+    for (const platform of ["Linux x86_64", "Win32", "all", "unknown"])
+      assert.equal(
+        newerForkRelease(candidate(name), "0.5.28-ideaflow.4", platform),
+        null,
+      );
+  }
+  for (const name of [
+    "source.zip",
+    "Buzz-Ideaflow-0.5.28-ideaflow.4-macos-arm64.zip",
+    "Buzz-Ideaflow-0.5.28-ideaflow.5-macos-x86_64.zip",
+    "Buzz-Ideaflow-0.5.28-ideaflow.5-macos-universal.zip",
+    "Buzz-Ideaflow-0.5.28-ideaflow.5-macos-arm64.zip.sig",
+    "Buzz-0.5.28-ideaflow.5-macos-arm64.zip",
+  ])
+    assert.equal(
+      newerForkRelease(candidate(name), "0.5.28-ideaflow.4", "MacIntel"),
+      null,
+    );
 });

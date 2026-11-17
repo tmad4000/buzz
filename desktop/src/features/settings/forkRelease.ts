@@ -42,7 +42,10 @@ export function newerForkRelease(
     if (r.draft || typeof r.tag_name !== "string" || !Array.isArray(r.assets))
       continue;
     const version = forkVersion(r.tag_name);
-    const macZip = `Buzz-Ideaflow-${r.tag_name.replace(/^buzz-ideaflow-v/, "")}-macos-arm64.zip`;
+    const releaseVersion = r.tag_name.replace(/^buzz-ideaflow-v/, "");
+    const macZips = ["arm64", "x64"].map(
+      (arch) => `Buzz-Ideaflow-${releaseVersion}-macos-${arch}.zip`,
+    );
     if (
       !version ||
       compare(version, newest) <= 0 ||
@@ -55,8 +58,7 @@ export function newerForkRelease(
           a &&
           typeof a.name === "string" &&
           (installer.test(a.name) ||
-            ((platform === "all" || /mac/i.test(platform)) &&
-              a.name === macZip)),
+            (/mac/i.test(platform) && macZips.includes(a.name))),
       )
     )
       continue;
