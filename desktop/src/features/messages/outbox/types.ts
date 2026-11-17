@@ -5,6 +5,8 @@ import type { QueuedMediaAttachment } from "../lib/backgroundMediaUploadStore";
 /** Files transfer to the outbox only after its durable commit succeeds. */
 export type OutboxSubmission = {
   attachments: QueuedMediaAttachment[];
+  /** Captured presentation owner; never inferred from a later selected view. */
+  localSendOrigin?: { viewInstanceId: string; threadRootId: string | null };
   onQueued: () => void;
   onSuperseded?: () => void;
   scope?: { relayUrl: string; signerPubkey: string };
@@ -39,6 +41,7 @@ export type OutboxRecord = {
   sequence: number;
   revision: number;
   intendedAt: number;
+  localSendOrigin?: { viewInstanceId: string; threadRootId: string | null };
   message: OutboxMessage;
   attachments: OutboxAttachment[];
   signedEvent?: RelayEvent;

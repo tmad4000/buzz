@@ -469,7 +469,7 @@ export const MessageActionBar = React.memo(function MessageActionBar({
         ),
     [customEmoji, quickReactionEmojis],
   );
-  const hasReplyAction = Boolean(onReply);
+  const hasReplyAction = Boolean(onReply) && !message.pending;
   const hasReactionAction = Boolean(onReactionSelect);
 
   const hasMoreMenuActions =
