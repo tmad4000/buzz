@@ -348,7 +348,11 @@ export function AppShell() {
       ? "Settings"
       : activeChannel?.name ||
         (selectedView === "home" ? "Home" : selectedView);
-    document.title = thing ? `${thing} · Buzz Ideaflow` : "Buzz Ideaflow";
+    const title = thing ? `${thing} · Buzz Ideaflow` : "Buzz Ideaflow";
+    document.title = title;
+    document
+      .querySelector('meta[property="og:title"]')
+      ?.setAttribute("content", title);
   }, [activeChannel?.name, selectedView, settingsOpen]);
 
   const effectiveTerminalContext = terminalContextOverride

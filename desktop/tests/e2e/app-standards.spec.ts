@@ -85,6 +85,10 @@ test("fresh theme follows the OS and feedback loads only after its own menu acti
   await page.goto("/");
   await page.getByTestId("channel-general").click();
   await expect(page).toHaveTitle("general · Buzz Ideaflow");
+  await expect(page.locator('meta[property="og:title"]')).toHaveAttribute(
+    "content",
+    "general · Buzz Ideaflow",
+  );
   await expect(page.locator("html")).toHaveClass(/light/);
   await page.emulateMedia({ colorScheme: "dark" });
   await expect(page.locator("html")).toHaveClass(/dark/);
