@@ -1,6 +1,10 @@
 // Test fixture only: real ChannelScreen/ChannelPane/composer hooks over the
 // existing mock IPC bridge. No relay, native build or production account.
 import * as React from "react";
+import {
+  ConversationViewGuards,
+  ConversationViewGuardsContext,
+} from "@/features/conversations/ConversationViewGuards";
 import { ConversationDragCoordinator } from "@/features/conversations/ConversationDragCoordinator";
 import { FixtureDragSidebar } from "./shared-drag-sidebar";
 import { createRoot } from "react-dom/client";
@@ -50,6 +54,8 @@ const harnessWindow = window as typeof window & {
   hostEffective: (messageId: string) => number | null;
   hostChannelRead: () => number | null;
   layoutSnapshot?: () => ConversationLayout;
+  requestPaneClose?: (paneId: string) => boolean;
+  requestPaneNavigate?: (viewId: string, channelId: string) => boolean;
   dragEvents?: Record<string, unknown>[];
 };
 harnessWindow.hostReads = [];
@@ -183,6 +189,7 @@ function FixtureDragScope({ children }: { children: React.ReactNode }) {
   );
 }
 function LayoutBody() {
+  const guards = React.useContext(ConversationViewGuardsContext);
   const [focusRequest, setFocusRequest] = React.useState<{
     viewId: string;
     sequence: number;
@@ -213,7 +220,7 @@ function LayoutBody() {
               value.id === id &&
               (value.channelType === "stream" || value.channelType === "dm"),
           ),
-        canLeave: () => true,
+        canLeave: (view) => guards?.allow(view.id) ?? false,
       });
     };
     const view = {
@@ -262,6 +269,9 @@ function LayoutBody() {
       });
   };
   harnessWindow.layoutSnapshot = () => layout;
+  harnessWindow.requestPaneClose = (paneId) => controller.close(paneId);
+  harnessWindow.requestPaneNavigate = (viewId, channelId) =>
+    controller.navigate(viewId, channelId);
   return (
     <div className="flex h-full min-h-0 min-w-0">
       {dragFixture && (
@@ -387,6 +397,7 @@ function LayoutBody() {
   );
 }
 function Screen() {
+  const [guards] = React.useState(() => new ConversationViewGuards());
   useMarkAsReadShortcuts({
     activeChannelId: channel?.id ?? null,
     activeChannelLastMessageAt: channel?.lastMessageAt,
@@ -434,70 +445,72 @@ function Screen() {
   );
   return (
     <AppShellProvider value={shell}>
-      <ConversationDraftEditorsProvider>
-        <Toaster />
-        <main className="flex h-screen flex-col bg-background text-foreground">
-          <div className="flex gap-3 border-b border-border p-2">
-            <span>
-              Buzz Ideaflow ·{" "}
-              {layoutFixture
-                ? "layout regression"
-                : "production host regression"}
-            </span>
-            {!layoutFixture && (
-              <button
-                type="button"
-                onClick={() => {
-                  setShowA(false);
-                  setFocused("b");
-                }}
-              >
-                Unmount A
-              </button>
-            )}
-          </div>
-          <div
-            className="grid min-h-0 flex-1"
-            style={{
-              gridTemplateColumns: layoutFixture
-                ? "1fr"
-                : showA
-                  ? "1fr 1fr"
-                  : "1fr",
-            }}
-          >
-            {layoutFixture ? (
-              <FixtureDragScope>
-                <LayoutBody />
-              </FixtureDragScope>
-            ) : (
-              [...(showA ? ["a"] : []), "b"].map((id) => (
-                <PerViewShell key={id} id={id}>
-                  <ConversationViewHost
-                    viewInstanceId={id}
-                    focused={focused === id}
-                    visible
-                    label={`General ${id}`}
-                    onFocusView={setFocused}
-                    initialPanelState={{ thread: id === "a" ? rootA : rootB }}
-                    channel={{
-                      activeChannel: channel ?? null,
-                      currentIdentity: identity,
-                      autoSendDraftKey: channel?.id ?? null,
-                      onCloseForumPost: noop,
-                      onSelectForumPost: noop,
-                      selectedForumPostId: null,
-                      targetForumReplyId: null,
-                      targetMessageEvents: emptyEvents,
-                      targetMessageId: null,
-                    }}
-                  />
-                </PerViewShell>
-              ))
-            )}
-          </div>
-        </main>
-      </ConversationDraftEditorsProvider>
+      <ConversationViewGuardsContext.Provider value={guards}>
+        <ConversationDraftEditorsProvider>
+          <Toaster />
+          <main className="flex h-screen flex-col bg-background text-foreground">
+            <div className="flex gap-3 border-b border-border p-2">
+              <span>
+                Buzz Ideaflow ·{" "}
+                {layoutFixture
+                  ? "layout regression"
+                  : "production host regression"}
+              </span>
+              {!layoutFixture && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowA(false);
+                    setFocused("b");
+                  }}
+                >
+                  Unmount A
+                </button>
+              )}
+            </div>
+            <div
+              className="grid min-h-0 flex-1"
+              style={{
+                gridTemplateColumns: layoutFixture
+                  ? "1fr"
+                  : showA
+                    ? "1fr 1fr"
+                    : "1fr",
+              }}
+            >
+              {layoutFixture ? (
+                <FixtureDragScope>
+                  <LayoutBody />
+                </FixtureDragScope>
+              ) : (
+                [...(showA ? ["a"] : []), "b"].map((id) => (
+                  <PerViewShell key={id} id={id}>
+                    <ConversationViewHost
+                      viewInstanceId={id}
+                      focused={focused === id}
+                      visible
+                      label={`General ${id}`}
+                      onFocusView={setFocused}
+                      initialPanelState={{ thread: id === "a" ? rootA : rootB }}
+                      channel={{
+                        activeChannel: channel ?? null,
+                        currentIdentity: identity,
+                        autoSendDraftKey: channel?.id ?? null,
+                        onCloseForumPost: noop,
+                        onSelectForumPost: noop,
+                        selectedForumPostId: null,
+                        targetForumReplyId: null,
+                        targetMessageEvents: emptyEvents,
+                        targetMessageId: null,
+                      }}
+                    />
+                  </PerViewShell>
+                ))
+              )}
+            </div>
+          </main>
+        </ConversationDraftEditorsProvider>
+      </ConversationViewGuardsContext.Provider>
     </AppShellProvider>
   );
 }

@@ -1,4 +1,6 @@
 import * as React from "react";
+import { toast } from "sonner";
+import { useConversationLeaveGuard } from "@/features/conversations/ConversationViewGuards";
 import { ConversationViewContext } from "@/features/conversations/ConversationViewContext";
 import { ConversationComposerOwnership } from "@/features/conversations/ConversationComposerOwnership";
 import {
@@ -395,6 +397,29 @@ function MessageComposerImpl({
     clearQueuedAttachments: media.clearQueuedAttachments,
     restoreQueuedAttachments: media.restoreQueuedAttachments,
     setSpoileredAttachmentUrls,
+  });
+  // Ready media/drafts persist on unmount; canonical pending sends continue.
+  // Mention preflight already persists and cancels safely when its owner leaves.
+  useConversationLeaveGuard(() => {
+    if (editTargetRef.current) {
+      toast.info(
+        "Finish or cancel your edit before leaving this conversation.",
+      );
+      return false;
+    }
+    if (voiceNote.statusRef.current !== "idle") {
+      toast.info(
+        "Finish or discard your voice note before leaving this conversation.",
+      );
+      return false;
+    }
+    if (isUploadingRef.current || isDeferredEditPending) {
+      toast.info(
+        "Wait for attachment processing to finish before leaving this conversation.",
+      );
+      return false;
+    }
+    return true;
   });
   const ownershipLocked =
     Boolean(editTarget) ||
