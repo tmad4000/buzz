@@ -231,9 +231,14 @@ test("explicit keyboard routing, cancel and new-message fallback preserve inline
     )
     .toBe(1);
   await expect(editor).toBeEmpty();
-  const queuedAnnouncement = main
+  const originOverlay = main.locator(
+    'xpath=ancestor::*[@data-testid="channel-composer-overlay"][1]',
+  );
+  await expect(originOverlay).toHaveCount(1);
+  const queuedAnnouncement = originOverlay
     .getByRole("article", { name: "Queued message" })
     .filter({ hasText: "A separate announcement" });
+  await expect(queuedAnnouncement).toHaveCount(1);
   await expect(queuedAnnouncement).toBeVisible();
   const announcement = page
     .getByTestId("message-timeline")
