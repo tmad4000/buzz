@@ -11,7 +11,8 @@ use tracing::{error, warn};
 ///
 /// Must comfortably exceed accepted event content sizes after Nostr JSON and
 /// NIP-44 encryption overhead.
-pub const DEFAULT_MAX_FRAME_BYTES: usize = 512 * 1024;
+// Accommodate a 512 KiB HTML Page plus worst-case JSON escaping and envelope.
+pub const DEFAULT_MAX_FRAME_BYTES: usize = 4 * 1024 * 1024;
 
 /// Errors that can occur while loading relay configuration.
 #[derive(Debug, Error)]

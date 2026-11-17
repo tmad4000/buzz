@@ -222,6 +222,9 @@ enum Cmd {
     /// Get and set channel canvas documents
     #[command(subcommand)]
     Canvas(CanvasCmd),
+    /// Get or replace a channel HTML Page
+    #[command(subcommand)]
+    Page(PageCmd),
     /// Add, remove, and list emoji reactions
     #[command(subcommand)]
     Reactions(ReactionsCmd),
@@ -767,6 +770,25 @@ pub enum ChannelsCmd {
         /// Policy: anyone | owner_only | nobody
         #[arg(long)]
         policy: String,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum PageCmd {
+    /// Get the current shared HTML Page (JSON event, or null)
+    Get {
+        /// Channel UUID
+        #[arg(long)]
+        channel: String,
+    },
+    /// Replace the shared Page from a UTF-8 HTML file (maximum 512 KiB)
+    Set {
+        /// Channel UUID
+        #[arg(long)]
+        channel: String,
+        /// Path to a self-contained HTML document
+        #[arg(long)]
+        file: std::path::PathBuf,
     },
 }
 
@@ -2212,6 +2234,7 @@ async fn run(cli: Cli) -> Result<(), CliError> {
         Cmd::Agents(sub) => commands::agents::dispatch(sub, &client).await,
         Cmd::Messages(sub) => commands::messages::dispatch(sub, &client, &cli.format).await,
         Cmd::Channels(sub) => commands::channels::dispatch(sub, &client, &cli.format).await,
+        Cmd::Page(sub) => commands::page::dispatch(sub, &client).await,
         Cmd::Canvas(sub) => commands::channels::dispatch_canvas(sub, &client).await,
         Cmd::Reactions(sub) => commands::reactions::dispatch(sub, &client).await,
         Cmd::Emoji(sub) => commands::emoji::dispatch(sub, &client).await,
@@ -2605,6 +2628,7 @@ mod tests {
             ("issues", 6),
             ("media", 1),
             ("messages", 8),
+            ("page", 2),
             ("pack", 2),
             ("patches", 4),
             ("pr", 5),
