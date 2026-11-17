@@ -83,6 +83,13 @@ const expect = baseExpect.configure({ timeout: 30000 });
       "B draft survives closing sibling panel",
     );
     await tb.getByRole("button", { name: "Close panel", exact: true }).click();
+    // Await actual deferred timeline rows, not the initial loading paint.
+    await expect(
+      a.locator(`[data-message-id="${"1".repeat(64)}"]`).first(),
+    ).toBeVisible();
+    await expect(
+      b.locator(`[data-message-id="${"2".repeat(64)}"]`).first(),
+    ).toBeVisible();
     // Both panes now target the same canonical main-channel draft.
     await a.getByTestId("message-input").fill("Shared draft before takeover");
     await expect(b.locator("[data-draft-preview]")).toContainText(
