@@ -99,12 +99,29 @@ test("held durable inline publish preserves queue height, anchor and real nested
         elements.map((element) => element.getAttribute("aria-valuenow")),
       );
     const target = inline.locator(`[data-message-id="${child}"]`);
+    const composer = inline.getByTestId("message-composer");
+    await expect(composer).toHaveJSProperty("tagName", "FORM");
+    await expect(composer).toHaveAttribute("data-compact", "true");
+    const nestedToggle = inline.locator(
+      `[data-testid="inline-branch-toggle"][data-thread-head-id="${child}"]`,
+    );
+    await expect(nestedToggle).toHaveAttribute("aria-expanded", "true");
+    await expect(
+      inline.getByText("Existing nested reply", { exact: true }),
+    ).toBeVisible();
+    const rowIdsBefore = await inline
+      .locator('[data-testid="message-row"][data-message-id]')
+      .evaluateAll((rows) =>
+        rows.map((row) => row.getAttribute("data-message-id")),
+      );
     await target.hover();
     const before = await target.boundingBox();
     if (!before) throw new Error("Missing visible nested Reply target");
     const beforeInline = await inline.boundingBox();
     if (!beforeInline) throw new Error("Missing inline layout box");
     const height = beforeInline.height;
+    const composerBefore = await composer.boundingBox();
+    if (!composerBefore) throw new Error("Missing compact composer form box");
     const timeline = page.getByTestId("message-timeline");
     const estimates = Number(
       await timeline.getAttribute("data-virtua-estimate-call-count"),
@@ -112,6 +129,14 @@ test("held durable inline publish preserves queue height, anchor and real nested
     const scroll = await timeline.evaluate((element) => element.scrollTop);
     // A real pointer click must succeed while delivery and the queue row are held.
     await inline.getByTestId(`reply-message-${child}`).click({ timeout: 5000 });
+    await expect(composer).toHaveAttribute("data-compact", "false");
+    await expect(inline.getByTestId("reply-target")).toContainText(
+      "Held inline nested target",
+    );
+    await expect(nestedToggle).toHaveAttribute("aria-expanded", "true");
+    await expect(
+      inline.getByText("Existing nested reply", { exact: true }),
+    ).toBeVisible();
     await expect(queued).toBeVisible();
     await expect
       .poll(() =>
@@ -132,6 +157,7 @@ test("held durable inline publish preserves queue height, anchor and real nested
           throw new Error("Held pending card disappeared");
         rows.push({
           cardHeight: card.getBoundingClientRect().height,
+          cardTop: card.getBoundingClientRect().top,
           status: card.querySelector('[role="status"]')?.textContent?.trim(),
           progress: [...card.querySelectorAll('[role="progressbar"]')].map(
             (progress) => progress.getAttribute("aria-valuenow"),
@@ -143,6 +169,17 @@ test("held durable inline publish preserves queue height, anchor and real nested
       }
       return rows;
     }, queueId);
+    const afterInline = await inline.boundingBox();
+    const composerAfter = await composer.boundingBox();
+    if (!afterInline || !composerAfter)
+      throw new Error("Inline or composer form disappeared during click");
+    const inlineDelta = afterInline.height - height;
+    const composerDelta = composerAfter.height - composerBefore.height;
+    const rowIdsAfter = await inline
+      .locator('[data-testid="message-row"][data-message-id]')
+      .evaluateAll((rows) =>
+        rows.map((row) => row.getAttribute("data-message-id")),
+      );
     await info.attach("held-inline-layout-samples", {
       body: JSON.stringify({
         before,
@@ -153,6 +190,12 @@ test("held durable inline publish preserves queue height, anchor and real nested
         cardBefore,
         statusBefore,
         progressBefore,
+        composerBefore,
+        composerAfter,
+        inlineDelta,
+        composerDelta,
+        rowIdsBefore,
+        rowIdsAfter,
         samples,
       }),
       contentType: "application/json",
@@ -170,12 +213,15 @@ test("held durable inline publish preserves queue height, anchor and real nested
       expect(
         Math.abs(sample.cardHeight - cardBefore.height),
       ).toBeLessThanOrEqual(1);
+      expect(Math.abs(sample.cardTop - cardBefore.y)).toBeLessThanOrEqual(1);
       expect(sample.status).toBe(statusBefore.trim());
       expect(sample.progress).toEqual(progressBefore);
     }
-    const afterInline = await inline.boundingBox();
-    if (!afterInline) throw new Error("Inline layout disappeared during click");
-    expect(Math.abs(afterInline.height - height)).toBeLessThanOrEqual(1);
+    // Reply intentionally expands only the compact composer (banner + toolbar).
+    // The existing nested branch is already open, so no disclosure growth is allowed.
+    expect(rowIdsAfter).toEqual(rowIdsBefore);
+    expect(composerDelta).toBeGreaterThan(0);
+    expect(Math.abs(inlineDelta - composerDelta)).toBeLessThanOrEqual(2);
     expect(
       Math.abs(samples[samples.length - 1].top - before.y),
     ).toBeLessThanOrEqual(1);
