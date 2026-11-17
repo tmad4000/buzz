@@ -1,3 +1,5 @@
+import '../../../shared/deeplink/link_scheme.dart';
+
 /// Escapes destination characters that the mobile Markdown renderer treats as
 /// syntax. Apply the same conversion to metadata keys to preserve media types.
 String normalizeMarkdownDestination(String url) =>
@@ -6,10 +8,14 @@ String normalizeMarkdownDestination(String url) =>
 const _markdownDelimiters = ['***', '___', '**', '__', '~~', '*', '_'];
 
 final _autolinkPattern = RegExp(
-  r'<((?:https?://|buzz://(?:message\?|join\?|channel/|(?:pr|issue|repo)\?))[^>]+)>',
+  r'<((?:https?://|'
+  '$buzzLinkSchemePattern'
+  r'://(?:message\?|join\?|channel/|(?:pr|issue|repo)\?))[^>]+)>',
 );
 final _bareLinkPattern = RegExp(
-  r'(?<![(\]=])(?:https?://|buzz://(?:message\?|join\?|channel/|(?:pr|issue|repo)\?))[^\s)>\]]+',
+  r'(?<![(\]=])(?:https?://|'
+  '$buzzLinkSchemePattern'
+  r'://(?:message\?|join\?|channel/|(?:pr|issue|repo)\?))[^\s)>\]]+',
 );
 final _trailingPunctuationPattern = RegExp(r'[.,!?:;]+$');
 final _backtickRunPattern = RegExp(r'`+');
@@ -273,7 +279,8 @@ String _normalizeBareLink(String segment, Match match) {
   final matched = match[0]!;
   var url = matched;
   var trailing = '';
-  final isBuzzUrl = matched.startsWith('buzz://');
+  final isBuzzUrl =
+      matched.startsWith('buzz://') || matched.startsWith('$buzzLinkScheme://');
   final start = match.start;
 
   if (isBuzzUrl) {
