@@ -34,6 +34,8 @@ type ChannelAgentRuntime = Pick<
 
 export type AttachManagedAgentToChannelInput = {
   agent: ManagedAgent;
+  expectedRelayUrl?: string;
+  expectedSignerPubkey?: string;
   role?: Exclude<ChannelRole, "owner">;
   ensureRunning?: boolean;
   /**
@@ -151,6 +153,7 @@ export async function applyReusableAgentAccessPolicy(
   agent: ManagedAgent,
   request: Pick<CreateManagedAgentInput, "respondTo" | "respondToAllowlist">,
   persona?: Pick<AgentPersona, "respondTo" | "respondToAllowlist">,
+  scope?: { expectedRelayUrl: string; expectedSignerPubkey: string },
 ): Promise<ApplyReusableAgentAccessPolicyResult> {
   const policy = resolveReusableAgentAccessPolicy(request, persona);
   const matches =
@@ -163,6 +166,7 @@ export async function applyReusableAgentAccessPolicy(
 
   const { agent: updatedAgent } = await updateManagedAgent({
     pubkey: agent.pubkey,
+    ...scope,
     ...policy,
   });
   return { agent: updatedAgent, wrote: true };
@@ -179,6 +183,8 @@ export async function attachManagedAgentToChannel(
     channelId,
     pubkeys: [input.agent.pubkey],
     role,
+    expectedRelayUrl: input.expectedRelayUrl,
+    expectedSignerPubkey: input.expectedSignerPubkey,
   });
   const membershipError = membershipResult.errors.find(
     (error) => normalizePubkey(error.pubkey) === agentPubkey,

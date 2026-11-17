@@ -1,3 +1,5 @@
+import { OutboxContext } from "../outbox/OutboxProvider";
+import { OutboxRows } from "../outbox/OutboxRows";
 import * as React from "react";
 import { ConversationViewContext } from "@/features/conversations/ConversationViewContext";
 import { ConversationComposerOwnership } from "@/features/conversations/ConversationComposerOwnership";
@@ -106,6 +108,7 @@ function MessageComposerImpl({
   replyTarget = null,
   mediaController,
   showBackgroundUploadProgress = true,
+  showOutboxRows = true,
   showTopBorder = false,
   toolbarExtraActions,
   threadRoutingEntries,
@@ -139,6 +142,8 @@ function MessageComposerImpl({
   presentationRef.current = presentation;
   const drafts = useDrafts();
   const identityQuery = useIdentityQuery();
+  const outboxView = React.useContext(OutboxContext);
+  const durableOutbox = outboxView.enabled;
   const effectiveDraftKey = draftKey ?? channelId;
   const ownerPubkey = identityQuery.data?.pubkey ?? null;
   const audienceScope =
@@ -370,6 +375,14 @@ function MessageComposerImpl({
     enabled: keepMentionedAgentsPinned,
   });
   const mentionSendFlow = useMentionSendFlow({
+    durableOutbox,
+    outboxScope:
+      outboxView.relayUrl && outboxView.signerPubkey
+        ? {
+            relayUrl: outboxView.relayUrl,
+            signerPubkey: outboxView.signerPubkey,
+          }
+        : undefined,
     getComposerRevision,
     runComposerUpdate,
     channelId,
@@ -670,7 +683,7 @@ function MessageComposerImpl({
         (!trimmed && !hasMedia) ||
         disabledRef.current ||
         voiceNote.statusRef.current !== "idle" ||
-        isSendingRef.current ||
+        (!durableOutbox && isSendingRef.current) ||
         isSubmitLockedRef.current ||
         isUploadingRef.current ||
         mentionSendFlow.isPreparingMentionSend
@@ -730,6 +743,7 @@ function MessageComposerImpl({
     [
       onCaptureRoutedSend,
       channelId,
+      durableOutbox,
       channelLinks.clearChannels,
       customEmoji,
       drafts.loadDraft,
@@ -926,6 +940,12 @@ function MessageComposerImpl({
           className="absolute inset-x-0 bottom-0 h-5 bg-transparent"
         />
         <div className="relative flex w-full flex-col gap-0">
+          {showOutboxRows ? (
+            <OutboxRows
+              channelId={channelId}
+              rootId={typingRootEventId ?? typingParentEventId}
+            />
+          ) : null}
           <ComposerReplyEditBanner
             isEditing={editTarget != null}
             isEditCancelDisabled={isDeferredEditPending}
@@ -1064,7 +1084,7 @@ function MessageComposerImpl({
                       <SendToThreadPicker
                         key={`${channelId}:${effectiveDraftKey}`}
                         entries={threadRoutingEntries}
-                        disabled={sendDisabled || isSubmitLocked || isSending}
+                        disabled={sendDisabled || isSubmitLocked || (!durableOutbox && isSending)}
                         getDraft={syncComposerContentFromEditor}
                         onPick={(id) => {
                           void submitMessage(id);
@@ -1077,7 +1097,7 @@ function MessageComposerImpl({
                 gifMediaController={media}
                 isEmojiPickerOpen={isEmojiPickerOpen}
                 isFormattingOpen={isFormattingOpen}
-                isSending={isSending || mentionSendFlow.isPreparingMentionSend}
+                isSending={(!durableOutbox && isSending) || mentionSendFlow.isPreparingMentionSend}
                 isUploading={media.isUploading}
                 isVoiceNoteProcessing={voiceNote.status !== "recording"}
                 isVoiceNoteRecording={voiceNote.status !== "idle"}

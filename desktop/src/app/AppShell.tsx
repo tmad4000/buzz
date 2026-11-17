@@ -1,3 +1,4 @@
+import { AppOutboxBoundary } from "./AppOutboxBoundary";
 import * as React from "react";
 import { ProtectedGlobalOverlay } from "@protected-feature-components";
 import { useQueryClient } from "@tanstack/react-query";
@@ -44,7 +45,6 @@ import {
   useHomeFeedNotifications,
   useHomeFeedNotificationState,
 } from "@/features/notifications/hooks";
-import { PreventSleepProvider } from "@/features/agents/usePreventSleep";
 import { requestOpenCreateAgent } from "@/features/agents/openCreateAgentEvent";
 import { useAgentsDataRefresh } from "@/features/agents/lib/useAgentsDataRefresh";
 import { useManagedAgentRuntimeReconciliation } from "@/features/agents/useManagedAgentRuntimeReconciliation";
@@ -716,7 +716,10 @@ export function AppShell() {
     selectedView,
   });
   return (
-    <PreventSleepProvider>
+    <AppOutboxBoundary
+      relayUrl={communitiesHook.activeCommunity?.relayUrl}
+      signerPubkey={identityQuery.data?.pubkey}
+    >
       {!isHuddleRoom ? (
         <AppShellTrayMenu
           channels={channels}
@@ -1019,6 +1022,6 @@ export function AppShell() {
           </AppHuddleShell>
         </AppShellProvider>
       </ChannelNavigationProvider>
-    </PreventSleepProvider>
+    </AppOutboxBoundary>
   );
 }

@@ -195,12 +195,13 @@ export async function ensureStarterChannels(): Promise<Channel[]> {
 export async function syncAgentsToActiveHuddle(
   channelId: string,
   agentPubkeys: string[],
+  scope?: { expectedRelayUrl: string; expectedSignerPubkey: string },
 ): Promise<void> {
   const record = beginChannelMembershipWrite();
   const result = await invokeTauri<{
     changed_channel_ids: string[];
     error: string | null;
-  }>("sync_agents_to_active_huddle", { channelId, agentPubkeys });
+  }>("sync_agents_to_active_huddle", { channelId, agentPubkeys, ...scope });
   for (const id of result.changed_channel_ids) record(id);
   if (result.error !== null) throw toTauriError(result.error);
 }

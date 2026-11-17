@@ -309,6 +309,7 @@ export function useChannelPaneHandlers({
         threadHeadId: string | null;
       } | null,
       forceRest?: boolean,
+      outbox?: import("@/features/messages/outbox/types").OutboxSubmission,
     ) => {
       return await sendMutateRef.current({
         content,
@@ -318,6 +319,7 @@ export function useChannelPaneHandlers({
         parentEventId: threadContext?.parentEventId ?? undefined,
         threadHeadId: threadContext?.threadHeadId,
         forceRest,
+        outbox,
       });
     },
     [],
@@ -356,6 +358,7 @@ export function useChannelPaneHandlers({
       channelId,
       context,
       forceRest,
+      outbox,
     ) => {
       if (!channelId || !context?.parentEventId)
         throw new Error("Inline reply target unavailable");
@@ -366,6 +369,7 @@ export function useChannelPaneHandlers({
         channelId,
         parentEventId: context.parentEventId,
         threadHeadId: context.threadHeadId,
+        outbox,
         forceRest,
       });
     },
@@ -383,6 +387,7 @@ export function useChannelPaneHandlers({
         threadHeadId: string | null;
       } | null,
       forceRest?: boolean,
+      outbox?: import("@/features/messages/outbox/types").OutboxSubmission,
     ) => {
       // Resolve target using captured submit-time context (race-free) or live
       // refs (legacy path). When threadContext is supplied, no live-ref reads
@@ -416,6 +421,7 @@ export function useChannelPaneHandlers({
         threadHeadId: activeThreadHeadId,
         mediaTags,
         channelId: channelId ?? undefined,
+        outbox,
         forceRest,
       });
 

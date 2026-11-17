@@ -18,10 +18,15 @@ export async function uploadMediaFile(
   progressId?: string,
   signal?: AbortSignal,
   onDispatch?: () => void,
+  scope?: { relayUrl: string; signerPubkey: string },
 ): Promise<BlobDescriptor> {
   const headers: Record<string, string> = {
     "x-buzz-filename": encodeRawIpcHeader(file.name),
   };
+  if (scope) {
+    headers["x-buzz-relay-url"] = encodeRawIpcHeader(scope.relayUrl);
+    headers["x-buzz-signer"] = encodeRawIpcHeader(scope.signerPubkey);
+  }
   if (progressId) {
     headers["x-buzz-progress-id"] = encodeRawIpcHeader(progressId);
   }

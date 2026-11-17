@@ -99,6 +99,7 @@ export type MessageComposerProps = {
     } | null,
     /** Route through the REST publisher even when best-effort enrichment settled empty. */
     forceRest?: boolean,
+    outbox?: import("../outbox/types").OutboxSubmission,
   ) => Promise<void | { id: string }>;
   /** Presentation only: keep the mounted editor compact while empty and fully blurred. */
   compactWhenEmpty?: boolean;
@@ -116,6 +117,7 @@ export type MessageComposerProps = {
   showTopBorder?: boolean;
   /** Render the app-wide upload queue above this composer dock. */
   showBackgroundUploadProgress?: boolean;
+  showOutboxRows?: boolean;
   toolbarExtraActions?: ReactNode;
   /** Loaded roots from this pane only; enables explicit routing beside Send. */
   /** Capture an origin-bound observer before the routed-send pipeline awaits. */

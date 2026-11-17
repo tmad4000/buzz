@@ -403,7 +403,13 @@ pub(crate) async fn upload_image_bytes(
         return Err("profile avatar must be an image".to_string());
     }
     let body = sanitize_image_for_upload(body, &mime)?;
-    do_upload(body, &mime, state, None, None).await
+    do_upload(body, &mime, state, None, None, None).await
+}
+
+/// Owner and destination captured before asynchronous media preparation.
+pub(super) struct UploadScope {
+    pub relay_url: String,
+    pub keys: nostr::Keys,
 }
 
 async fn do_upload(
@@ -412,6 +418,7 @@ async fn do_upload(
     state: &AppState,
     progress: Option<(tauri::AppHandle, String)>,
     cancellation: Option<&CancellationToken>,
+    scope: Option<&UploadScope>,
 ) -> Result<BlobDescriptor, String> {
     let sha256 = hex::encode(Sha256::digest(&body));
 
@@ -421,11 +428,14 @@ async fn do_upload(
     // reasonable connection (the body is already hashed and ready to send).
     // The server-side window is also 60s in Strict mode, matching this value.
     let expiry_secs = 60u64;
-    let base_url = relay_api_base_url_with_override(state);
-    let auth_event = {
-        let keys = state.signing_keys()?;
-        sign_blossom_upload_auth(&keys, &sha256, expiry_secs, &base_url)?
+    let base_url = scope
+        .map(|scope| scope.relay_url.clone())
+        .unwrap_or_else(|| relay_api_base_url_with_override(state));
+    let keys = match scope {
+        Some(scope) => scope.keys.clone(),
+        None => state.signing_keys()?,
     };
+    let auth_event = sign_blossom_upload_auth(&keys, &sha256, expiry_secs, &base_url)?;
 
     let auth_header = format!(
         "Nostr {}",
@@ -506,7 +516,7 @@ pub async fn upload_media(
 
     let mime = detect_and_validate_mime(&body)?;
     let body = sanitize_image_for_upload(body, &mime)?;
-    do_upload(body, &mime, &state, None, None).await
+    do_upload(body, &mime, &state, None, None, None).await
 }
 
 /// Read a picked path through the TOCTOU-safe pipeline (fd pin → sniff →
@@ -587,9 +597,9 @@ async fn process_picked_path(
 
     // Upload video first, then poster (best-effort). If poster upload fails,
     // the video descriptor is returned without an image field.
-    let mut descriptor = do_upload(body, &mime, state, progress, None).await?;
+    let mut descriptor = do_upload(body, &mime, state, progress, None, None).await?;
     if let Some(poster) = poster_bytes {
-        match do_upload(poster, "image/jpeg", state, None, None).await {
+        match do_upload(poster, "image/jpeg", state, None, None, None).await {
             Ok(poster_desc) => descriptor.image = Some(poster_desc.url),
             Err(e) => eprintln!("buzz-desktop: poster upload failed (non-fatal): {e}"),
         }
@@ -695,6 +705,7 @@ pub(super) async fn upload_media_bytes_inner(
     app: tauri::AppHandle,
     state: State<'_, AppState>,
     cancellation: Option<&CancellationToken>,
+    scope: Option<&UploadScope>,
 ) -> Result<BlobDescriptor, String> {
     if data.is_empty() {
         return Err("empty upload".to_string());
@@ -769,11 +780,11 @@ pub(super) async fn upload_media_bytes_inner(
     if cancellation.is_some_and(CancellationToken::is_cancelled) {
         return Err("upload cancelled".to_string());
     }
-    let mut descriptor = do_upload(body, &mime, &state, progress, cancellation).await?;
+    let mut descriptor = do_upload(body, &mime, &state, progress, cancellation, scope).await?;
 
     emit_media_upload_phase(&app, progress_id.as_deref(), "finishing");
     if let Some(poster) = poster_bytes {
-        match do_upload(poster, "image/jpeg", &state, None, cancellation).await {
+        match do_upload(poster, "image/jpeg", &state, None, cancellation, scope).await {
             Ok(poster_desc) => descriptor.image = Some(poster_desc.url),
             Err(e) => eprintln!("buzz-desktop: poster upload failed (non-fatal): {e}"),
         }

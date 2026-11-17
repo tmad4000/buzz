@@ -35,6 +35,7 @@ pub async fn upload_media_bytes(
         app,
         state,
         cancellation.as_ref(),
+        None,
     )
     .await;
     finish_media_upload(progress_id.as_deref());
@@ -87,6 +88,13 @@ pub async fn upload_media_bytes_raw(
     let filename = optional_raw_upload_header(&request, "x-buzz-filename")?;
     let progress_id = optional_raw_upload_header(&request, "x-buzz-progress-id")?;
 
+    let expected_relay = optional_raw_upload_header(&request, "x-buzz-relay-url")?;
+    let expected_signer = optional_raw_upload_header(&request, "x-buzz-signer")?;
+    let relay_url = crate::relay::relay_api_base_url_with_override(&state);
+    crate::relay::assert_expected_relay_scope(expected_relay.as_deref(), &relay_url)?;
+    let keys = state.signing_keys()?;
+    crate::relay::assert_expected_signer(expected_signer.as_deref(), &keys.public_key().to_hex())?;
+    let scope = super::media::UploadScope { relay_url, keys };
     let cancellation = begin_media_upload(progress_id.as_deref());
     let result = upload_media_bytes_inner(
         data,
@@ -95,6 +103,7 @@ pub async fn upload_media_bytes_raw(
         app,
         state,
         cancellation.as_ref(),
+        Some(&scope),
     )
     .await;
     finish_media_upload(progress_id.as_deref());

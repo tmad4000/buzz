@@ -1,3 +1,7 @@
+import { useContext } from "react";
+import { OutboxContext } from "./outbox/OutboxProvider";
+import { enqueueOutbox } from "./outbox/runtime";
+import { getRelayHttpUrl } from "@/shared/api/tauri";
 import { useEffect, useEffectEvent } from "react";
 import {
   type QueryClient,
@@ -479,8 +483,9 @@ export function useSendMessageMutation(
   identity: Identity | undefined,
 ) {
   const queryClient = useQueryClient();
+  const outboxScope = useContext(OutboxContext);
 
-  return useMutation<
+  const mutation = useMutation<
     RelayEvent,
     Error,
     {
@@ -495,6 +500,7 @@ export function useSendMessageMutation(
       sentFromThreadRootId?: string | null;
       sentFromThreadRootExcerpt?: string | null;
       transport?: "auto" | "http";
+      outbox?: import("./outbox/types").OutboxSubmission;
     },
     MessageQueryContext | undefined
   >({
@@ -510,6 +516,7 @@ export function useSendMessageMutation(
       sentFromThreadRootId,
       sentFromThreadRootExcerpt,
       transport = "auto",
+      outbox,
     }) => {
       // Prefer a channel captured by the caller at compose time. Otherwise,
       // resolve a captured id from the shared channel cache so navigation
@@ -564,6 +571,46 @@ export function useSendMessageMutation(
             sentFromThreadRootExcerpt,
           )
         : undefined;
+
+      if (outbox) {
+        const cachedMessages =
+          queryClient.getQueryData<RelayEvent[]>(
+            channelMessagesKey(effectiveChannel.id),
+          ) ?? [];
+        const threadCaches = queryClient
+          .getQueriesData<RelayEvent[]>({
+            queryKey: ["thread-replies", effectiveChannel.id],
+          })
+          .flatMap(([, events]) => (events ? [events] : []));
+        const rootEventId =
+          capturedThreadHeadId ??
+          (parentEventId
+            ? resolveCachedReplyRootId(parentEventId, [
+                cachedMessages,
+                ...threadCaches,
+              ])
+            : null);
+        return enqueueOutbox(
+          {
+            channelId: effectiveChannel.id,
+            channel: effectiveChannel,
+            content: content.trim(),
+            parentEventId: parentEventId ?? null,
+            rootEventId,
+            mentionPubkeys: recipientPubkeys,
+            tags: [
+              ...(mediaTags ?? []),
+              ...(sentFromThreadTag ? [sentFromThreadTag] : []),
+            ],
+            relayUrl:
+              outbox.scope?.relayUrl ||
+              outboxScope.relayUrl ||
+              (await getRelayHttpUrl()),
+            signerPubkey: outbox.scope?.signerPubkey ?? identity.pubkey,
+          },
+          outbox,
+        );
+      }
 
       // Messages carrying media OR custom-emoji tags MUST go through REST so
       // the relay's tag validation runs. The WebSocket path emits no extra
@@ -660,6 +707,7 @@ export function useSendMessageMutation(
       );
     },
     onMutate: async ({
+      outbox,
       channelId: capturedChannelId,
       targetChannel,
       content,
@@ -670,6 +718,7 @@ export function useSendMessageMutation(
       sentFromThreadRootId,
       sentFromThreadRootExcerpt,
     }) => {
+      if (outbox) return undefined;
       // Mirror mutationFn's target resolution so the optimistic message lands
       // in the cache for the same channel as the real send. A caller-supplied
       // channel remains valid even when a stale channel-list read omitted it.
@@ -771,6 +820,12 @@ export function useSendMessageMutation(
       projectChannelWindowMessages(queryClient, context.channelId);
     },
   });
+  // Composer admission owns the short commit lock. A committed outbox send
+  // must not hold every editor/takeover UI until the relay comes back online.
+  return {
+    ...mutation,
+    isPending: mutation.isPending && !mutation.variables?.outbox,
+  };
 }
 
 export function useToggleReactionMutation() {

@@ -1,3 +1,4 @@
+import { OutboxRemovedError } from "../outbox/errors";
 import * as React from "react";
 import { claimDraftSend } from "@/features/messages/lib/useDrafts";
 import { toast } from "sonner";
@@ -50,6 +51,8 @@ import type { UseMentionSendFlowOptions } from "./useMentionSendFlow.types";
 
 export function useMentionSendFlow({
   channelId,
+  durableOutbox = false,
+  outboxScope,
   effectiveDraftKey,
   getComposerRevision,
   runComposerUpdate,
@@ -301,7 +304,7 @@ export function useMentionSendFlow({
       completeSendRef.current = draft;
       setCompleteSendOwner(draft.sourceOwner);
       const preparedUpload =
-        draft.queuedAttachments.length > 0
+        !durableOutbox && draft.queuedAttachments.length > 0
           ? prepareBackgroundMediaUpload(draft.queuedAttachments)
           : null;
       const persistRecoverableDraft = () => {
@@ -350,6 +353,7 @@ export function useMentionSendFlow({
           draft.queuedAttachments,
         );
       };
+      let supersededInOutbox = false;
       let composerCleared = false;
       let optimisticComposerContent = "";
       let clearedRevision = -1;
@@ -394,19 +398,27 @@ export function useMentionSendFlow({
           );
         });
       };
-      if (ownsComposer() && getComposerRevision() === draft.composerRevision) {
-        runComposerUpdate(() => {
-          clearComposer();
-          if (draft.addressedAgentPubkeys.length > 0) {
-            optimisticComposerContent =
-              onAddressedAgentsComposerCleared?.(draft.addressedAgentPubkeys) ??
-              "";
-            contentRef.current = optimisticComposerContent;
-          }
-        });
-        composerCleared = true;
-        clearedRevision = getComposerRevision();
-      }
+      const clearCommittedComposer = () => {
+        if (
+          isMountedRef.current &&
+          ownsComposer() &&
+          getComposerRevision() === draft.composerRevision
+        ) {
+          runComposerUpdate(() => {
+            clearComposer();
+            if (draft.addressedAgentPubkeys.length > 0) {
+              optimisticComposerContent =
+                onAddressedAgentsComposerCleared?.(
+                  draft.addressedAgentPubkeys,
+                ) ?? "";
+              contentRef.current = optimisticComposerContent;
+            }
+          });
+          composerCleared = true;
+          clearedRevision = getComposerRevision();
+        }
+      };
+      if (!durableOutbox) clearCommittedComposer();
       // Recover on invalidation, not when an arbitrary external await settles.
       // In particular a later visit to A must load recovery before it can edit
       // or clear A again. The async continuation only observes cancellation.
@@ -421,281 +433,365 @@ export function useMentionSendFlow({
         once: true,
       });
       let uploadStarted = false;
-      try {
-        const admittedMentionPubkeys = uniqueNormalizedPubkeys(
-          await mentions.revalidateMentionPubkeys(
-            mentionPubkeys,
-            draft.capturedChannelId,
-            mentionRevalidationOptions(draft, "prepare"),
-          ),
-        );
-        if (isSendCancelled()) return restoreComposerAfterFailure();
-        if (!isMountedRef.current) return persistPreflightDraft();
-        const admittedMentionPubkeySet = new Set(admittedMentionPubkeys);
-        const readyAgentPubkeys = new Set(
-          uniqueNormalizedPubkeys(draft.readyAgentPubkeys ?? []).filter(
-            (pubkey) => admittedMentionPubkeySet.has(pubkey),
-          ),
-        );
-        const managedAgentsByPubkey = await getManagedAgentsByPubkey().catch(
-          () => new Map<string, ManagedAgent>(),
-        );
-        if (isSendCancelled()) return restoreComposerAfterFailure();
-        if (!isMountedRef.current) {
-          persistPreflightDraft();
-          return;
-        }
-        for (const agent of draft.preparedManagedAgents ?? []) {
-          managedAgentsByPubkey.set(normalizePubkey(agent.pubkey), agent);
-        }
-        const normalizedMentionPubkeys = admittedMentionPubkeys;
-        const managedMentionPubkeys = normalizedMentionPubkeys.filter(
-          (pubkey) => managedAgentsByPubkey.has(pubkey),
-        );
-        const agentMentionPubkeys = uniqueNormalizedPubkeys([
-          ...managedMentionPubkeys,
-          ...normalizedMentionPubkeys.filter(mentions.isAgentPubkey),
-        ]);
-        const preparedAgentPubkeys = uniqueNormalizedPubkeys([
-          ...readyAgentPubkeys,
-          ...agentMentionPubkeys,
-        ]);
-        let sendChannelId = draft.capturedChannelId;
-        if (preparedAgentPubkeys.length > 0 && onPrepareSendChannel) {
-          sendChannelId = await onPrepareSendChannel(preparedAgentPubkeys);
+      let acknowledgeQueue!: () => void;
+      const queued = new Promise<void>((resolve) => {
+        acknowledgeQueue = resolve;
+      });
+      const operation = (async () => {
+        try {
+          const admittedMentionPubkeys = uniqueNormalizedPubkeys(
+            durableOutbox
+              ? mentionPubkeys
+              : await mentions.revalidateMentionPubkeys(
+                  mentionPubkeys,
+                  draft.capturedChannelId,
+                  mentionRevalidationOptions(draft, "prepare"),
+                ),
+          );
           if (isSendCancelled()) return restoreComposerAfterFailure();
-          if (!sendChannelId) {
-            return restoreComposerAfterFailure();
-          }
+          if (!isMountedRef.current) return persistPreflightDraft();
+          const admittedMentionPubkeySet = new Set(admittedMentionPubkeys);
+          const readyAgentPubkeys = new Set(
+            uniqueNormalizedPubkeys(draft.readyAgentPubkeys ?? []).filter(
+              (pubkey) => admittedMentionPubkeySet.has(pubkey),
+            ),
+          );
+          const managedAgentsByPubkey = durableOutbox
+            ? new Map(
+                (managedAgentsQuery.data ?? []).map((agent) => [
+                  normalizePubkey(agent.pubkey),
+                  agent,
+                ]),
+              )
+            : admittedMentionPubkeys.length > 0
+              ? await getManagedAgentsByPubkey().catch(
+                  () => new Map<string, ManagedAgent>(),
+                )
+              : new Map<string, ManagedAgent>();
+          if (isSendCancelled()) return restoreComposerAfterFailure();
           if (!isMountedRef.current) {
             persistPreflightDraft();
             return;
           }
-        }
-        const agentReadiness = await ensureManagedAgentMentionsReady(
-          managedMentionPubkeys.filter(
-            (pubkey) => !readyAgentPubkeys.has(normalizePubkey(pubkey)),
-          ),
-          sendChannelId ?? "",
-          onPrepareSendChannel ? preparedAgentPubkeys : [],
-          [...managedAgentsByPubkey.values()],
-          isSendCancelled,
-        );
-        // Every wake this send queued: persona creates carried on the draft
-        // (enqueued before the non-member prompt could defer us here), then
-        // the readiness pass's. Flushed only after the relay accepts the
-        // publish — every abort path between here and there just drops them,
-        // so no wake (or "your message was sent" failure toast) can exist for
-        // a message that never landed. First entry wins the dedupe because it
-        // carries the earliest replay floor, and the floor is a lower bound.
-        const agentsToWake = dedupeQueuedAgentWakes([
-          ...(draft.queuedAgentWakes ?? []),
-          ...agentReadiness.agentsToWake,
-        ]);
-        if (isSendCancelled()) return restoreComposerAfterFailure();
-        if (!isMountedRef.current) {
-          persistPreflightDraft();
-          return;
-        }
-        if (agentReadiness.errors.length > 0) {
-          const message =
-            agentReadiness.errors.length === 1
-              ? `Could not prepare agent mention: ${agentReadiness.errors[0]}`
-              : `Could not prepare agent mentions: ${agentReadiness.errors.join(
-                  "; ",
-                )}`;
-          setNonMemberPromptError(message);
-          toast.error(message);
-          return restoreComposerAfterFailure();
-        }
-        if (preparedAgentPubkeys.length > 0 && sendChannelId) {
-          try {
-            await syncAgentsToActiveHuddle(sendChannelId, preparedAgentPubkeys);
+          for (const agent of draft.preparedManagedAgents ?? []) {
+            managedAgentsByPubkey.set(normalizePubkey(agent.pubkey), agent);
+          }
+          const normalizedMentionPubkeys = admittedMentionPubkeys;
+          const managedMentionPubkeys = normalizedMentionPubkeys.filter(
+            (pubkey) => managedAgentsByPubkey.has(pubkey),
+          );
+          const agentMentionPubkeys = uniqueNormalizedPubkeys([
+            ...managedMentionPubkeys,
+            ...normalizedMentionPubkeys.filter(mentions.isAgentPubkey),
+          ]);
+          const preparedAgentPubkeys = uniqueNormalizedPubkeys([
+            ...readyAgentPubkeys,
+            ...agentMentionPubkeys,
+          ]);
+          let sendChannelId = draft.capturedChannelId;
+          if (
+            preparedAgentPubkeys.length > 0 &&
+            onPrepareSendChannel &&
+            (!durableOutbox ||
+              !sendChannelId ||
+              preparedAgentPubkeys.some(
+                (key) => !mentions.memberPubkeys.has(key),
+              ))
+          ) {
+            sendChannelId = await onPrepareSendChannel(preparedAgentPubkeys);
             if (isSendCancelled()) return restoreComposerAfterFailure();
-          } catch (error) {
-            if (isSendCancelled()) return restoreComposerAfterFailure();
-            const message = `Could not add mentioned agent to the Huddle: ${getErrorMessage(
-              error,
-              "Huddle enrollment failed.",
-            )}`;
+            if (!sendChannelId) {
+              return restoreComposerAfterFailure();
+            }
+            if (!isMountedRef.current) {
+              persistPreflightDraft();
+              return;
+            }
+          }
+          const agentReadiness = durableOutbox
+            ? { errors: [] as string[], agentsToWake: [] as QueuedAgentWake[] }
+            : await ensureManagedAgentMentionsReady(
+                managedMentionPubkeys.filter(
+                  (pubkey) => !readyAgentPubkeys.has(normalizePubkey(pubkey)),
+                ),
+                sendChannelId ?? "",
+                onPrepareSendChannel ? preparedAgentPubkeys : [],
+                [...managedAgentsByPubkey.values()],
+                isSendCancelled,
+              );
+          // Every wake this send queued: persona creates carried on the draft
+          // (enqueued before the non-member prompt could defer us here), then
+          // the readiness pass's. Flushed only after the relay accepts the
+          // publish — every abort path between here and there just drops them,
+          // so no wake (or "your message was sent" failure toast) can exist for
+          // a message that never landed. First entry wins the dedupe because it
+          // carries the earliest replay floor, and the floor is a lower bound.
+          const agentsToWake = dedupeQueuedAgentWakes([
+            ...(draft.queuedAgentWakes ?? []),
+            ...agentReadiness.agentsToWake,
+          ]);
+          if (isSendCancelled()) return restoreComposerAfterFailure();
+          if (!isMountedRef.current) {
+            persistPreflightDraft();
+            return;
+          }
+          if (agentReadiness.errors.length > 0) {
+            const message =
+              agentReadiness.errors.length === 1
+                ? `Could not prepare agent mention: ${agentReadiness.errors[0]}`
+                : `Could not prepare agent mentions: ${agentReadiness.errors.join(
+                    "; ",
+                  )}`;
             setNonMemberPromptError(message);
             toast.error(message);
             return restoreComposerAfterFailure();
           }
-        }
-        const send = onSendRef.current;
-        const finishSend = async (
-          uploaded: ImetaMedia[],
-          signal?: AbortSignal,
-        ) => {
-          const { content: finalContent, mediaTags } = buildOutgoingMessage(
-            draft.trimmed,
-            [...draft.savedImeta, ...uploaded],
-            new Set([
-              ...draft.savedSpoileredAttachmentUrls,
-              ...draft.queuedAttachments.flatMap((attachment, index) =>
-                attachment.spoilered && uploaded[index]
-                  ? [uploaded[index].url]
-                  : [],
-              ),
-            ]),
-          );
-          const finalOutgoingTags = await resolvePreviewTags(
-            draft,
-            mediaTags,
-            outgoingTags,
-          );
-          if (!finalOutgoingTags || signal?.aborted || isSendCancelled())
-            return restoreComposerAfterFailure();
-          // The pass immediately before signing/publish is always fresh:
-          // mention authorization is re-validated here unconditionally,
-          // whatever did or did not separate it from the admission pass
-          // above (#5681).
-          const revalidatedMentionPubkeys =
-            await mentions.revalidateMentionPubkeys(
-              mentionPubkeys,
-              sendChannelId,
-              mentionRevalidationOptions(
-                draft,
-                "publish",
+          if (
+            !durableOutbox &&
+            preparedAgentPubkeys.length > 0 &&
+            sendChannelId
+          ) {
+            try {
+              await syncAgentsToActiveHuddle(
+                sendChannelId,
                 preparedAgentPubkeys,
+              );
+              if (isSendCancelled()) return restoreComposerAfterFailure();
+            } catch (error) {
+              if (isSendCancelled()) return restoreComposerAfterFailure();
+              const message = `Could not add mentioned agent to the Huddle: ${getErrorMessage(
+                error,
+                "Huddle enrollment failed.",
+              )}`;
+              setNonMemberPromptError(message);
+              toast.error(message);
+              return restoreComposerAfterFailure();
+            }
+          }
+          const send = onSendRef.current;
+          const finishSend = async (
+            uploaded: ImetaMedia[],
+            signal?: AbortSignal,
+          ) => {
+            const { content: finalContent, mediaTags } = buildOutgoingMessage(
+              draft.trimmed,
+              [...draft.savedImeta, ...uploaded],
+              new Set([
+                ...draft.savedSpoileredAttachmentUrls,
+                ...draft.queuedAttachments.flatMap((attachment, index) =>
+                  attachment.spoilered && uploaded[index]
+                    ? [uploaded[index].url]
+                    : [],
+                ),
+              ]),
+            );
+            const finalOutgoingTags = await resolvePreviewTags(
+              draft,
+              mediaTags,
+              outgoingTags,
+            );
+            if (!finalOutgoingTags || signal?.aborted || isSendCancelled())
+              return restoreComposerAfterFailure();
+            // The pass immediately before signing/publish is always fresh:
+            // mention authorization is re-validated here unconditionally,
+            // whatever did or did not separate it from the admission pass
+            // above (#5681).
+            const revalidatedMentionPubkeys = durableOutbox
+              ? mentionPubkeys
+              : await mentions.revalidateMentionPubkeys(
+                  mentionPubkeys,
+                  sendChannelId,
+                  mentionRevalidationOptions(
+                    draft,
+                    "publish",
+                    preparedAgentPubkeys,
+                  ),
+                );
+            if (signal?.aborted || isSendCancelled())
+              return restoreComposerAfterFailure();
+            const finalTagsWithAgentAddress = [
+              ...finalOutgoingTags,
+              ...buildAgentAddressMentionTags(
+                draft.addressedAgentPubkeys,
+                revalidatedMentionPubkeys,
               ),
-            );
-          if (signal?.aborted || isSendCancelled())
-            return restoreComposerAfterFailure();
-          const finalTagsWithAgentAddress = [
-            ...finalOutgoingTags,
-            ...buildAgentAddressMentionTags(
-              draft.addressedAgentPubkeys,
+            ];
+            const published = await send(
+              finalContent,
               revalidatedMentionPubkeys,
-            ),
-          ];
-          const published = await send(
-            finalContent,
-            revalidatedMentionPubkeys,
-            finalTagsWithAgentAddress,
-            sendChannelId,
-            draft.capturedThreadContext,
-            draft.preparedLinkPreviews != null,
-          );
-          if (draft.onPublished && published?.id)
-            queueMicrotask(() => draft.onPublished?.(published.id));
-          // The relay accepted the publish: flush the queued wakes now,
-          // before the post-send cancellation check — a cancellation racing
-          // a successful publish must not drop the wake for a message that
-          // did land. Fire-and-forget: the send awaits nothing here, and
-          // each wake carries its enqueue-time replay floor so the spawned
-          // harness replays back past this message however late the flush.
-          for (const wake of agentsToWake) {
-            startAgentDetached(wake.agent, wake.replayFloorUnix);
-          }
-          if (signal?.aborted || isSendCancelled()) return;
-          const sentMentionPubkeys = new Set(
-            revalidatedMentionPubkeys.map(normalizePubkey),
-          );
-          const newlyPinnedPubkeys = draft.inlineAgentMentionPubkeys.filter(
-            (pubkey) => sentMentionPubkeys.has(normalizePubkey(pubkey)),
-          );
-          if (
-            ownsComposer() &&
-            getComposerRevision() === draft.composerRevision
-          ) {
-            onAddressedAgentsSendSucceeded?.(
-              [
-                ...new Set([
-                  ...draft.addressedAgentPubkeys,
-                  ...newlyPinnedPubkeys,
-                ]),
-              ],
-              newlyPinnedPubkeys,
+              finalTagsWithAgentAddress,
+              sendChannelId,
+              draft.capturedThreadContext,
+              draft.preparedLinkPreviews != null,
+              durableOutbox
+                ? {
+                    attachments: draft.queuedAttachments,
+                    scope: draft.outboxScope,
+                    onSuperseded: () => {
+                      supersededInOutbox = true;
+                    },
+                    agentPubkeys: preparedAgentPubkeys,
+                    mentionRefs: draft.savedMentionRefs,
+                    wakes: agentsToWake.map((wake) => ({
+                      pubkey: wake.agent.pubkey,
+                      replayFloorUnix: wake.replayFloorUnix,
+                    })),
+                    onQueued: () => {
+                      try {
+                        clearCommittedComposer();
+                        if (
+                          draft.sentDraftKey &&
+                          draft.sourceOwner.getComposerRevision() ===
+                            draft.composerRevision &&
+                          JSON.stringify(
+                            drafts.loadDraft(draft.sentDraftKey)?.mentionRefs ??
+                              [],
+                          ) === JSON.stringify(draft.savedMentionRefs)
+                        ) {
+                          drafts.markDraftSent(
+                            draft.sentDraftKey,
+                            draft.savedContent,
+                            draft.capturedChannelId ?? draft.sentDraftKey,
+                            draft.savedImeta,
+                            [...draft.savedSpoileredAttachmentUrls],
+                          );
+                        }
+                      } finally {
+                        if (completeSendRef.current === draft) {
+                          completeSendRef.current = null;
+                          if (isMountedRef.current) setCompleteSendOwner(null);
+                        }
+                        acknowledgeQueue();
+                      }
+                    },
+                  }
+                : undefined,
             );
-          }
-          if (
-            draft.sentDraftKey &&
-            draft.sourceOwner.getComposerRevision() ===
-              draft.composerRevision &&
-            JSON.stringify(
-              drafts.loadDraft(draft.sentDraftKey)?.mentionRefs ?? [],
-            ) === JSON.stringify(draft.savedMentionRefs)
-          ) {
-            drafts.markDraftSent(
-              draft.sentDraftKey,
-              draft.savedContent,
-              draft.capturedChannelId ?? draft.sentDraftKey,
-              draft.savedImeta,
-              [...draft.savedSpoileredAttachmentUrls],
+            if (supersededInOutbox) return;
+            if (draft.onPublished && published?.id)
+              queueMicrotask(() => draft.onPublished?.(published.id));
+            // The relay accepted the publish: flush the queued wakes now,
+            // before the post-send cancellation check — a cancellation racing
+            // a successful publish must not drop the wake for a message that
+            // did land. Fire-and-forget: the send awaits nothing here, and
+            // each wake carries its enqueue-time replay floor so the spawned
+            // harness replays back past this message however late the flush.
+            for (const wake of durableOutbox ? [] : agentsToWake) {
+              startAgentDetached(wake.agent, wake.replayFloorUnix);
+            }
+            if (signal?.aborted || isSendCancelled()) return;
+            const sentMentionPubkeys = new Set(
+              revalidatedMentionPubkeys.map(normalizePubkey),
             );
-          }
-        };
-        if (preparedUpload) {
-          let settleUpload!: () => void;
-          const uploadSettled = new Promise<void>((resolve) => {
-            settleUpload = resolve;
-          });
-          uploadStarted = preparedUpload.start({
-            onComplete: async (uploaded, signal) => {
-              try {
-                await finishSend(uploaded, signal);
-              } catch (error) {
+            const newlyPinnedPubkeys = draft.inlineAgentMentionPubkeys.filter(
+              (pubkey) => sentMentionPubkeys.has(normalizePubkey(pubkey)),
+            );
+            if (
+              ownsComposer() &&
+              getComposerRevision() === draft.composerRevision
+            ) {
+              onAddressedAgentsSendSucceeded?.(
+                [
+                  ...new Set([
+                    ...draft.addressedAgentPubkeys,
+                    ...newlyPinnedPubkeys,
+                  ]),
+                ],
+                newlyPinnedPubkeys,
+              );
+            }
+            if (
+              draft.sentDraftKey &&
+              draft.sourceOwner.getComposerRevision() ===
+                draft.composerRevision &&
+              JSON.stringify(
+                drafts.loadDraft(draft.sentDraftKey)?.mentionRefs ?? [],
+              ) === JSON.stringify(draft.savedMentionRefs)
+            ) {
+              drafts.markDraftSent(
+                draft.sentDraftKey,
+                draft.savedContent,
+                draft.capturedChannelId ?? draft.sentDraftKey,
+                draft.savedImeta,
+                [...draft.savedSpoileredAttachmentUrls],
+              );
+            }
+          };
+          if (preparedUpload) {
+            let settleUpload!: () => void;
+            const uploadSettled = new Promise<void>((resolve) => {
+              settleUpload = resolve;
+            });
+            uploadStarted = preparedUpload.start({
+              onComplete: async (uploaded, signal) => {
+                try {
+                  await finishSend(uploaded, signal);
+                } catch (error) {
+                  restoreComposerAfterFailure();
+                  toast.error(
+                    error instanceof AgentMentionAuthorizationError
+                      ? error.message
+                      : formatMessageSendError(error),
+                  );
+                } finally {
+                  settleUpload();
+                }
+              },
+              onError: (error) => {
                 restoreComposerAfterFailure();
                 toast.error(
-                  error instanceof AgentMentionAuthorizationError
-                    ? error.message
-                    : formatMessageSendError(error),
+                  `Upload failed: ${getErrorMessage(error, "Unknown error")}`,
                 );
-              } finally {
                 settleUpload();
-              }
-            },
-            onError: (error) => {
+              },
+              onCancel: () => {
+                restoreComposerAfterFailure();
+                settleUpload();
+              },
+            });
+            if (!uploadStarted) {
+              settleUpload();
+              return restoreComposerAfterFailure();
+            }
+            await uploadSettled;
+          }
+          if (!preparedUpload) {
+            try {
+              await finishSend([]);
+            } catch (error) {
               restoreComposerAfterFailure();
               toast.error(
-                `Upload failed: ${getErrorMessage(error, "Unknown error")}`,
+                error instanceof AgentMentionAuthorizationError
+                  ? error.message
+                  : formatMessageSendError(error),
               );
-              settleUpload();
-            },
-            onCancel: () => {
-              restoreComposerAfterFailure();
-              settleUpload();
-            },
-          });
-          if (!uploadStarted) {
-            settleUpload();
-            return restoreComposerAfterFailure();
+            }
           }
-          await uploadSettled;
-        }
-        if (!preparedUpload) {
-          try {
-            await finishSend([]);
-          } catch (error) {
-            restoreComposerAfterFailure();
-            toast.error(
-              error instanceof AgentMentionAuthorizationError
-                ? error.message
-                : formatMessageSendError(error),
-            );
+        } catch (error) {
+          if (error instanceof OutboxRemovedError) return;
+          restoreComposerAfterFailure();
+          toast.error(
+            getErrorMessage(error, "Could not send message. Please retry."),
+          );
+        } finally {
+          if (draft.preparedLinkPreviews) {
+            activePreparedLinkPreviews.delete(draft.preparedLinkPreviews);
+          }
+          draft.preparedLinkPreviews?.release();
+          if (!uploadStarted) preparedUpload?.cancel();
+          draft.invitationSignal?.removeEventListener("abort", cancelSend);
+          if (completeSendRef.current === draft) {
+            completeSendRef.current = null;
+            if (isMountedRef.current) setCompleteSendOwner(null);
           }
         }
-      } catch (error) {
-        restoreComposerAfterFailure();
-        toast.error(
-          getErrorMessage(error, "Could not send message. Please retry."),
-        );
-      } finally {
-        if (draft.preparedLinkPreviews) {
-          activePreparedLinkPreviews.delete(draft.preparedLinkPreviews);
-        }
-        draft.preparedLinkPreviews?.release();
-        if (!uploadStarted) preparedUpload?.cancel();
-        draft.invitationSignal?.removeEventListener("abort", cancelSend);
-        if (completeSendRef.current === draft) {
-          completeSendRef.current = null;
-          if (isMountedRef.current) setCompleteSendOwner(null);
-        }
-      }
+      })();
+      await Promise.race([operation, queued]);
     },
     [
+      durableOutbox,
+      managedAgentsQuery.data,
+      mentions.memberPubkeys,
       clearComposer,
       getComposerRevision,
       runComposerUpdate,
@@ -872,6 +968,7 @@ export function useMentionSendFlow({
               .filter((ref) => ref.isAgent)
               .map((ref) => ref.pubkey),
           ),
+          outboxScope,
           capturedChannelId: effectiveChannelId,
           capturedThreadContext,
           trimmed,
@@ -918,6 +1015,7 @@ export function useMentionSendFlow({
     },
     [
       completeSend,
+      outboxScope,
       effectiveDraftKey,
       sourceOwner,
       getComposerRevision,
