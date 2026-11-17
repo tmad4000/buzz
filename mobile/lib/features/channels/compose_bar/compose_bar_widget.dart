@@ -5,6 +5,10 @@ class ComposeBar extends HookConsumerWidget {
   final String channelName;
   final String? hintText;
   final ComposeBarOnSend onSend;
+  final ComposeBarOnQueue? onQueue;
+  final String? draftKeyOverride;
+  final List<OutboxAttachment> initialAttachments;
+  final bool showOutbox;
 
   /// Lets a parent prepare its layout before the editor requests focus.
   final VoidCallback? onFocusRequested;
@@ -29,6 +33,10 @@ class ComposeBar extends HookConsumerWidget {
     this.onFocusRestorerChanged,
     this.onFocusRequested,
     required this.onSend,
+    this.onQueue,
+    this.draftKeyOverride,
+    this.initialAttachments = const [],
+    this.showOutbox = true,
   });
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -38,7 +46,9 @@ class ComposeBar extends HookConsumerWidget {
       () => controller.text,
     );
     useEffect(() => controller.dispose, [controller]);
-    final draftKey = composeDraftKey(channelId, threadHeadId: threadHeadId);
+    final draftKey =
+        draftKeyOverride ??
+        composeDraftKey(channelId, threadHeadId: threadHeadId);
     final draftRevision = useRef(0);
     final draftIdentity = _composerDraftIdentity(ref);
     final isComposerExpanded = useState(false);
@@ -72,6 +82,7 @@ class ComposeBar extends HookConsumerWidget {
     final uploadError = useState<String?>(null);
     final uploadingCount = useState(0);
     final uploadProgress = useState(0.0);
+    _useInitialOutboxAttachments(attachments, initialAttachments);
     final uploadGeneration = useRef(0);
     final activeUploadCancellation = useRef<UploadCancellationToken?>(null);
     final voiceNote = _useComposerVoiceNote(
@@ -502,221 +513,288 @@ class ComposeBar extends HookConsumerWidget {
       _removePendingAttachment(attachments, draftRevision, id);
     }
 
-    // Send the message.
+    final sendEntry = useRef(false);
     Future<void> send() async {
-      final text = controller.text.trim();
-      if ((text.isEmpty && !hasAttachments) ||
-          isSending.value ||
-          uploadingCount.value > 0) {
-        return;
-      }
-      final submittedDraftRevision = draftRevision.value;
-      // Resolved before any await: see
-      // `_reportSendCancelledByCommunitySwitch`.
-      final messenger = ScaffoldMessenger.maybeOf(context);
-
-      // Extract pubkeys for mentions present in the final text.
-      List<MentionCandidate> selectedMentions;
+      if (sendEntry.value) return;
+      sendEntry.value = true;
+      final capturedFiles = List<_PendingAttachment>.of(attachments.value);
+      OutboxFileLease? entryLease = onQueue == null
+          ? null
+          : OutboxFileLease(capturedFiles.map((file) => file.file));
       try {
-        selectedMentions = _resolveComposerMentions(
-          text,
-          mentionMap.value,
-          buildMentionCandidates(
-            members: channelMembersForAutocomplete(
-              membersAsync: membersAsync,
-              sessionStatus: sessionStatus,
-              cachedMembers: cachedMembers,
-            ),
-            relayAgents: const [],
-            sharedChannelIds: const {},
-            userCache: userCache,
-            ownerByAgentPubkey: agentOwners ?? const {},
-          ),
-          buildMentionCandidates(
-            members: membersAsync.asData?.value ?? const [],
-            relayAgents: relayAgents ?? const [],
-            sharedChannelIds: {
-              for (final c in channels)
-                if (c.isMember && !c.isArchived) c.id,
-            },
-            userCache: userCache,
-            ownerByAgentPubkey: agentOwners ?? const {},
-            currentPubkey: currentPubkey,
-            // Reuse ordinary search-result classification, not membership as
-            // permission. Persisted keys/flags themselves prove no role.
-            searchResults: [
-              for (final c in mentionMap.value.values)
-                if (c.requiresRevalidation && userCache[c.pubkey] != null)
-                  userCache[c.pubkey]!,
-            ],
-          ),
-        );
-      } on FormatException catch (error) {
-        messenger?.showSnackBar(SnackBar(content: Text(error.message)));
-        return;
-      }
-      final outgoing = _OutgoingMentions(selectedMentions);
-      // Read before any await. These actions belong to this community and
-      // refuse to run after a switch, so an Invite answered after a switch
-      // cannot add people in the new community.
-      final channelActions = ref.read(channelActionsProvider);
-      final _NonMemberMentionScan scan;
-      try {
-        scan = await _scanNonMemberMentions(
-          ref,
-          channelId: channelId,
-          selectedMentions: selectedMentions,
-          currentPubkey: currentPubkey,
-        );
-      } catch (_) {
-        // Nothing was sent and the draft is untouched, so Retry sends it again.
-        messenger?.showSnackBar(
-          SnackBar(
-            content: const Text(
-              'Message not sent: could not check who is in this channel',
-            ),
-            action: SnackBarAction(
-              label: 'Retry',
-              onPressed: () => unawaited(send()),
-            ),
-          ),
-        );
-        return;
-      }
+        final text = controller.text.trim();
+        if ((text.isEmpty && !hasAttachments) ||
+            isSending.value ||
+            (onQueue == null && uploadingCount.value > 0)) {
+          return;
+        }
+        final submittedDraftRevision = draftRevision.value;
+        final messenger = ScaffoldMessenger.maybeOf(context);
 
-      // Mentioning anyone outside the channel, person or agent, prompts
-      // "Invite" / "Do nothing" (portable mention rules, section 7). Nobody
-      // can be added to a DM, so a DM sends them as references without asking.
-      if (scan.outside.isNotEmpty && scan.isDm) {
-        outgoing.resolveOutsideChoice(
-          _NonMemberMentionChoice.sendWithoutInviting,
-          scan.outside,
-        );
-      } else if (scan.outside.isNotEmpty) {
-        if (!context.mounted) return;
-        final choice = await _promptNonMemberMention(
-          context,
-          names: [for (final candidate in scan.outside) candidate.label],
-          canInvite: scan.canAddMembers,
-        );
-        if (choice == null) return; // Dismissed — keep the draft, send nothing.
-        outgoing.resolveOutsideChoice(choice, scan.outside);
-      }
-
-      final queuedAttachments = List<_PendingAttachment>.of(attachments.value);
-
-      // An add that was refused doesn't block the message: it is reported and
-      // the un-added mentions are demoted to reference tags so the send lands.
-      Future<void> addMentionedNonMembers() => outgoing.addNonMembers(
-        channelActions,
-        scan: scan,
-        messenger: messenger,
-      );
-
-      isSending.value = true;
-      try {
-        if (queuedAttachments.isEmpty) {
-          if (!context.mounted) return;
-          await _sendTextOnlyDraft(
-            context: context,
-            controller: controller,
-            mentionMap: mentionMap,
-            draftRevision: draftRevision,
-            submittedDraftRevision: submittedDraftRevision,
-            focusNode: focusNode,
-            clearComposer: clearComposer,
-            addMentionedNonMembers: addMentionedNonMembers,
-            payload: _ComposeDraftPayload.fromDraft(
-              text: text,
-              attachments: const [],
-              customEmoji: customEmoji,
+        List<MentionCandidate> selectedMentions;
+        try {
+          selectedMentions = _resolveComposerMentions(
+            text,
+            mentionMap.value,
+            buildMentionCandidates(
+              members: channelMembersForAutocomplete(
+                membersAsync: membersAsync,
+                sessionStatus: sessionStatus,
+                cachedMembers: cachedMembers,
+              ),
+              relayAgents: const [],
+              sharedChannelIds: const {},
+              userCache: userCache,
+              ownerByAgentPubkey: agentOwners ?? const {},
             ),
-            outgoing: outgoing,
-            onSend: onSend,
-            messenger: messenger,
+            buildMentionCandidates(
+              members: membersAsync.asData?.value ?? const [],
+              relayAgents: relayAgents ?? const [],
+              sharedChannelIds: {
+                for (final c in channels)
+                  if (c.isMember && !c.isArchived) c.id,
+              },
+              userCache: userCache,
+              ownerByAgentPubkey: agentOwners ?? const {},
+              currentPubkey: currentPubkey,
+              // Reuse ordinary search-result classification, not membership as
+              // permission. Persisted keys/flags themselves prove no role.
+              searchResults: [
+                for (final c in mentionMap.value.values)
+                  if (c.requiresRevalidation && userCache[c.pubkey] != null)
+                    userCache[c.pubkey]!,
+              ],
+            ),
+            deferValidation:
+                onQueue != null && sessionStatus != SessionStatus.connected,
+          );
+        } on FormatException catch (error) {
+          messenger?.showSnackBar(SnackBar(content: Text(error.message)));
+          return;
+        }
+        final outgoing = _OutgoingMentions(selectedMentions);
+        // Read before any await. These actions belong to this community and
+        // refuse to run after a switch, so an Invite answered after a switch
+        // cannot add people in the new community.
+        final channelActions = ref.read(channelActionsProvider);
+        final _NonMemberMentionScan scan;
+        try {
+          scan = onQueue != null && sessionStatus != SessionStatus.connected
+              ? _NonMemberMentionScan(
+                  channelId: channelId,
+                  outside: const [],
+                  canAddMembers: false,
+                  isDm: false,
+                )
+              : await _scanNonMemberMentions(
+                  ref,
+                  channelId: channelId,
+                  selectedMentions: selectedMentions,
+                  currentPubkey: currentPubkey,
+                );
+        } catch (_) {
+          // Nothing was sent and the draft is untouched, so Retry sends it again.
+          messenger?.showSnackBar(
+            SnackBar(
+              content: const Text(
+                'Message not sent: could not check who is in this channel',
+              ),
+              action: SnackBarAction(
+                label: 'Retry',
+                onPressed: () => unawaited(send()),
+              ),
+            ),
           );
           return;
         }
 
-        final draftText = controller.value;
-        final draftAttachments = List<_PendingAttachment>.of(attachments.value);
-        final draftMentions = Map<String, MentionCandidate>.of(
-          mentionMap.value,
+        // DMs keep outside mentions as references; channels ask before inviting.
+        if (scan.outside.isNotEmpty && scan.isDm) {
+          outgoing.resolveOutsideChoice(
+            _NonMemberMentionChoice.sendWithoutInviting,
+            scan.outside,
+          );
+        } else if (scan.outside.isNotEmpty) {
+          if (!context.mounted) return;
+          final choice = await _promptNonMemberMention(
+            context,
+            names: [for (final candidate in scan.outside) candidate.label],
+            canInvite: scan.canAddMembers,
+          );
+          if (choice == null) {
+            return;
+          }
+          outgoing.resolveOutsideChoice(choice, scan.outside);
+        }
+
+        final queuedAttachments = capturedFiles;
+
+        Future<void> addMentionedNonMembers() => outgoing.addNonMembers(
+          channelActions,
+          scan: scan,
+          messenger: messenger,
         );
-        clearComposer();
-        final clearedDraftRevision = draftRevision.value;
-        uploadingCount.value += 1;
-        uploadProgress.value = 0;
-        isSending.value = false;
-        final queueGeneration = uploadGeneration.value;
-        final cancellation = UploadCancellationToken();
-        final uploadService = ref.read(mediaUploadServiceProvider);
-        activeUploadCancellation.value = cancellation;
-        final delivery = onSend;
-        unawaited(() async {
-          var retainedForRetry = false;
-          try {
-            final uploaded = <BlobDescriptor>[];
-            for (var index = 0; index < queuedAttachments.length; index++) {
-              final attachment = queuedAttachments[index];
-              final descriptor = await _uploadPendingAttachment(
-                uploadService,
-                attachment,
-                onProgress: (progress) {
-                  if (context.mounted) {
-                    uploadProgress.value =
-                        (index + progress) / queuedAttachments.length;
-                  }
-                },
-                cancellationToken: cancellation,
+
+        isSending.value = true;
+        try {
+          if (!context.mounted) return;
+          if (onQueue case final queue?) {
+            final lease = entryLease!;
+            entryLease = null;
+            await _handoffDurableDraft(
+              lease: lease,
+              context: context,
+              queue: queue,
+              text: text,
+              attachments: queuedAttachments,
+              isDraftCurrent: () =>
+                  draftRevision.value == submittedDraftRevision,
+              clearComposer: clearComposer,
+              prepare: () async {
+                await addMentionedNonMembers();
+                if (!context.mounted ||
+                    draftRevision.value != submittedDraftRevision) {
+                  return null;
+                }
+                final keys = {
+                  for (final entry in mentionMap.value.entries)
+                    entry.key: entry.value.pubkey,
+                };
+                return (
+                  keys: keys,
+                  pubkeys: List<String>.of(outgoing.pubkeys),
+                  tags: [
+                    ...buildCustomEmojiTags(text, customEmoji),
+                    ...outgoing.referenceTags,
+                  ],
+                  retire: ref
+                      .read(composeDraftsProvider.notifier)
+                      .captureRetirement(draftKey, controller.text, keys),
+                );
+              },
+            );
+            return;
+          }
+          if (queuedAttachments.isEmpty) {
+            if (!context.mounted) return;
+            await _sendTextOnlyDraft(
+              context: context,
+              controller: controller,
+              mentionMap: mentionMap,
+              draftRevision: draftRevision,
+              submittedDraftRevision: submittedDraftRevision,
+              focusNode: focusNode,
+              clearComposer: clearComposer,
+              addMentionedNonMembers: addMentionedNonMembers,
+              payload: _ComposeDraftPayload.fromDraft(
+                text: text,
+                attachments: const [],
+                customEmoji: customEmoji,
+              ),
+              outgoing: outgoing,
+              onSend: onSend,
+              messenger: messenger,
+            );
+            return;
+          }
+
+          final draftText = controller.value;
+          final draftAttachments = List<_PendingAttachment>.of(
+            attachments.value,
+          );
+          final draftMentions = Map<String, MentionCandidate>.of(
+            mentionMap.value,
+          );
+          clearComposer();
+          final clearedDraftRevision = draftRevision.value;
+          uploadingCount.value += 1;
+          uploadProgress.value = 0;
+          isSending.value = false;
+          final queueGeneration = uploadGeneration.value;
+          final cancellation = UploadCancellationToken();
+          final uploadService = ref.read(mediaUploadServiceProvider);
+          activeUploadCancellation.value = cancellation;
+          final delivery = onSend;
+          unawaited(() async {
+            var retainedForRetry = false;
+            try {
+              final uploaded = <BlobDescriptor>[];
+              for (var index = 0; index < queuedAttachments.length; index++) {
+                final attachment = queuedAttachments[index];
+                final descriptor = await _uploadPendingAttachment(
+                  uploadService,
+                  attachment,
+                  onProgress: (progress) {
+                    if (context.mounted) {
+                      uploadProgress.value =
+                          (index + progress) / queuedAttachments.length;
+                    }
+                  },
+                  cancellationToken: cancellation,
+                );
+                if (queueGeneration != uploadGeneration.value) return;
+                uploaded.add(descriptor);
+                if (context.mounted) {
+                  uploadProgress.value = (index + 1) / queuedAttachments.length;
+                }
+              }
+              final payload = _ComposeDraftPayload.fromDraft(
+                text: text,
+                attachments: uploaded,
+                customEmoji: customEmoji,
               );
               if (queueGeneration != uploadGeneration.value) return;
-              uploaded.add(descriptor);
+              await addMentionedNonMembers();
+              if (queueGeneration != uploadGeneration.value) return;
+              await delivery(
+                payload.content,
+                outgoing.pubkeys,
+                mediaTags: [...payload.mediaTags, ...outgoing.referenceTags],
+              );
+            } catch (error) {
+              if (cancellation.isCancelled) return;
               if (context.mounted) {
-                uploadProgress.value = (index + 1) / queuedAttachments.length;
+                uploadError.value = _formatUploadError(error);
+              }
+              if (context.mounted &&
+                  queueGeneration == uploadGeneration.value &&
+                  draftRevision.value == clearedDraftRevision) {
+                attachments.value = draftAttachments;
+                retainedForRetry = true;
+                mentionMap.value
+                  ..clear()
+                  ..addAll(draftMentions);
+                controller.value = draftText;
+                focusNode.requestFocus();
+              }
+            } finally {
+              if (!retainedForRetry) {
+                await _deleteOwnedAttachments(queuedAttachments);
+              }
+              if (activeUploadCancellation.value == cancellation) {
+                activeUploadCancellation.value = null;
+              }
+              if (context.mounted &&
+                  queueGeneration == uploadGeneration.value) {
+                uploadingCount.value = math.max(0, uploadingCount.value - 1);
               }
             }
-            final payload = _ComposeDraftPayload.fromDraft(
-              text: text,
-              attachments: uploaded,
-              customEmoji: customEmoji,
-            );
-            if (queueGeneration != uploadGeneration.value) return;
-            await addMentionedNonMembers();
-            if (queueGeneration != uploadGeneration.value) return;
-            await delivery(
-              payload.content,
-              outgoing.pubkeys,
-              mediaTags: [...payload.mediaTags, ...outgoing.referenceTags],
-            );
-          } catch (error) {
-            if (cancellation.isCancelled) return;
-            if (context.mounted) uploadError.value = _formatUploadError(error);
-            if (context.mounted &&
-                queueGeneration == uploadGeneration.value &&
-                draftRevision.value == clearedDraftRevision) {
-              attachments.value = draftAttachments;
-              retainedForRetry = true;
-              mentionMap.value
-                ..clear()
-                ..addAll(draftMentions);
-              controller.value = draftText;
-              focusNode.requestFocus();
-            }
-          } finally {
-            if (!retainedForRetry) {
-              await _deleteOwnedAttachments(queuedAttachments);
-            }
-            if (activeUploadCancellation.value == cancellation) {
-              activeUploadCancellation.value = null;
-            }
-            if (context.mounted && queueGeneration == uploadGeneration.value) {
-              uploadingCount.value = math.max(0, uploadingCount.value - 1);
-            }
+          }());
+        } catch (error) {
+          if (context.mounted) {
+            uploadError.value = _composeSendErrorMessage(error);
           }
-        }());
+        } finally {
+          if (context.mounted && isSending.value) isSending.value = false;
+        }
       } finally {
-        if (context.mounted && isSending.value) isSending.value = false;
+        final abandoned = entryLease;
+        abandoned?.release();
+        if (abandoned != null && !context.mounted) {
+          await _deleteOwnedAttachments(capturedFiles);
+        }
+        sendEntry.value = false;
+        if (context.mounted) isSending.value = false;
       }
     }
 
@@ -1046,6 +1124,12 @@ class ComposeBar extends HookConsumerWidget {
               uploadProgress.value = 0;
             },
           ),
+          if (showOutbox && onQueue != null)
+            OutboxRows(
+              channelId: channelId,
+              parentId: threadHeadId,
+              rootId: rootId,
+            ),
           _ComposerOverlayPortal(
             controller: suggestionOverlayController,
             attachmentSurface: attachmentSurface,

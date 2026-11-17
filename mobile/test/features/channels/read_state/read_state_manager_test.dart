@@ -1,3 +1,4 @@
+import '../../../support/submission_only_relay.dart';
 import 'dart:async';
 import 'dart:convert';
 
@@ -204,7 +205,9 @@ NostrEvent _stubAckEvent() => const NostrEvent(
   sig: '',
 );
 
-class _FakeSignedEventRelay implements SignedEventRelay {
+class _FakeSignedEventRelay
+    with SubmissionOnlyRelay
+    implements SignedEventRelay {
   final Completer<_SubmittedEvent> submitted = Completer<_SubmittedEvent>();
   int submitCount = 0;
 
@@ -225,7 +228,9 @@ class _FakeSignedEventRelay implements SignedEventRelay {
   }
 }
 
-class _UnsupportedKindSignedEventRelay implements SignedEventRelay {
+class _UnsupportedKindSignedEventRelay
+    with SubmissionOnlyRelay
+    implements SignedEventRelay {
   int submitCount = 0;
 
   @override
@@ -244,7 +249,9 @@ class _UnsupportedKindSignedEventRelay implements SignedEventRelay {
   }
 }
 
-class _MissingScopeSignedEventRelay implements SignedEventRelay {
+class _MissingScopeSignedEventRelay
+    with SubmissionOnlyRelay
+    implements SignedEventRelay {
   int submitCount = 0;
 
   @override

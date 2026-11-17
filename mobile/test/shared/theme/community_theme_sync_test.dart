@@ -1,3 +1,4 @@
+import '../../support/submission_only_relay.dart';
 import 'dart:async';
 import 'dart:convert';
 
@@ -503,7 +504,7 @@ class _Submission {
   const _Submission(this.kind, this.content, this.tags);
 }
 
-class _FakeSignedRelay implements SignedEventRelay {
+class _FakeSignedRelay with SubmissionOnlyRelay implements SignedEventRelay {
   _FakeSignedRelay({
     this.failuresRemaining = 0,
     this.eventId = 'event',

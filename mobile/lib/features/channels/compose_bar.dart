@@ -39,6 +39,8 @@ import '../../shared/deeplink/deep_link.dart';
 import '../activity/compose_drafts_provider.dart';
 import 'camera_capture_cleanup.dart';
 import 'channel.dart';
+import 'outbox/message_outbox.dart';
+import 'outbox/outbox_rows.dart';
 import 'channel_management_provider.dart';
 import 'channels_provider.dart';
 import 'emoji_picker.dart';
@@ -54,6 +56,7 @@ part 'compose_bar/helpers.dart';
 part 'compose_bar/agent_mention_labels.dart';
 part 'compose_bar/markdown_editing_controller.dart';
 part 'compose_bar/draft_lifecycle.dart';
+part 'compose_bar/outbox_handoff.dart';
 part 'compose_bar/suggestions.dart';
 part 'compose_bar/mention_chooser.dart';
 part 'compose_bar/formatting_toolbar.dart';
@@ -75,4 +78,14 @@ typedef ComposeBarOnSend =
       String content,
       List<String> mentionPubkeys, {
       List<List<String>> mediaTags,
+    });
+
+/// Raw attachment handoff. Success means bytes and authored text are durable.
+typedef ComposeBarOnQueue =
+    Future<void> Function(
+      String content,
+      List<String> mentionPubkeys, {
+      List<List<String>> mediaTags,
+      List<OutboxAttachment> attachments,
+      Map<String, String> mentionKeys,
     });

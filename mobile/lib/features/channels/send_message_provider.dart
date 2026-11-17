@@ -61,6 +61,42 @@ class SendMessage {
     Channel? channel,
     List<List<String>> mediaTags = const [],
   }) async {
+    final prepared = await prepare(
+      channelId: channelId,
+      content: content,
+      parentEventId: parentEventId,
+      rootEventId: rootEventId,
+      mentionPubkeys: mentionPubkeys,
+      channel: channel,
+      mediaTags: mediaTags,
+    );
+    _ensureDeliveryValid();
+    NostrEvent? localMessage;
+    try {
+      localMessage = prepared;
+      _markLocalMessageForAnimation(channelId, prepared.id);
+      _addLocalMessage(channelId, prepared);
+      await _signedEventRelay.publish(prepared);
+      _completeLocalMessage(channelId, prepared.id);
+    } catch (_) {
+      final event = localMessage;
+      if (event != null) _removeLocalMessage(channelId, event.id);
+      rethrow;
+    }
+  }
+
+  /// Reuse the ordinary channel/thread tag builder without publishing.
+  Future<NostrEvent> prepare({
+    required String channelId,
+    required String content,
+    String? parentEventId,
+    String? rootEventId,
+    List<String>? mentionPubkeys,
+    Channel? channel,
+    List<List<String>> mediaTags = const [],
+    String? clientMessageId,
+    int? intendedAt,
+  }) async {
     _ensureDeliveryValid();
     // Use explicitly passed pubkeys, or resolve @mentions against
     // channel members to avoid matching the wrong user.
@@ -113,25 +149,15 @@ class SendMessage {
     ];
 
     _ensureDeliveryValid();
-    NostrEvent? localMessage;
-    try {
-      await _signedEventRelay.submit(
-        kind: EventKind.streamMessage,
-        content: content,
-        tags: tags,
-        onSigned: (event) {
-          localMessage = event;
-          _markLocalMessageForAnimation(channelId, event.id);
-          _addLocalMessage(channelId, event);
-        },
-      );
-      final event = localMessage;
-      if (event != null) _completeLocalMessage(channelId, event.id);
-    } catch (_) {
-      final event = localMessage;
-      if (event != null) _removeLocalMessage(channelId, event.id);
-      rethrow;
-    }
+    return _signedEventRelay.sign(
+      kind: EventKind.streamMessage,
+      content: content,
+      tags: [
+        ...tags,
+        if (clientMessageId != null) ['client_msg_id', clientMessageId],
+        if (intendedAt != null) ['client_written_at', '$intendedAt'],
+      ],
+    );
   }
 
   /// Resolve every identity that is actually a current member of this DM.

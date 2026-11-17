@@ -216,4 +216,59 @@ void main() {
       'first identity draft',
     );
   });
+  test('captured retirement preserves newer text and mention keys', () async {
+    SharedPreferences.setMockInitialValues({});
+    final container = await containerWithPrefs();
+    final drafts = container.read(composeDraftsProvider.notifier);
+    drafts.save(
+      key: 'ch1',
+      channelId: 'ch1',
+      text: 'original',
+      mentionKeys: {'name': 'key'},
+    );
+    final retire = drafts.captureRetirement('ch1', 'original', {'name': 'key'});
+    drafts.save(
+      key: 'ch1',
+      channelId: 'ch1',
+      text: 'newer',
+      mentionKeys: {'name': 'other'},
+    );
+    await retire();
+    expect(drafts.draftFor('ch1')!.text, 'newer');
+    expect(drafts.draftFor('ch1')!.mentionKeys, {'name': 'other'});
+  });
+
+  test(
+    'captured retirement works after owning container is disposed',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      final container = await containerWithPrefs();
+      final drafts = container.read(composeDraftsProvider.notifier);
+      drafts.save(key: 'ch1', channelId: 'ch1', text: 'captured');
+      final retire = drafts.captureRetirement('ch1', 'captured', {});
+      container.dispose();
+      await retire();
+      final reopened = await containerWithPrefs();
+      expect(reopened.read(composeDraftsProvider), isEmpty);
+    },
+  );
+  test(
+    'A to B to A draft cannot be retired by an older identical capture',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      final container = await containerWithPrefs();
+      final drafts = container.read(composeDraftsProvider.notifier);
+      drafts.save(key: 'ch1', channelId: 'ch1', text: 'hello');
+      final retire = drafts.captureRetirement('ch1', 'hello', {});
+      drafts.save(key: 'ch1', channelId: 'ch1', text: 'hello again');
+      drafts.save(key: 'ch1', channelId: 'ch1', text: 'hello');
+      final newer = drafts.draftFor('ch1')!.revision;
+      await retire();
+      expect(drafts.draftFor('ch1')!.revision, newer);
+      container.dispose();
+      final reopened = await containerWithPrefs();
+      expect(reopened.read(composeDraftsProvider).single.text, 'hello');
+      expect(reopened.read(composeDraftsProvider).single.revision, newer);
+    },
+  );
 }
