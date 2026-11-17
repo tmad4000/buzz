@@ -62,6 +62,7 @@ export function conversationRouteProjection(
       // Local projection is not another search activation. Each view retains
       // its highlight locally instead of inheriting the previous route's one.
       searchHighlight: null,
+      buzzConversationIntent: null,
       [HISTORY_KEY]: { ...metadata, ...(projectionId ? { projectionId } : {}) },
     }),
     replace,

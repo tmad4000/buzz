@@ -1,6 +1,7 @@
 export type ConversationHistoryOrigin = {
   entryKey: string | undefined;
   traversal: boolean;
+  fresh: boolean;
 };
 type HistoryPort = {
   location: { state: { __TSR_key?: string } };
@@ -23,6 +24,7 @@ export class ConversationHistoryOrigins {
     this.value = {
       entryKey: history.location.state.__TSR_key,
       traversal: false,
+      fresh: false,
     };
   }
   getSnapshot = () => this.value;
@@ -31,10 +33,12 @@ export class ConversationHistoryOrigins {
     if (!this.unsubscribe) {
       const key = this.history.location.state.__TSR_key;
       const changed = key !== this.value.entryKey;
-      if (changed) this.value = { entryKey: key, traversal: false };
+      if (changed)
+        this.value = { entryKey: key, traversal: false, fresh: false };
       this.unsubscribe = this.history.subscribe(({ location, action }) => {
         this.value = {
           entryKey: location.state.__TSR_key,
+          fresh: action.type === "PUSH" || action.type === "REPLACE",
           traversal:
             action.type === "BACK" ||
             action.type === "FORWARD" ||

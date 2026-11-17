@@ -14,6 +14,7 @@ import type { Channel } from "@/shared/api/types";
 import type { SearchHighlightNavigation } from "./navigation/searchHighlightNavigation";
 import { admittedRouteSearchHighlight } from "@/features/conversations/routeSearchHighlight";
 import { useConversationHistoryOrigin } from "@/features/conversations/useConversationHistoryOrigin";
+import { hasSidebarConversationIntent } from "@/features/conversations/conversationNavigationIntent";
 
 const ChannelRouteScreen = React.lazy(async () => {
   const module = await import("./routes/ChannelRouteScreen");
@@ -235,6 +236,9 @@ export function AppConversationWorkspace({
             search: location.search as Record<string, unknown>,
             state: location.state,
             historyTraversal: historyOrigin.traversal,
+            sidebarNavigation:
+              historyOrigin.fresh &&
+              hasSidebarConversationIntent(location.state),
           }
         : null,
     visibleViewIds: visible,

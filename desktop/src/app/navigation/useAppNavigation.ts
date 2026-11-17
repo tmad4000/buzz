@@ -14,6 +14,7 @@ import {
   traverseHistory,
 } from "@/app/navigation/navigationGuard";
 import type { SearchHit } from "@/shared/api/types";
+import { buildChannelNavigationState } from "@/features/conversations/conversationNavigationIntent";
 
 type NavigationBehavior = {
   force?: boolean;
@@ -279,6 +280,7 @@ export function useAppNavigation() {
         messageId?: string;
         /** Preserve an active search highlight; ordinary navigation clears it. */
         preserveSearchHighlight?: boolean;
+        paneNavigationOrigin?: "sidebar";
         searchHighlight?: SearchHighlightNavigation;
         replace?: boolean;
         /** Open this thread panel directly without waiting for a timeline row. */
@@ -305,12 +307,8 @@ export function useAppNavigation() {
             ...(options?.thread ? { thread: options.thread } : {}),
             ...(options?.autoSend ? { autoSend: options.autoSend } : {}),
           },
-          state: options?.preserveSearchHighlight
-            ? undefined
-            : (previousState: Record<string, unknown>) => ({
-                ...previousState,
-                searchHighlight: options?.searchHighlight ?? null,
-              }),
+          state: (previousState: Record<string, unknown>) =>
+            buildChannelNavigationState(previousState, options),
         },
         {
           force: options?.force,
