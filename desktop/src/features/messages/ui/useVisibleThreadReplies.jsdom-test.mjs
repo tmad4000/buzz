@@ -3,7 +3,13 @@ import { test } from "node:test";
 import React, { act } from "react";
 import { createRoot } from "react-dom/client";
 import { useVisibleThreadReplies } from "./useVisibleThreadReplies.ts";
+import { ConversationViewContext } from "@/features/conversations/ConversationViewContext";
 test("read acknowledgements require exposed committed rows, deduplicate, and reject detached/stale scope callbacks", async () => {
+  document.hasFocus = () => true;
+  Object.defineProperty(document, "visibilityState", {
+    configurable: true,
+    value: "visible",
+  });
   const previous = globalThis.IntersectionObserver;
   const observers = [];
   globalThis.IntersectionObserver = class {
@@ -37,11 +43,19 @@ test("read acknowledgements require exposed committed rows, deduplicate, and rej
       { ref },
       show
         ? messages.map((m) =>
-            React.createElement("article", {
-              key: m.id,
-              "data-testid": "message-row",
-              "data-message-id": m.id,
-            }),
+            React.createElement(
+              "article",
+              {
+                key: m.id,
+                "data-testid": "message-row",
+                "data-message-id": m.id,
+              },
+              React.createElement(
+                "div",
+                { "data-testid": "message-body" },
+                "body",
+              ),
+            ),
           )
         : null,
     );
@@ -80,4 +94,110 @@ test("read acknowledgements require exposed committed rows, deduplicate, and rej
     container.remove();
     globalThis.IntersectionObserver = previous;
   }
+});
+
+test("only intersecting reply bodies in the foreground are observed, with re-entry after focus", async () => {
+  document.hasFocus = () => true;
+  Object.defineProperty(document, "visibilityState", {
+    configurable: true,
+    value: "visible",
+  });
+  const observers = [];
+  globalThis.IntersectionObserver = class {
+    nodes = [];
+    constructor(callback) {
+      this.callback = callback;
+      observers.push(this);
+    }
+    observe(node) {
+      this.nodes.push(node);
+    }
+    disconnect() {}
+  };
+  const writes = [];
+  const onReveal = (rows) => writes.push(rows.map((x) => x.id));
+  const messages = [{ id: "reply", createdAt: 20 }];
+  function Host({ focused, viewId = "test" }) {
+    return React.createElement(
+      ConversationViewContext.Provider,
+      { value: { viewInstanceId: viewId, focused, visible: true } },
+      React.createElement(Rows),
+    );
+  }
+  function Rows() {
+    const ref = React.useRef(null);
+    useVisibleThreadReplies(ref, messages, onReveal, "root", "scope");
+    return React.createElement(
+      "div",
+      { ref },
+      React.createElement(
+        "div",
+        { "data-testid": "message-row", "data-message-id": "reply" },
+        React.createElement(
+          "div",
+          { "data-testid": "message-body" },
+          "reply body",
+        ),
+      ),
+    );
+  }
+  const container = document.createElement("div");
+  document.body.append(container);
+  const root = createRoot(container);
+  await act(async () =>
+    root.render(React.createElement(Host, { focused: true })),
+  );
+  let observer = observers.at(-1);
+  assert.equal(observer.nodes.length, 1);
+  const body = observer.nodes[0];
+  assert.equal(body.dataset.testid, "message-body");
+  body.getClientRects = () => [{ width: 100, height: 40 }];
+  await act(async () =>
+    observer.callback([{ target: body, isIntersecting: false }]),
+  );
+  assert.equal(writes.length, 0);
+  await act(async () =>
+    root.render(React.createElement(Host, { focused: false })),
+  );
+  await act(async () =>
+    observer.callback([{ target: body, isIntersecting: true }]),
+  );
+  assert.equal(writes.length, 0);
+  await act(async () =>
+    root.render(React.createElement(Host, { focused: true })),
+  );
+  observer = observers.at(-1);
+  await act(async () =>
+    observer.callback([{ target: body, isIntersecting: true }]),
+  );
+  assert.deepEqual(writes, [["reply"]]);
+  await act(async () =>
+    observer.callback([{ target: body, isIntersecting: true }]),
+  );
+  assert.equal(writes.length, 1);
+  const retired = observer;
+  await act(async () =>
+    root.render(
+      React.createElement(Host, { focused: true, viewId: "replacement-view" }),
+    ),
+  );
+  await act(async () =>
+    retired.callback([{ target: body, isIntersecting: true }]),
+  );
+  assert.equal(
+    writes.length,
+    1,
+    "same canonical reply rejects retired view callbacks",
+  );
+  observer = observers.at(-1);
+  await act(async () =>
+    observer.callback([{ target: body, isIntersecting: true }]),
+  );
+  assert.equal(
+    writes.length,
+    2,
+    "replacement view has its own observation lifecycle",
+  );
+  await act(async () => root.unmount());
+  container.remove();
 });
