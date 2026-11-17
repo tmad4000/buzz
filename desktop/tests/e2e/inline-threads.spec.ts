@@ -300,6 +300,12 @@ test("incoming replies above and below a scrolled reader preserve anchor, focuse
     "general",
     "9a1657ac-f7aa-5db0-b632-d8bbeb6dfb50",
   );
+  await page
+    .getByRole("combobox", { name: "Order", exact: true })
+    .selectOption("threads");
+  await expect(
+    page.getByRole("combobox", { name: "Order", exact: true }),
+  ).toHaveValue("threads");
   const ids = {
     closed: "e1".repeat(32),
     above: "e2".repeat(32),
@@ -384,13 +390,119 @@ test("incoming replies above and below a scrolled reader preserve anchor, focuse
     { ids, pubkey: TEST_IDENTITIES.bob.pubkey },
   );
   const timeline = page.getByTestId("message-timeline");
-  await timeline.evaluate((element) => {
-    element.scrollTop = 0;
-  });
   const anchor = timeline.locator(
     `[data-testid="message-row"][data-message-id="${ids.anchor}"]`,
   );
+  const aboveInline = timeline.locator(
+    `[data-testid="inline-thread"][data-thread-head-id="${ids.above}"]`,
+  );
+  const belowInline = timeline.locator(
+    `[data-testid="inline-thread"][data-thread-head-id="${ids.below}"]`,
+  );
+  // Wait for the whole seeded snapshot and both inline query bodies, not just
+  // the early anchor row while the deferred list is still chasing its floor.
+  const lastSeedId = (10000 + 16).toString(16).padStart(64, "0");
+  await expect(
+    timeline.locator(`[data-message-id="${lastSeedId}"]`),
+  ).toHaveCount(1);
   await expect(anchor).toHaveCount(1);
+  await expect(aboveInline).toContainText("Existing above reply");
+  await expect(belowInline).toContainText("Existing below reply");
+  const expectedOrder = [ids.closed, ids.above, ids.anchor, ids.below];
+  const captureFixtureOrder = () =>
+    timeline.evaluate((container, fixtureIds) => {
+      const rows = [
+        ...container.querySelectorAll<HTMLElement>(
+          '[data-testid="message-row"][data-message-id]',
+        ),
+      ];
+      const selected = rows.filter((row) =>
+        fixtureIds.includes(row.dataset.messageId ?? ""),
+      );
+      return {
+        order: selected.map((row) => row.dataset.messageId),
+        positions: selected.map((row) => ({
+          id: row.dataset.messageId,
+          top: row.getBoundingClientRect().top,
+          bottom: row.getBoundingClientRect().bottom,
+        })),
+        scrollTop: container.scrollTop,
+        scrollHeight: container.scrollHeight,
+        clientHeight: container.clientHeight,
+      };
+    }, expectedOrder);
+  const orderBeforePosition = await captureFixtureOrder();
+  await info.attach("incoming-fixture-order-before-position", {
+    body: JSON.stringify(orderBeforePosition),
+    contentType: "application/json",
+  });
+  expect(orderBeforePosition.order).toEqual(expectedOrder);
+  const setupSamples: {
+    phase: string;
+    samples: {
+      top: number;
+      scrollTop: number;
+      scrollHeight: number;
+      clientHeight: number;
+    }[];
+  }[] = [];
+  const waitForStableLayout = async (phase: string) => {
+    await expect
+      .poll(
+        async () => {
+          const samples = await timeline.evaluate(
+            async (container, anchorId) => {
+              const samples = [];
+              for (let frame = 0; frame < 4; frame++) {
+                await new Promise<void>((resolve) =>
+                  requestAnimationFrame(() => resolve()),
+                );
+                const row = container.querySelector<HTMLElement>(
+                  `[data-testid="message-row"][data-message-id="${anchorId}"]`,
+                );
+                if (!row) return [];
+                samples.push({
+                  top: row.getBoundingClientRect().top,
+                  scrollTop: container.scrollTop,
+                  scrollHeight: container.scrollHeight,
+                  clientHeight: container.clientHeight,
+                });
+              }
+              return samples;
+            },
+            ids.anchor,
+          );
+          setupSamples.push({ phase, samples });
+          return (
+            samples.length === 4 &&
+            (
+              ["top", "scrollTop", "scrollHeight", "clientHeight"] as const
+            ).every(
+              (key) =>
+                Math.max(...samples.map((sample) => sample[key])) -
+                  Math.min(...samples.map((sample) => sample[key])) <=
+                1,
+            )
+          );
+        },
+        { message: `Reader fixture layout must settle during ${phase}` },
+      )
+      .toBe(true);
+  };
+  await waitForStableLayout("seeded");
+  // Establish real upward reading intent before the one setup placement, so
+  // initial virtualizer floor settling cannot override it afterward.
+  await timeline.hover();
+  await page.mouse.wheel(0, -160);
+  await expect
+    .poll(() =>
+      timeline.evaluate(
+        (element) =>
+          element.scrollHeight - element.scrollTop - element.clientHeight,
+      ),
+    )
+    .toBeGreaterThan(32);
+  await waitForStableLayout("reader-wheel");
   await anchor.evaluate((element) => {
     const scroller = element.closest('[data-testid="message-timeline"]');
     if (!(scroller instanceof HTMLElement))
@@ -400,16 +512,18 @@ test("incoming replies above and below a scrolled reader preserve anchor, focuse
       scroller.getBoundingClientRect().top -
       120;
   });
-  await timeline.hover();
-  await page.mouse.wheel(0, -20);
-  const aboveInline = timeline.locator(
-    `[data-testid="inline-thread"][data-thread-head-id="${ids.above}"]`,
-  );
-  const belowInline = timeline.locator(
-    `[data-testid="inline-thread"][data-thread-head-id="${ids.below}"]`,
-  );
-  await expect(aboveInline).toContainText("Existing above reply");
-  await expect(belowInline).toContainText("Existing below reply");
+  await waitForStableLayout("positioned");
+  const orderAfterPosition = await captureFixtureOrder();
+  expect(orderAfterPosition.order).toEqual(expectedOrder);
+  const positionedOffset = await anchor.evaluate((element) => {
+    const scroller = element.closest('[data-testid="message-timeline"]');
+    if (!(scroller instanceof HTMLElement))
+      throw new Error("Missing scroll owner");
+    return (
+      element.getBoundingClientRect().top - scroller.getBoundingClientRect().top
+    );
+  });
+  expect(Math.abs(positionedOffset - 120)).toBeLessThanOrEqual(1);
   const assertOffscreenBaseline = async () => {
     const viewport = await timeline.boundingBox();
     const aboveBox = await aboveInline.boundingBox();
@@ -445,6 +559,7 @@ test("incoming replies above and below a scrolled reader preserve anchor, focuse
     selection?.removeAllRanges();
     selection?.addRange(range);
   });
+  await waitForStableLayout("focused");
   const baselineBoxes = await assertOffscreenBaseline();
   const readingAnchor = await timeline.evaluate((container) => {
     const viewport = container.getBoundingClientRect();
@@ -546,7 +661,16 @@ test("incoming replies above and below a scrolled reader preserve anchor, focuse
     ),
   ).toHaveCount(0);
   await info.attach("incoming-reader-anchor-and-selection", {
-    body: JSON.stringify({ before, baselineBoxes, readingAnchor, snapshots }),
+    body: JSON.stringify({
+      before,
+      baselineBoxes,
+      readingAnchor,
+      snapshots,
+      orderBeforePosition,
+      orderAfterPosition,
+      positionedOffset,
+      setupSamples,
+    }),
     contentType: "application/json",
   });
 });
