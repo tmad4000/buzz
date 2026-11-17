@@ -128,9 +128,17 @@ export function useUnreadSidebarThread({
     authoredVisit.current = {
       latestOwnKey,
       key,
-      seen: new Set(messages.map((m) => m.renderKey ?? m.id)),
+      seen: new Set(
+        messages
+          .filter(
+            (m) =>
+              !m.pending ||
+              completeThreadAncestors(index.messageById, root, m.id),
+          )
+          .map((m) => m.renderKey ?? m.id),
+      ),
     };
-  }, [key, messages, latestOwnKey]);
+  }, [key, messages, latestOwnKey, index, root]);
   const unread = new Set(
     messages.filter((m) => m.id !== root && isUnread?.(m.id)).map((m) => m.id),
   );

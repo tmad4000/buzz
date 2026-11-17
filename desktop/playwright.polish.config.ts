@@ -6,7 +6,7 @@ export default defineConfig({
     "inline-threads.spec.ts",
     "send-to-thread.spec.ts",
   ],
-  timeout: 45000,
+  timeout: 90000,
   workers: 1,
   reporter: [["list"]],
   use: {

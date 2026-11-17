@@ -840,6 +840,9 @@ export const ChannelPane = React.memo(function ChannelPane({
                   ) : null}
                   {timeoutActive ? <ComposerTimeoutBanner /> : null}
                   <ComposerDockBackdrop gutterClassName="inset-x-5" />
+                  {routedSend.notice ? (
+                    <div className="px-5">{routedSend.notice}</div>
+                  ) : null}
                   <MessageComposer
                     channelId={activeChannel?.id ?? null}
                     channelName={activeChannel?.name ?? "channel"}
@@ -865,7 +868,6 @@ export const ChannelPane = React.memo(function ChannelPane({
                     onSend={handleSendMessage}
                     threadRoutingEntries={mainTimelineEntries}
                     onCaptureRoutedSend={routedSend.captureSend}
-                    routedSendNotice={routedSend.notice}
                     {...{ profiles, recentMentionPubkeys: recentMentions }}
                     showBackgroundUploadProgress={false}
                     placeholder={

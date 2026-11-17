@@ -122,8 +122,6 @@ export type MessageComposerProps = {
   onCaptureRoutedSend?: (
     rootId: string,
   ) => ((messageId?: string) => void) | undefined;
-  /** Status belongs to the originating conversation view, outside the editor. */
-  routedSendNotice?: ReactNode;
   threadRoutingEntries?: readonly import("../lib/threadPanel").MainTimelineEntry[];
   typingParentEventId?: string | null;
   typingRootEventId?: string | null;
