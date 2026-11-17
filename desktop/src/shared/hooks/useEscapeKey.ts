@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useConversationControlScope } from "@/features/conversations/ConversationViewContext";
 
 import { acquireEscapeSurface } from "@/shared/hooks/escapeSurfaces";
 
@@ -14,11 +15,12 @@ import { acquireEscapeSurface } from "@/shared/hooks/escapeSurfaces";
  * Pass `enabled: false` to skip registering the listener entirely.
  */
 export function useEscapeKey(onEscape: () => void, enabled: boolean = true) {
+  const { active, canHandle } = useConversationControlScope();
   React.useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || !active) return;
     const releaseSurface = acquireEscapeSurface();
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape" && !event.defaultPrevented) {
+      if (event.key === "Escape" && !event.defaultPrevented && canHandle()) {
         event.preventDefault();
         onEscape();
       }
@@ -28,5 +30,5 @@ export function useEscapeKey(onEscape: () => void, enabled: boolean = true) {
       window.removeEventListener("keydown", handleKeyDown);
       releaseSurface();
     };
-  }, [enabled, onEscape]);
+  }, [active, canHandle, enabled, onEscape]);
 }

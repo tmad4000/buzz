@@ -1,11 +1,12 @@
 import { motion, useReducedMotion } from "motion/react";
 import * as React from "react";
+import { useConversationControlScope } from "@/features/conversations/ConversationViewContext";
 
 import {
   THREAD_FOCUS_DRAWER_TRAVEL_PX,
   THREAD_FOCUS_SLIVER_WIDTH_PX,
 } from "@/features/channels/lib/threadFocusLayout";
-import { getThreadViewMode } from "@/features/channels/lib/threadViewModePreference";
+import { useThreadViewMode } from "@/features/channels/lib/threadViewModePreference";
 import { cn } from "@/shared/lib/cn";
 
 type FocusThreadDrawerProps = {
@@ -193,6 +194,10 @@ export function FocusThreadDrawer({
   restoreFocusTarget,
 }: FocusThreadDrawerProps) {
   const prefersReducedMotion = useReducedMotion();
+  const { active, canHandle, canRestoreFocus } = useConversationControlScope();
+  const threadViewMode = useThreadViewMode();
+  const latestThreadViewMode = React.useRef(threadViewMode);
+  latestThreadViewMode.current = threadViewMode;
   const travelPx = prefersReducedMotion ? 0 : THREAD_FOCUS_DRAWER_TRAVEL_PX;
   const drawerRef = React.useRef<HTMLDivElement>(null);
   const overlayRef = React.useRef<HTMLDivElement>(null);
@@ -200,10 +205,10 @@ export function FocusThreadDrawer({
   const viewportRightInsetPx = useViewportRightInsetPx(overlayRef);
 
   React.useEffect(() => {
-    if (!escapeEnabled) return;
+    if (!escapeEnabled || !active) return;
 
     function handleEscape(event: KeyboardEvent) {
-      if (event.key !== "Escape") return;
+      if (event.key !== "Escape" || !canHandle()) return;
       const target = event.target;
       if (
         hasActiveEdit &&
@@ -221,18 +226,19 @@ export function FocusThreadDrawer({
     return () => {
       window.removeEventListener("keydown", handleEscape, { capture: true });
     };
-  }, [escapeEnabled, hasActiveEdit, onClose]);
+  }, [active, canHandle, escapeEnabled, hasActiveEdit, onClose]);
 
   React.useLayoutEffect(() => {
     previousFocusRef.current =
       document.activeElement instanceof HTMLElement
         ? document.activeElement
         : null;
-    drawerRef.current?.focus({ preventScroll: true });
+    if (canHandle()) drawerRef.current?.focus({ preventScroll: true });
 
     return () => {
       const previousFocus = previousFocusRef.current;
       requestAnimationFrame(() => {
+        if (!canRestoreFocus()) return;
         const explicitTarget = restoreFocusTarget?.();
         if (explicitTarget) {
           explicitTarget.focus({ preventScroll: true });
@@ -240,12 +246,15 @@ export function FocusThreadDrawer({
         }
         // A real dismissal keeps focus mode selected; a presentation switch
         // has already selected split mode and owns focus inside the new panel.
-        if (getThreadViewMode() === "focus") {
+        if (
+          latestThreadViewMode.current === "focus" &&
+          previousFocus?.isConnected
+        ) {
           previousFocus?.focus({ preventScroll: true });
         }
       });
     };
-  }, [restoreFocusTarget]);
+  }, [canHandle, canRestoreFocus, restoreFocusTarget]);
 
   return (
     <div
