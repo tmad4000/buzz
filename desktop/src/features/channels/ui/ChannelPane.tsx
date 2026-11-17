@@ -423,14 +423,18 @@ export const ChannelPane = React.memo(function ChannelPane({
     onWelcomeAddAgent: onAddAgent ? handleWelcomeAddAgent : undefined,
   });
   const channelIntro = isHuddleTranscript ? null : standardChannelIntro;
-  const { mainTimelineEntries, recentMentions, visibleMessages } =
-    useChannelPaneMessages({
-      activeChannel,
-      isHuddleTranscript,
-      messages,
-      profiles,
-      threadSummaries,
-    });
+  const {
+    mainTimelineEntries,
+    threadRoutingEntries,
+    recentMentions,
+    visibleMessages,
+  } = useChannelPaneMessages({
+    activeChannel,
+    isHuddleTranscript,
+    messages,
+    profiles,
+    threadSummaries,
+  });
   useRenderScopedReactionHydration({
     activeChannel,
     mainTimelineEntries,
@@ -899,7 +903,7 @@ export const ChannelPane = React.memo(function ChannelPane({
                         : undefined
                     }
                     onSend={handleSendMessage}
-                    threadRoutingEntries={mainTimelineEntries}
+                    threadRoutingEntries={threadRoutingEntries}
                     {...{ profiles, recentMentionPubkeys: recentMentions }}
                     showBackgroundUploadProgress={false}
                     placeholder={

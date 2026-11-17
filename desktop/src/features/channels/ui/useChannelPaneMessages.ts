@@ -55,8 +55,30 @@ export function useChannelPaneMessages({
     [activeChannel?.channelType, messages],
   );
 
+  // Composer routing selects canonical roots, independently of the display order.
+  const threadRoutingEntries = React.useMemo(
+    () =>
+      mode === "timeline" && !isHuddleTranscript
+        ? buildMainTimelineEntries(
+            visibleMessages,
+            new Set(),
+            threadSummaries,
+            profiles,
+          )
+        : mainTimelineEntries,
+    [
+      mode,
+      isHuddleTranscript,
+      visibleMessages,
+      threadSummaries,
+      profiles,
+      mainTimelineEntries,
+    ],
+  );
+
   return {
     mainTimelineEntries,
+    threadRoutingEntries,
     recentMentions: recentMentionPubkeys,
     visibleMessages,
   };

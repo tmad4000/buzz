@@ -63,18 +63,27 @@ export const TimelineViewContext = React.createContext<TimelineView>({
 export const useTimelineView = () => React.useContext(TimelineViewContext);
 
 /** One order setting; activity ordering waits for stable live-movement anchoring. */
-export function ChannelOrderSetting() {
+export function ChannelOrderSetting({
+  compact = false,
+}: {
+  compact?: boolean;
+}) {
   const { mode, changeMode } = useTimelineView();
   return (
     <label className="flex shrink-0 items-center gap-2 rounded-lg border border-border bg-background px-2.5 py-1 text-xs">
-      <span className="text-muted-foreground">Order</span>
+      <span className={compact ? "sr-only" : "text-muted-foreground"}>
+        Order
+      </span>
       <select
         aria-label="Order"
         value={mode}
         onChange={(event) =>
           changeMode(event.target.value === "timeline" ? "timeline" : "threads")
         }
-        className="min-w-0 max-w-48 bg-transparent font-medium text-foreground focus-visible:outline-2 focus-visible:outline-primary"
+        title={
+          CHANNEL_ORDER_OPTIONS.find((option) => option.value === mode)?.label
+        }
+        className={`${compact ? "w-28" : "max-w-48"} min-w-0 bg-transparent font-medium text-foreground focus-visible:outline-2 focus-visible:outline-primary`}
       >
         {CHANNEL_ORDER_OPTIONS.map(({ value, label, available }) => (
           <option key={value} value={value} disabled={!available}>
