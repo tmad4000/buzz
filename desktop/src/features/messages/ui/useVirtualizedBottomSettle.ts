@@ -44,7 +44,13 @@ export function useVirtualizedBottomSettle(
     const scroller = hostRef.current?.firstElementChild;
     const lastIndex = itemsLengthRef.current - 1;
     if (!(scroller instanceof HTMLDivElement) || lastIndex < 0) return;
-    listRef.current?.scrollToIndex(lastIndex, { align: "end" });
+    const list = listRef.current;
+    if (!list) return;
+    // A no-op scrollToIndex still starts Virtua's measurement/scroll work.
+    // Resize notifications at the settled floor must not feed that work back
+    // into another bottom jump.
+    if (list.scrollSize - list.viewportSize - list.scrollOffset <= 1) return;
+    list.scrollToIndex(lastIndex, { align: "end" });
   }, [hostRef, itemsLengthRef, listRef]);
 
   const schedulePinToBottom = React.useCallback(() => {
@@ -71,6 +77,17 @@ export function useVirtualizedBottomSettle(
       // physical floor.
       if (!event.ctrlKey) cancel();
     };
+    const retireForMessageHover = (event: PointerEvent) => {
+      if (
+        event.target instanceof HTMLElement &&
+        event.target.closest("[data-message-id]")
+      ) {
+        // Keep the message under the pointer still while its actions are used.
+        // Otherwise native scroll-into-view and a late queue/row resize fight
+        // the armed bottom pin before a pointerdown can reach the action.
+        cancel();
+      }
+    };
     const retireForScrollKey = (event: KeyboardEvent) => {
       if (
         !event.altKey &&
@@ -89,11 +106,15 @@ export function useVirtualizedBottomSettle(
     });
     scroller.addEventListener("touchmove", retire, { passive: true });
     scroller.addEventListener("wheel", retireForWheel, { passive: true });
+    scroller.addEventListener("pointermove", retireForMessageHover, {
+      passive: true,
+    });
     window.addEventListener("keydown", retireForScrollKey, true);
     return () => {
       scroller.removeEventListener("pointerdown", retireForPointer);
       scroller.removeEventListener("touchmove", retire);
       scroller.removeEventListener("wheel", retireForWheel);
+      scroller.removeEventListener("pointermove", retireForMessageHover);
       window.removeEventListener("keydown", retireForScrollKey, true);
     };
   }, [cancel, hostRef]);

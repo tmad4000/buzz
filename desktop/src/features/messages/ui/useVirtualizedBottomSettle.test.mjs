@@ -177,6 +177,69 @@ test("bottom intent follows arbitrarily late virtual geometry changes", async ()
   await act(async () => root.unmount());
 });
 
+test("settled geometry cannot feed another virtualizer bottom measurement loop", async () => {
+  const { content, refs, root, writes } = await mountHarness();
+  const list = refs.list.current;
+  Object.assign(list, {
+    scrollSize: 1200,
+    viewportSize: 400,
+    scrollOffset: 800,
+  });
+  refs.api.current.settle();
+  const observer = resizeObservers.find((entry) =>
+    entry.targets?.includes(content),
+  );
+  for (let index = 0; index < 20; index++) {
+    observer.callback();
+    flushAnimationFrames();
+  }
+  assert.equal(
+    writes.length,
+    0,
+    "already-settled extent needs no scroll command",
+  );
+  list.scrollSize = 1400;
+  observer.callback();
+  flushAnimationFrames();
+  assert.equal(writes.length, 1, "a genuinely new floor still settles");
+  list.scrollOffset = 1000;
+  observer.callback();
+  flushAnimationFrames();
+  assert.equal(writes.length, 1, "settlement does not trigger another pin");
+  await act(async () => root.unmount());
+});
+
+test("hovering a message retires scheduled bottom pin before its Reply action moves", async () => {
+  const { content, refs, root, scroller, writes } = await mountHarness();
+  refs.api.current.settle();
+  const observer = resizeObservers.find((entry) =>
+    entry.targets?.includes(content),
+  );
+  observer.callback();
+  const rowBody = new ElementShim();
+  rowBody.closest = (selector) =>
+    selector === "[data-message-id]" ? rowBody : null;
+  scroller.dispatchEvent({ type: "pointermove", target: rowBody });
+  flushAnimationFrames();
+  for (let index = 0; index < 20; index++) {
+    observer.callback();
+    flushAnimationFrames();
+  }
+  assert.equal(
+    writes.length,
+    1,
+    "pending row resize cannot override message interaction",
+  );
+  refs.api.current.settle();
+  assert.equal(
+    writes.length,
+    2,
+    "a later explicit own-send intent can settle again",
+  );
+  await act(async () => root.unmount());
+  assert.equal(scroller.listeners.get("pointermove")?.length, 0);
+});
+
 for (const eventType of ["pointerdown", "touchmove", "wheel", "keydown"]) {
   test(`${eventType} transfers ownership away from bottom intent`, async () => {
     const { content, refs, root, scroller, writes } = await mountHarness();
