@@ -138,6 +138,7 @@ export type ChannelPaneProps = {
       threadHeadId: string | null;
     } | null,
     forceRest?: boolean,
+    outbox?: import("@/features/messages/outbox/types").OutboxSubmission,
   ) => Promise<void | { id: string }>;
   onSendToChannel: (
     message: TimelineMessage,
