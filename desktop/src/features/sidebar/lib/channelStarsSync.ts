@@ -274,8 +274,11 @@ export class ChannelStarSyncManager {
       localStore,
       isLocalNonEmpty: (s) => Object.keys(s.channels).length > 0,
       publishFn: (s) => {
-        this.seedStore = s;
-        this.publishStars(s);
+        // A local star/bulk conversion made during the initial read is newer
+        // than its bootstrap snapshot; never replace that pending full store.
+        const latest = this.pendingStore ?? s;
+        this.seedStore = latest;
+        this.publishStars(latest);
       },
     });
   }

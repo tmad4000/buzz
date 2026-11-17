@@ -77,3 +77,58 @@ test("same-second star and unstar mutations survive at capacity", async () => {
     relayClient.subscribeToReconnects = originalSubscribeToReconnects;
   }
 });
+
+test("bulk conversion persists one complete snapshot and keeps existing favorites", async () => {
+  const { act, cleanup, renderHook } = await import("@testing-library/react");
+  const { relayClient } = await import("@/shared/api/relayClient");
+  const { readChannelStarsStore, storageKey } = await import(
+    "./channelStarsStorage.ts"
+  );
+  const { useChannelStars } = await import("./useChannelStars.ts");
+  const originals = [
+    relayClient.fetchEvents,
+    relayClient.subscribeLive,
+    relayClient.subscribeToReconnects,
+  ];
+  relayClient.fetchEvents = async () => [];
+  relayClient.subscribeLive = async () => async () => {};
+  relayClient.subscribeToReconnects = () => () => {};
+  const pk = "pk-bulk-conversion";
+  const channels = Object.fromEntries(
+    Array.from({ length: 500 }, (_, i) => [
+      `old-${i}`,
+      { starred: i === 0, updatedAt: 1 },
+    ]),
+  );
+  window.localStorage.setItem(
+    storageKey(pk),
+    JSON.stringify({ version: 1, channels }),
+  );
+  const proto = Object.getPrototypeOf(window.localStorage);
+  const save = proto.setItem;
+  let writes = 0;
+  proto.setItem = function (key, value) {
+    if (key === storageKey(pk)) writes++;
+    return save.call(this, key, value);
+  };
+  try {
+    const { result, unmount } = renderHook(() =>
+      useChannelStars(pk, "wss://bulk.test"),
+    );
+    act(() => result.current.starChannel(["new-one", "new-two"]));
+    const persisted = readChannelStarsStore(pk);
+    assert.equal(writes, 1);
+    assert.equal(Object.keys(persisted.channels).length, 500);
+    for (const id of ["old-0", "new-one", "new-two"])
+      assert.equal(persisted.channels[id].starred, true);
+    unmount();
+  } finally {
+    proto.setItem = save;
+    cleanup();
+    [
+      relayClient.fetchEvents,
+      relayClient.subscribeLive,
+      relayClient.subscribeToReconnects,
+    ] = originals;
+  }
+});

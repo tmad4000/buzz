@@ -10,6 +10,7 @@ import {
   Trash2,
 } from "lucide-react";
 
+import { useSidebarSectionOrder } from "./SidebarLayout";
 import { useRef, useState } from "react";
 import type * as React from "react";
 
@@ -163,8 +164,15 @@ export function SectionActionsMenu({
   sortMode?: ChannelSortMode;
   onSortModeChange?: (mode: ChannelSortMode) => void;
 }) {
+  const layout = useSidebarSectionOrder();
+  const moveUp = layout?.moveUp ?? onMoveSectionUp;
+  const moveDown = layout?.moveDown ?? onMoveSectionDown;
+  const first = layout?.isFirst ?? isFirstSection;
+  const last = layout?.isLast ?? isLastSection;
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const showSectionManagement = Boolean(onRenameSection || onDeleteSection);
+  const showSectionManagement = Boolean(
+    onRenameSection || onDeleteSection || moveUp || moveDown,
+  );
   const showSort = Boolean(sortMode && onSortModeChange);
 
   return (
@@ -226,19 +234,19 @@ export function SectionActionsMenu({
                 <span>Rename section</span>
               </DropdownMenuItem>
             ) : null}
-            {onMoveSectionUp ? (
+            {moveUp ? (
               <DropdownMenuItem
-                disabled={isFirstSection}
-                onSelect={() => deferMenuAction(onMoveSectionUp)}
+                disabled={first}
+                onSelect={() => deferMenuAction(moveUp)}
               >
                 <ArrowUp className="h-4 w-4" />
                 <span>Move up</span>
               </DropdownMenuItem>
             ) : null}
-            {onMoveSectionDown ? (
+            {moveDown ? (
               <DropdownMenuItem
-                disabled={isLastSection}
-                onSelect={() => deferMenuAction(onMoveSectionDown)}
+                disabled={last}
+                onSelect={() => deferMenuAction(moveDown)}
               >
                 <ArrowDown className="h-4 w-4" />
                 <span>Move down</span>
@@ -306,10 +314,12 @@ function ChannelSectionHeader({
   testId: string;
   actions: React.ReactNode;
 }) {
+  const layout = useSidebarSectionOrder();
   return (
     <div className="relative">
       <SidebarGroupLabel asChild>
         <button
+          {...layout?.dragHandleProps}
           aria-controls={contentId}
           aria-expanded={!isCollapsed}
           className={SECTION_LABEL_BUTTON_CLASS}
@@ -434,7 +444,7 @@ export function ChannelGroupSection({
         {items.map((channel) => (
           <ContextMenu key={channel.id}>
             <ContextMenuTrigger asChild>
-              <SidebarMenuItem className="content-visibility-auto-row">
+              <SidebarMenuItem className="content-visibility-auto-row group/menu-item">
                 {draggable ? (
                   <DraggableChannelRow channelId={channel.id}>
                     <ChannelMenuButton
@@ -739,7 +749,7 @@ export function CustomChannelSection({
                     {channels.map((channel) => (
                       <ContextMenu key={channel.id}>
                         <ContextMenuTrigger asChild>
-                          <SidebarMenuItem>
+                          <SidebarMenuItem className="group/menu-item">
                             <DraggableChannelRow channelId={channel.id}>
                               <ChannelMenuButton
                                 channel={channel}
@@ -776,16 +786,8 @@ export function CustomChannelSection({
                             onMarkChannelUnread={onMarkChannelUnread}
                             onMuteChannel={onMuteChannel}
                             onUnmuteChannel={onUnmuteChannel}
-                            onStarChannel={
-                              channel.channelType === "dm"
-                                ? undefined
-                                : onStarChannel
-                            }
-                            onUnstarChannel={
-                              channel.channelType === "dm"
-                                ? undefined
-                                : onUnstarChannel
-                            }
+                            onStarChannel={onStarChannel}
+                            onUnstarChannel={onUnstarChannel}
                             onAssignChannel={onAssignChannel}
                             onUnassignChannel={onUnassignChannel}
                             onCreateSectionForChannel={
