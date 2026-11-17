@@ -1,4 +1,10 @@
 import * as React from "react";
+import { ConversationViewContext } from "@/features/conversations/ConversationViewContext";
+import { ConversationComposerOwnership } from "@/features/conversations/ConversationComposerOwnership";
+import {
+  ConversationDraftEditorsContext,
+  DraftEditorPresentationContext,
+} from "@/features/conversations/ConversationDraftEditors";
 import { EditorContent } from "@tiptap/react";
 import {
   useChannelLinks,
@@ -123,6 +129,10 @@ function MessageComposerImpl({
     if (pressed) setIsEmojiPickerOpen(false);
     setIsFormattingOpen(pressed);
   }, []);
+  const presentation = React.useContext(DraftEditorPresentationContext);
+  const conversationView = React.useContext(ConversationViewContext);
+  const presentationRef = React.useRef(presentation);
+  presentationRef.current = presentation;
   const drafts = useDrafts();
   const identityQuery = useIdentityQuery();
   const effectiveDraftKey = draftKey ?? channelId;
@@ -300,6 +310,7 @@ function MessageComposerImpl({
     onLinkSelectionChange: (info) => onLinkSelectionChangeRef.current?.(info),
     onLinkShortcut: () => onLinkShortcutRef.current?.() ?? false,
     onUpdate: ({ cursor, linkPreviewContent, text }) => {
+      presentationRef.current?.publishPreview(text);
       trackAuthoredContent(text);
       contentRef.current = text;
       setComposerContentFromText(text);
@@ -384,6 +395,18 @@ function MessageComposerImpl({
     restoreQueuedAttachments: media.restoreQueuedAttachments,
     setSpoileredAttachmentUrls,
   });
+  const ownershipLocked =
+    Boolean(editTarget) ||
+    isEditSubmissionLocked ||
+    isSubmitLocked ||
+    voiceNote.status !== "idle" ||
+    mentionSendFlow.isPreparingMentionSend;
+  React.useLayoutEffect(() => {
+    presentation?.setLocked(ownershipLocked);
+  }, [presentation, ownershipLocked]);
+  React.useLayoutEffect(() => {
+    presentation?.publishPreview(contentRef.current);
+  }, [presentation, contentRef]);
   React.useEffect(() => {
     onDeferredEditPendingChange?.(isDeferredEditPending);
     return () => onDeferredEditPendingChange?.(false);
@@ -435,6 +458,27 @@ function MessageComposerImpl({
     if (!replyTarget || composerDisabled) return;
     richText.focusPreserve();
   }, [composerDisabled, replyTarget, richText.focusPreserve]);
+  const canFocusConversation =
+    conversationView === null ||
+    (conversationView.focused && conversationView.visible);
+  // Explicit Take over may focus the restored editor; ordinary pane mounts do not.
+  React.useLayoutEffect(() => {
+    if (
+      !canFocusConversation ||
+      document.visibilityState !== "visible" ||
+      !document.hasFocus()
+    ) {
+      presentation?.takeFocus();
+      return;
+    }
+    if (
+      !richText.editor ||
+      richText.editor.isDestroyed ||
+      !richText.editor.view.dom.isConnected
+    )
+      return;
+    if (presentation?.takeFocus()) richText.focus();
+  }, [presentation, richText.editor, richText.focus, canFocusConversation]);
   useComposerAutofocus(richText.focus, effectiveDraftKey, composerDisabled);
   const applyAutocompleteEdit = React.useCallback(
     (edit: AutocompleteEdit) => {
@@ -555,6 +599,7 @@ function MessageComposerImpl({
   });
   const submitMessage = React.useCallback(
     async (id?: string | null) => {
+      if (presentationRef.current && !presentationRef.current.canEdit()) return;
       const trimmed = syncComposerContentFromEditor().trim();
       // Edit mode
       if (editTargetRef.current && onEditSaveRef.current) {
@@ -636,6 +681,7 @@ function MessageComposerImpl({
       ) {
         return;
       }
+      presentationRef.current?.setLocked(true);
       isSubmitLockedRef.current = true;
       setIsSubmitLocked(true);
       onPreparingMentionSendChange?.(true);
@@ -665,6 +711,7 @@ function MessageComposerImpl({
         });
       } finally {
         isSubmitLockedRef.current = false;
+        presentationRef.current?.setLocked(false);
         setIsSubmitLocked(false);
         onPreparingMentionSendChange?.(false);
       }
@@ -1036,4 +1083,28 @@ function MessageComposerImpl({
     </>
   );
 }
-export const MessageComposer = React.memo(MessageComposerImpl);
+function MessageComposerWithOwnership(props: MessageComposerProps) {
+  const coordinator = React.useContext(ConversationDraftEditorsContext);
+  const view = React.useContext(ConversationViewContext);
+  const draftKey = props.draftKey ?? props.channelId;
+  const composer = (
+    <MessageComposerImpl
+      {...props}
+      autoSubmitDraftKey={view ? null : props.autoSubmitDraftKey}
+    />
+  );
+  return coordinator && view && draftKey ? (
+    <ConversationComposerOwnership
+      coordinator={coordinator}
+      viewInstanceId={view.viewInstanceId}
+      draftKey={draftKey}
+      onAttachmentAcceptanceChange={props.onAttachmentAcceptanceChange}
+      containerClassName={props.containerClassName}
+    >
+      {composer}
+    </ConversationComposerOwnership>
+  ) : (
+    composer
+  );
+}
+export const MessageComposer = React.memo(MessageComposerWithOwnership);
