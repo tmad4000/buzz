@@ -538,16 +538,21 @@ test("growth between the first visible row and focused inline editor preserves t
   const h = await mount();
   const inline = document.createElement("div");
   inline.dataset.testid = "inline-thread";
+  inline.dataset.threadHeadId = "row-30";
   const editor = document.createElement("textarea");
   editor.value = "Keep this focused inline draft";
   const composer = document.createElement("div");
   composer.dataset.testid = "message-composer";
   composer.append(editor);
-  inline.append(composer);
+  const footer = document.createElement("footer");
+  footer.dataset.composerTargetId = "row-30";
+  footer.append(composer);
+  inline.append(footer);
   // Production InlineChannelThread renders its composer after the reply rows,
   // not inside any article[data-message-id]. Model that exact ancestor shape.
   h.scroller.firstElementChild.append(inline);
   composer.getBoundingClientRect = () => h.rows[32].getBoundingClientRect();
+  editor.getBoundingClientRect = () => composer.getBoundingClientRect();
   try {
     const row = composer;
     assert.equal(editor.closest("[data-message-id]"), null);
