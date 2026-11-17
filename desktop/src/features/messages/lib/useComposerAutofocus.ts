@@ -1,4 +1,5 @@
 import * as React from "react";
+import { ConversationViewContext } from "@/features/conversations/ConversationViewContext";
 
 /**
  * Focus the composer editor on mount and whenever the active draft key
@@ -30,8 +31,11 @@ export function useComposerAutofocus(
 ) {
   // We read `disabled` at execution time but intentionally don't depend on
   // it — see the comment above.
+  const view = React.useContext(ConversationViewContext);
   const disabledRef = React.useRef(disabled);
-  disabledRef.current = disabled;
+  // Pane navigation manages initial/header focus explicitly. Mounting a
+  // second composer must not steal keyboard input from the existing view.
+  disabledRef.current = disabled || view !== null;
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: draftKey is the trigger; disabled is read via ref
   React.useEffect(() => {
