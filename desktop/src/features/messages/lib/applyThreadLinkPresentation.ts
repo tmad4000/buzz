@@ -11,6 +11,15 @@ export type ThreadOrganization = {
   operation: "link" | "unlink";
 };
 
+/** Transport provenance/follow metadata always uses the original native root. */
+export function canonicalThreadRootId(
+  message: Pick<TimelineMessage, "id" | "rootId" | "canonicalRootId">,
+): string {
+  return message.canonicalRootId !== undefined
+    ? (message.canonicalRootId ?? message.id)
+    : (message.rootId ?? message.id);
+}
+
 /** Only view fields change; tags, source bodies, IDs and wire ancestry stay raw. */
 export function applyThreadLinkPresentation(
   messages: TimelineMessage[],

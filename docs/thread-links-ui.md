@@ -2,7 +2,7 @@
 
 The stream/DM channel screen reads `buzz-thread-link-v1` kind9 annotations using the protocol in [thread-links.md](thread-links.md). Forum posts and huddle transcripts use their existing views.
 
-The UI loads the channel's annotation history before applying any organization. It resolves exact referenced originals and their native ancestors, then unions every affected canonical subthread. This matters when a previously top-level message C is displayed below A: replies whose native root remains C must still appear below A. The signed originals and tags are unchanged. Raw export and the send mutation continue using native ancestry; a presentation root is never passed to the relay as a native root.
+The UI loads the channel's annotation history before applying any organization. It resolves exact referenced originals and their native ancestors, then unions every affected canonical subthread. This matters when a previously top-level message C is displayed below A: replies whose native root remains C must still appear below A. The signed originals and tags are unchanged. Raw export and the send mutation continue using native ancestry; a presentation root is never passed to the relay as a native root. Reaction follow bookkeeping and send-to-channel provenance also retain the original native root; the UI never labels A's subject as C's native subject.
 
 The channel timeline, inline branches and independent thread panel receive a separate presentation projection. Opening a moved subroot shows its own descendants. Affected roots use counts derived from the verified union, rather than substituting the native relay summary for a projected total. Loading errors, incomplete history and resource limits retain original positions and show an explicit notice. Invalid, unauthorized or conflicting annotations remain ordinary visible messages, with receipt details available in the channel notice. Valid selected controls are represented by audit badges instead of new task messages.
 
@@ -29,7 +29,7 @@ Run the signed production loader/projector/undo tests and mounted hook/component
 ```sh
 cd desktop
 ../bin/node --import ./test-loader.mjs --experimental-strip-types --test src/features/messages/lib/threadLinkIntegration.test.mjs src/features/messages/lib/threadLinks.test.mjs src/features/messages/lib/threadLinkProjection.test.mjs
-../bin/node --import ./test-jsdom-setup.mjs --import ./test-loader.mjs --experimental-strip-types --test-force-exit --test src/features/messages/useChannelThreadLinks.jsdom-test.mjs src/features/messages/ui/useUnreadSidebarThread.jsdom-test.mjs
+../bin/node --import ./test-jsdom-setup.mjs --import ./test-loader.mjs --experimental-strip-types --test-force-exit --test src/features/messages/useChannelThreadLinks.jsdom-test.mjs src/features/messages/ui/useUnreadSidebarThread.jsdom-test.mjs src/features/messages/useThreadLinkWireMetadata.jsdom-test.mjs
 pnpm build:e2e
 BUZZ_THREAD_LINK_PORT=8873 pnpm exec playwright test --config=playwright.thread-links.config.ts
 ```
