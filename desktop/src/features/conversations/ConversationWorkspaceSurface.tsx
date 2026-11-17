@@ -23,7 +23,10 @@ type Props = {
     renderChannel: (props: ChannelScreenProps) => React.ReactNode,
   ) => React.ReactNode;
   /** Presentation focus was already committed; mirror the canonical URL without replacing another view. */
-  onFocusedViewChange?: (view: ConversationView) => void;
+  onFocusedViewChange?: (
+    view: ConversationView,
+    options: { replace: boolean },
+  ) => void;
 };
 
 /** One production workspace surface under the AppShell's existing drag coordinator. */
@@ -84,11 +87,11 @@ export function ConversationWorkspaceSurface({
     );
     return pane ? state.views[pane.viewInstanceId] : undefined;
   };
-  const announceFocus = (requestHeader: boolean) => {
+  const announceFocus = (requestHeader: boolean, replace = true) => {
     if (!canHandle()) return;
     const view = focused();
     if (!view) return;
-    current.current.onFocusedViewChange?.(view);
+    current.current.onFocusedViewChange?.(view, { replace });
     if (requestHeader && canHandle())
       setFocusRequest({
         viewId: view.id,
@@ -250,7 +253,7 @@ export function ConversationWorkspaceSurface({
                         interactive={active}
                         label={available.label}
                         initialPanelState={view.panelState}
-                        onPanelNavigate={(patch) => {
+                        onPanelNavigate={(patch, options) => {
                           if (!canHandle()) return;
                           if (
                             controller.update(view.id, view.channelId, visit, {
@@ -259,7 +262,7 @@ export function ConversationWorkspaceSurface({
                             controller.getSnapshot().layout.focusedPaneId ===
                               pane.id
                           )
-                            announceFocus(false);
+                            announceFocus(false, options?.replace ?? false);
                         }}
                         onFocusView={() => focusPane(pane.id)}
                         channel={{ ...channel, headerEndActions }}
