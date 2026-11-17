@@ -457,6 +457,107 @@ void main() {
     },
   );
   test(
+    '51 arrivals during held history are observed live, including the oldest, without capped late replay',
+    () async {
+      final f = await ThreadFixture.create(
+        roots: [topic(1)],
+        authored: {eventId(1)},
+        holdReplies: true,
+      );
+      await f.settle();
+      expect(
+        f.session.pendingReads.where((read) => read.filter.ids == null),
+        hasLength(1),
+      );
+      expect(
+        f.session.live,
+        hasLength(1),
+        reason: 'live must precede finite reply history',
+      );
+      expect(f.state.loading, isTrue);
+      for (var n = 100; n < 151; n++) {
+        f.session.live.single.onEvent(response(n, 1));
+      }
+      expect(f.state.items, hasLength(51));
+      expect(f.state.items.any((item) => item.id == eventId(100)), isTrue);
+      f.session.releaseReads();
+      await f.settle();
+      expect(f.state.items, hasLength(51));
+      expect(f.state.phase, ThreadInboxPhase.ready);
+      expect(f.state.historyLimited, isFalse);
+    },
+  );
+  test(
+    'fallback completion without EOSE stays partial and real EOSE alone restores live readiness',
+    () async {
+      final f = await ThreadFixture.create(
+        roots: [topic(1)],
+        authored: {eventId(1)},
+        signalReady: false,
+      );
+      await f.settle();
+      expect(f.state.loading, isFalse);
+      expect(f.state.phase, ThreadInboxPhase.partial);
+      expect(f.state.liveUnavailable, isTrue);
+      f.session.live.single.status(RelaySubscriptionStatus.ready);
+      expect(f.state.phase, ThreadInboxPhase.ready);
+      expect(f.state.liveUnavailable, isFalse);
+    },
+  );
+  test(
+    'capped replay remains partial after EOSE and later history, and early live eviction is retained',
+    () async {
+      final capped = await ThreadFixture.create(
+        roots: [topic(1)],
+        authored: {eventId(1)},
+        initialReplay: [for (var n = 100; n < 150; n++) response(n, 1)],
+      );
+      await capped.settle();
+      expect(capped.state.items, hasLength(50));
+      expect(capped.state.phase, ThreadInboxPhase.partial);
+      expect(capped.state.historyLimited, isTrue);
+      expect(capped.state.liveUnavailable, isFalse);
+      final f = await ThreadFixture.create(
+        roots: [topic(1)],
+        authored: {eventId(1)},
+        holdReplies: true,
+      );
+      await f.settle();
+      for (var n = 100; n < 610; n++) {
+        f.session.live.single.onEvent(response(n, 1));
+      }
+      expect(f.state.items, hasLength(500));
+      f.session.releaseReads();
+      await f.settle();
+      expect(f.state.items, hasLength(500));
+      expect(f.state.phase, ThreadInboxPhase.partial);
+      expect(f.state.historyLimited, isTrue);
+      f.session.live.single.status(RelaySubscriptionStatus.ready);
+      expect(f.state.phase, ThreadInboxPhase.partial);
+    },
+  );
+  test(
+    'membership loss during early subscription setup starts no history and closes late ownership',
+    () async {
+      final f = await ThreadFixture.create(
+        roots: [topic(1)],
+        authored: {eventId(1)},
+        holdSubscriptions: true,
+      );
+      await f.settle();
+      expect(f.session.reads.where((filter) => filter.ids == null), isEmpty);
+      final (live, completion) = f.session.pendingSubscriptions.single;
+      f.channels.change([memberChannel('a', member: false)]);
+      await f.settle();
+      completion.complete(live.close);
+      await f.settle();
+      expect(live.closed, isTrue);
+      live.onEvent(response(100, 1));
+      expect(f.state.items, isEmpty);
+      expect(f.session.reads.where((filter) => filter.ids == null), isEmpty);
+    },
+  );
+  test(
     'live admission failure is partial, retries recover, and stale callbacks cannot undo it',
     () async {
       final f = await ThreadFixture.create(
@@ -477,6 +578,14 @@ void main() {
       f.session.live.last.status(RelaySubscriptionStatus.retrying);
       expect(f.state.phase, ThreadInboxPhase.partial);
       f.session.live.last.status(RelaySubscriptionStatus.ready);
+      expect(f.state.phase, ThreadInboxPhase.partial);
+      expect(
+        f.state.liveUnavailable,
+        isTrue,
+        reason: 'EOSE cannot expose a cap hidden by transport replay dedup',
+      );
+      await f.source.refresh();
+      await f.settle();
       expect(f.state.phase, ThreadInboxPhase.ready);
     },
   );

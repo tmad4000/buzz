@@ -3,6 +3,7 @@ part of 'activity_page_test.dart';
 typedef _InboxBuilder =
     Future<Widget> Function({
       HomeFeedResponse? feed,
+      ActivityNotifier Function()? activityNotifier,
       TextScaler? textScaler,
       List<Override> overrides,
       List<NavigatorObserver> observers,
@@ -33,7 +34,133 @@ class _InboxRouteObserver extends NavigatorObserver {
   }
 }
 
+class _RecoverableMainFeed extends ActivityNotifier {
+  int retries = 0;
+  final recovery = Completer<HomeFeedResponse>();
+  @override
+  Future<HomeFeedResponse> build() async =>
+      throw StateError('synthetic private transport failure');
+  @override
+  Future<void> refresh() async {
+    retries++;
+    state = AsyncData(await recovery.future);
+  }
+}
+
 void _threadInboxWidgetCases(_InboxBuilder buildTestable) {
+  final tracked = FeedItem(
+    id: 'tracked',
+    kind: 9,
+    pubkey: 'bob_pk',
+    content: 'Available thread reply',
+    createdAt: DateTime.now().millisecondsSinceEpoch ~/ 1000,
+    channelId: 'ch1',
+    channelName: 'general',
+    category: 'activity',
+    tags: const [
+      ['e', 'tracked-root', '', 'reply'],
+    ],
+  );
+  testWidgets(
+    'main feed failure stays visible alongside ready tracked rows with independent bounded retry',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final main = _RecoverableMainFeed();
+      final threads = _CoverageSource(
+        ThreadInboxState(phase: ThreadInboxPhase.ready, items: [tracked]),
+      );
+      await tester.pumpWidget(
+        await buildTestable(
+          activityNotifier: () => main,
+          textScaler: const TextScaler.linear(2),
+          overrides: [threadInboxProvider.overrideWith(() => threads)],
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Available thread reply'), findsOneWidget);
+      expect(find.text('Some Inbox items couldn’t be loaded.'), findsOneWidget);
+      expect(find.textContaining('synthetic private'), findsNothing);
+      final retry = find.byKey(const Key('main-inbox-retry'));
+      await tester.tap(retry);
+      await tester.tap(retry);
+      await tester.pump();
+      expect(main.retries, 1);
+      expect(tester.widget<TextButton>(retry).onPressed, isNull);
+      expect(find.text('Loading Inbox items…'), findsOneWidget);
+      expect(find.text('Available thread reply'), findsOneWidget);
+      expect(threads.retries, 0);
+      // The coverage widget moves between sliver and empty-filter layouts.
+      // Retry ownership belongs to the page and must survive that move.
+      await tester.tap(find.byKey(const ValueKey('activity-filter-menu')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Mentions'));
+      await tester.pumpAndSettle();
+      expect(tester.widget<TextButton>(retry).onPressed, isNull);
+      expect(main.retries, 1);
+      await tester.tap(find.byKey(const ValueKey('activity-filter-menu')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('All'));
+      await tester.pumpAndSettle();
+      expect(tester.widget<TextButton>(retry).onPressed, isNull);
+      main.recovery.complete(
+        HomeFeedResponse(
+          mentions: [],
+          needsAction: [],
+          activity: [],
+          agentActivity: [],
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('main-inbox-coverage')), findsNothing);
+      expect(find.text('Available thread reply'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+  testWidgets(
+    'main loading preserves tracked rows and error cannot claim an empty filtered source',
+    (tester) async {
+      final threads = _CoverageSource(
+        ThreadInboxState(phase: ThreadInboxPhase.ready, items: [tracked]),
+      );
+      await tester.pumpWidget(
+        await buildTestable(
+          activityNotifier: _PendingActivityNotifier.new,
+          overrides: [threadInboxProvider.overrideWith(() => threads)],
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Loading Inbox items…'), findsOneWidget);
+      expect(find.text('Available thread reply'), findsOneWidget);
+      expect(find.byKey(const Key('main-inbox-retry')), findsNothing);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpWidget(
+        await buildTestable(
+          activityNotifier: _ErrorActivityNotifier.new,
+          overrides: [
+            threadInboxProvider.overrideWith(
+              () => _CoverageSource(
+                ThreadInboxState(
+                  phase: ThreadInboxPhase.ready,
+                  items: [tracked],
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('activity-filter-menu')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Mentions'));
+      await tester.pumpAndSettle();
+      expect(find.text('Some Inbox items couldn’t be loaded.'), findsOneWidget);
+      expect(find.text('No other Inbox items loaded.'), findsOneWidget);
+      expect(find.text('No mentions yet'), findsNothing);
+    },
+  );
   testWidgets(
     'tracked-source failure keeps base Inbox usable with honest retry at narrow 2x scale',
     (tester) async {

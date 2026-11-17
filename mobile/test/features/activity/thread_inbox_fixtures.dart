@@ -155,6 +155,8 @@ class TestSession extends RelaySessionNotifier {
   final pendingReads = <PendingRead>[];
   final pendingSubscriptions = <(TestLive, Completer<void Function()>)>[];
   List<NostrEvent> roots = [], replies = [], extraRoots = [], extraReplies = [];
+  List<NostrEvent> initialReplay = [];
+  bool signalReady = true;
   bool holdRoots = false, holdReplies = false, holdSubscriptions = false;
   bool failRoots = false, failReplies = false;
   int activeReads = 0, maxActiveReads = 0;
@@ -225,7 +227,10 @@ class TestSession extends RelaySessionNotifier {
       pendingSubscriptions.add((entry, pending));
       return pending.future;
     }
-    onStatusChanged(RelaySubscriptionStatus.ready);
+    for (final event in initialReplay) {
+      onEvent(event);
+    }
+    if (signalReady) onStatusChanged(RelaySubscriptionStatus.ready);
     return entry.close;
   }
 
@@ -258,6 +263,8 @@ class ThreadFixture {
     bool holdSubscriptions = false,
     bool failRoots = false,
     bool failReplies = false,
+    List<NostrEvent> initialReplay = const [],
+    bool signalReady = true,
   }) async {
     SharedPreferences.setMockInitialValues({});
     final prefs = await SharedPreferences.getInstance();
@@ -269,6 +276,8 @@ class ThreadFixture {
       ..holdSubscriptions = holdSubscriptions
       ..failRoots = failRoots
       ..failReplies = failReplies;
+    session.initialReplay = initialReplay;
+    session.signalReady = signalReady;
     final roster = TestChannels(channels ?? [memberChannel('a')]);
     final base = TestBaseFeed();
     final container = ProviderContainer(

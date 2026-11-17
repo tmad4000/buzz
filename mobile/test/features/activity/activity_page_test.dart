@@ -138,6 +138,8 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     final prefs = await SharedPreferences.getInstance();
     return ProviderScope(
+      // Synthetic source failures stay settled until an explicit test retry.
+      retry: (_, _) => null,
       overrides: [
         savedPrefsProvider.overrideWithValue(prefs),
         activityProvider.overrideWith(

@@ -226,6 +226,11 @@ class ThreadInboxNotifier extends Notifier<ThreadInboxState> {
           if (_bindings[id] != null) id: _bindings[id]!,
       };
       final batches = inboxReplyBatches(active);
+      // A bounded replay installed after history can omit an intervening burst.
+      // Register live ownership first, preserving busy through both phases.
+      state = state.copyWith(busy: true);
+      await _subscribe(session, generation, input, batches, liveSince);
+      if (!_current(generation, input)) return;
       for (
         var start = 0;
         start < batches.length;
@@ -274,10 +279,12 @@ class ThreadInboxNotifier extends Notifier<ThreadInboxState> {
       final evicted = _trimEvents();
       final unavailableRoots = active.length < requested.length;
       final more = input.roots.length > requested.length;
-      final limited = saturated || evicted;
+      final limited = saturated || evicted || state.historyLimited;
+      final liveUnavailable =
+          state.liveUnavailable || _liveUnavailable.isNotEmpty;
       final phase = (failed || unavailableRoots) && active.isEmpty
           ? ThreadInboxPhase.unavailable
-          : failed || unavailableRoots || more || limited
+          : failed || unavailableRoots || more || limited || liveUnavailable
           ? ThreadInboxPhase.partial
           : ThreadInboxPhase.ready;
       state = ThreadInboxState(
@@ -289,9 +296,9 @@ class ThreadInboxNotifier extends Notifier<ThreadInboxState> {
         rootCapReached: more && requested.length >= threadInboxMaxRoots,
         historyLimited: limited,
         unavailableRoots: failed || unavailableRoots,
+        liveUnavailable: liveUnavailable,
         busy: true,
       );
-      await _subscribe(session, generation, input, batches, liveSince);
     } finally {
       if (_current(generation, input)) {
         _inFlight = null;
@@ -360,6 +367,9 @@ class ThreadInboxNotifier extends Notifier<ThreadInboxState> {
       if (!_current(generation, input)) return;
       final batch = batches[index];
       final batchIndex = index;
+      var replaying = true;
+      var retryGap = false;
+      final replayIds = <String>{};
       void availability(bool available) {
         if (!_current(generation, input)) return;
         if (available) {
@@ -396,6 +406,18 @@ class ThreadInboxNotifier extends Notifier<ThreadInboxState> {
                 )) {
               return;
             }
+            // Completion of subscribeWithStatus can be its 500ms fallback,
+            // not EOSE. A capped initial/retry replay remains incomplete even
+            // after EOSE; history may be stale or share the same finite cap.
+            if (replaying && replayIds.length < threadInboxReplyLimit) {
+              replayIds.add(event.id);
+              if (replayIds.length >= threadInboxReplyLimit) {
+                state = state.copyWith(
+                  historyLimited: true,
+                  phase: ThreadInboxPhase.partial,
+                );
+              }
+            }
             if (_events.containsKey(event.id)) return;
             _events[event.id] = event;
             final limited = _trimEvents();
@@ -406,8 +428,20 @@ class ThreadInboxNotifier extends Notifier<ThreadInboxState> {
             );
           },
           onClosed: (_) => availability(false),
-          onStatusChanged: (status) =>
-              availability(status == RelaySubscriptionStatus.ready),
+          onStatusChanged: (status) {
+            if (status == RelaySubscriptionStatus.ready) {
+              replaying = false;
+              // The normal session dedups previously delivered rows before
+              // callbacks, so EOSE cannot prove a retry replay was below cap.
+              // A manual bounded fresh-subscription/history refresh can.
+              availability(!retryGap);
+            } else {
+              retryGap = true;
+              replaying = true;
+              replayIds.clear();
+              availability(false);
+            }
+          },
         );
         if (!_current(generation, input)) {
           cleanup();

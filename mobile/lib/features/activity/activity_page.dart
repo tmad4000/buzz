@@ -40,6 +40,7 @@ import 'dm_resurface.dart';
 import 'inbox_item.dart';
 import 'inbox_local_state_provider.dart';
 import 'inbox_read_state.dart';
+import 'main_inbox_coverage.dart';
 import 'reminders_provider.dart';
 import 'thread_inbox_provider.dart';
 import 'thread_inbox_state.dart';
@@ -87,6 +88,7 @@ class ActivityPage extends HookConsumerWidget {
         filter.value == InboxFilter.thread ||
         filter.value == InboxFilter.activity;
     final unreadOnly = useState(false);
+    final mainRetrying = useState(false);
     final scrollController = useScrollController();
     final reducedMotion = MediaQuery.disableAnimationsOf(context);
     useEffect(() {
@@ -353,6 +355,18 @@ class ActivityPage extends HookConsumerWidget {
       );
     }
 
+    Future<void> retryMainFeed() async {
+      if (mainRetrying.value) return;
+      mainRetrying.value = true;
+      try {
+        await ref.read(activityProvider.notifier).refresh();
+      } catch (_) {
+        // Keep the existing generic unavailable state.
+      } finally {
+        if (context.mounted) mainRetrying.value = false;
+      }
+    }
+
     Future<void> refresh() async {
       await Future.wait([
         ref.read(activityProvider.notifier).refresh(),
@@ -384,9 +398,11 @@ class ActivityPage extends HookConsumerWidget {
     } else if (!hasLoadedOnce.value && allItems.isEmpty) {
       body = _LoadingSkeleton(scrollController: scrollController);
     } else if (visibleItems.isEmpty &&
-        showThreadCoverage &&
-        threadSource.hasInterest &&
-        threadSource.phase != ThreadInboxPhase.ready) {
+        (feedAsync.hasError ||
+            feedAsync.isLoading ||
+            showThreadCoverage &&
+                threadSource.hasInterest &&
+                threadSource.phase != ThreadInboxPhase.ready)) {
       body = const Center(child: Text('No other Inbox items loaded.'));
     } else if (visibleItems.isEmpty) {
       body = _EmptyFilterState(
@@ -410,6 +426,12 @@ class ActivityPage extends HookConsumerWidget {
           controller: scrollController,
           slivers: [
             SliverToBoxAdapter(child: SizedBox(height: topSectionHeight)),
+            SliverToBoxAdapter(
+              child: MainInboxCoverage(
+                retrying: mainRetrying.value,
+                onRetry: retryMainFeed,
+              ),
+            ),
             if (showThreadCoverage)
               const SliverToBoxAdapter(child: ThreadInboxCoverage()),
             DecoratedSliver(
@@ -527,6 +549,11 @@ class ActivityPage extends HookConsumerWidget {
                 padding: EdgeInsets.only(top: topSectionHeight),
                 child: Column(
                   children: [
+                    if (allItems.isNotEmpty)
+                      MainInboxCoverage(
+                        retrying: mainRetrying.value,
+                        onRetry: retryMainFeed,
+                      ),
                     if (showThreadCoverage) const ThreadInboxCoverage(),
                     Expanded(child: body),
                   ],

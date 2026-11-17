@@ -7,7 +7,9 @@ stores and `threadFollowsProvider`; no second follow, task or shared status mode
 is persisted. Self-only channel catch-up explicitly publishes an immutable
 interest snapshot even when unread channel rows do not change.
 
-The existing addressed and DM feed stays available independently. Items merge
+The existing addressed and DM feed stays available independently, with its own
+loading/unavailable notice and main-only manual retry when tracked rows exist.
+Items merge
 by actual event ID before native thread grouping, keeping the existing explicit
 mention/action category when sources overlap. Unread uses the same root read
 frontier and local unread overrides. Personal Done/read state never resolves a
@@ -34,7 +36,14 @@ comments open the canonical parent post (exact comment focus is not supported).
 - Relay, signing identity, interest/follow or membership changes retire reads,
   cache and live ownership. Channel timestamp changes do not refetch the base
   Inbox. Reconnect within the same scope retains accepted rows while unavailable.
-- Live overlap starts before history reads, and exact event IDs absorb replay.
+- After exact root resolution, live handlers are registered before finite reply
+  history, and exact event IDs absorb replay. Returning a cleanup callback can
+  be the existing 500ms transport fallback; only an actual EOSE/status clears
+  live unavailability. A capped initial/retry replay remains partial after EOSE.
+  The normal transport suppresses previously delivered replay rows before
+  callbacks, so any in-place retry keeps coverage partial until a manual bounded
+  fresh-subscription/history retry. EOSE alone cannot reveal a hidden replay cap.
+  Early live rows and cache-eviction coverage survive history completion.
   Disposal and late subscription setup release only this source's subscriptions.
 
 Partial coverage is visible when roots remain unloaded/missing, a query reaches
