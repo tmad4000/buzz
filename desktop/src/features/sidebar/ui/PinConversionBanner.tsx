@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ChannelSection } from "../lib/channelSectionsStorage";
 import { pinSectionOffers } from "../lib/sidebarSectionOrder";
 import { MAX_CHANNEL_STAR_ENTRIES } from "../lib/channelStarsStorage";
@@ -21,19 +21,21 @@ export function PinConversionBanner({
   onHandled: (id: string) => void;
 }) {
   const stars = useSidebarStars();
+  const [failed, setFailed] = useState(false);
   const attempted = useRef(new Map<string, string>());
   useEffect(() => {
     if (!stars) return;
     for (const [id, ids] of Object.entries(pending)) {
       if (handled[id]) continue;
-      if (ids.every((channel) => stars.ids.has(channel))) {
-        onHandled(id);
-        continue;
-      }
       const fingerprint = JSON.stringify(ids);
       if (attempted.current.get(id) !== fingerprint) {
         attempted.current.set(id, fingerprint);
-        stars.star(ids);
+        void Promise.resolve()
+          .then(() => stars.star(ids))
+          .then((confirmed) => {
+            if (confirmed === true) onHandled(id);
+            else setFailed(true);
+          });
       }
     }
   }, [pending, handled, stars, onHandled]);
@@ -59,6 +61,12 @@ export function PinConversionBanner({
           Conversion saved for retry. Your section is safe.
         </p>
       ) : null}
+      {failed && queued ? (
+        <p role="alert">
+          Conversion is waiting for synchronization or available Starred
+          capacity. Retry when connected and space is available.
+        </p>
+      ) : null}
       {full ? (
         <p role="alert">
           Starred is full. Unstar some conversations before converting this
@@ -71,7 +79,13 @@ export function PinConversionBanner({
           disabled={full}
           className="underline disabled:opacity-50"
           onClick={() => {
-            if (queued) stars.star(ids);
+            if (queued)
+              void Promise.resolve()
+                .then(() => stars.star(ids))
+                .then((confirmed) => {
+                  if (confirmed === true) onHandled(offer.id);
+                  else setFailed(true);
+                });
             else onConvert(offer.id, ids);
           }}
         >

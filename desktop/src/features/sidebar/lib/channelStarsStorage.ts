@@ -123,6 +123,7 @@ export function writeChannelStarsStore(
 export function mergeStores(
   local: ChannelStarStore,
   remote: ChannelStarStore,
+  requireAllFavorites = false,
 ): ChannelStarStore {
   const allIds = new Set([
     ...Object.keys(local.channels),
@@ -138,7 +139,18 @@ export function mergeStores(
       merged[id] = (l ?? r) as ChannelStarEntry;
     }
   }
-  return boundStarStore({ version: 1, channels: merged });
+  if (
+    requireAllFavorites &&
+    Object.values(merged).filter((entry) => entry.starred).length >
+      MAX_CHANNEL_STAR_ENTRIES
+  )
+    throw new Error("Starred is full");
+  return boundStarStore(
+    { version: 1, channels: merged },
+    requireAllFavorites
+      ? Object.keys(merged).filter((id) => merged[id].starred)
+      : undefined,
+  );
 }
 
 export function starredChannelIdsFromStore(

@@ -52,6 +52,11 @@ export class ChannelStarSyncManager {
   private remoteStore: ChannelStarStore | null = null;
   private remoteRev = 0;
   private destroyed = false;
+  private converting = false;
+
+  isConverting(): boolean {
+    return this.converting;
+  }
 
   constructor(pubkey: string, relayUrl: string) {
     this.pubkey = pubkey;
@@ -175,7 +180,25 @@ export class ChannelStarSyncManager {
     return true;
   }
 
-  private async doPublish(store: ChannelStarStore): Promise<void> {
+  async publishConversion(
+    store: ChannelStarStore,
+  ): Promise<ChannelStarStore | null> {
+    this.converting = true;
+    this.cancelPendingStarPublish();
+    this.pendingStore = store;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const revision = this.remoteRev;
+      const confirmed = await this.doPublish(store, true);
+      if (confirmed || this.destroyed || revision === this.remoteRev)
+        return confirmed;
+    }
+    return null;
+  }
+
+  private async doPublish(
+    store: ChannelStarStore,
+    conversion = this.converting,
+  ): Promise<ChannelStarStore | null> {
     // A seed retired while acquired (preflight, crypto or socket wait) aborts.
     const seed = store === this.seedStore;
     let rev = this.remoteRev; // a changed winner before dispatch voids it
@@ -190,16 +213,20 @@ export class ChannelStarSyncManager {
     try {
       const pre = await this.fetchOwnBlobBeforePublish(store);
       const merged = this.remoteStore
-        ? mergeStores(pre, this.remoteStore)
+        ? mergeStores(pre, this.remoteStore, conversion)
         : pre;
       rev = this.remoteRev;
       // Guard: manager may have been destroyed while fetchOwnBlobBeforePublish
       // was awaited (community switch during in-flight fetch). If so, abort
       // before touching the relay.
-      if (stale()) return;
+      if (stale()) return null;
       if (this.sameEntries(this.lastPublishedStore, merged)) {
+        if (conversion) {
+          this.remoteStore = merged;
+          this.converting = false;
+        }
         release();
-        return;
+        return merged;
       }
       const payload = {
         version: 1,
@@ -219,7 +246,7 @@ export class ChannelStarSyncManager {
           ["t", D_TAG], // relay discoverability; not used in our filters
         ],
       });
-      if (stale()) return;
+      if (stale()) return null;
       await relayClient.publishEvent(
         event,
         "Timed out publishing channel stars.",
@@ -228,13 +255,20 @@ export class ChannelStarSyncManager {
       );
       this.recordRemoteHead(event.created_at);
       this.lastPublishedStore = merged;
+      if (conversion) {
+        this.remoteStore = merged;
+        this.converting = false;
+      }
       release();
+      return merged;
     } catch (error) {
       console.warn("[channelStarsSync] publish failed:", error);
     } finally {
       const owned = !this.destroyed && this.pendingStore === store;
-      if (owned && rev !== this.remoteRev) this.publishStars(store);
+      if (owned && rev !== this.remoteRev && !conversion)
+        this.publishStars(store);
     }
+    return null;
   }
 
   async subscribeToStars(

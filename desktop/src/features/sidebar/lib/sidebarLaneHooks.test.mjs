@@ -61,7 +61,9 @@ async function harness() {
     )
       fx.heads[d] = event;
   });
-  mock.method(console, "warn", () => {});
+  mock.method(console, "warn", (...args) => {
+    fx.warnings = [...(fx.warnings ?? []), args.map(String).join(" ")];
+  });
   window.__TAURI_INTERNALS__ = {
     invoke: async (cmd, args) => {
       if (cmd === "load_sidebar_section_defaults") {
@@ -690,3 +692,128 @@ test("deleting a section cancels its pending conversion journal", async () => {
   assert.equal(result.current.pendingPinConversions[section.id], undefined);
   cleanup();
 });
+
+for (const overflow of [false, true]) {
+  test(`Pin conversion keeps its journal until relay ACK across remount (remote capacity ${overflow ? "full" : "available"})`, async () => {
+    const { render, fireEvent, act, advance, cleanup } = await harness();
+    const React = await import("react");
+    const { useChannelStars } = await import("./useChannelStars.ts");
+    const { useChannelSections } = await import("./useChannelSections.ts");
+    const { PinConversionBanner } = await import(
+      "../ui/PinConversionBanner.tsx"
+    );
+    const { SidebarStarProvider } = await import("../ui/SidebarStars.tsx");
+    const { storageKey } = await import("./channelStarsStorage.ts");
+    const { storageKey: sectionsKey } = await import(
+      "./channelSectionsStorage.ts"
+    );
+    const remote = Object.fromEntries(
+      Array.from({ length: 500 }, (_, i) => [
+        `old-${i}`,
+        { starred: overflow || i === 0, updatedAt: i === 0 ? 1 : 100 },
+      ]),
+    );
+    fx.heads["channel-stars"] = ev(
+      "channel-stars",
+      { version: 1, channels: remote },
+      100,
+    );
+    window.localStorage.setItem(
+      storageKey(PK),
+      JSON.stringify({ version: 1, channels: overflow ? {} : remote }),
+    );
+    window.localStorage.setItem(
+      sectionsKey(PK, RELAY),
+      JSON.stringify({
+        version: 1,
+        sections: [{ id: "pin", name: "Pin", order: 0 }],
+        assignments: { one: "pin", two: "pin" },
+      }),
+    );
+    let latest;
+    function Fixture() {
+      const sections = useChannelSections(PK, RELAY);
+      const stars = useChannelStars(PK, RELAY);
+      latest = { sections, stars };
+      return React.createElement(
+        SidebarStarProvider,
+        {
+          value: {
+            ids: stars.starredChannelIds,
+            star: stars.starChannel,
+            unstar: stars.unstarChannel,
+          },
+        },
+        React.createElement(PinConversionBanner, {
+          sections: sections.sections,
+          assignments: sections.assignments,
+          handled: sections.pinConversionHandled,
+          pending: sections.pendingPinConversions,
+          onConvert: sections.requestPinConversion,
+          onHandled: sections.dismissPinConversion,
+        }),
+      );
+    }
+    // Hold the existing head's bootstrap so the full-remote case discovers its
+    // competing favorites at publication, not at the initial UI capacity check.
+    let release;
+    fx.holdPublish = new Promise((resolve) => {
+      release = resolve;
+    });
+    let view = render(React.createElement(Fixture));
+    if (!overflow) await advance(1000);
+    await act(async () => {
+      fireEvent.click(
+        view.getByRole("button", {
+          name: "Convert Pin → Starred",
+          exact: true,
+        }),
+      );
+      for (let i = 0; i < 10; i++) await new Promise(setImmediate);
+    });
+    assert.deepEqual(latest.sections.pendingPinConversions.pin, ["one", "two"]);
+    assert.equal(latest.sections.pinConversionHandled.pin, undefined);
+    // Interrupt before publication ACK. The original promise cannot retire
+    // intent after its hook/manager has been destroyed.
+    view.unmount();
+    await act(async () => {
+      release();
+      for (let i = 0; i < 10; i++) await new Promise(setImmediate);
+    });
+    fx.holdPublish = null;
+    view = render(React.createElement(Fixture));
+    await advance(3000);
+    if (overflow) {
+      assert.deepEqual(latest.sections.pendingPinConversions.pin, [
+        "one",
+        "two",
+      ]);
+      assert.equal(latest.sections.pinConversionHandled.pin, undefined);
+      assert.ok(view.getByRole("alert").textContent.includes("capacity"));
+      assert.equal(
+        Object.values(
+          JSON.parse(fx.heads["channel-stars"].content).channels,
+        ).filter((e) => e.starred).length,
+        500,
+      );
+    } else {
+      assert.equal(
+        latest.sections.pendingPinConversions.pin,
+        undefined,
+        JSON.stringify({
+          warnings: fx.warnings,
+          attempts: fx.attempts.map((e) => e.tags),
+          published: fx.published.map((e) => e.tags),
+        }),
+      );
+      assert.equal(latest.sections.pinConversionHandled.pin, true);
+      const published = JSON.parse(fx.heads["channel-stars"].content).channels;
+      for (const id of ["old-0", "one", "two"])
+        assert.equal(published[id].starred, true);
+      assert.equal(Object.keys(published).length, 500);
+    }
+    assert.equal(latest.sections.sections[0].name, "Pin");
+    assert.equal(latest.sections.assignments.one, "pin");
+    cleanup();
+  });
+}
