@@ -38,7 +38,7 @@ export function MessageTimestamp({
             dateTime={iso}
             title={exact}
             className={cn(
-              "shrink-0 cursor-default whitespace-nowrap text-message-timestamp font-normal tabular-nums text-muted-foreground/55",
+              "shrink-0 cursor-default whitespace-nowrap text-message-timestamp font-normal tabular-nums text-muted-foreground",
               hideDayPeriod &&
                 "max-w-full whitespace-normal break-words text-right",
               className,
