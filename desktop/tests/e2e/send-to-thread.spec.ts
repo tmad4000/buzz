@@ -225,9 +225,11 @@ test("explicit keyboard routing, cancel and new-message fallback preserve inline
   await page.keyboard.press("End");
   await page.keyboard.press("Enter");
   await expect(editor).toBeEmpty();
-  const announcement = page.getByText("A separate announcement", {
-    exact: true,
-  });
+  const announcement = page
+    .getByTestId("message-timeline")
+    .getByTestId("message-body")
+    .filter({ hasText: /^A separate announcement$/ });
+  await expect(announcement).toHaveCount(1);
   await expect(announcement).toBeVisible();
   expect(
     await announcement.evaluate(
