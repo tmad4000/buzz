@@ -290,23 +290,34 @@ test("own edited DM with canonical Paseo member supports explicit resend and tri
     ["edit", edit],
     ["t", "paseo-resend-v1"],
   ]);
+  await page.waitForFunction(
+    (target) =>
+      (window.__BUZZ_E2E_COMMAND_PAYLOADS__ ?? []).some((call) => {
+        if (call.command !== "plugin:websocket|send") return false;
+        const message = (
+          call.payload as { message?: { type: string; data: string } }
+        )?.message;
+        if (message?.type !== "Text") return false;
+        const [kind, subscription, ...filters] = JSON.parse(message.data);
+        return (
+          kind === "REQ" &&
+          subscription.startsWith("live-") &&
+          filters.some((filter: { "#e"?: string[] }) =>
+            filter["#e"]?.includes(target),
+          )
+        );
+      }),
+    trigger.id,
+  );
   await page.evaluate(
-    ({ trigger, channelName, channelId, paseo }) =>
-      window.__BUZZ_E2E_EMIT_MOCK_MESSAGE__?.({
-        channelName,
+    ({ trigger, channelId, paseo }) =>
+      window.__BUZZ_E2E_EMIT_MOCK_REACTION__?.({
         channelId,
         pubkey: paseo,
-        kind: 7,
+        targetId: trigger,
         content: "👀",
-        extraTags: [["e", trigger]],
-        createdAt: Math.floor(Date.now() / 1000) + 100,
       }),
-    {
-      trigger: trigger.id,
-      channelName: dm.name,
-      channelId: dm.id,
-      paseo: PASEO,
-    },
+    { trigger: trigger.id, channelId: dm.id, paseo: PASEO },
   );
   await expect(row.getByTestId("paseo-resend-status")).toHaveText(
     "Sent to Paseo",
