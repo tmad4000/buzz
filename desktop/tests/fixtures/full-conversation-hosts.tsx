@@ -53,7 +53,11 @@ window.__BUZZ_E2E__ = {
     new URLSearchParams(location.search).has("routing") ||
     new URLSearchParams(location.search).has("outbox")
       ? {
-          sendMessageDelayMs: new URLSearchParams(location.search).has("routing") ? 6000 : 1200,
+          sendMessageDelayMs: new URLSearchParams(location.search).has(
+            "routing",
+          )
+            ? 6000
+            : 1200,
           deferredComposerUploads: true,
           uploadDescriptors: [
             {

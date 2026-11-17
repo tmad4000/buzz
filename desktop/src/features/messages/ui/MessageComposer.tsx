@@ -1084,7 +1084,11 @@ function MessageComposerImpl({
                       <SendToThreadPicker
                         key={`${channelId}:${effectiveDraftKey}`}
                         entries={threadRoutingEntries}
-                        disabled={sendDisabled || isSubmitLocked || (!durableOutbox && isSending)}
+                        disabled={
+                          sendDisabled ||
+                          isSubmitLocked ||
+                          (!durableOutbox && isSending)
+                        }
                         getDraft={syncComposerContentFromEditor}
                         onPick={(id) => {
                           void submitMessage(id);
@@ -1097,7 +1101,10 @@ function MessageComposerImpl({
                 gifMediaController={media}
                 isEmojiPickerOpen={isEmojiPickerOpen}
                 isFormattingOpen={isFormattingOpen}
-                isSending={(!durableOutbox && isSending) || mentionSendFlow.isPreparingMentionSend}
+                isSending={
+                  (!durableOutbox && isSending) ||
+                  mentionSendFlow.isPreparingMentionSend
+                }
                 isUploading={media.isUploading}
                 isVoiceNoteProcessing={voiceNote.status !== "recording"}
                 isVoiceNoteRecording={voiceNote.status !== "idle"}
