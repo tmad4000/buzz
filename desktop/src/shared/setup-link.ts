@@ -1,6 +1,7 @@
 /** Setup URLs contain only a non-authorizing invitation reference, never a SAS/session key. */
 export function parseSetupLink(input: string): string | null {
-  if (typeof input !== "string" || input.length > 512 || /\s/.test(input)) return null;
+  if (typeof input !== "string" || input.length > 512 || /\s/.test(input))
+    return null;
   try {
     const url = new URL(input);
     const native =
@@ -16,12 +17,11 @@ export function parseSetupLink(input: string): string | null {
       url.username ||
       url.password ||
       url.port ||
-      url.search
+      input.split("#", 1)[0].includes("?")
     )
       return null;
-    const fragment = new URLSearchParams(url.hash.slice(1));
-    if ([...fragment.keys()].length !== 1) return null;
-    const code = fragment.get("c");
+    if (!/^#c=[A-Za-z0-9_-]{43}$/.test(url.hash)) return null;
+    const code = url.hash.slice(3);
     return code &&
       /^[A-Za-z0-9_-]{43}$/.test(code) &&
       code === base64url(decode(code))

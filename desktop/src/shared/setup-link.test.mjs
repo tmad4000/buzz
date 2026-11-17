@@ -1,22 +1,22 @@
 import assert from "node:assert/strict";
+import {
+  createCipheriv,
+  createPrivateKey,
+  createPublicKey,
+  diffieHellman,
+  generateKeyPairSync,
+  hkdfSync,
+  randomBytes,
+  sign,
+  verify,
+} from "node:crypto";
 import { test } from "node:test";
 import {
-  createPublicKey,
-  createPrivateKey,
-  verify,
-  generateKeyPairSync,
-  diffieHellman,
-  hkdfSync,
-  createCipheriv,
-  sign,
-  randomBytes,
-} from "node:crypto";
-import {
   createSetupAttempt,
+  openSetupEnvelope,
   parseSetupLink,
   setupAdmission,
   signSetupProof,
-  openSetupEnvelope,
 } from "./setup-link.ts";
 
 test("setup links accept only the fork and owned landing with a single opaque reference", () => {
@@ -30,6 +30,8 @@ test("setup links accept only the fork and owned landing with a single opaque re
     `buzz://setup#c=${code}`,
     `buzz-ideaflow://setup/path#c=${code}`,
     `buzz-ideaflow://setup?secret=abc#c=${code}`,
+    `buzz-ideaflow://setup?#c=${code}`,
+    `buzz-ideaflow://setup#%63=${code}`,
     `buzz-ideaflow://setup#c=${code}&c=${code}`,
     `buzz-ideaflow://setup#c=${code}&secret=abc`,
     `https://setup.ideaflow.app.attacker.invalid/v1/buzz/pair#c=${code}`,

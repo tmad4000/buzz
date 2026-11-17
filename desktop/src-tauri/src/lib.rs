@@ -44,6 +44,7 @@ mod relay;
 mod relay_admission;
 mod reset;
 mod secret_store;
+mod setup_links;
 mod shutdown;
 mod team_catalog;
 mod templates;
@@ -229,6 +230,7 @@ pub fn run() {
         .manage(PendingCommunityDeepLinks::default())
         .manage(PendingNavigationDeepLinks::default())
         .manage(PendingEntityDeepLinks::default())
+        .manage(setup_links::PendingSetupLinks::default())
         .manage(BuilderlabSession::default())
         .manage(BuilderlabLogin::default())
         .manage(commands::pairing::PairingHandle::new())
@@ -544,6 +546,9 @@ pub fn run() {
             clear_pending_navigation_deep_links,
             take_pending_entity_deep_link,
             acknowledge_pending_entity_deep_link,
+            setup_links::ideaflow_setup_links_enabled,
+            setup_links::take_pending_setup_link,
+            setup_links::acknowledge_pending_setup_link,
             start_builderlab_login,
             cancel_builderlab_login,
             get_builderlab_auth,

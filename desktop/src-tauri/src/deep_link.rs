@@ -301,7 +301,7 @@ pub(crate) fn install_deep_link_handlers(app: &mut tauri::App) {
             }
         }
         Ok(None) => {}
-        Err(error) => eprintln!("buzz-desktop: failed to read launch deep link: {error}"),
+        Err(_) => eprintln!("buzz-desktop: failed to read launch deep link"),
     }
 }
 
@@ -606,21 +606,26 @@ fn parse_nostr_bind_deep_link(url: &Url) -> Result<NostrBindDeepLinkPayload, Str
 pub(crate) fn handle_deep_link_url(app: &tauri::AppHandle, url_str: &str) {
     let url = match Url::parse(url_str) {
         Ok(u) => u,
-        Err(e) => {
-            eprintln!("buzz-desktop: invalid deep link URL {url_str:?}: {e}");
+        Err(_) => {
+            eprintln!("buzz-desktop: invalid deep link URL");
             return;
         }
     };
 
     if url.scheme() != crate::build_identity::deep_link_scheme() {
-        eprintln!("buzz-desktop: ignoring unsupported deep link scheme: {url_str}");
+        eprintln!("buzz-desktop: ignoring unsupported deep link scheme");
         return;
     }
 
     match url.host_str() {
+        Some("setup") => {
+            if crate::setup_links::receive(app, &url) {
+                activate_main_window(app);
+            }
+        }
         Some("connect") => {
             let Some(relay_url) = parse_websocket_relay_param(&url) else {
-                eprintln!("buzz-desktop: connect deep link missing/invalid relay: {url_str}");
+                eprintln!("buzz-desktop: connect deep link missing/invalid relay");
                 return;
             };
             activate_main_window(app);
@@ -632,7 +637,7 @@ pub(crate) fn handle_deep_link_url(app: &tauri::AppHandle, url_str: &str) {
             // the relay's /invite/<code> landing page. The frontend claims the
             // invite against the relay's HTTP API, then adds the workspace.
             let Some(payload) = parse_join_deep_link(&url) else {
-                eprintln!("buzz-desktop: join deep link missing/invalid relay or code: {url_str}");
+                eprintln!("buzz-desktop: join deep link missing/invalid relay or code");
                 return;
             };
             activate_main_window(app);
@@ -644,7 +649,7 @@ pub(crate) fn handle_deep_link_url(app: &tauri::AppHandle, url_str: &str) {
         }
         Some("add-community") => {
             let Some(payload) = parse_add_community_deep_link(&url) else {
-                eprintln!("buzz-desktop: add-community deep link missing/invalid relay: {url_str}");
+                eprintln!("buzz-desktop: add-community deep link missing/invalid relay");
                 return;
             };
             activate_main_window(app);
@@ -660,7 +665,7 @@ pub(crate) fn handle_deep_link_url(app: &tauri::AppHandle, url_str: &str) {
         }
         Some("channel") => {
             let Some(payload) = parse_channel_deep_link(&url) else {
-                eprintln!("buzz-desktop: channel deep link missing/invalid channel: {url_str}");
+                eprintln!("buzz-desktop: channel deep link missing/invalid channel");
                 return;
             };
             activate_main_window(app);
@@ -682,7 +687,7 @@ pub(crate) fn handle_deep_link_url(app: &tauri::AppHandle, url_str: &str) {
             // structure on this side (serde JSON) and let the TS code own
             // any further normalisation.
             let Some(payload) = parse_message_deep_link(&url) else {
-                eprintln!("buzz-desktop: message deep link missing channel or id: {url_str}");
+                eprintln!("buzz-desktop: message deep link missing channel or id");
                 return;
             };
             activate_main_window(app);
@@ -696,7 +701,7 @@ pub(crate) fn handle_deep_link_url(app: &tauri::AppHandle, url_str: &str) {
                 &url,
                 crate::build_identity::deep_link_scheme().as_ref(),
             ) else {
-                eprintln!("buzz-desktop: malformed entity deep link: {url_str}");
+                eprintln!("buzz-desktop: malformed entity deep link");
                 return;
             };
             activate_main_window(app);
@@ -708,15 +713,15 @@ pub(crate) fn handle_deep_link_url(app: &tauri::AppHandle, url_str: &str) {
                 activate_main_window(app);
                 let _ = app.emit("deep-link-nostr-bind", payload);
             }
-            Err(error) => {
-                eprintln!("buzz-desktop: rejecting nostr-bind deep link: {error}: {url_str}");
+            Err(_) => {
+                eprintln!("buzz-desktop: rejecting nostr-bind deep link");
             }
         },
-        Some(action) => {
-            eprintln!("buzz-desktop: unknown deep link action: {action}");
+        Some(_) => {
+            eprintln!("buzz-desktop: unknown deep link action");
         }
         None => {
-            eprintln!("buzz-desktop: deep link missing action: {url_str}");
+            eprintln!("buzz-desktop: deep link missing action");
         }
     }
 }
