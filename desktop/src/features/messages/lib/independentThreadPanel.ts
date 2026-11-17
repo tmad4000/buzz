@@ -76,12 +76,8 @@ export function buildIndependentThreadPanel(
     : [];
   // The channel cache owns optimistic sends and their acknowledged local key.
   // Keep that local echo in this projection until the thread query catches up.
-  const localEcho = channelEvents.filter((event) => {
-    if (
-      (!event.pending && !event.localKey) ||
-      event.pubkey !== formatArgs[1] ||
-      replyEventIds.has(event.id)
-    )
+  const ownLocal = channelEvents.filter((event) => {
+    if ((!event.pending && !event.localKey) || event.pubkey !== formatArgs[1])
       return false;
     const ref = getThreadReference(event.tags);
     return (
@@ -90,9 +86,19 @@ export function buildIndependentThreadPanel(
       (ref.parentId !== null && replyEventIds.has(ref.parentId))
     );
   });
+  const localById = new Map(ownLocal.map((event) => [event.id, event]));
+  const canonicalReplies = replyEvents.map((event) => {
+    const echo = localById.get(event.id);
+    // Only presentation identity crosses into the query result. Server body,
+    // tags, acknowledgement state and auxiliary overlays remain authoritative.
+    return echo?.localKey && echo.pubkey === event.pubkey
+      ? { ...event, localKey: echo.localKey }
+      : event;
+  });
+  const localEcho = ownLocal.filter((event) => !replyEventIds.has(event.id));
   const events = head
-    ? [head, ...headAux, ...replyEvents, ...localEcho]
-    : [...replyEvents, ...localEcho];
+    ? [head, ...headAux, ...canonicalReplies, ...localEcho]
+    : [...canonicalReplies, ...localEcho];
   const messages = formatTimelineMessages(events, ...formatArgs);
   return {
     ...buildThreadPanelData(messages, rootId, replyTargetId, expandedReplyIds),

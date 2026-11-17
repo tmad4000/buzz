@@ -241,6 +241,24 @@ test("sidebar projection includes only this user's scoped local echo through opt
         e.message.id === ack.id && e.message.renderKey === pending.localKey,
     ),
   );
-  const converged = project([root, ack], [branch, ack]);
+  const rawServerAck = { ...ack, content: "canonical server body" };
+  delete rawServerAck.localKey;
+  delete rawServerAck.pending;
+  const converged = project([root, ack], [branch, rawServerAck]);
   assert.equal(converged.messages.filter((m) => m.id === ack.id).length, 1);
+  const row = converged.messages.find((m) => m.id === ack.id);
+  assert.equal(
+    row.renderKey,
+    pending.localKey,
+    "raw query convergence cannot remount the acknowledged row",
+  );
+  assert.equal(
+    row.body,
+    "canonical server body",
+    "server content remains authoritative",
+  );
+  assert.equal(
+    first.messages.find((m) => m.id === pending.id).renderKey,
+    row.renderKey,
+  );
 });
