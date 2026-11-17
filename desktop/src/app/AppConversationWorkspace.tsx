@@ -13,6 +13,7 @@ import { isProjectCollectionAuthoritative } from "@/features/projects/projectSna
 import type { Channel } from "@/shared/api/types";
 import type { SearchHighlightNavigation } from "./navigation/searchHighlightNavigation";
 import { admittedRouteSearchHighlight } from "@/features/conversations/routeSearchHighlight";
+import { useConversationHistoryOrigin } from "@/features/conversations/useConversationHistoryOrigin";
 
 const ChannelRouteScreen = React.lazy(async () => {
   const module = await import("./routes/ChannelRouteScreen");
@@ -63,6 +64,7 @@ export function AppConversationWorkspace({
   navigationRef: React.RefObject<AppConversationNavigation | null>;
 }) {
   const location = useLocation();
+  const historyOrigin = useConversationHistoryOrigin();
   const queryClient = useQueryClient();
   const projects = useProjectsQuery();
   const [slot] = React.useState(windowSlot);
@@ -220,7 +222,11 @@ export function AppConversationWorkspace({
   );
   const retry = useConversationIncomingRoute({
     session,
-    active: active && bounds.width > 0 && bounds.height > 0,
+    active:
+      active &&
+      bounds.width > 0 &&
+      bounds.height > 0 &&
+      historyOrigin.entryKey === location.state.__TSR_key,
     route:
       selectedChannelId && channelSurfaceActive
         ? {
@@ -228,6 +234,7 @@ export function AppConversationWorkspace({
             channelId: selectedChannelId,
             search: location.search as Record<string, unknown>,
             state: location.state,
+            historyTraversal: historyOrigin.traversal,
           }
         : null,
     visibleViewIds: visible,

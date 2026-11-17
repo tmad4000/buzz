@@ -15,6 +15,8 @@ export type IncomingConversationRoute = {
   channelId: string;
   search: Record<string, unknown>;
   state: unknown;
+  /** Set only from the observed router BACK/FORWARD/GO action. */
+  historyTraversal?: boolean;
 };
 
 /** Reconcile explicit incoming routes once; local focus/panel projection echoes do not navigate again. */
@@ -89,7 +91,7 @@ export function useConversationIncomingRoute({
     }
     const target = controller.navigateRoute({
       channelId: route.channelId,
-      intent: historyViewId
+      intent: route.historyTraversal
         ? { kind: "history", viewInstanceId: historyViewId }
         : { kind: "external", channelId: route.channelId },
       panelState: conversationPanelStateFromSearch(route.search),
