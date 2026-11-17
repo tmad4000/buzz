@@ -1,3 +1,4 @@
+import { ConversationViewContext } from "@/features/conversations/ConversationViewContext";
 import * as React from "react";
 import {
   initialBranchChoice,
@@ -71,8 +72,15 @@ export function useUnreadSidebarThread({
 }) {
   // Community switches remount AppReady; don't migrate storage per row render.
   const community = React.useMemo(loadActiveCommunityId, []);
+  const viewScope = React.useContext(ConversationViewContext);
   const key = enabled
-    ? threadExpansionKey(community, currentPubkey, channelId, root)
+    ? threadExpansionKey(
+        community,
+        currentPubkey,
+        channelId,
+        root,
+        viewScope?.viewInstanceId,
+      )
     : null;
   const [saved, setSaved] = React.useState<State>(() =>
     empty(key, initialMode),

@@ -1,3 +1,4 @@
+import { ConversationViewContext } from "@/features/conversations/ConversationViewContext";
 import * as React from "react";
 import { useThreadDisclosureFocus } from "@/features/messages/ui/useThreadDisclosureFocus";
 import { PanelRight, ChevronDown, ChevronRight } from "lucide-react";
@@ -52,7 +53,8 @@ export type InlineChannelThreadProps = {
 type Props = InlineChannelThreadProps;
 export function InlineChannelThread(props: Props) {
   const community = React.useMemo(loadActiveCommunityId, []);
-  const key = `${threadExpansionKey(community, props.currentPubkey, props.channel.id, props.root.id)}:inline`;
+  const view = React.useContext(ConversationViewContext);
+  const key = `${threadExpansionKey(community, props.currentPubkey, props.channel.id, props.root.id, view?.viewInstanceId)}:inline`;
   return <ScopedInlineThread key={key} {...props} storageKey={key} />;
 }
 function ScopedInlineThread(props: Props & { storageKey: string }) {
