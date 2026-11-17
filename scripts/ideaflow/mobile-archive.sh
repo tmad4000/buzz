@@ -57,15 +57,19 @@ flutter --version --machine > "$BUZZ_RELEASE_DIR/flutter-version.json"
 cd mobile
 flutter pub get --enforce-lockfile
 (cd ios && pod install --deployment)
-# Only this task checkout's prior archive is removed; exported artifacts live outside it.
-rm -rf build/ios/archive
+# Retain prior outputs; bind selection to this build's fresh archive Info.plist.
+python3 ../scripts/ideaflow/mobile-archive-artifacts.py prepare "$source_root" "$BUZZ_RELEASE_DIR" > "$BUZZ_RELEASE_DIR/archive-prepare.json"
 flutter build ipa --release --no-pub --build-name=0.1.0 --build-number="$BUZZ_IOS_BUILD_NUMBER" \
  --dart-define=BUZZ_RELAY_URL=https://jprojects.communities.buzz.xyz \
  --dart-define=BUZZ_URL_SCHEME=buzz-ideaflow \
  --export-options-plist="$BUZZ_RELEASE_DIR/ExportOptions.plist"
 # Flutter can return success on export failure; use an explicit checked fresh export.
-xcodebuild -exportArchive -archivePath build/ios/archive/Runner.xcarchive \
+archive_path="$(python3 ../scripts/ideaflow/mobile-archive-artifacts.py select "$source_root" "$BUZZ_RELEASE_DIR")"
+export BUZZ_IOS_ARCHIVE_PATH="$archive_path"
+# Xcode's system rsync must also launch its receiver from the system PATH.
+PATH=/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin xcodebuild -exportArchive -archivePath "$archive_path" \
  -exportPath "$BUZZ_RELEASE_DIR/export" -exportOptionsPlist "$BUZZ_RELEASE_DIR/ExportOptions.plist"
+python3 ../scripts/ideaflow/mobile-archive-artifacts.py reconcile-lock "$source_root" "$BUZZ_RELEASE_DIR" > "$BUZZ_RELEASE_DIR/generated-lock-postflight.json"
 python3 - <<'PY_LOCKS'
 from pathlib import Path
 import hashlib,json,os
@@ -76,7 +80,7 @@ PY_LOCKS
 python3 - <<'PY'
 from pathlib import Path
 import hashlib,json,os,plistlib,subprocess,tempfile,zipfile
-release=Path(os.environ['BUZZ_RELEASE_DIR']); archive=Path('build/ios/archive/Runner.xcarchive')
+release=Path(os.environ['BUZZ_RELEASE_DIR']); archive=Path(os.environ['BUZZ_IOS_ARCHIVE_PATH'])
 source=Path.cwd().parent.resolve()
 source_receipt=json.loads(subprocess.check_output(['python3','../scripts/ideaflow/verify-mobile-source.py',str(source),os.environ['BUZZ_SOURCE_REVISION'],os.environ['BUZZ_SOURCE_MANIFEST']]))
 assert source_receipt==json.loads((release/'source-verified.json').read_text()), 'Source changed after preflight'
@@ -109,14 +113,14 @@ with tempfile.TemporaryDirectory(prefix='verify-ipa-',dir=release) as temporary:
   assert exported_info['CFBundleIdentifier']==bundle
   assert exported_info['CFBundleVersion']==os.environ['BUZZ_IOS_BUILD_NUMBER']
   subprocess.run(['codesign','--verify','--deep','--strict',str(target)],check=True)
-  ent=plistlib.loads(subprocess.check_output(['codesign','-d','--entitlements','-',str(target)],stderr=subprocess.DEVNULL))
+  ent=plistlib.loads(subprocess.check_output(['codesign','-d','--entitlements',':-',str(target)],stderr=subprocess.DEVNULL))
   assert ent['application-identifier']=='JESMXK96LG.'+bundle
   assert ent['com.apple.developer.team-identifier']=='JESMXK96LG'
   assert ent.get('get-task-allow') is not True
   assert ent['com.apple.security.application-groups']==['group.app.ideaflow.buzz.mobile']
   assert ent['keychain-access-groups']==['JESMXK96LG.app.ideaflow.buzz.mobile']
   prefix=str(stage/('certificate-'+str(number)+'-'))
-  subprocess.run(['codesign','-d','--extract-certificates',prefix,str(target)],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+  subprocess.run(['codesign','-d','--extract-certificates='+prefix,str(target)],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
   assert hashlib.sha1(Path(prefix+'0').read_bytes()).hexdigest().upper()=='300FAAFC4D696C4B886638DECE3E1319C3D0082E'
  profile_check=json.loads(subprocess.check_output(['python3','../scripts/ideaflow/verify-mobile-profiles.py',str(exported[0]/'embedded.mobileprovision'),str(exported_extensions[0]/'embedded.mobileprovision')]))
  expected_profiles=json.loads((release/'profiles.json').read_text())
