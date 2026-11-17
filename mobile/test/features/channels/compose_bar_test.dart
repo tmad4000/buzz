@@ -16,6 +16,7 @@ import 'package:nostr/nostr.dart' as nostr;
 import 'package:buzz/features/channels/channel.dart';
 import 'package:buzz/features/channels/channel_management_provider.dart';
 import 'package:buzz/features/channels/compose_bar.dart';
+import 'package:buzz/features/channels/outbox/message_outbox.dart';
 import 'package:buzz/features/channels/mentions/mention_candidates_provider.dart';
 import 'package:buzz/features/channels/send_message_provider.dart';
 import 'package:buzz/features/channels/channels_provider.dart';
@@ -38,6 +39,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 part 'compose_bar_test/exact_mention_tests.dart';
 part 'compose_bar_test/durable_mention_tests.dart';
+part 'compose_bar_test/outbox_tests.dart';
 
 final _pngBytes = Uint8List.fromList([
   0x89,
@@ -181,6 +183,7 @@ late SharedPreferences _testPrefs;
 Widget _buildComposeBar({
   required MediaUploadService uploadService,
   required ComposeBarOnSend onSend,
+  ComposeBarOnQueue? onQueue,
   List<ChannelMember> members = const <ChannelMember>[],
   Future<List<ChannelMember>>? membersFuture,
   Future<List<ChannelMember>> Function()? loadMembers,
@@ -276,6 +279,8 @@ Widget _buildComposeBar({
                   onFocusRestorerChanged: onFocusRestorerChanged,
                   onFocusRequested: onFocusRequested,
                   onSend: onSend,
+                  onQueue: onQueue,
+                  showOutbox: false,
                 );
                 if (viewPadding == null) return composeBar;
                 return MediaQuery(
@@ -662,6 +667,7 @@ class _FakeChannelsNotifier extends ChannelsNotifier {
 void main() {
   exactMentionTests();
   durableMentionTests();
+  outboxTests();
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUp(() async {

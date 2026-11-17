@@ -36,6 +36,23 @@ class SignedEventRelay {
     int? createdAt,
     void Function(NostrEvent event)? onSigned,
   }) async {
+    final event = sign(
+      kind: kind,
+      content: content,
+      tags: tags,
+      createdAt: createdAt,
+    );
+    onSigned?.call(event);
+    return publish(event);
+  }
+
+  /// Sign without publishing, so durable outboxes can journal the exact event.
+  NostrEvent sign({
+    required int kind,
+    required String content,
+    required List<List<String>> tags,
+    int? createdAt,
+  }) {
     final nsec = _nsec;
     if (nsec == null || nsec.isEmpty) {
       throw Exception('Cannot submit event: no signing key available');
@@ -56,8 +73,13 @@ class SignedEventRelay {
     );
 
     final nostrEvent = NostrEvent.fromJson(event.toMap());
-    onSigned?.call(nostrEvent);
-    return _session.publish(nostrEvent);
+    return nostrEvent;
+  }
+
+  /// Publish a previously journaled signature without generating a new event ID.
+  Future<NostrEvent> publish(NostrEvent event) {
+    if (event.pubkey != pubkey) throw StateError('Publisher identity changed');
+    return _session.publish(event);
   }
 }
 

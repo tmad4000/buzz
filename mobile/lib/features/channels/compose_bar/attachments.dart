@@ -378,7 +378,10 @@ Future<void> _deleteOwnedAttachments(
   Iterable<_PendingAttachment> attachments,
 ) async {
   for (final attachment in attachments) {
-    if (attachment.deleteAfterUse) await _deleteXFile(attachment.file);
+    if (attachment.deleteAfterUse &&
+        !OutboxFileLease.owns(attachment.file.path)) {
+      await _deleteXFile(attachment.file);
+    }
   }
 }
 

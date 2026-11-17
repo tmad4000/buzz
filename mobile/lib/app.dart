@@ -1,3 +1,4 @@
+import 'features/channels/outbox/outbox_provider.dart';
 import 'dart:async';
 import 'shared/widgets/ios_navigation_metrics.dart';
 import 'shared/community/paired_community_landing.dart';
@@ -351,6 +352,7 @@ class App extends HookConsumerWidget {
     if (ageSignalState != AgeSignalState.restricted &&
         authState.value?.status == AuthStatus.authenticated) {
       ref.watch(relaySessionProvider);
+      ref.watch(messageOutboxProvider);
       ref.watch(observerRelayProvider);
       ref.watch(appLifecycleProvider);
       ref.watch(userStatusCacheProvider);
