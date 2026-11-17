@@ -5,6 +5,7 @@ import {
   storageKey,
   type ChannelSection,
 } from "./channelSectionsStorage";
+import { projectSectionOrder } from "./sidebarSectionOrder";
 import type { Lane } from "./sidebarLaneReconciler";
 import { isReg, type Reg, type Tree } from "./sidebarLwwMap";
 
@@ -15,6 +16,9 @@ type SectionNode = { name?: Reg; icon?: Reg; order?: Reg; live?: Reg };
 export type SectionsView = {
   sections: ChannelSection[];
   assignments: Record<string, string>;
+  layoutOrder: string[];
+  pinConversionHandled: Record<string, boolean>;
+  pendingPinConversions: Record<string, string[]>;
 };
 
 const val = (reg: unknown) => (isReg(reg) ? reg[2] : undefined);
@@ -58,12 +62,29 @@ export function projectSections(tree: Tree): SectionsView {
     if (isString(target) && live.has(target as string))
       assignments[channelId] = target as string;
   }
-  return { sections, assignments };
+  const pinConversionHandled = Object.fromEntries(
+    Object.entries(tree.m ?? {})
+      .filter(([, reg]) => val(reg) === true)
+      .map(([id]) => [id, true]),
+  );
+  const pendingPinConversions = Object.fromEntries(
+    Object.entries(tree.c ?? {})
+      .filter(([, reg]) => Array.isArray(val(reg)))
+      .map(([id, reg]) => [id, val(reg) as string[]]),
+  );
+  return {
+    pendingPinConversions,
+    sections,
+    assignments,
+    layoutOrder: projectSectionOrder(tree, sections),
+    pinConversionHandled,
+  };
 }
 
 /** Channel sections: kind 30078, d-tag `channel-sections`, per-field registers. */
 export const SECTIONS_LANE: Lane = {
   dTag: "channel-sections",
+  metaVersion: 2,
   storageKey,
   legacyStorageKey: (pubkey) => storageKey(pubkey),
   shape: {
@@ -76,6 +97,15 @@ export const SECTIONS_LANE: Lane = {
       },
     },
     a: { "*": (v) => v === null || isString(v) },
+    o: { "*": Number.isSafeInteger },
+    m: { "*": (v) => typeof v === "boolean" },
+    c: {
+      "*": (v) =>
+        v === null ||
+        (Array.isArray(v) &&
+          v.length <= 500 &&
+          v.every((id) => typeof id === "string")),
+    },
   },
   fromLegacy(json, stamp) {
     const store = parseChannelSectionPayload(json);
@@ -97,7 +127,36 @@ export const SECTIONS_LANE: Lane = {
         stamp(target),
       ]),
     );
-    return { s, a };
+    const obj = json as Record<string, unknown>;
+    const o: Tree = Object.fromEntries(
+      Array.isArray(obj.layoutOrder)
+        ? obj.layoutOrder
+            .filter((id): id is string => typeof id === "string")
+            .map((id, index) => [id, stamp(index)])
+        : [],
+    );
+    const m: Tree = Object.fromEntries(
+      Object.entries((obj.pinConversionHandled ?? {}) as object)
+        .filter(([, value]) => value === true)
+        .map(([id]) => [id, stamp(true)]),
+    );
+    const c: Tree = Object.fromEntries(
+      Object.entries((obj.pendingPinConversions ?? {}) as object)
+        .filter(
+          ([, value]) =>
+            Array.isArray(value) &&
+            value.length <= 500 &&
+            value.every((id) => typeof id === "string"),
+        )
+        .map(([id, value]) => [id, stamp(value)]),
+    );
+    return {
+      ...(Object.keys(c).length ? { c } : {}),
+      s,
+      a,
+      ...(Object.keys(o).length ? { o } : {}),
+      ...(Object.keys(m).length ? { m } : {}),
+    };
   },
   project: projectSections,
   withinLimits: (p) =>

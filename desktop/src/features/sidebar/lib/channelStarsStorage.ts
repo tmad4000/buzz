@@ -67,26 +67,38 @@ export function readChannelStarsStore(pubkey: string): ChannelStarStore {
 
 export function boundStarStore(
   store: ChannelStarStore,
-  preservedKey?: string,
+  preservedKey?: string | readonly string[],
 ): ChannelStarStore {
-  const preservedEntry =
-    preservedKey === undefined ? undefined : store.channels[preservedKey];
+  const preserved = new Set(
+    typeof preservedKey === "string" ? [preservedKey] : (preservedKey ?? []),
+  );
+  const preservedEntries = Object.entries(store.channels).filter(([id]) =>
+    preserved.has(id),
+  );
   const entries = Object.entries(store.channels).filter(
-    ([channelId]) => channelId !== preservedKey,
+    ([id]) => !preserved.has(id),
   );
-  if (entries.length + (preservedEntry ? 1 : 0) <= MAX_CHANNEL_STAR_ENTRIES)
+  if (entries.length + preservedEntries.length <= MAX_CHANNEL_STAR_ENTRIES)
     return store;
-  entries.sort(([leftId, left], [rightId, right]) => {
-    if (left.updatedAt !== right.updatedAt)
-      return left.updatedAt - right.updatedAt;
-    return leftId < rightId ? -1 : leftId > rightId ? 1 : 0;
-  });
-  const retainedEntries = entries.slice(
-    -(MAX_CHANNEL_STAR_ENTRIES - (preservedEntry ? 1 : 0)),
+  entries.sort(
+    ([leftId, left], [rightId, right]) =>
+      left.updatedAt - right.updatedAt ||
+      (leftId < rightId ? -1 : leftId > rightId ? 1 : 0),
   );
-  if (preservedEntry && preservedKey !== undefined) {
-    retainedEntries.push([preservedKey, preservedEntry]);
-  }
+  const retainedEntries = [
+    ...entries.slice(
+      -Math.max(0, MAX_CHANNEL_STAR_ENTRIES - preservedEntries.length),
+    ),
+    ...preservedEntries,
+  ];
+  // A protected full batch has no room for other entries (`slice(-0)` is all).
+  if (preservedEntries.length >= MAX_CHANNEL_STAR_ENTRIES)
+    return {
+      ...store,
+      channels: Object.fromEntries(
+        preservedEntries.slice(-MAX_CHANNEL_STAR_ENTRIES),
+      ),
+    };
   return {
     ...store,
     channels: Object.fromEntries(retainedEntries),

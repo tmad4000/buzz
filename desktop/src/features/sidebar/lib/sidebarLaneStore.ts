@@ -14,6 +14,8 @@ export type LaneCodec = {
   storageKey: (pubkey: string, relayUrl: string) => string;
   /** Pre-relay-scoping key migrated once on first read, then removed. */
   legacyStorageKey?: (pubkey: string) => string;
+  /** New metadata versions fence older writers; version 1 remains readable for migration. */
+  metaVersion?: number;
   /** Shape of `meta` (excluding `meta.v`). */
   shape: Shape;
   /** Registers for a meta-less payload, every value stamped by `stamp`. */
@@ -45,14 +47,20 @@ export function decodeDoc(
     );
     return tree && !isReg(tree) ? { tree, legacy: true } : null;
   }
-  if ((meta as { v?: unknown } | null)?.v !== 1) return null;
+  const metaVersion = (meta as { v?: unknown } | null)?.v;
+  if (metaVersion !== 1 && metaVersion !== (codec.metaVersion ?? 1))
+    return null;
   const { v: _v, ...fields } = meta as Record<string, unknown>;
   const tree = validTree(fields, codec.shape);
   return tree && !isReg(tree) ? { tree, legacy: false } : null;
 }
 
 export function encodeDoc(codec: LaneCodec, tree: Tree) {
-  return { version: 1, ...codec.project(tree), meta: { v: 1, ...tree } };
+  return {
+    version: 1,
+    ...codec.project(tree),
+    meta: { v: codec.metaVersion ?? 1, ...tree },
+  };
 }
 
 /**

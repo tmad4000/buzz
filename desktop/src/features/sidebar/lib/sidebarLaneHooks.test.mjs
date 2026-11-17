@@ -649,3 +649,44 @@ test("sections bootstrap: late identity result never enters another user's store
   );
   cleanup();
 });
+
+test("conversion intent persists before completion and leaves the Pin section intact", async () => {
+  const { renderHook, act, cleanup } = await harness();
+  const { useChannelSections } = await import("./useChannelSections.ts");
+  const { result } = renderHook(() => useChannelSections(PK, RELAY));
+  let section;
+  act(() => {
+    section = result.current.createSection("Pin");
+  });
+  act(() => {
+    result.current.assignChannel("channel", section.id);
+    result.current.requestPinConversion(section.id, ["channel"]);
+  });
+  assert.deepEqual(result.current.pendingPinConversions[section.id], [
+    "channel",
+  ]);
+  assert.equal(result.current.pinConversionHandled[section.id], undefined);
+  act(() => result.current.dismissPinConversion(section.id));
+  assert.equal(result.current.pinConversionHandled[section.id], true);
+  assert.equal(result.current.pendingPinConversions[section.id], undefined);
+  assert.equal(result.current.sections[0].name, "Pin");
+  assert.equal(result.current.assignments.channel, section.id);
+  cleanup();
+});
+
+test("deleting a section cancels its pending conversion journal", async () => {
+  const { renderHook, act, cleanup } = await harness();
+  const { useChannelSections } = await import("./useChannelSections.ts");
+  const { result } = renderHook(() => useChannelSections(PK, RELAY));
+  let section;
+  act(() => {
+    section = result.current.createSection("Pinned");
+  });
+  act(() => result.current.requestPinConversion(section.id, ["channel"]));
+  assert.deepEqual(result.current.pendingPinConversions[section.id], [
+    "channel",
+  ]);
+  act(() => result.current.deleteSection(section.id));
+  assert.equal(result.current.pendingPinConversions[section.id], undefined);
+  cleanup();
+});

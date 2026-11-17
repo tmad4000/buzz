@@ -180,11 +180,11 @@ function MoreActionsMenu({
             <DropdownMenuItem
               onSelect={() => {
                 void setMessagePin(channelId, message.id, true)
-                  .then(() => toast.success("Pinned to channel"))
+                  .then(() => toast.success("Pinned message to channel"))
                   .catch((e) => toast.error(String(e)));
               }}
             >
-              Pin to channel
+              Pin message
             </DropdownMenuItem>
           ) : null}
           {onEdit ? (

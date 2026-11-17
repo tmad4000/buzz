@@ -40,7 +40,7 @@ test("ordered sections preserve channel objects and pin/navigation identity with
     ["later", "work"],
   );
 });
-test("unknown sections return DMs to their list; Starred and forums keep upstream placement", () => {
+test("unknown sections return DMs to their list; Starred shortcuts do not remove original placement", () => {
   const dm = channel("dm", "DM", "dm");
   const stream = channel("star", "Star");
   const forum = channel("forum", "Forum", "forum");
@@ -53,9 +53,10 @@ test("unknown sections return DMs to their list; Starred and forums keep upstrea
   );
   assert.deepEqual(result.directMessages, [dm]);
   assert.deepEqual(result.unassigned, []);
+  assert.deepEqual(result.bySection.work, [stream]);
   assert.equal(
-    result.groups.every((g) => g.channels.length === 0),
-    true,
+    result.groups.some((g) => g.channels.includes(forum)),
+    false,
   );
 });
 test("each section and default group use their existing sort mode", () => {

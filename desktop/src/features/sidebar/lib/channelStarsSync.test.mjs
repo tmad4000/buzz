@@ -200,3 +200,34 @@ test("revert-fix: relay-A watermark does not suppress first-sync seed on relay-B
     mock.reset();
   }
 });
+
+test("a star made during bootstrap survives the older first-copy snapshot", async () => {
+  let finish;
+  mock.method(
+    relayClient,
+    "fetchEvents",
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+  );
+  const fw = makeFakeWindow();
+  const restore = installFakeWindow(fw);
+  const manager = new ChannelStarSyncManager("pk-bootstrap-edit", RELAY);
+  try {
+    const old = makeStore({ old: { starred: true, updatedAt: 100 } });
+    const reading = manager.bootstrap(old);
+    const current = makeStore({
+      ...old.channels,
+      converted: { starred: true, updatedAt: 200 },
+    });
+    manager.publishStars(current);
+    finish([]);
+    await reading;
+    assert.deepEqual(manager.getPendingStarStore(), current);
+  } finally {
+    manager.destroy();
+    restore();
+    mock.reset();
+  }
+});

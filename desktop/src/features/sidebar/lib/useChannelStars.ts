@@ -2,6 +2,7 @@ import * as React from "react";
 
 import { relayClient } from "@/shared/api/relayClient";
 import {
+  MAX_CHANNEL_STAR_ENTRIES,
   boundStarStore,
   DEFAULT_STORE,
   mergeStores,
@@ -21,7 +22,7 @@ export function useChannelStars(
   relayUrl?: string,
 ): {
   starredChannelIds: Set<string>;
-  starChannel: (channelId: string) => void;
+  starChannel: (channelId: string | readonly string[]) => void;
   unstarChannel: (channelId: string) => void;
 } {
   const [store, setStore] = React.useState<ChannelStarStore>(() => {
@@ -188,19 +189,26 @@ export function useChannelStars(
   );
 
   const setStarState = React.useCallback(
-    (channelId: string, starred: boolean) => {
+    (channelId: string | readonly string[], starred: boolean) => {
       if (!pubkey) return;
       const entry: ChannelStarEntry = {
         starred,
         updatedAt: Math.floor(Date.now() / 1000),
       };
       setStore((prev) => {
+        const ids =
+          typeof channelId === "string" ? [channelId] : [...new Set(channelId)];
+        const allStars = new Set([...starredChannelIdsFromStore(prev), ...ids]);
+        // A bulk conversion must not silently evict existing favorites.
+        if (
+          typeof channelId !== "string" &&
+          allStars.size > MAX_CHANNEL_STAR_ENTRIES
+        )
+          return prev;
+        const changed = Object.fromEntries(ids.map((id) => [id, entry]));
         const next = boundStarStore(
-          {
-            version: 1,
-            channels: { ...prev.channels, [channelId]: entry },
-          },
-          channelId,
+          { version: 1, channels: { ...prev.channels, ...changed } },
+          typeof channelId === "string" ? channelId : [...allStars],
         );
         if (!writeChannelStarsStore(pubkey, next)) return prev;
         localRevision.current += 1;
@@ -212,7 +220,7 @@ export function useChannelStars(
   );
 
   const starChannel = React.useCallback(
-    (channelId: string) => setStarState(channelId, true),
+    (channelId: string | readonly string[]) => setStarState(channelId, true),
     [setStarState],
   );
   const unstarChannel = React.useCallback(
