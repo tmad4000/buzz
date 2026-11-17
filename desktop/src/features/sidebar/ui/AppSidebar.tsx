@@ -267,6 +267,8 @@ export function AppSidebar({
   }, []);
 
   const {
+    bootstrapError,
+    retryBootstrap,
     sections: channelSections,
     assignments: channelAssignments,
     createSection,
@@ -314,15 +316,16 @@ export function AppSidebar({
     const unassigned: Channel[] = [];
     const sectionIds = new Set(channelSections.map((s) => s.id));
 
-    for (const channel of streamChannels) {
-      if (starredChannelIds?.has(channel.id)) continue;
+    for (const channel of [...streamChannels, ...directMessages]) {
+      if (channel.channelType !== "dm" && starredChannelIds?.has(channel.id))
+        continue;
       const sectionId = channelAssignments[channel.id];
       if (sectionId && sectionIds.has(sectionId)) {
         if (!bySection[sectionId]) {
           bySection[sectionId] = [];
         }
         bySection[sectionId].push(channel);
-      } else {
+      } else if (channel.channelType !== "dm") {
         unassigned.push(channel);
       }
     }
@@ -340,6 +343,7 @@ export function AppSidebar({
     };
   }, [
     streamChannels,
+    directMessages,
     channelSections,
     channelAssignments,
     starredChannelIds,
@@ -401,11 +405,11 @@ export function AppSidebar({
   const sortedDirectMessages = React.useMemo(
     () =>
       sortDmChannelsForSidebar(
-        directMessages,
+        directMessages.filter((channel) => !channelAssignments[channel.id]),
         dmChannelLabels,
         sortModeFor("dms"),
       ),
-    [directMessages, dmChannelLabels, sortModeFor],
+    [directMessages, channelAssignments, dmChannelLabels, sortModeFor],
   );
   const unreadDmPreviewsBelow = React.useMemo(
     () =>
@@ -631,6 +635,9 @@ export function AppSidebar({
                       <CustomChannelSection
                         key={section.id}
                         section={section}
+                        channelLabels={dmChannelLabels}
+                        dmParticipantsByChannelId={dmParticipantsByChannelId}
+                        presenceByChannelId={dmPresenceByChannelId}
                         channels={sectionBuckets.bySection[section.id] ?? []}
                         hasUnread={
                           sectionBuckets.bySection[section.id]?.some((c) =>
@@ -780,6 +787,11 @@ export function AppSidebar({
                     isCollapsed={collapsedGroups.directMessages}
                     isActiveChannel={selectedView === "channel"}
                     activeWorkingByChannelId={activeWorkingByChannelId}
+                    sections={channelSections}
+                    assignments={channelAssignments}
+                    onAssignChannel={assignChannel}
+                    onUnassignChannel={unassignChannel}
+                    onCreateSectionForChannel={handleCreateSectionForChannel}
                     items={sortedDirectMessages}
                     channelLabels={dmChannelLabels}
                     onHideDm={onHideDm}
@@ -803,6 +815,21 @@ export function AppSidebar({
                 </>
               ) : null}
 
+              {bootstrapError ? (
+                <div
+                  className="px-3 py-2 text-sm text-destructive"
+                  role="alert"
+                >
+                  Could not organize your sidebar.{" "}
+                  <button
+                    className="underline"
+                    type="button"
+                    onClick={retryBootstrap}
+                  >
+                    Retry
+                  </button>
+                </div>
+              ) : null}
               {errorMessage && !relayConnectionCard.hasRelayUnreachableError ? (
                 <div className="px-3 py-2 text-sm text-destructive">
                   {errorMessage}

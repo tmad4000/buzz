@@ -64,6 +64,10 @@ async function harness() {
   mock.method(console, "warn", () => {});
   window.__TAURI_INTERNALS__ = {
     invoke: async (cmd, args) => {
+      if (cmd === "load_sidebar_section_defaults") {
+        fx.bootstrapCalls = (fx.bootstrapCalls ?? 0) + 1;
+        return fx.loadBootstrap();
+      }
       if (cmd === "nip44_encrypt_to_self")
         return Promise.resolve(fx.holdCrypto).then(() => args.plaintext);
       if (cmd === "nip44_decrypt_from_self") return args.ciphertext;
@@ -570,3 +574,78 @@ for (const L of UPGRADE_LANES) {
     });
   }
 }
+
+test("sections bootstrap: failure is visible, Retry imports once, edits survive retry", async () => {
+  const { renderHook, act, cleanup } = await harness();
+  const { useChannelSections } = await import("./useChannelSections.ts");
+  const owner =
+    "3eb6491e9fecd5e2c0221f76b79685a1478b591bf90ea155f5352ebe12672e1f";
+  fx.loadBootstrap = async () => {
+    throw new Error("identity locked");
+  };
+  const { result } = renderHook(() =>
+    useChannelSections(owner, "wss://jprojects.communities.buzz.xyz"),
+  );
+  await act(async () => {
+    await new Promise(setImmediate);
+  });
+  assert.equal(result.current.bootstrapError, true);
+  fx.loadBootstrap = async () =>
+    JSON.stringify({
+      version: 1,
+      sections: [{ id: "seed", name: "Projects", order: 0 }],
+      assignments: { channel: "seed" },
+    });
+  await act(async () => {
+    result.current.retryBootstrap();
+  });
+  assert.equal(result.current.bootstrapError, false);
+  assert.equal(result.current.assignments.channel, "seed");
+  act(() => result.current.unassignChannel("channel"));
+  act(() => result.current.deleteSection("seed"));
+  await act(async () => {
+    result.current.retryBootstrap();
+  });
+  assert.equal(result.current.assignments.channel, undefined);
+  assert.deepEqual(result.current.sections, []);
+  cleanup();
+});
+
+test("sections bootstrap: late identity result never enters another user's store", async () => {
+  const { renderHook, act, cleanup } = await harness();
+  const { useChannelSections } = await import("./useChannelSections.ts");
+  const owner =
+    "3eb6491e9fecd5e2c0221f76b79685a1478b591bf90ea155f5352ebe12672e1f";
+  let resolve;
+  fx.loadBootstrap = () =>
+    new Promise((done) => {
+      resolve = done;
+    });
+  const { result, rerender } = renderHook(
+    ({ pk }) => useChannelSections(pk, "wss://jprojects.communities.buzz.xyz"),
+    { initialProps: { pk: owner } },
+  );
+  await act(async () => {
+    rerender({ pk: PK });
+  });
+  await act(async () => {
+    resolve(
+      JSON.stringify({
+        version: 1,
+        sections: [{ id: "private", name: "Private", order: 0 }],
+        assignments: {},
+      }),
+    );
+  });
+  assert.deepEqual(result.current.sections, []);
+  assert.equal(fx.bootstrapCalls, 1);
+  const { storageKey } = await import("./channelSectionsStorage.ts");
+  assert.equal(
+    window.localStorage.getItem(
+      storageKey(owner, "wss://jprojects.communities.buzz.xyz"),
+    ),
+    null,
+    "stale import does not persist after account change",
+  );
+  cleanup();
+});

@@ -41,7 +41,10 @@ import {
   SidebarMenu,
   SidebarMenuItem,
 } from "@/shared/ui/sidebar";
-import { ChannelMenuButton } from "@/features/sidebar/ui/SidebarSection";
+import {
+  ChannelMenuButton,
+  type SidebarDmParticipant,
+} from "@/features/sidebar/ui/SidebarSection";
 import { ChannelContextMenuItems } from "@/features/sidebar/ui/ChannelContextMenu";
 import { deferMenuAction } from "@/features/sidebar/ui/sidebarMenuHelpers";
 import {
@@ -56,7 +59,7 @@ import {
 } from "@/features/sidebar/ui/sidebarSectionStyles";
 import type { ActiveChannelTurnSummary } from "@/features/agents/activeAgentTurnsStore";
 import type { ChannelSection } from "@/features/sidebar/lib/useChannelSections";
-import type { Channel } from "@/shared/api/types";
+import type { Channel, PresenceStatus } from "@/shared/api/types";
 import { cn } from "@/shared/lib/cn";
 import { getPlatformKeysById } from "@/shared/lib/keyboard-shortcuts";
 import { HashSearch } from "@/shared/ui/icons";
@@ -538,6 +541,9 @@ export function ChannelGroupSection({
 
 export function CustomChannelSection({
   section,
+  channelLabels,
+  dmParticipantsByChannelId,
+  presenceByChannelId,
   channels,
   hasUnread,
   isCollapsed,
@@ -574,6 +580,9 @@ export function CustomChannelSection({
   onLeaveChannel,
 }: {
   section: ChannelSection;
+  channelLabels?: Record<string, string>;
+  dmParticipantsByChannelId?: Record<string, SidebarDmParticipant[]>;
+  presenceByChannelId?: Record<string, PresenceStatus>;
   channels: Channel[];
   hasUnread: boolean;
   isCollapsed: boolean;
@@ -734,6 +743,13 @@ export function CustomChannelSection({
                             <DraggableChannelRow channelId={channel.id}>
                               <ChannelMenuButton
                                 channel={channel}
+                                label={channelLabels?.[channel.id]}
+                                dmParticipants={
+                                  dmParticipantsByChannelId?.[channel.id]
+                                }
+                                presenceStatus={
+                                  presenceByChannelId?.[channel.id]
+                                }
                                 activeWorking={activeWorkingByChannelId?.get(
                                   channel.id,
                                 )}
@@ -760,15 +776,27 @@ export function CustomChannelSection({
                             onMarkChannelUnread={onMarkChannelUnread}
                             onMuteChannel={onMuteChannel}
                             onUnmuteChannel={onUnmuteChannel}
-                            onStarChannel={onStarChannel}
-                            onUnstarChannel={onUnstarChannel}
+                            onStarChannel={
+                              channel.channelType === "dm"
+                                ? undefined
+                                : onStarChannel
+                            }
+                            onUnstarChannel={
+                              channel.channelType === "dm"
+                                ? undefined
+                                : onUnstarChannel
+                            }
                             onAssignChannel={onAssignChannel}
                             onUnassignChannel={onUnassignChannel}
                             onCreateSectionForChannel={
                               onCreateSectionForChannel
                             }
                             onDeleteChannel={onDeleteChannel}
-                            onLeaveChannel={onLeaveChannel}
+                            onLeaveChannel={
+                              channel.channelType === "dm"
+                                ? undefined
+                                : onLeaveChannel
+                            }
                           />
                         </ContextMenuContent>
                       </ContextMenu>
