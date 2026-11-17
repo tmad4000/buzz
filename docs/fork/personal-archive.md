@@ -1,4 +1,4 @@
-# Personal archive integration
+# Personal archive integration (.8 target)
 
 This change starts at frozen `0e891f22766ac214acbe2b1bfb813a488f08e93b`.
 It changes no version, native package, relay protocol, message, read marker, or
@@ -24,9 +24,15 @@ Storage is finite: an edit exceeding 36 KB plaintext in a hash bucket is rejecte
 before changing local state. Very large thread snapshots can therefore fail with
 a visible capacity error. No silent eviction, pruning, or message deletion.
 
-## Integration with unseen replies (PR34 replaces PR31)
+## Integration with unseen replies (PR28 owns the .7+ projection)
 
-The frozen base predates `useUnseenThreadReplies`. In the integrating owner's
+Root supersedes the earlier PR34 direction: PR34 is skipped. PR28 owns
+`useUnseenThreadReplies` and exact `getThreadReplyObservedAt` for .7+
+(root names head `86a127a1`), maintained by
+`445b5cb9-77a2-408c-9bc6-f85153a52716`. Archive targets .8 and keeps the
+optional adapter; agree its hook placement against that owner's admitted head.
+
+The frozen archive base predates that hook. In the integrating owner's
 version of that hook import:
 
 ```ts
@@ -44,9 +50,11 @@ existing committed-body observer, active-view admission and seen writer exactly.
 Do not treat archive, fetching, mounting, Show, or expansion as observation.
 
 The older base's ordinary unread projection is already filtered. This adapter
-must also be applied if the integrating owner replaces that projection with PR34.
-The archive adapter is independent of PR28's exact-observed getter/readiness fix;
-it does not make inherited frontier timestamps positive body evidence.
+must also be applied if the integrating owner replaces that projection with PR28.
+The archive adapter consumes PR28's exact `getThreadReplyObservedAt`/readiness contract;
+legacy `getThreadReplySeenAt` frontier progress is not positive body evidence.
+Archive/exclusion never calls markSeen or markRead; only admitted body observation
+may write observation markers.
 
 ## Timeline and sections
 
