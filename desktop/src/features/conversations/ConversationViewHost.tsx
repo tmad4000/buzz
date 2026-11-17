@@ -71,7 +71,7 @@ export function ConversationViewHost({
       data-focused-conversation={focused || undefined}
       className="relative flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
       hidden={!visible}
-      style={visible ? undefined : { display: "none" }}
+      style={{ contain: "layout paint", display: visible ? undefined : "none" }}
       onPointerDownCapture={focusView}
       onFocusCapture={focusView}
     >

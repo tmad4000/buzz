@@ -18,6 +18,8 @@ import type { ProfilePanelOpenOptions } from "@/shared/context/ProfilePanelConte
 import type { Channel, RespondToMode } from "@/shared/api/types";
 import type { IdleAuxiliaryHeaderControls } from "./IdleAuxiliaryPanel";
 export type ChannelPaneProps = {
+  paneHeaderEndActions?: React.ReactNode;
+  paneConversationTitle?: string;
   activeChannel: Channel | null;
   activityAgents?: BotActivityAgent[];
   agentPubkeys?: ReadonlySet<string>;
