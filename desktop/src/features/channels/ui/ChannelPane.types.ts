@@ -199,6 +199,7 @@ export type ChannelPaneProps = {
   ) => void;
   threadMessages: MainTimelineEntry[];
   threadMessagesPending?: boolean;
+  threadMessagesComplete?: boolean;
   threadMessagesError?: boolean;
   onRetryThreadReplies?: () => void;
   threadPanelWidthPx: number;

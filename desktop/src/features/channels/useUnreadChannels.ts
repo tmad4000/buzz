@@ -963,6 +963,7 @@ export function useUnreadChannels(
   );
 
   return {
+    threadReplySeenReady: isReadStateReady,
     unreadChannelIds,
     topLevelUnreadChannelIds,
     unreadChannelCounts,

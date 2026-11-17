@@ -1016,6 +1016,7 @@ export function ChannelScreen({
                   threadHeadMessage={displayedThreadHeadMessage}
                   threadMessages={displayedThreadMessages}
                   threadMessagesPending={threadRepliesQuery.isPending}
+                  threadMessagesComplete={threadRepliesQuery.isSuccess && !threadRepliesQuery.isFetching}
                   threadMessagesError={threadRepliesQuery.isError}
                   onRetryThreadReplies={() => {
                     void threadRepliesQuery.refetch();

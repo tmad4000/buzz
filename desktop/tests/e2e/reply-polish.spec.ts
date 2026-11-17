@@ -345,3 +345,160 @@ test("routed accepted reply confirmation opens exact collapsed target and Back p
     path: info.outputPath("routed-confirmation-back.png"),
   });
 });
+
+test("sidebar new visit renders first/latest reply despite legacy collapse and current-visit Hide", async ({
+  page,
+}, info) => {
+  await installMockBridge(page);
+  await page.goto("/");
+  await page.getByTestId("channel-general").click();
+  await waitForMockChannelHeadReady(
+    page,
+    "general",
+    "9a1657ac-f7aa-5db0-b632-d8bbeb6dfb50",
+  );
+  const root = "a7".repeat(32);
+  await page.evaluate(
+    ({ root, pubkey }) => {
+      window.__BUZZ_E2E_EMIT_MOCK_MESSAGE__?.({
+        id: root,
+        content: "yo — synthetic sidebar opening repro",
+        pubkey,
+        channelName: "general",
+        createdAt: Math.floor(Date.now() / 1000) + 10,
+      });
+      window.__BUZZ_E2E_EMIT_MOCK_MESSAGE__?.({
+        id: "a8".repeat(32),
+        parentEventId: root,
+        content: "Synthetic first and latest Paseo reply body",
+        pubkey,
+        channelName: "general",
+        createdAt: Math.floor(Date.now() / 1000) + 11,
+      });
+    },
+    { root, pubkey: TEST_IDENTITIES.bob.pubkey },
+  );
+  const open = page.locator(
+    `[data-testid="open-thread-side-panel"][data-thread-head-id="${root}"]`,
+  );
+  // Persist the same legacy collapse produced by the inline policy. Sidebar visits
+  // must ignore this storage without rewriting the independent inline preference.
+  const summary = page
+    .locator(
+      `[data-testid="message-thread-summary"][data-thread-head-id="${root}"]`,
+    )
+    .first();
+  if ((await summary.getAttribute("aria-expanded")) !== "true")
+    await summary.click();
+  await summary.click();
+  await open.click();
+  const panel = page.getByTestId("message-thread-panel");
+  const body = panel
+    .getByTestId("message-body")
+    .filter({ hasText: "Synthetic first and latest Paseo reply body" });
+  await expect(body).toBeVisible();
+  await panel
+    .locator(`button[aria-expanded="true"][data-thread-head-id="${root}"]`)
+    .click();
+  await expect(body).toHaveCount(0);
+  await panel.getByRole("button", { name: "Close panel", exact: true }).click();
+  await expect(panel).toHaveCount(0);
+  await open.click();
+  await expect(body).toBeVisible();
+  await expect(
+    panel
+      .getByTestId("message-body")
+      .filter({ hasText: "yo — synthetic sidebar opening repro" }),
+  ).toBeVisible();
+  await page.screenshot({
+    path: info.outputPath("sidebar-reopen-first-latest.png"),
+  });
+});
+
+test("sidebar required unseen paths bypass both smart branch budget and row window without focus theft", async ({
+  page,
+}) => {
+  await installMockBridge(page);
+  await page.goto("/");
+  await page.getByTestId("channel-general").click();
+  await waitForMockChannelHeadReady(
+    page,
+    "general",
+    "9a1657ac-f7aa-5db0-b632-d8bbeb6dfb50",
+  );
+  const root = "e7".repeat(32);
+  await page.evaluate(
+    ({ root, pubkey }) => {
+      const now = Math.floor(Date.now() / 1000) + 10;
+      const emit = (
+        id: string,
+        content: string,
+        at: number,
+        parentEventId?: string,
+      ) =>
+        window.__BUZZ_E2E_EMIT_MOCK_MESSAGE__?.({
+          id,
+          content,
+          pubkey,
+          channelName: "general",
+          createdAt: at,
+          parentEventId,
+        });
+      emit(root, "Many unseen sidebar paths", now);
+      for (let i = 0; i < 24; i++) {
+        const branch = (0xe800 + i * 2).toString(16).padStart(64, "0");
+        emit(branch, `Required branch ${i}`, now + i * 2 + 1, root);
+        emit(
+          (0xe801 + i * 2).toString(16).padStart(64, "0"),
+          `Required unseen leaf ${i}`,
+          now + i * 2 + 2,
+          branch,
+        );
+      }
+    },
+    { root, pubkey: TEST_IDENTITIES.bob.pubkey },
+  );
+  await page
+    .locator(
+      `[data-testid="open-thread-side-panel"][data-thread-head-id="${root}"]`,
+    )
+    .click();
+  const panel = page.getByTestId("message-thread-panel");
+  await expect(
+    panel
+      .getByTestId("message-body")
+      .filter({ hasText: /^Required unseen leaf \d+$/ }),
+  ).toHaveCount(24);
+  await expect(
+    panel
+      .getByTestId("message-body")
+      .filter({ hasText: /^Required branch \d+$/ }),
+  ).toHaveCount(24);
+  await expect(panel.getByTestId("message-input")).not.toBeFocused();
+  const scroller = panel.getByTestId("message-thread-body");
+  await scroller.evaluate((el) => {
+    el.scrollTop = 100;
+    el.dispatchEvent(new Event("scroll"));
+  });
+  const before = await scroller.evaluate((el) => el.scrollTop);
+  await page.evaluate(
+    ({ root, pubkey }) =>
+      window.__BUZZ_E2E_EMIT_MOCK_MESSAGE__?.({
+        id: "ef".repeat(32),
+        content: "Incoming required unseen while reader away",
+        parentEventId: root,
+        pubkey,
+        channelName: "general",
+        createdAt: Math.floor(Date.now() / 1000) + 100,
+      }),
+    { root, pubkey: TEST_IDENTITIES.bob.pubkey },
+  );
+  await expect(
+    panel
+      .getByTestId("message-body")
+      .filter({ hasText: "Incoming required unseen while reader away" }),
+  ).toHaveCount(1);
+  expect(
+    Math.abs((await scroller.evaluate((el) => el.scrollTop)) - before),
+  ).toBeLessThan(4);
+});
