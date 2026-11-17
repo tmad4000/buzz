@@ -105,44 +105,29 @@ test("the label follows the current clock, not a captured one", () => {
 
 // ── formatItemTimestamp ─────────────────────────────────────────────────────
 
-test("today is a bare clock time in both modes", () => {
-  const today = at(2026, 6, 30, 9, 5);
-  assert.equal(formatItemTimestamp(today, { nowSeconds: NOW }), "9:05 AM");
-  assert.equal(
-    formatItemTimestamp(today, { withTime: true, nowSeconds: NOW }),
-    "9:05 AM",
-  );
-});
-
-test("compact mode drops the time outside today", () => {
-  const opts = { nowSeconds: NOW };
-  assert.equal(formatItemTimestamp(at(2026, 6, 29, 9, 5), opts), "Yesterday");
-  assert.equal(formatItemTimestamp(at(2026, 6, 27, 9, 5), opts), "Monday");
-  assert.equal(formatItemTimestamp(at(2026, 5, 20, 9, 5), opts), "Sat, Jun 20");
-  assert.equal(
-    formatItemTimestamp(at(2025, 5, 20, 9, 5), opts),
-    "Jun 20, 2025",
-  );
-});
-
-test("roomy mode keeps the time at every band, joined with 'at'", () => {
-  const opts = { withTime: true, nowSeconds: NOW };
-  assert.equal(
-    formatItemTimestamp(at(2026, 6, 29, 9, 5), opts),
-    "Yesterday at 9:05 AM",
-  );
-  assert.equal(
-    formatItemTimestamp(at(2026, 6, 27, 14, 34), opts),
-    "Monday at 2:34 PM",
-  );
-  assert.equal(
-    formatItemTimestamp(at(2026, 5, 20, 14, 34), opts),
-    "Sat, Jun 20 at 2:34 PM",
-  );
-  assert.equal(
-    formatItemTimestamp(at(2025, 5, 20, 14, 34), opts),
-    "Jun 20, 2025 at 2:34 PM",
-  );
+test("item timestamps use the shared relative-first standard in both modes", () => {
+  for (const withTime of [false, true]) {
+    for (const [seconds, label] of [
+      [0, "just now"],
+      [60, "1m ago"],
+      [3600, "1h ago"],
+      [86400, "1d ago"],
+      [3 * 86400, "3d ago"],
+    ]) {
+      assert.equal(
+        formatItemTimestamp(NOW - seconds, { withTime, nowSeconds: NOW }),
+        label,
+      );
+    }
+    assert.equal(
+      formatItemTimestamp(at(2026, 5, 20, 9, 5), { withTime, nowSeconds: NOW }),
+      "Jun 20",
+    );
+    assert.equal(
+      formatItemTimestamp(at(2025, 5, 20, 9, 5), { withTime, nowSeconds: NOW }),
+      "Jun 20, 2025",
+    );
+  }
 });
 
 test("the year is omitted within the current year in both modes", () => {

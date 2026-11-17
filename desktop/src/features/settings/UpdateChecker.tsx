@@ -21,7 +21,7 @@ export function UpdateChecker() {
           <SettingsOptionRow>
             <div className="min-w-0">
               <p
-                className="text-sm font-normal text-muted-foreground/70"
+                className="text-sm font-normal text-muted-foreground"
                 data-settings-subcopy
               >
                 Check if a new version is available.
@@ -37,7 +37,7 @@ export function UpdateChecker() {
           <SettingsOptionRow>
             <div className="min-w-0">
               <p
-                className="text-sm font-normal text-muted-foreground/70"
+                className="text-sm font-normal text-muted-foreground"
                 data-settings-subcopy
               >
                 Checking for updates...
@@ -50,7 +50,7 @@ export function UpdateChecker() {
           <SettingsOptionRow>
             <div className="min-w-0">
               <p
-                className="text-sm font-normal text-muted-foreground/70"
+                className="text-sm font-normal text-muted-foreground"
                 data-settings-subcopy
               >
                 You're on the latest version.
@@ -66,7 +66,7 @@ export function UpdateChecker() {
           <SettingsOptionRow>
             <div className="min-w-0">
               <p
-                className="text-sm font-normal text-muted-foreground/70"
+                className="text-sm font-normal text-muted-foreground"
                 data-settings-subcopy
               >
                 No published Buzz Ideaflow build is available. Check again
@@ -86,7 +86,7 @@ export function UpdateChecker() {
                 Update available — v{status.version}
               </p>
               <p
-                className="text-sm font-normal text-muted-foreground/70"
+                className="text-sm font-normal text-muted-foreground"
                 data-settings-subcopy
               >
                 Download the Buzz Ideaflow build, then restart after installing.
@@ -102,7 +102,7 @@ export function UpdateChecker() {
           <SettingsOptionRow>
             <div className="min-w-0">
               <p
-                className="text-sm font-normal text-muted-foreground/70"
+                className="text-sm font-normal text-muted-foreground"
                 data-settings-subcopy
               >
                 Preparing update...
@@ -115,7 +115,7 @@ export function UpdateChecker() {
           <SettingsOptionRow>
             <div className="min-w-0">
               <p
-                className="text-sm font-normal text-muted-foreground/70"
+                className="text-sm font-normal text-muted-foreground"
                 data-settings-subcopy
               >
                 Downloading update...
@@ -128,7 +128,7 @@ export function UpdateChecker() {
           <SettingsOptionRow>
             <div className="min-w-0">
               <p
-                className="text-sm font-normal text-muted-foreground/70"
+                className="text-sm font-normal text-muted-foreground"
                 data-settings-subcopy
               >
                 Installing update...
@@ -141,7 +141,7 @@ export function UpdateChecker() {
           <SettingsOptionRow>
             <div className="min-w-0">
               <p
-                className="text-sm font-normal text-muted-foreground/70"
+                className="text-sm font-normal text-muted-foreground"
                 data-settings-subcopy
               >
                 Update downloaded. Click to apply.
