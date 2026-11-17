@@ -1,4 +1,5 @@
-import { InlineAutoExpansionProvider } from "@/features/messages/ui/InlineAutoExpansion";
+import { useTimelineView } from "./TimelineViewContext";
+import { ChannelTimelineProviders } from "./ChannelTimelineProviders";
 import { InlineChannelThread } from "./InlineChannelThread";
 import type { ThreadSummaryRenderer } from "@/features/messages/ui/TimelineMessageRow";
 import { PinnedBar } from "@/features/messages/pins/PinnedBar";
@@ -621,8 +622,14 @@ export const ChannelPane = React.memo(function ChannelPane({
     isSinglePanelView,
     useSplitAuxiliaryPane,
   });
+  const timelineView = useTimelineView();
+  const flatTimeline = timelineView.mode === "timeline" && !isHuddleTranscript;
   const timelineReplyHandler =
-    activeChannel?.archivedAt || isHuddleTranscript ? undefined : onOpenThread;
+    activeChannel?.archivedAt || isHuddleTranscript
+      ? undefined
+      : flatTimeline
+        ? timelineView.openReply
+        : onOpenThread;
   return (
     <div
       className="relative flex min-h-0 min-w-0 flex-1 flex-row overflow-hidden"
@@ -675,14 +682,24 @@ export const ChannelPane = React.memo(function ChannelPane({
               }}
             />
           ) : null}
-          {isHuddleTranscript && huddleThreadRepliesError ? (
+          {(isHuddleTranscript || flatTimeline) && huddleThreadRepliesError ? (
             <div className="px-5 pt-3">
               <ThreadRepliesErrorCard onRetry={onRetryHuddleThreadReplies} />
             </div>
           ) : null}
+          {flatTimeline && timelineView.loadingReplies ? (
+            <div
+              role="status"
+              className="px-5 py-2 text-xs text-muted-foreground"
+            >
+              Loading older replies… Channel history is shown while threads
+              load.
+            </div>
+          ) : null}
           <div className="relative isolate flex min-h-0 min-w-0 flex-1 flex-col">
-            <InlineAutoExpansionProvider
+            <ChannelTimelineProviders
               key={`${activeChannel?.id}:${currentPubkey}`}
+              onRepliesRevealed={onSidebarRepliesRevealed}
               scope={`${activeChannel?.id}:${currentPubkey}`}
               currentPubkey={currentPubkey}
             >
@@ -740,9 +757,13 @@ export const ChannelPane = React.memo(function ChannelPane({
                 onMarkUnread={onMarkUnread}
                 onMarkRead={onMarkRead}
                 onReply={timelineReplyHandler}
-                onOpenThread={isHuddleTranscript ? undefined : onOpenThread}
+                onOpenThread={
+                  isHuddleTranscript || flatTimeline ? undefined : onOpenThread
+                }
                 renderThreadSummary={
-                  isHuddleTranscript ? undefined : renderThreadSummary
+                  isHuddleTranscript || flatTimeline
+                    ? undefined
+                    : renderThreadSummary
                 }
                 channelName={activeChannel?.name}
                 channelType={activeChannel?.channelType ?? null}
@@ -763,7 +784,7 @@ export const ChannelPane = React.memo(function ChannelPane({
                 }
                 threadUnreadCounts={threadUnreadCounts}
               />
-            </InlineAutoExpansionProvider>
+            </ChannelTimelineProviders>
             {isNonMemberView ? (
               <div
                 data-testid="join-banner"

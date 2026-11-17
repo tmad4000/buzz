@@ -238,6 +238,7 @@ export function combineThreadRepliesResults(
   results: readonly {
     data?: RelayEvent[];
     isPending: boolean;
+    isFetching?: boolean;
     isError: boolean;
     error: unknown;
     refetch: () => unknown;
@@ -246,6 +247,7 @@ export function combineThreadRepliesResults(
   return {
     events: sortMessages(results.flatMap((result) => result.data ?? [])),
     isPending: results.some((result) => result.isPending),
+    isFetching: results.some((result) => result.isFetching),
     isError: results.some((result) => result.isError),
     error: results.find((result) => result.isError)?.error ?? null,
     refetch: () => {
@@ -272,7 +274,16 @@ export function useThreadRepliesForRoots(
     queries: rootIds.map((rootId) => ({
       queryKey: threadRepliesKey(channelId, rootId),
       enabled: activeChannel !== null && activeChannel.channelType !== "forum",
-      queryFn: () => loadThreadReplies(queryClient, channelId, rootId),
+      queryFn: ({ signal }) =>
+        loadThreadReplies(
+          queryClient,
+          channelId,
+          rootId,
+          null,
+          undefined,
+          getThreadReplies,
+          signal,
+        ),
       staleTime: 0,
       gcTime: 60 * 60 * 1_000,
     })),

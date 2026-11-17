@@ -1,6 +1,7 @@
 import { LogIn, SquareTerminal } from "lucide-react";
 import type * as React from "react";
 
+import { ChannelViewToggle } from "./TimelineViewContext";
 import { ChatHeader } from "@/features/chat/ui/ChatHeader";
 import type { EphemeralChannelDisplay } from "@/features/channels/lib/ephemeralChannel";
 import type { ActiveDmHeaderParticipant } from "@/features/channels/useActiveChannelHeader";
@@ -130,6 +131,9 @@ export function ChannelScreenHeader({
   const actions =
     terminalButton || channelActions ? (
       <div className="flex items-center gap-1">
+        {activeChannel && activeChannel.channelType !== "forum" ? (
+          <ChannelViewToggle />
+        ) : null}
         {terminalButton}
         {channelActions}
       </div>
