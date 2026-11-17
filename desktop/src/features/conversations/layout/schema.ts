@@ -1,3 +1,7 @@
+import {
+  isExplicitExpansionSnapshot,
+  type ExplicitExpansionSnapshot,
+} from "./explicitExpansion";
 import { z } from "zod";
 import { CHANNEL_SEARCH_KEYS } from "@/features/channels/ui/channelSearchKeys";
 import {
@@ -27,6 +31,9 @@ export const conversationViewSchema = z
     id: identifier,
     channelId: identifier,
     panelState: z.object(panelShape).strict(),
+    explicitExpansion: z
+      .custom<ExplicitExpansionSnapshot>(isExplicitExpansionSnapshot)
+      .optional(),
     preferences: z
       .object({
         timelineMode: z.enum(["threads", "timeline"]).optional(),

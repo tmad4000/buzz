@@ -156,3 +156,38 @@ test("old visits remain valid but invalid or command-bearing preferences are rej
       null,
     );
 });
+
+test("explicit disclosures round-trip in the bounded visit cache without automatic state", () => {
+  const cache = new ConversationVisitCache();
+  cache.remember({
+    ...chat("channel"),
+    explicitExpansion: {
+      legacySeeded: true,
+      entries: [["root", [["branch", false]]]],
+    },
+  });
+  const restored = new ConversationVisitCache();
+  assert.equal(restored.restore(cache.serialize()), true);
+  const selected = restored.recall("a", "channel");
+  assert.equal(selected.explicitExpansion.entries[0][1][0][1], false);
+  selected.explicitExpansion.entries[0][1][0][1] = true;
+  assert.equal(
+    restored.recall("a", "channel").explicitExpansion.entries[0][1][0][1],
+    false,
+  );
+  assert.equal(
+    parseVisitCache(
+      serialize([
+        {
+          ...chat("channel"),
+          explicitExpansion: {
+            legacySeeded: true,
+            entries: [],
+            automatic: ["branch"],
+          },
+        },
+      ]),
+    ),
+    null,
+  );
+});
