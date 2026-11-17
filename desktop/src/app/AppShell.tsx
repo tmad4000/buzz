@@ -41,6 +41,7 @@ import {
   useOpenDmMutation,
 } from "@/features/channels/hooks";
 import { useDmResurfaceFromMessages } from "@/features/channels/useDmResurfaceFromMessages";
+import { isChannelMembershipHydrated } from "@/features/channels/channelMembershipHydration";
 import { useUnreadChannels } from "@/features/channels/useUnreadChannels";
 import { useMembershipNotifications } from "@/features/channels/useMembershipNotifications";
 import { useFeedItemState } from "@/features/home/useFeedItemState";
@@ -1023,7 +1024,13 @@ export function AppShell() {
                           channels={channels}
                           membershipReady={
                             identityQuery.isSuccess &&
-                            channelsQuery.dataUpdatedAt > 0
+                            isChannelMembershipHydrated(queryClient, {
+                              communityId:
+                                communitiesHook.activeCommunity?.id ?? "",
+                              relayUrl:
+                                communitiesHook.activeCommunity?.relayUrl ?? "",
+                              identityPubkey: identityQuery.data?.pubkey ?? "",
+                            })
                           }
                           excludedChannelIds={huddleBackingChannelIds}
                           selectedChannelId={selectedChannelId}

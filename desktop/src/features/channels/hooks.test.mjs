@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { QueryClient } from "@tanstack/react-query";
+import { isChannelMembershipHydrated } from "./channelMembershipHydration.ts";
 
 import {
   applyLastMessages,
@@ -100,6 +101,77 @@ function refreshWithHarness(harness, fetchChannels = harness.fetchChannels) {
 
 const T1 = "2026-01-01T00:01:00.000Z";
 const T2 = "2026-01-01T00:02:00.000Z";
+
+test("a local upsert cannot hydrate a stale snapshot during pending or failed initial validation", async () => {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  const scope = {
+    communityId: "community",
+    relayUrl: "wss://relay",
+    identityPubkey: "viewer",
+  };
+  const stale = makeChannel("stale-member", "Stale member");
+  const created = makeChannel("new", "New");
+  queryClient.setQueryData(channelsQueryKey, [stale], { updatedAt: 0 });
+  let rejectValidation;
+  const validation = new Promise((_resolve, reject) => {
+    rejectValidation = reject;
+  });
+  const options = {
+    queryClient,
+    communityId: scope.communityId,
+    relayUrl: scope.relayUrl,
+    ownerPubkey: scope.identityPubkey,
+    initialSnapshotPair: { channels: [stale], hash: "snapshot" },
+    persistSnapshot: () => {},
+  };
+  try {
+    const pending = queryClient.fetchQuery({
+      queryKey: channelsQueryKey,
+      queryFn: () =>
+        refreshChannelsQuery({ ...options, fetchChannels: () => validation }),
+    });
+    const rejected = assert.rejects(pending, /offline/);
+    queryClient.setQueryData(channelsQueryKey, (rows) =>
+      upsertCachedChannel(rows, created),
+    );
+    assert.ok(queryClient.getQueryState(channelsQueryKey).dataUpdatedAt > 0);
+    assert.equal(isChannelMembershipHydrated(queryClient, scope), false);
+    rejectValidation(new Error("offline"));
+    await rejected;
+    assert.equal(isChannelMembershipHydrated(queryClient, scope), false);
+    await queryClient.fetchQuery({
+      queryKey: channelsQueryKey,
+      queryFn: () =>
+        refreshChannelsQuery({
+          ...options,
+          fetchChannels: async () => ({
+            channels: [created],
+            hash: "validated",
+            lastMessages: {},
+          }),
+        }),
+    });
+    assert.equal(isChannelMembershipHydrated(queryClient, scope), true);
+    await assert.rejects(
+      queryClient.fetchQuery({
+        queryKey: channelsQueryKey,
+        queryFn: () =>
+          refreshChannelsQuery({
+            ...options,
+            fetchChannels: async () => {
+              throw new Error("offline again");
+            },
+          }),
+      }),
+      /offline again/,
+    );
+    assert.equal(isChannelMembershipHydrated(queryClient, scope), true);
+  } finally {
+    queryClient.clear();
+  }
+});
 
 test("refreshChannelsQuery preserves a live update through matching not-modified settlement", async () => {
   const harness = makeRefreshHarness();

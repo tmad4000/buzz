@@ -52,6 +52,7 @@ import {
   channelMembersQueryKey,
 } from "@/features/channels/rosterFreshness";
 import { dmVisibilityQueryKeyFor } from "@/features/channels/useHiddenDmIds";
+import { markChannelMembershipHydrated } from "./channelMembershipHydration";
 
 export const channelsQueryKey = ["channels"] as const;
 /** Keeps focused polling at the established one-minute cadence. */
@@ -322,6 +323,7 @@ export function requireFullChannelList(channels: Channel[] | null): Channel[] {
 }
 
 export type RefreshChannelsQueryOptions = {
+  communityId?: string | null;
   queryClient: QueryClient;
   initialSnapshotPair: ChannelSnapshot | null;
   relayUrl: string | null;
@@ -336,6 +338,7 @@ export type RefreshChannelsQueryOptions = {
  * be regression-tested without replacing it with a helper-only simulation.
  */
 export async function refreshChannelsQuery({
+  communityId,
   queryClient,
   initialSnapshotPair,
   relayUrl,
@@ -343,6 +346,14 @@ export async function refreshChannelsQuery({
   fetchChannels = getChannels,
   persistSnapshot = writeChannelSnapshot,
 }: RefreshChannelsQueryOptions): Promise<Channel[]> {
+  const markHydrated = () => {
+    if (communityId && relayUrl && ownerPubkey)
+      markChannelMembershipHydrated(queryClient, {
+        communityId,
+        relayUrl,
+        identityPubkey: ownerPubkey,
+      });
+  };
   // Revalidation uses only an authoritative list/hash pair. The displayed
   // channels cache is intentionally ignored because successful mutations
   // patch it before the relay's list/hash has necessarily caught up.
@@ -390,6 +401,7 @@ export async function refreshChannelsQuery({
     if (relayUrl && ownerPubkey) {
       persistSnapshot(relayUrl, ownerPubkey, pair.channels, pair.hash);
     }
+    markHydrated();
     return sorted;
   }
 
@@ -425,6 +437,7 @@ export async function refreshChannelsQuery({
   if (relayUrl && ownerPubkey) {
     persistSnapshot(relayUrl, ownerPubkey, pair.channels, pair.hash);
   }
+  markHydrated();
   return sorted;
 }
 
@@ -469,6 +482,7 @@ export function useChannelsQuery(options?: { enabled?: boolean }) {
     queryKey: channelsQueryKey,
     queryFn: () =>
       refreshChannelsQuery({
+        communityId: activeCommunity?.id,
         queryClient,
         initialSnapshotPair,
         relayUrl,
