@@ -53,12 +53,14 @@ async function preferences(
   page: Page,
   channels: "collapsed" | "smart" | "expanded",
   replies: "collapsed" | "smart" | "expanded",
+  layout?: "focus",
 ) {
   await page.keyboard.press("ControlOrMeta+,");
   await expect(page.getByTestId("settings-view")).toBeVisible();
   await page.getByTestId("settings-nav-appearance").click();
   await page.getByTestId(`thread-display-channels-${channels}`).click();
   await page.getByTestId(`thread-display-replies-${replies}`).click();
+  if (layout) await page.getByTestId(`thread-layout-${layout}`).click();
   await page.getByTestId("settings-back-to-app").click();
   await page.getByTestId("channel-random").click();
   await ready(page);
@@ -296,4 +298,54 @@ test("Expanded uses bounded pages/rows and does not acknowledge unloaded replies
   ).toBeVisible();
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({ path: `${shots}/bounded-narrow.png` });
+});
+
+test("focused thread keyboard disclosure retains focus after branch/root collapse and expansion", async ({
+  page,
+}) => {
+  await installMockBridge(page);
+  await page.goto("/");
+  await ready(page);
+  await preferences(page, "collapsed", "expanded", "focus");
+  const emit = emitter(page);
+  const root = await emit("Keyboard review discussion");
+  const branch = await emit("Signing details", root.id);
+  await emit("Preserve the rollback bundle.", branch.id);
+  await page
+    .locator(
+      `[data-testid="open-thread-side-panel"][data-thread-head-id="${root.id}"]`,
+    )
+    .click();
+  const panel = page.getByTestId("message-thread-panel");
+  await expect(
+    panel.getByText("Preserve the rollback bundle.", { exact: true }),
+  ).toBeVisible();
+  const disclosure = (id: string, open: boolean) =>
+    panel.locator(
+      `button[data-thread-head-id="${id}"][aria-expanded="${open}"]`,
+    );
+  await disclosure(branch.id, true).focus();
+  await page.keyboard.press("Enter");
+  await expect(disclosure(branch.id, false)).toBeFocused();
+  await expect(
+    panel.getByText("Preserve the rollback bundle.", { exact: true }),
+  ).toHaveCount(0);
+  await page.keyboard.press("Space");
+  await expect(disclosure(branch.id, true)).toBeFocused();
+  await expect(
+    panel.getByText("Preserve the rollback bundle.", { exact: true }),
+  ).toBeVisible();
+  await disclosure(root.id, true).focus();
+  await page.keyboard.press("Space");
+  await expect(disclosure(root.id, false)).toBeFocused();
+  await expect(panel.getByText("Signing details", { exact: true })).toHaveCount(
+    0,
+  );
+  await page.keyboard.press("ArrowRight");
+  await expect(disclosure(root.id, true)).toBeFocused();
+  await expect(
+    panel.getByText("Preserve the rollback bundle.", { exact: true }),
+  ).toBeVisible();
+  fs.mkdirSync(shots, { recursive: true });
+  await page.screenshot({ path: `${shots}/focused-keyboard-disclosure.png` });
 });

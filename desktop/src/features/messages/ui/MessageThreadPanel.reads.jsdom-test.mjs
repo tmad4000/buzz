@@ -11,8 +11,9 @@ const reactURL = new URL(
 const modules = {
   "./MessageComposer": "export const MessageComposer=()=>null;",
   "./MessageThreadRow":
-    'export const MessageThreadRow=({message})=>React.createElement("div",{"data-message-id":message.id,"data-testid":"message-row"},message.body);',
-  "./MessageThreadSummaryRow": "export const MessageThreadSummaryRow=()=>null;",
+    'export const MessageThreadRow=({message})=>React.createElement("div",{"data-message-id":message.id,"data-testid":"message-row"},message.body,React.createElement("button",{"data-reply-action":message.id},"Reply"));',
+  "./MessageThreadSummaryRow":
+    'export const MessageThreadSummaryRow=({message,onOpenThread,expanded})=>React.createElement("button",{"data-thread-head-id":message.id,"aria-expanded":expanded,onClick:()=>onOpenThread(message)},"Read replies");',
   "./MessageThreadPanelSkeleton":
     "export const MessageThreadPanelHeader=()=>null;export const ThreadMessageSkeleton=()=>null;",
   "./TypingIndicatorRow": "export const TypingIndicatorRow=()=>null;",
@@ -174,4 +175,142 @@ test("read callbacks contain only committed rows and never descendants hidden by
   assert.ok(calls.some((ids) => ids.includes("deep")));
   await act(async () => root.unmount());
   dom.window.close();
+});
+
+test("focused panel restores branch/root disclosure focus for local and synchronized collapses without stealing outside focus", async () => {
+  const dom = new JSDOM(
+    '<button id="outside">Outside</button><div id="root"></div>',
+    { url: "http://localhost" },
+  );
+  Object.assign(globalThis, {
+    window: dom.window,
+    document: dom.window.document,
+    localStorage: dom.window.localStorage,
+    HTMLElement: dom.window.HTMLElement,
+    IS_REACT_ACT_ENVIRONMENT: true,
+    CSS: { escape: (value) => value },
+  });
+  const { threadExpansionKey, saveThreadExpansion } = await import(
+    "../lib/threadExpansionStorage.ts"
+  );
+  const { MessageThreadPanel } = await import("./MessageThreadPanel.tsx");
+  const { buildThreadPanelData } = await import("../lib/threadPanel.ts");
+  const msg = (id, parentId = null) => ({
+    id,
+    parentId,
+    rootId: "root",
+    createdAt: 1000,
+    depth: 0,
+    body: id,
+    author: "Nora",
+    time: "now",
+  });
+  const messages = [msg("root"), msg("branch", "root"), msg("deep", "branch")];
+  const key = threadExpansionKey(null, "me", "focus-channel", "root");
+  localStorage.setItem(
+    key,
+    JSON.stringify([
+      ["root", true],
+      ["branch", true],
+    ]),
+  );
+  const projection = buildThreadPanelData(
+    messages,
+    "root",
+    null,
+    new Set(["root", "branch"]),
+  );
+  const props = {
+    channel: null,
+    channelId: "focus-channel",
+    channelName: "test",
+    currentPubkey: "me",
+    isSending: false,
+    isFocusMode: true,
+    isSinglePanelView: true,
+    onCancelReply: () => {},
+    onClose: () => {},
+    onExpandReplies: () => {},
+    onScrollTargetResolved: () => {},
+    onSelectReplyTarget: () => {},
+    onSend: async () => {},
+    replyTargetMessage: null,
+    scrollTargetId: null,
+    threadHead: projection.threadHead,
+    threadReplies: projection.visibleReplies,
+    allThreadMessages: messages,
+    threadTypingPubkeys: [],
+    activityAccessoryVisible: false,
+    widthPx: 800,
+  };
+  const root = createRoot(document.getElementById("root"));
+  const disclosure = (id, open) =>
+    document.querySelector(
+      `button[data-thread-head-id="${id}"][aria-expanded="${open}"]`,
+    );
+  const activate = async (button) => {
+    assert.ok(button);
+    button.focus();
+    await act(() => button.click());
+  };
+  try {
+    await act(() =>
+      root.render(React.createElement(MessageThreadPanel, props)),
+    );
+    await activate(disclosure("branch", true));
+    assert.equal(document.activeElement, disclosure("branch", false));
+    assert.equal(document.querySelector('[data-message-id="deep"]'), null);
+    await activate(disclosure("branch", false));
+    assert.equal(document.activeElement, disclosure("branch", true));
+    await activate(disclosure("root", true));
+    assert.equal(document.activeElement, disclosure("root", false));
+    await activate(disclosure("root", false));
+    assert.equal(document.activeElement, disclosure("root", true));
+    document.querySelector('[data-reply-action="deep"]').focus();
+    await act(() =>
+      saveThreadExpansion(
+        key,
+        new Map([
+          ["root", true],
+          ["branch", false],
+        ]),
+      ),
+    );
+    assert.equal(
+      document.activeElement,
+      disclosure("branch", false),
+      "a synchronized collapse returns focus from its removed descendant",
+    );
+    await activate(disclosure("branch", false));
+    document.querySelector('[data-reply-action="deep"]').focus();
+    await act(() =>
+      saveThreadExpansion(
+        key,
+        new Map([
+          ["root", false],
+          ["branch", true],
+        ]),
+      ),
+    );
+    assert.equal(
+      document.activeElement,
+      disclosure("root", false),
+      "a synchronized root collapse returns focus to the root",
+    );
+    await activate(disclosure("root", false));
+    document.getElementById("outside").focus();
+    await act(() =>
+      saveThreadExpansion(
+        key,
+        new Map([
+          ["root", true],
+          ["branch", false],
+        ]),
+      ),
+    );
+    assert.equal(document.activeElement, document.getElementById("outside"));
+  } finally {
+    await act(() => root.unmount());
+    dom.window.close();
+  }
 });

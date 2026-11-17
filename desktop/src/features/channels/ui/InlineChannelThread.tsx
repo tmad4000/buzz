@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useThreadDisclosureFocus } from "@/features/messages/ui/useThreadDisclosureFocus";
 import { PanelRight, ChevronDown, ChevronRight } from "lucide-react";
 import { loadActiveCommunityId } from "@/features/communities/communityStorage";
 import type { UserProfileLookup } from "@/features/profile/lib/identity";
@@ -78,10 +79,25 @@ function ScopedInlineThread(props: Props & { storageKey: string }) {
     summary.replyCount <= 4;
   const enabled =
     choice === true || (choice === undefined && (automatic || candidate));
-  const data = useInlineThreadData(props, enabled, auto.scope, auto.policy);
+  const data = useInlineThreadData(
+    props,
+    enabled,
+    auto.scope,
+    auto.policy,
+    auto.answerTargets.get(root.id),
+  );
   const legacyClosed = data.thread.remembered.get(root.id) === false;
   const expanded = choice ?? (automatic && !legacyClosed);
   const regionId = React.useId();
+  const controlsRef = React.useRef<HTMLDivElement>(null);
+  const contentRef = React.useRef<HTMLElement>(null);
+  useThreadDisclosureFocus({
+    scope: `${auto.scope}:${root.id}`,
+    root: root.id,
+    regions: [controlsRef, contentRef],
+    messages: data.thread.index.messageById,
+    expanded: expanded ? data.thread.expanded : new Set<string>(),
+  });
   React.useEffect(() => {
     const changed = (event: Event) => {
       const change = (event as CustomEvent<ThreadExpansionChange>).detail;
@@ -155,7 +171,7 @@ function ScopedInlineThread(props: Props & { storageKey: string }) {
   };
   return (
     <>
-      <div className="flex items-center gap-1">
+      <div ref={controlsRef} className="flex items-center gap-1">
         <MessageThreadSummaryRow
           message={root}
           summary={summary}
@@ -185,6 +201,7 @@ function ScopedInlineThread(props: Props & { storageKey: string }) {
       ) : null}
       {expanded ? (
         <section
+          ref={contentRef}
           id={regionId}
           aria-label={`Inline replies to ${root.author}`}
           data-testid="inline-thread"
@@ -282,6 +299,8 @@ function InlineThreadContent({
         <button
           type="button"
           className="mx-3 my-2 text-sm text-primary"
+          aria-expanded="false"
+          data-thread-head-id={root.id}
           onClick={() => thread.setExpanded(root.id, true)}
         >
           Show replies

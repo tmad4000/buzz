@@ -20,6 +20,7 @@ export function useInlineThreadData(
   enabled: boolean,
   scope: string,
   policy: ThreadDisplayPolicy,
+  retainedAnswerId?: string,
 ) {
   const {
     channel,
@@ -130,7 +131,10 @@ export function useInlineThreadData(
     complete,
     indexOverride: index,
     initialMode: policy.replies,
-    autoRevealId: policy.channels === "smart" ? decision?.answerId : undefined,
+    autoRevealId:
+      policy.channels === "smart"
+        ? (retainedAnswerId ?? decision?.answerId)
+        : undefined,
   });
   return {
     query,

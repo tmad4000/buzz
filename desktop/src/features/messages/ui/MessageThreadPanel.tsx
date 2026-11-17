@@ -8,7 +8,8 @@ import {
   THREAD_REPLY_BODY_OFFSET_REM,
 } from "@/features/messages/lib/threadTreeLayout";
 import { useUnreadSidebarThread } from "./useUnreadSidebarThread";
-import { formatThreadSummaryLastReplyTime } from "@/features/messages/lib/dateFormatters";
+import { CollapsedThreadSummary } from "./CollapsedThreadSummary";
+import { useThreadDisclosureFocus } from "./useThreadDisclosureFocus";
 import * as React from "react";
 import { ArrowDown } from "lucide-react";
 
@@ -309,6 +310,13 @@ export function MessageThreadPanel({
     newIds,
     toggle: toggleSidebarBranch,
   } = sidebar;
+  useThreadDisclosureFocus({
+    scope: `${channelId}:${currentPubkey}:${threadHeadId}`,
+    root: hasStoredDisclosure ? threadHeadId : null,
+    regions: [threadBodyRef],
+    messages: sidebar.index.messageById,
+    expanded: sidebarExpanded,
+  });
   const collapseThreadHeadReplies = React.useCallback(() => {
     if (!threadHeadId) {
       return;
@@ -628,31 +636,17 @@ export function MessageThreadPanel({
   const compactSummary = (
     message: TimelineMessage,
     summary: NonNullable<MainTimelineEntry["summary"]>,
-  ) => {
-    const latestAuthor = sidebar.index.descendantStatsByMessageId.get(
-      message.id,
-    )?.recentParticipantsNewestFirst[0]?.author;
-    return (
-      <button
-        type="button"
-        aria-expanded="false"
-        data-testid="sidebar-read-branch"
-        data-thread-head-id={message.id}
-        className="block h-8 truncate rounded text-left text-xs text-muted-foreground hover:bg-muted focus-visible:ring-2"
-        style={{
-          marginInlineStart: `${getThreadReplyIndentRem(Math.min(2, message.depth)) + THREAD_REPLY_BODY_OFFSET_REM}rem`,
-          maxWidth: `calc(100% - ${getThreadReplyIndentRem(Math.min(2, message.depth)) + THREAD_REPLY_BODY_OFFSET_REM}rem)`,
-        }}
-        onClick={() => toggleSidebarBranch(message)}
-      >
-        {summary.replyCount} {summary.replyCount === 1 ? "reply" : "replies"} ·
-        last {latestAuthor ?? summary.participants.at(-1)?.author ?? "reply"}{" "}
-        {summary.lastReplyAt
-          ? formatThreadSummaryLastReplyTime(summary.lastReplyAt)
-          : ""}
-      </button>
-    );
-  };
+  ) => (
+    <CollapsedThreadSummary
+      message={message}
+      summary={summary}
+      latestAuthor={
+        sidebar.index.descendantStatsByMessageId.get(message.id)
+          ?.recentParticipantsNewestFirst[0]?.author
+      }
+      onToggle={toggleSidebarBranch}
+    />
+  );
   const firstNewId = sidebar.firstNewId;
   const jumpToUnread = () => {
     if (!firstNewId || !threadHeadId) return;
@@ -752,6 +746,7 @@ export function MessageThreadPanel({
             type="button"
             aria-expanded="true"
             className="ml-4 h-7 text-xs text-muted-foreground"
+            data-thread-head-id={threadHead.id}
             onClick={() => toggleSidebarBranch(threadHead)}
           >
             Hide replies
@@ -818,6 +813,7 @@ export function MessageThreadPanel({
                     compactSummary(threadHead, visibleThreadHeadSummary)
                   ) : (
                     <MessageThreadSummaryRow
+                      expanded={hasStoredDisclosure ? false : undefined}
                       depth={threadHead.depth}
                       message={threadHead}
                       onOpenThread={expandThreadHeadReplies}
@@ -993,6 +989,7 @@ export function MessageThreadPanel({
                             compactSummary(entry.message, entry.summary)
                           ) : (
                             <MessageThreadSummaryRow
+                              expanded={hasStoredDisclosure ? false : undefined}
                               collapseDepthGuideActions={
                                 collapseDepthGuideActions
                               }
