@@ -87,6 +87,8 @@ export function MessageThreadSummaryRow({
   onCollapseDepthGuide,
   onCollapseDepthGuideHoverChange,
   onOpenThread,
+  expanded,
+  controlsId,
   showDepthGuides = true,
   summary,
   summaryIndentOffsetRem = 0,
@@ -103,6 +105,8 @@ export function MessageThreadSummaryRow({
     hovered: boolean,
   ) => void;
   onOpenThread: (message: TimelineMessage) => void;
+  expanded?: boolean;
+  controlsId?: string;
   showDepthGuides?: boolean;
   summary: TimelineThreadSummary;
   summaryIndentOffsetRem?: number;
@@ -119,9 +123,12 @@ export function MessageThreadSummaryRow({
     THREAD_SUMMARY_SURFACE_AVATAR_INSET_REM,
   )})`;
   const replyLabel = summary.replyCount === 1 ? "reply" : "replies";
-  const summaryAriaLabel = summary.lastReplyAt
-    ? `View thread with ${summary.replyCount} ${replyLabel}, last reply ${formatThreadSummaryLastReplyTime(summary.lastReplyAt)}`
-    : `View thread with ${summary.replyCount} ${replyLabel}`;
+  const summaryAriaLabel =
+    expanded !== undefined
+      ? `${expanded ? "Collapse" : "Expand"} ${summary.replyCount} ${replyLabel} inline`
+      : summary.lastReplyAt
+        ? `View thread with ${summary.replyCount} ${replyLabel}, last reply ${formatThreadSummaryLastReplyTime(summary.lastReplyAt)}`
+        : `View thread with ${summary.replyCount} ${replyLabel}`;
   const guideDepths = depthGuideDepths
     ? [...depthGuideDepths]
     : Array.from({ length: Math.max(0, depth - 1) }, (_, index) => index + 1);
@@ -234,6 +241,8 @@ export function MessageThreadSummaryRow({
 
       <button
         aria-label={summaryAriaLabel}
+        aria-expanded={expanded}
+        aria-controls={controlsId}
         className="group relative isolate inline-flex h-[1.875rem] w-fit max-w-full cursor-pointer items-center gap-1.5 rounded-full py-0 pr-3 text-left text-xs font-medium text-muted-foreground transition-[color,opacity] hover:text-foreground hover:opacity-90 focus-visible:outline-hidden"
         data-thread-head-id={message.id}
         data-testid="message-thread-summary"

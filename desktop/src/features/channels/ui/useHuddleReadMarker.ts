@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useConversationReadAdmission } from "@/features/conversations/ConversationViewContext";
 
 import { getThreadReference } from "@/features/messages/lib/threading";
 import type { RelayEvent } from "@/shared/api/types";
@@ -26,6 +27,7 @@ export function useHuddleReadMarker({
   messages,
   resolvedMessages,
 }: HuddleReadMarkerOptions) {
+  const { canRead } = useConversationReadAdmission();
   const latestActiveMessage = React.useMemo(() => {
     if (!messages) return null;
     for (let index = messages.length - 1; index >= 0; index -= 1) {
@@ -65,7 +67,8 @@ export function useHuddleReadMarker({
   const lastHuddleReadKeyRef = React.useRef<string | null>(null);
 
   React.useEffect(() => {
-    if (!activeChannelId || activeChannelIsMember === false) return;
+    if (!canRead() || !activeChannelId || activeChannelIsMember === false)
+      return;
     const huddleReadKey = hasFlattenedHuddleReplies
       ? `${activeChannelId}:${huddleReadAt}`
       : null;
@@ -80,6 +83,7 @@ export function useHuddleReadMarker({
     });
     lastHuddleReadKeyRef.current = huddleReadKey;
   }, [
+    canRead,
     activeChannelId,
     activeChannelIsMember,
     hasFlattenedHuddleReplies,

@@ -1,3 +1,4 @@
+import type { MessageComposerProps } from "@/features/messages/ui/MessageComposer.types";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -304,7 +305,7 @@ export function useChannelPaneHandlers({
       mentionPubkeys: string[],
       mediaTags?: string[][],
       channelId?: string | null,
-      _threadContext?: {
+      threadContext?: {
         parentEventId: string | null;
         threadHeadId: string | null;
       } | null,
@@ -315,8 +316,10 @@ export function useChannelPaneHandlers({
         mentionPubkeys,
         mediaTags,
         channelId: channelId ?? undefined,
+        parentEventId: threadContext?.parentEventId ?? undefined,
         forceRest,
       });
+      if (threadContext?.parentEventId) toast.success("Sent to thread");
     },
     [],
   );
@@ -344,6 +347,32 @@ export function useChannelPaneHandlers({
               ? summarizeThreadRoot(message.body)
               : null,
         sentFromThreadRootId: canonicalRoot,
+      });
+    },
+    [],
+  );
+
+  // Inline composers always supply captured context and never mutate side-panel selection.
+  const handleSendInlineThreadReply = React.useCallback<
+    MessageComposerProps["onSend"]
+  >(
+    async (
+      content,
+      mentionPubkeys,
+      mediaTags,
+      channelId,
+      context,
+      forceRest,
+    ) => {
+      if (!channelId || !context?.parentEventId)
+        throw new Error("Inline reply target unavailable");
+      await sendMutateRef.current({
+        content,
+        mentionPubkeys,
+        mediaTags,
+        channelId,
+        parentEventId: context.parentEventId,
+        forceRest,
       });
     },
     [],
@@ -443,6 +472,7 @@ export function useChannelPaneHandlers({
     handleSendMessage,
     handleSendToChannel,
     handleSendThreadReply,
+    handleSendInlineThreadReply,
     handleSelectThreadReplyTarget,
     handleToggleReaction,
   };

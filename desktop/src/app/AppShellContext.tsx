@@ -1,6 +1,5 @@
 import * as React from "react";
 import type { ForcedUnreadSource } from "@/features/channels/forcedUnreadStore";
-import type { ContextParentResolver } from "@/features/channels/readState/readStateManager";
 import type { ThreadActivityItem } from "@/features/channels/useUnreadChannels";
 import type { FeedItemState } from "@/features/home/useFeedItemState";
 import type { FeedItem } from "@/shared/api/types";
@@ -49,9 +48,8 @@ type AppShellContextValue = {
   // Bump-counter that invalidates whenever the read marker changes. Include
   // in memo deps that consume getChannelReadAt.
   readStateVersion: number;
-  // Inject the thread→channel parent resolver derived from the event graph
-  // (NIP-RS hierarchical frontier). Set by the active channel surface.
-  setContextParentResolver: (resolver: ContextParentResolver | null) => void;
+  // Register event graph evidence with the single app-owned parent resolver.
+  registerContextParents: (parents: ReadonlyMap<string, string>) => () => void;
   followThread: (rootId: string) => void;
   unfollowThread: (rootId: string) => void;
   isFollowingThread: (rootId: string) => boolean;
@@ -97,7 +95,7 @@ const AppShellContext = React.createContext<AppShellContextValue>({
   getChannelActivityItemReadAt: () => null,
   markMessageRead: () => {},
   readStateVersion: 0,
-  setContextParentResolver: () => {},
+  registerContextParents: () => () => {},
   followThread: () => {},
   unfollowThread: () => {},
   isFollowingThread: () => false,

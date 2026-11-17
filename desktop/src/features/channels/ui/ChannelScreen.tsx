@@ -1,5 +1,6 @@
 // biome-ignore-all format: line-count ratchet requires compact forwarding in this legacy component
 import * as React from "react";
+import { buildContextParents } from "@/features/channels/readState/contextParentRegistry";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAppShell } from "@/app/AppShellContext";
 import { useAppNavigation } from "@/app/navigation/useAppNavigation";
@@ -12,10 +13,6 @@ import {
   useChannelMembersQuery,
   useJoinChannelMutation,
 } from "@/features/channels/hooks";
-import {
-  MSG_PREFIX,
-  THREAD_PREFIX,
-} from "@/features/channels/readState/readStateFormat";
 import { ChannelScreenEmptyState } from "@/features/channels/ui/ChannelScreenEmptyState";
 import { ChannelScreenHeader } from "@/features/channels/ui/ChannelScreenHeader";
 import { WelcomeAgentCreateDialog } from "@/features/channels/ui/WelcomeAgentCreateDialog";
@@ -114,7 +111,7 @@ export function ChannelScreen({
     getChannelReadAt,
     getMessageReadAt,
     markMessageRead,
-    setContextParentResolver,
+    registerContextParents,
     openBrowseChannels,
     openCreateChannel,
     openChannelManagement: openGlobalChannelManagement,
@@ -230,18 +227,12 @@ export function ChannelScreen({
     activeChannel?.isMember,
     activeReadAt,
   );
-  React.useEffect(() => {
-    if (!activeChannelId) {
-      setContextParentResolver(null);
-      return;
-    }
-    setContextParentResolver((contextId) =>
-      contextId.startsWith(THREAD_PREFIX) || contextId.startsWith(MSG_PREFIX)
-        ? activeChannelId
-        : null,
-    );
-    return () => setContextParentResolver(null);
-  }, [activeChannelId, setContextParentResolver]);
+  React.useLayoutEffect(() => {
+    if (!activeChannelId) return;
+    const parents = buildContextParents(activeChannelId, [...(messagesQuery.data ?? []), ...(threadRepliesQuery.data ?? []), ...(targetMessageEvents ?? [])]);
+    return registerContextParents(parents);
+  }, [activeChannelId, messagesQuery.data, threadRepliesQuery.data, targetMessageEvents, registerContextParents]);
+
   const {
     activeChannelTitle,
     activeDmAvatarUrl,
@@ -507,6 +498,7 @@ export function ChannelScreen({
     handleSendMessage,
     handleSendToChannel,
     handleSendThreadReply,
+    handleSendInlineThreadReply,
     handleSelectThreadReplyTarget,
     handleToggleReaction,
   } = useChannelPaneHandlers({
@@ -946,6 +938,7 @@ export function ChannelScreen({
                   onSendToChannel={handleSendToChannel}
                   onSendVideoReviewComment={effectiveSendVideoReviewComment}
                   onSendThreadReply={handleSendThreadReply}
+                  onSendInlineThreadReply={handleSendInlineThreadReply} respondToLookup={respondToLookup}
                   onThreadScrollTargetResolved={() =>
                     setThreadScrollTargetId(null)
                   }

@@ -1,4 +1,5 @@
 import * as React from "react";
+import { HistorySearchScopeContext } from "./HistorySearchScope";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 
 /**
@@ -17,6 +18,7 @@ export type HistorySearchSetterOptions = {
 };
 
 export function useHistorySearchState<K extends string>(keys: readonly K[]) {
+  const scope = React.useContext(HistorySearchScopeContext);
   const navigate = useNavigate();
   const search = useSearch({ strict: false } as never) as Partial<
     Record<K, string>
@@ -24,7 +26,7 @@ export function useHistorySearchState<K extends string>(keys: readonly K[]) {
 
   const values = {} as Record<K, string | null>;
   for (const key of keys) {
-    values[key] = search[key] ?? null;
+    values[key] = scope ? (scope.values[key] ?? null) : (search[key] ?? null);
   }
 
   const currentValuesRef = React.useRef(values);
@@ -95,5 +97,5 @@ export function useHistorySearchState<K extends string>(keys: readonly K[]) {
     [navigate],
   );
 
-  return { applyPatch, values };
+  return { applyPatch: scope?.applyPatch ?? applyPatch, values };
 }
