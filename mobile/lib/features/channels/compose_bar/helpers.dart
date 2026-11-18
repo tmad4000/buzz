@@ -681,7 +681,7 @@ Future<_NonMemberMentionScan?> _prepareComposerMentionScan({
           );
   } catch (_) {
     // Nothing was sent and the draft is untouched, so Retry sends it again.
-    if (!durable && context.mounted)
+    if (!durable && context.mounted) {
       messenger?.showSnackBar(
         SnackBar(
           content: const Text(
@@ -690,6 +690,7 @@ Future<_NonMemberMentionScan?> _prepareComposerMentionScan({
           action: SnackBarAction(label: 'Retry', onPressed: retry),
         ),
       );
+    }
     return null;
   }
 

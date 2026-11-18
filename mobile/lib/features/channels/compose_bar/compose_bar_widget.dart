@@ -623,16 +623,18 @@ class ComposeBar extends HookConsumerWidget {
                 final scan = await prepareMentionScan();
                 if (scan == null ||
                     !context.mounted ||
-                    draftRevision.value != submittedDraftRevision)
+                    draftRevision.value != submittedDraftRevision) {
                   return null;
+                }
                 await outgoing.addNonMembers(
                   channelActions,
                   scan: scan,
                   messenger: messenger,
                 );
                 if (!context.mounted ||
-                    draftRevision.value != submittedDraftRevision)
+                    draftRevision.value != submittedDraftRevision) {
                   return null;
+                }
                 return (
                   keys: keys,
                   pubkeys: List<String>.of(outgoing.pubkeys),
@@ -642,8 +644,9 @@ class ComposeBar extends HookConsumerWidget {
               },
             );
           } catch (error) {
-            if (context.mounted)
+            if (context.mounted) {
               uploadError.value = _composeSendErrorMessage(error);
+            }
           }
           return;
         }
