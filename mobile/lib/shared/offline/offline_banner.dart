@@ -5,7 +5,7 @@ import 'offline_provider.dart';
 import 'read_admission.dart';
 
 /// Nonblocking cached-source status; its Retry action has one semantics owner.
-class OfflineBanner extends ConsumerWidget {
+class OfflineBanner extends ConsumerStatefulWidget {
   final String sourceId;
   final VoidCallback onRetry;
   const OfflineBanner({
@@ -14,13 +14,38 @@ class OfflineBanner extends ConsumerWidget {
     required this.onRetry,
   });
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<OfflineBanner> createState() => _OfflineBannerState();
+}
+
+class _OfflineBannerState extends ConsumerState<OfflineBanner> {
+  bool _wasOffline = false;
+  @override
+  void didUpdateWidget(covariant OfflineBanner oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.sourceId != widget.sourceId) _wasOffline = false;
+  }
+
+  @override
+  Widget build(BuildContext context) {
     if (!ref.watch(offlineEnabledProvider)) return const SizedBox.shrink();
-    final source = ref.watch(offlineSourceProvider(sourceId));
+    final source = ref.watch(offlineSourceProvider(widget.sourceId));
     final connected =
         ref.watch(networkAvailableProvider) &&
         ref.watch(relaySessionProvider).status == SessionStatus.connected;
-    if (connected && ref.watch(readAdmissionProvider(sourceId))) {
+    if (!connected) _wasOffline = true;
+    if (connected && ref.watch(readAdmissionProvider(widget.sourceId))) {
+      if (_wasOffline) {
+        _wasOffline = false;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted || ModalRoute.of(context)?.isCurrent == false) return;
+          ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+            const SnackBar(
+              content: Text('Up to date'),
+              duration: Duration(seconds: 4),
+            ),
+          );
+        });
+      }
       return const SizedBox.shrink();
     }
     final at = source.savedAt == null
@@ -40,10 +65,26 @@ class OfflineBanner extends ConsumerWidget {
         color: Theme.of(context).colorScheme.surfaceContainerHigh,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Row(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Expanded(child: Text(text)),
-              TextButton(onPressed: onRetry, child: const Text('Retry')),
+              Row(
+                children: [
+                  Expanded(child: Text(text)),
+                  TextButton(
+                    onPressed: widget.onRetry,
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
+              if (source.truncated)
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    'Showing newest 200 cached replies. Earlier replies load when online.',
+                  ),
+                ),
             ],
           ),
         ),

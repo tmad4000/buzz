@@ -7,7 +7,15 @@ class OfflineSource {
   final bool live;
   final int? savedAt;
   final int? generation;
-  const OfflineSource({this.live = false, this.savedAt, this.generation});
+  final bool truncated;
+  final int networkGeneration;
+  const OfflineSource({
+    this.live = false,
+    this.savedAt,
+    this.generation,
+    this.truncated = false,
+    this.networkGeneration = 0,
+  });
 }
 
 class OfflineSourceNotifier extends Notifier<OfflineSource> {
@@ -19,12 +27,15 @@ class OfflineSourceNotifier extends Notifier<OfflineSource> {
     return const OfflineSource();
   }
 
-  void cached(int savedAt) => state = OfflineSource(savedAt: savedAt);
-  void authoritative(int generation) => state = OfflineSource(
-    live: true,
-    savedAt: DateTime.now().millisecondsSinceEpoch,
-    generation: generation,
-  );
+  void cached(int savedAt, {bool truncated = false}) =>
+      state = OfflineSource(savedAt: savedAt, truncated: truncated);
+  void authoritative(int generation, {int networkGeneration = 0}) =>
+      state = OfflineSource(
+        live: true,
+        savedAt: DateTime.now().millisecondsSinceEpoch,
+        generation: generation,
+        networkGeneration: networkGeneration,
+      );
 }
 
 final offlineSourceProvider =
@@ -40,6 +51,8 @@ final readAdmissionProvider = Provider.family<bool, String>((ref, sourceId) {
       ref.watch(relaySessionProvider).status == SessionStatus.connected &&
       ref.watch(appLifecycleProvider) == AppLifecycleState.resumed &&
       source.live &&
+      source.networkGeneration ==
+          ref.read(networkAvailableProvider.notifier).generation &&
       source.generation ==
           ref.read(relaySessionProvider.notifier).connectionGeneration;
 });

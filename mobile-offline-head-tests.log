@@ -1,0 +1,3 @@
+00:00 +0: loading /home/dev/agent-worktrees/buzz-offline-p1-mobile-20261118/mobile/test/offline_head_p1_test.dart
+00:00 +0: head closure keeps deletion of an edit but excludes unopened reply edits/reactions
+00:00 +1: All tests passed!

@@ -1,10 +1,12 @@
 import 'package:flutter/foundation.dart';
 import '../../shared/offline/offline_provider.dart';
 import '../../shared/offline/read_admission.dart';
+import '../../shared/offline/offline_head.dart';
 import 'dart:async';
 
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:hooks_riverpod/misc.dart' show KeepAliveLink;
+import 'package:hooks_riverpod/misc.dart'
+    show KeepAliveLink, FutureProviderFamily;
 
 import '../../shared/relay/relay.dart';
 import 'channel_event_order.dart';
@@ -35,7 +37,8 @@ class _ThreadCursor {
   const _ThreadCursor({required this.createdAt, required this.eventId});
 }
 
-final threadRepliesProvider = FutureProvider.autoDispose
+final FutureProviderFamily<List<NostrEvent>, ThreadRepliesArgs>
+threadRepliesProvider = FutureProvider.autoDispose
     .family<List<NostrEvent>, ThreadRepliesArgs>((ref, args) async {
       ref.watch(relayConfigProvider);
       // A reply missed while the socket is stale cannot invalidate this
@@ -49,6 +52,14 @@ final threadRepliesProvider = FutureProvider.autoDispose
       });
       final session = ref.read(relaySessionProvider.notifier);
       final offline = ref.read(offlineEnabledProvider);
+      if (offline) {
+        ref.listen(networkAvailableProvider, (previous, next) {
+          if (previous == false && next) ref.invalidateSelf();
+        });
+      }
+      final offlineNetworkGeneration = ref
+          .read(networkAvailableProvider.notifier)
+          .generation;
       final offlineStoreFuture = offline
           ? ref.read(offlineStoreProvider.future).catchError((Object error) {
               debugPrint('Offline thread store unavailable: $error');
@@ -58,7 +69,9 @@ final threadRepliesProvider = FutureProvider.autoDispose
       final sourceId = 'thread:${args.channelId}:${args.rootId}';
       final offlineGeneration = session.connectionGeneration;
       if (offline &&
-          ref.read(relaySessionProvider).status != SessionStatus.connected) {
+          (!ref.read(networkAvailableProvider) ||
+              ref.read(relaySessionProvider).status !=
+                  SessionStatus.connected)) {
         final store = await offlineStoreFuture;
         final snapshot = await store?.load(
           'thread',
@@ -68,10 +81,10 @@ final threadRepliesProvider = FutureProvider.autoDispose
         if (snapshot == null) {
           throw StateError("Replies load when you're back online");
         }
+        final payload = Map<String, dynamic>.from(snapshot.payload as Map);
         ref
             .read(offlineSourceProvider(sourceId).notifier)
-            .cached(snapshot.savedAt);
-        final payload = Map<String, dynamic>.from(snapshot.payload as Map);
+            .cached(snapshot.savedAt, truncated: payload['truncated'] == true);
         return (payload['events'] as List)
             .map(
               (row) =>
@@ -147,28 +160,96 @@ final threadRepliesProvider = FutureProvider.autoDispose
           }
         }
         if (offline && ref.mounted) {
-          ref
-              .read(offlineSourceProvider(sourceId).notifier)
-              .authoritative(offlineGeneration);
-          final store = await offlineStoreFuture;
-          if (ref.mounted) {
-            final sorted = [...replies]
-              ..sort(compareChannelTimelineEventsChronologically);
+          // Grant only after this FutureProvider has committed its live AsyncData.
+          Timer.run(() {
+            if (!ref.mounted) return;
+            final committed = ref.container.read(threadRepliesProvider(args));
+            if (!committed.isLoading && identical(committed.value, replies)) {
+              ref
+                  .read(offlineSourceProvider(sourceId).notifier)
+                  .authoritative(
+                    offlineGeneration,
+                    networkGeneration: offlineNetworkGeneration,
+                  );
+            }
+          });
+          var snapshotEvents = replies;
+          Timer? saveTimer;
+          void saveSnapshot() {
+            final captured = snapshotEvents;
             unawaited(
-              store
-                      ?.save('thread', '${args.channelId}:${args.rootId}', {
-                        'events': sorted
-                            .skip((sorted.length - 200).clamp(0, sorted.length))
-                            .map((event) => event.toJson())
-                            .toList(),
-                        'truncated': sorted.length > 200,
-                      })
-                      .catchError((Object error) {
-                        debugPrint('Offline thread write failed: $error');
-                      }) ??
-                  Future<void>.value(),
+              () async {
+                final store = await offlineStoreFuture;
+                if (!ref.mounted) return;
+                final bodies =
+                    captured
+                        .where(
+                          (event) => EventKind.channelTimelineContentKinds
+                              .contains(event.kind),
+                        )
+                        .toList()
+                      ..sort(compareChannelTimelineEventsChronologically);
+                final newest = bodies
+                    .skip((bodies.length - 200).clamp(0, bodies.length))
+                    .toList();
+                final aux = offlineHeadAux(
+                  captured,
+                  newest.map((event) => event.id).toSet(),
+                );
+                await store?.save(
+                  'thread',
+                  '${args.channelId}:${args.rootId}',
+                  {
+                    'events': [
+                      ...newest,
+                      ...aux,
+                    ].map((event) => event.toJson()).toList(),
+                    'truncated': bodies.length > 200,
+                  },
+                );
+              }().catchError((Object error) {
+                debugPrint('Offline thread write failed: $error');
+              }),
             );
           }
+
+          saveSnapshot();
+          if (ref.exists(channelProvider)) {
+            ref.listen(channelProvider, (_, next) {
+              if (ref.read(relaySessionProvider).status !=
+                      SessionStatus.connected ||
+                  !ref.read(networkAvailableProvider)) {
+                return;
+              }
+              final pending = ref.read(
+                pendingLocalMessagesProvider(args.channelId),
+              );
+              final events = next.value ?? const <NostrEvent>[];
+              final bodies = events.where(
+                (event) =>
+                    EventKind.channelTimelineContentKinds.contains(
+                      event.kind,
+                    ) &&
+                    event.threadReference.rootId == args.rootId &&
+                    !pending.containsKey(event.id),
+              );
+              final merged = mergeThreadEvents(snapshotEvents, bodies);
+              final ids = merged.map((event) => event.id).toSet();
+              snapshotEvents = mergeThreadEvents(
+                merged,
+                offlineHeadAux(events, ids),
+              );
+              saveTimer?.cancel();
+              saveTimer = Timer(const Duration(seconds: 2), saveSnapshot);
+            });
+          }
+          ref.onCancel(() {
+            saveTimer?.cancel();
+            saveSnapshot();
+          });
+          ref.onDispose(() {
+            saveTimer?.cancel();
+          });
         }
         return replies;
       } catch (_) {

@@ -1,3 +1,4 @@
+import '../../shared/offline/offline_provider.dart';
 import 'dart:async';
 
 import 'package:flutter/widgets.dart';
@@ -141,6 +142,7 @@ final class MobileHuddleController extends Notifier<bool> {
   }
 
   Future<void> _start({required String parentChannelId}) async {
+    if (offlineConnectionRequired(ref)) throw StateError('Needs a connection');
     if (state) return;
     final generation = ++_generation;
     final admissionEpoch = ++_admissionEpoch;
@@ -209,6 +211,7 @@ final class MobileHuddleController extends Notifier<bool> {
     required String startedBy,
     required String startedEventId,
   }) async {
+    if (offlineConnectionRequired(ref)) throw StateError('Needs a connection');
     ++_generation;
     final admissionEpoch = ++_admissionEpoch;
     _latestAdmissionTargetBackingChannelId = ephemeralChannelId;

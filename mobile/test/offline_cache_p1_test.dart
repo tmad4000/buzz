@@ -20,8 +20,10 @@ class DelayedCipher extends ModelCipher {
   final release = Completer<void>();
   @override
   Future<String> seal(Map<String, dynamic> value) async {
-    started.complete();
-    await release.future;
+    if (!started.isCompleted) {
+      started.complete();
+      await release.future;
+    }
     return super.seal(value);
   }
 }
@@ -55,6 +57,15 @@ void main() {
       final bytes = await files.single.readAsString();
       expect(bytes.contains('🐝'), isFalse);
       expect(bytes.contains('general'), isFalse);
+      final envelope = jsonDecode(bytes) as Map<String, dynamic>;
+      final chunks = jsonDecode(envelope['ciphertext'] as String) as List;
+      final firstBody = chunks[1];
+      chunks[1] = chunks[2];
+      chunks[2] = firstBody;
+      envelope['ciphertext'] = jsonEncode(chunks);
+      await files.single.writeAsString(jsonEncode(envelope));
+      expect(await store.load('head', 'general'), isNull);
+      await files.single.writeAsString(bytes);
       final restarted = OfflineCacheStore(
         root: root,
         scope: 'account:relay-a',
@@ -153,4 +164,14 @@ void main() {
       expect(await store.load('sidebar', 'sidebar'), isNull);
     },
   );
+  test('late encryption cannot replace a newer committed unit', () async {
+    final cipher = DelayedCipher();
+    final store = OfflineCacheStore(root: root, scope: 'scope', cipher: cipher);
+    final oldWrite = store.save('head', 'same', ['old']);
+    await cipher.started.future;
+    await store.save('head', 'same', ['new']);
+    cipher.release.complete();
+    await oldWrite;
+    expect((await store.load('head', 'same'))?.payload, ['new']);
+  });
 }

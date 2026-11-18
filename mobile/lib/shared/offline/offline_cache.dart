@@ -38,6 +38,13 @@ String _seal((Uint8List, Map<String, dynamic>) args) {
     chunks.add(nip44Encrypt(args.$1, text.substring(start, end)));
     start = end;
   }
+  chunks.insert(
+    0,
+    nip44Encrypt(
+      args.$1,
+      jsonEncode({'digest': offlineHash(text), 'count': chunks.length}),
+    ),
+  );
   return jsonEncode(chunks);
 }
 
@@ -46,8 +53,15 @@ Map<String, dynamic> _open((Uint8List, String) args) {
   if (chunks.isEmpty || chunks.length > 140) {
     throw const FormatException('Invalid offline chunks');
   }
-  return jsonDecode(chunks.map((chunk) => nip44Decrypt(args.$1, chunk)).join())
-      as Map<String, dynamic>;
+  final manifest = jsonDecode(nip44Decrypt(args.$1, chunks.first)) as Map;
+  final text = chunks
+      .skip(1)
+      .map((chunk) => nip44Decrypt(args.$1, chunk))
+      .join();
+  if (manifest['count'] != chunks.length - 1 ||
+      manifest['digest'] != offlineHash(text))
+    throw const FormatException('Offline chunk integrity mismatch');
+  return jsonDecode(text) as Map<String, dynamic>;
 }
 
 String offlineHash(String value) => SHA256Digest()
@@ -119,6 +133,7 @@ class OfflineCacheStore {
 
   static final _tails = <String, Future<void>>{};
   static final _generations = <String, int>{};
+  static final _pendingWrites = <String, Object>{};
   OfflineCacheStore({
     required this.root,
     required this.scope,
@@ -150,50 +165,60 @@ class OfflineCacheStore {
     if (_retired.contains(_key)) return;
     final cap = offlineCaps[kind];
     if (cap == null) throw ArgumentError.value(kind);
-    final generation = _generations[_key] ?? 0;
-    final now = DateTime.now().millisecondsSinceEpoch;
-    final envelope = <String, dynamic>{
-      'version': 1,
-      'scope': scope,
-      'kind': kind,
-      'id': id,
-      'savedAt': now,
-      'payload': payload,
-    };
-    // Bound serialization before encryption and reject whole units, never partial JSON.
-    final size = await compute(_jsonBytes, envelope);
-    if (size > cap.$2) return;
-    final ciphertext = await cipher.seal(envelope);
-    if (utf8.encode(ciphertext).length > cap.$2 * 3) return;
-    await _serial(() async {
-      if ((_generations[_key] ?? 0) != generation || _retired.contains(_key)) {
-        return;
-      }
-      await _atomic(
-        _file(kind, id),
-        jsonEncode({
-          'savedAt': now,
-          'lastVisitedAt': _visit(),
-          'bytes': utf8.encode(ciphertext).length,
-          'ciphertext': ciphertext,
-        }),
-      );
-      final cached = _recordCaches[_key];
-      if (cached != null) {
-        final file = _file(kind, id);
-        cached.removeWhere((row) => row.file.path == file.path);
-        cached.add((
-          file: file,
-          kind: kind,
-          visited: _visitClocks[_key]!,
-          bytes: await file.length(),
-        ));
-      }
-      await _evictAndIndex();
-    });
+    final writeKey = '$_key/$kind/${offlineHash(id)}';
+    final token = Object();
+    _pendingWrites[writeKey] = token;
+    try {
+      final generation = _generations[_key] ?? 0;
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final envelope = <String, dynamic>{
+        'version': 1,
+        'scope': scope,
+        'kind': kind,
+        'id': id,
+        'savedAt': now,
+        'payload': payload,
+      };
+      // Bound serialization before encryption and reject whole units, never partial JSON.
+      final size = await compute(_jsonBytes, envelope);
+      if (size > cap.$2) return;
+      final ciphertext = await cipher.seal(envelope);
+      if (utf8.encode(ciphertext).length > cap.$2 * 3) return;
+      await _serial(() async {
+        if (_pendingWrites[writeKey] != token ||
+            (_generations[_key] ?? 0) != generation ||
+            _retired.contains(_key)) {
+          return;
+        }
+        await _atomic(
+          _file(kind, id),
+          jsonEncode({
+            'savedAt': now,
+            'lastVisitedAt': _visit(),
+            'bytes': utf8.encode(ciphertext).length,
+            'ciphertext': ciphertext,
+          }),
+        );
+        final cached = _recordCaches[_key];
+        if (cached != null) {
+          final file = _file(kind, id);
+          cached.removeWhere((row) => row.file.path == file.path);
+          cached.add((
+            file: file,
+            kind: kind,
+            visited: _visitClocks[_key]!,
+            bytes: await file.length(),
+          ));
+        }
+        await _evictAndIndex();
+      });
+    } finally {
+      if (_pendingWrites[writeKey] == token) _pendingWrites.remove(writeKey);
+    }
   }
 
   Future<OfflineSnapshot?> load(String kind, String id) => _serial(() async {
+    if (_retired.contains(_key)) return null;
     final file = _file(kind, id);
     if (!await file.exists()) return null;
     return _read(file, kind, id: id);
@@ -221,7 +246,8 @@ class OfflineCacheStore {
       if (utf8.encode(ciphertext).length > cap) return null;
       final generation = _generations[_key] ?? 0;
       final envelope = await cipher.open(ciphertext);
-      if ((_generations[_key] ?? 0) != generation) return null;
+      if (_retired.contains(_key) || (_generations[_key] ?? 0) != generation)
+        return null;
       if (envelope['version'] != 1 ||
           envelope['scope'] != scope ||
           envelope['kind'] != kind ||

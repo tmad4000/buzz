@@ -156,8 +156,24 @@ class ChannelsNotifier extends AsyncNotifier<List<Channel>> {
     }
     final connected = Completer<void>();
     final sessionState = ref.read(relaySessionProvider);
+    final offlineEnabled = ref.read(offlineEnabledProvider);
     final waitingForInitialConnection =
-        sessionState.status != SessionStatus.connected;
+        sessionState.status != SessionStatus.connected ||
+        (offlineEnabled && !ref.read(networkAvailableProvider));
+    if (offlineEnabled) {
+      ref.listen(networkAvailableProvider, (previous, next) {
+        if (previous != false ||
+            !next ||
+            ref.read(relaySessionProvider).status != SessionStatus.connected) {
+          return;
+        }
+        if (!_hasLoaded && !connected.isCompleted) {
+          connected.complete();
+        } else {
+          unawaited(_backstopRefresh());
+        }
+      });
+    }
     ref.listen(relaySessionProvider, (previous, next) {
       if (next.status != SessionStatus.connected) return;
       if (waitingForInitialConnection &&
@@ -188,7 +204,7 @@ class ChannelsNotifier extends AsyncNotifier<List<Channel>> {
       _backstopTimer = null;
     });
 
-    if (sessionState.status != SessionStatus.connected) {
+    if (waitingForInitialConnection) {
       // Preserve cached channels only for a reconnect within the same scope.
       if (_hasLoaded) return state.value ?? const [];
       if (ref.read(offlineEnabledProvider)) {
@@ -208,6 +224,16 @@ class ChannelsNotifier extends AsyncNotifier<List<Channel>> {
           ref
               .read(offlineSourceProvider('sidebar').notifier)
               .cached(snapshot.savedAt);
+          // Publish the cached list first; a restore during decryption must not
+          // turn a failed optional refresh into a blank sidebar.
+          Timer.run(() {
+            if (ref.mounted &&
+                ref.read(networkAvailableProvider) &&
+                ref.read(relaySessionProvider).status ==
+                    SessionStatus.connected) {
+              unawaited(_backstopRefresh());
+            }
+          });
           return cached;
         }
       }
@@ -230,6 +256,9 @@ class ChannelsNotifier extends AsyncNotifier<List<Channel>> {
             return null;
           })
         : null;
+    final offlineNetworkGeneration = ref
+        .read(networkAvailableProvider.notifier)
+        .generation;
     final offlineGeneration = ref
         .read(relaySessionProvider.notifier)
         .connectionGeneration;
@@ -245,26 +274,37 @@ class ChannelsNotifier extends AsyncNotifier<List<Channel>> {
     }
     _hasLoaded = true;
     if (ref.read(offlineEnabledProvider)) {
-      ref
-          .read(offlineSourceProvider('sidebar').notifier)
-          .authoritative(offlineGeneration);
-      final store = await offlineStoreFuture;
-      if (!ref.mounted ||
-          ref.read(relayConfigProvider).wsUrl != configAtStart.wsUrl ||
-          ref.read(myPubkeyProvider) != pubkeyAtStart) {
-        throw const _StaleChannelRefresh();
-      }
+      Timer.run(() {
+        if (!ref.mounted ||
+            ref.read(relayConfigProvider).wsUrl != configAtStart.wsUrl ||
+            ref.read(myPubkeyProvider) != pubkeyAtStart) {
+          return;
+        }
+        if (!state.isLoading && identical(state.value, channels)) {
+          ref
+              .read(offlineSourceProvider('sidebar').notifier)
+              .authoritative(
+                offlineGeneration,
+                networkGeneration: offlineNetworkGeneration,
+              );
+        }
+      });
       unawaited(
-        store
-                ?.save(
-                  'sidebar',
-                  'sidebar',
-                  channels.map(offlineChannelJson).toList(),
-                )
-                .catchError((Object error) {
-                  debugPrint('Offline sidebar write failed: $error');
-                }) ??
-            Future<void>.value(),
+        () async {
+          final store = await offlineStoreFuture;
+          if (!ref.mounted ||
+              ref.read(relayConfigProvider).wsUrl != configAtStart.wsUrl ||
+              ref.read(myPubkeyProvider) != pubkeyAtStart) {
+            return;
+          }
+          await store?.save(
+            'sidebar',
+            'sidebar',
+            channels.map(offlineChannelJson).toList(),
+          );
+        }().catchError((Object error) {
+          debugPrint('Offline sidebar write failed: $error');
+        }),
       );
     }
     return channels;

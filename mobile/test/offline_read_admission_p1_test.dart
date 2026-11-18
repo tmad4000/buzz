@@ -59,6 +59,17 @@ void main() {
       expect(container.read(gate), isFalse);
       origin.authoritative(session.connectionGeneration);
       expect(container.read(gate), isTrue);
+      container.read(networkAvailableProvider.notifier).update(false);
+      expect(container.read(gate), isFalse);
+      container.read(networkAvailableProvider.notifier).update(true);
+      expect(container.read(gate), isFalse);
+      origin.authoritative(
+        session.connectionGeneration,
+        networkGeneration: container
+            .read(networkAvailableProvider.notifier)
+            .generation,
+      );
+      expect(container.read(gate), isTrue);
       lifecycle.hidden();
       expect(container.read(gate), isFalse);
       container

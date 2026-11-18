@@ -1,3 +1,4 @@
+import '../../shared/offline/offline_provider.dart';
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -125,6 +126,10 @@ class SearchNotifier extends Notifier<SearchState> {
     // If the query changed while debouncing, bail out.
     if (state.query != query) return;
 
+    if (offlineConnectionRequired(ref)) {
+      state = SearchState(query: query, error: 'Needs a connection');
+      return;
+    }
     // Fire all three lookups in parallel.
     _searchMessages(query);
     _searchUsers(query);

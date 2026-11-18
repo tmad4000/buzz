@@ -1,4 +1,5 @@
 import '../../shared/offline/read_admission.dart';
+import '../../shared/offline/offline_provider.dart';
 import '../../shared/offline/offline_banner.dart';
 import 'dart:async';
 import 'dart:math' show cos, max, min, pi;

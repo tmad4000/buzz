@@ -57,9 +57,11 @@ final appLifecycleProvider =
 
 /// Network signal owned by the existing connectivity subscription, not a second poller.
 class NetworkAvailableNotifier extends Notifier<bool> {
+  int generation = 0;
   @override
   bool build() => true;
   void update(bool available) {
+    if (state != available) generation++;
     state = available;
   }
 }

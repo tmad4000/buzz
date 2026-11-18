@@ -50,6 +50,14 @@ class _ChannelsBody extends StatelessWidget {
               hitTestBehavior: HitTestBehavior.translucent,
               slivers: [
                 SliverToBoxAdapter(child: SizedBox(height: barHeight)),
+                SliverToBoxAdapter(
+                  child: OfflineBanner(
+                    sourceId: 'sidebar',
+                    onRetry: () {
+                      unawaited(onRefresh());
+                    },
+                  ),
+                ),
                 if (usesPinnedGradient)
                   _SliverChannelsList(
                     channels: loadedChannels,

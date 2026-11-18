@@ -59,3 +59,11 @@ bool offlineConnectionRequired(Ref ref) =>
     ref.read(offlineEnabledProvider) &&
     (!ref.read(networkAvailableProvider) ||
         ref.read(relaySessionProvider).status != SessionStatus.connected);
+
+/// Reactive view of the same callback-time fence; no additional connectivity source.
+final offlineConnectionRequiredProvider = Provider<bool>(
+  (ref) =>
+      ref.watch(offlineEnabledProvider) &&
+      (!ref.watch(networkAvailableProvider) ||
+          ref.watch(relaySessionProvider).status != SessionStatus.connected),
+);

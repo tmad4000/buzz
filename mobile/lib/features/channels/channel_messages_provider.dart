@@ -1,5 +1,6 @@
 import 'dart:async';
 import '../../shared/offline/offline_provider.dart';
+import '../../shared/offline/offline_head.dart';
 import '../../shared/offline/read_admission.dart';
 import 'package:flutter/foundation.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -143,6 +144,9 @@ class ChannelMessagesNotifier extends Notifier<AsyncValue<List<NostrEvent>>> {
       _deferredDeletionTargets.clear();
     }
     final sessionState = ref.watch(relaySessionProvider);
+    final networkAvailable =
+        !ref.read(offlineEnabledProvider) ||
+        ref.watch(networkAvailableProvider);
     ref.onCancel(() {
       _hasListeners = false;
       _offlineSaveTimer?.cancel();
@@ -163,7 +167,7 @@ class ChannelMessagesNotifier extends Notifier<AsyncValue<List<NostrEvent>>> {
       _clearSubscription();
     });
 
-    if (sessionState.status != SessionStatus.connected) {
+    if (!networkAvailable || sessionState.status != SessionStatus.connected) {
       _initVersion++;
       _initInFlight = false;
       _initialWindowQueryInFlight = false;
@@ -258,13 +262,12 @@ class ChannelMessagesNotifier extends Notifier<AsyncValue<List<NostrEvent>>> {
               )
               .toList()
             ..sort(compareChannelTimelineEventsChronologically);
+      final headLimit = _hasListeners ? 100 : 50;
       final heads = content
-          .skip((content.length - 100).clamp(0, content.length))
+          .skip((content.length - headLimit).clamp(0, content.length))
           .toList();
       final ids = heads.map((event) => event.id).toSet();
-      final aux = events.where(
-        (event) => !EventKind.channelTimelineContentKinds.contains(event.kind),
-      );
+      final aux = offlineHeadAux(events, ids);
       await store?.save('head', channelId, {
         'events': [...heads, ...aux].map((event) => event.toJson()).toList(),
         'summaries': {
@@ -318,6 +321,9 @@ class ChannelMessagesNotifier extends Notifier<AsyncValue<List<NostrEvent>>> {
 
       if (_lastKnownMessages == null) await _hydrateOffline(_offlineScope!);
       final offlineGeneration = session.connectionGeneration;
+      final offlineNetworkGeneration = ref
+          .read(networkAvailableProvider.notifier)
+          .generation;
       final historyVersion = ++_threadQuerySerial;
       final history = await _fetchNewestHistory(session);
       if (!_isCurrentInit(initVersion)) return;
@@ -339,7 +345,10 @@ class ChannelMessagesNotifier extends Notifier<AsyncValue<List<NostrEvent>>> {
       if (ref.read(offlineEnabledProvider)) {
         ref
             .read(offlineSourceProvider('head:$channelId').notifier)
-            .authoritative(offlineGeneration);
+            .authoritative(
+              offlineGeneration,
+              networkGeneration: offlineNetworkGeneration,
+            );
         unawaited(_saveOffline());
       }
       _summaryRefreshes.resume();
@@ -411,7 +420,9 @@ class ChannelMessagesNotifier extends Notifier<AsyncValue<List<NostrEvent>>> {
     tags: {
       '#h': [channelId],
     },
-    limit: ref.read(offlineEnabledProvider) && cursor == null ? 100 : 50,
+    limit: ref.read(offlineEnabledProvider) && cursor == null && _hasListeners
+        ? 100
+        : 50,
     until: cursor?.createdAt,
     extensions: {
       'top_level': true,

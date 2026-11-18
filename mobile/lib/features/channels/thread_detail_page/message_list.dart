@@ -63,6 +63,9 @@ class _ThreadMessageList extends HookWidget {
     if (!relayReplyState.hasValue && replies.isEmpty) {
       return relayReplyState.isLoading
           ? 'Loading replies…'
+          : relayReplyState.error is StateError &&
+                relayReplyState.error.toString().contains("Replies load when")
+          ? "Replies load when you're back online"
           : 'Couldn’t load replies';
     }
     final count =

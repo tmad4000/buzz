@@ -685,14 +685,18 @@ class _MessageList extends HookConsumerWidget {
             ),
             const SizedBox(height: Grid.xxs),
             Text(
-              'No messages yet',
+              ref.watch(offlineConnectionRequiredProvider)
+                  ? 'Not available offline'
+                  : 'No messages yet',
               style: context.textTheme.bodyLarge?.copyWith(
                 color: context.colors.onSurfaceVariant,
               ),
             ),
             const SizedBox(height: Grid.half),
             Text(
-              'Be the first to say something!',
+              ref.watch(offlineConnectionRequiredProvider)
+                  ? 'Connect to load this conversation, then retry.'
+                  : 'Be the first to say something!',
               style: context.textTheme.bodySmall?.copyWith(
                 color: context.colors.onSurfaceVariant,
               ),
