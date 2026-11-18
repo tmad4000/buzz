@@ -11,7 +11,12 @@ import {
 } from "./useThreadReadingScroll.ts";
 import { useThreadRowWindow } from "./useThreadRowWindow.ts";
 
-async function fixture({ explicit = null, focused = true } = {}) {
+async function fixture({
+  explicit = null,
+  focused = true,
+  missingPrimary = false,
+  measuredComposer = false,
+} = {}) {
   const previousRaf = globalThis.requestAnimationFrame;
   const previousCancel = globalThis.cancelAnimationFrame;
   const previousObserver = globalThis.ResizeObserver;
@@ -29,9 +34,18 @@ async function fixture({ explicit = null, focused = true } = {}) {
     return sequence;
   };
   globalThis.cancelAnimationFrame = (id) => frames.delete(id);
+  const observers = [];
   globalThis.ResizeObserver = class {
-    observe() {}
-    disconnect() {}
+    constructor(callback) {
+      this.callback = callback;
+      observers.push(this);
+    }
+    observe(element) {
+      this.element = element;
+    }
+    disconnect() {
+      this.element = null;
+    }
   };
   document.hasFocus = () => true;
   Object.defineProperty(document, "visibilityState", {
@@ -51,7 +65,9 @@ async function fixture({ explicit = null, focused = true } = {}) {
   const initial = [
     {
       key: slot,
-      position: { id: "m80", neighbors: ["m79"], offset: 0, pixel: 1600 },
+      position: missingPrimary
+        ? { id: "deleted", neighbors: ["m80"], offset: -4, pixel: 40 }
+        : { id: "m80", neighbors: ["m79"], offset: 0, pixel: 1600 },
     },
   ];
   let view = {
@@ -94,7 +110,7 @@ async function fixture({ explicit = null, focused = true } = {}) {
         paddingResetKey: false,
       },
     );
-    return React.createElement(
+    const body = React.createElement(
       "div",
       {
         onScroll: scroll.onScroll,
@@ -128,6 +144,24 @@ async function fixture({ explicit = null, focused = true } = {}) {
         }),
       ),
     );
+    return React.createElement(
+      React.Fragment,
+      null,
+      body,
+      measuredComposer
+        ? React.createElement("div", {
+            ref: (element) => {
+              composer.current = element;
+              if (element)
+                element.getBoundingClientRect = () => ({
+                  height: 40,
+                  top: 0,
+                  bottom: 40,
+                });
+            },
+          })
+        : null,
+    );
   }
   const render = async () =>
     act(() =>
@@ -154,6 +188,17 @@ async function fixture({ explicit = null, focused = true } = {}) {
   return {
     viewport,
     readers,
+    measureComposer: async (height) =>
+      act(() => {
+        for (const observer of observers)
+          if (observer.element === composer.current && composer.current)
+            observer.callback([
+              {
+                borderBoxSize: [{ blockSize: height }],
+                contentRect: { height },
+              },
+            ]);
+      }),
     slot,
     retained,
     writes: () => automaticWrites,
@@ -246,6 +291,52 @@ test("unfocused thread waits, and retired queued frames cannot replay after focu
     });
     await h.flush();
     assert.equal(h.viewport.current.scrollTop, 700);
+  } finally {
+    await h.close();
+  }
+});
+
+test("a missing primary anchor realizes its loaded neighbor beyond the first window", async () => {
+  const h = await fixture({ missingPrimary: true });
+  try {
+    await h.flush();
+    assert.ok(h.viewport.current.querySelector('[data-message-id="m80"]'));
+    assert.equal(
+      h.viewport.current.scrollTop,
+      1604,
+      "neighbor offset wins over stale pixel fallback40",
+    );
+    assert.ok(h.readers.get(h.slot)());
+    assert.equal(h.writes(), 0);
+  } finally {
+    await h.close();
+  }
+});
+
+test("attached composer measurements wait for restoration release without retiring capture", async () => {
+  const h = await fixture({ measuredComposer: true });
+  try {
+    assert.equal(
+      h.viewport.current.style.paddingBottom,
+      "",
+      "initial measurement must not mutate coverage mid-restore",
+    );
+    await h.measureComposer(60);
+    await h.flush(1);
+    await h.measureComposer(80);
+    assert.equal(h.viewport.current.style.paddingBottom, "");
+    await h.flush();
+    assert.equal(h.viewport.current.scrollTop, 1600);
+    assert.equal(
+      h.viewport.current.style.paddingBottom,
+      "80px",
+      "latest measured size flushes after release",
+    );
+    assert.ok(
+      h.readers.get(h.slot)(),
+      "style observer must not strand capture after a settled restore",
+    );
+    assert.equal(h.writes(), 0);
   } finally {
     await h.close();
   }

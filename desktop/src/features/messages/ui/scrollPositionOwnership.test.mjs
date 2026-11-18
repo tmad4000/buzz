@@ -50,3 +50,29 @@ test("initial reservation blocks automatic positioning until acquisition or expl
   assert.equal(owner.blocked(), false);
   assert.equal(restore.current(), false);
 });
+
+test("layout listeners flush only on a live release and stop after unsubscribe", () => {
+  const owner = createScrollPositionOwnership();
+  const seen = [];
+  const unsubscribe = owner.subscribe(() => seen.push(owner.blocked()));
+  owner.reserve();
+  const old = owner.acquire();
+  const live = owner.acquire();
+  old.release();
+  assert.deepEqual(seen, []);
+  live.release();
+  assert.deepEqual(seen, [false]);
+  owner.reserve();
+  owner.retire(false);
+  assert.deepEqual(
+    seen,
+    [false],
+    "teardown must not flush deferred layout into a retired scroller",
+  );
+  owner.reserve();
+  owner.retire();
+  assert.deepEqual(seen, [false, false]);
+  unsubscribe();
+  owner.acquire().release();
+  assert.deepEqual(seen, [false, false]);
+});

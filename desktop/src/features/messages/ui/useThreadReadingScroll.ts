@@ -186,6 +186,7 @@ export function useThreadReadingScroll(
     paddingResetKey,
     "padding",
     settlePadding,
+    reading.saved ? scroll.readingLayout : undefined,
   );
   return scroll;
 }

@@ -413,10 +413,7 @@ export function MessageThreadPanel({
     opening.firstUnseen ?? sidebar.firstNewId,
     pendingJump?.root === threadHeadId
       ? pendingJump.id
-      : (initialPositionTarget ??
-          sidebar.ownSendTargetId ??
-          reading.saved?.id ??
-          null),
+      : (initialPositionTarget ?? sidebar.ownSendTargetId ?? null),
   );
 
   const deferredThreadReplies = React.useDeferredValue(
