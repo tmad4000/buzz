@@ -41,3 +41,11 @@ Product content not already in3a and retained:
 - useUnreadSidebarThread.jsdom-test.mjs: actual hook repeated reveal for open/closed/collapsed destinations.
 
 DELIVERY.md and quote validation logs/receipts are also retained. No other product content differs from3a. Pre-rebase backup4f29 product/test source matches the rebased result exactly. Earlier parent-restack receipts are historical; fresh rebase checks follow in the final receipt. PR67 stays3a, PR84 and PR87 untouched.
+
+## Final rebased candidate validation
+
+Fresh PASS:18 focused model tests,15 DOM tests,whole-desktop tsc --noEmit exit0/no diagnostics. Logs validation/final-rebase-model.log,final-rebase-dom.log,final-rebase-typecheck.log; structured final-rebase-receipt.json. Runs use setsid/60s test/90s typecheck deadlines/process-group kill cleanup. Product/test tree matches backup4f29 exactly; original3a ancestry supplies all provenance changes. The retained5-file quote-only product delta is listed above.
+
+PR67 remote readback3a and body explicitly record restore/freeze and independent GO comments6971137524 and6971162662. Requested PR67 expected183 lease push was no-op Everything up-to-date because remote already held3a. PR84 and PR87 are left untouched at their observed current heads,76e8ddaee andde2bf4765.
+
+PR88 requested force-with-lease expectede021fa3677a1042f0a6e434d6e0227252f98ce68 differs from observed remote4f29b77b06760b539f9b21c6607fcbe421f88968 (our earlier normal-merge validation receipt). Candidate is prepared; push must preserve the requested lease guard. No silent replacement with a different expected SHA. Exact push outcome/needed decision will be recorded in Stream and root handoff. No live/native/release claim.
