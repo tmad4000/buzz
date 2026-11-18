@@ -1,3 +1,7 @@
+import {
+  useDeviceOffline,
+  offlineNeedsConnection,
+} from "@/shared/api/offlineConnection";
 import { CircleAlert } from "lucide-react";
 import { useReducedMotion } from "motion/react";
 
@@ -148,6 +152,7 @@ export function AgentRuntimeAvatarControl({
   onOpenError,
   onStart,
 }: AgentRuntimeAvatarControlProps) {
+  const offline = useDeviceOffline();
   const shouldReduceMotion = useReducedMotion();
   const trimmedAvatarUrl = avatarUrl?.trim() || null;
   const isRestartAction = requiresRestart || isRestarting;
@@ -209,16 +214,22 @@ export function AgentRuntimeAvatarControl({
                     : "bg-primary text-primary-foreground hover:bg-primary/90",
               )}
               data-testid={hasError ? errorTestId : startTestId}
-              disabled={isPending}
+              disabled={isPending || (offline && !hasError)}
               onClick={(event) => {
                 event.stopPropagation();
                 if (hasError) {
                   onOpenError?.();
                   return;
                 }
-                onStart();
+                if (!offlineNeedsConnection()) onStart();
               }}
-              title={hasError ? errorLabel || errorActionLabel : actionLabel}
+              title={
+                offline && !hasError
+                  ? "Needs a connection"
+                  : hasError
+                    ? errorLabel || errorActionLabel
+                    : actionLabel
+              }
               type="button"
             >
               {isPending ? (

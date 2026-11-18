@@ -57,11 +57,15 @@ function MoveToSectionSubmenu({
   onUnassignChannel: (channelId: string) => void;
   onCreateSectionForChannel: (channelId: string) => void;
 }) {
+  const offline = useDeviceOffline();
   const currentSectionId = assignments[channelId];
 
   return (
     <ContextMenuSub>
-      <ContextMenuSubTrigger>
+      <ContextMenuSubTrigger
+        disabled={offline}
+        title={offline ? "Needs a connection" : undefined}
+      >
         <ContextMenuIconSlot />
         <span>Move to section</span>
       </ContextMenuSubTrigger>

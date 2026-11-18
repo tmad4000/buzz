@@ -1,4 +1,5 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invokeTauri as invoke } from "@/shared/api/tauri";
+import { useDeviceOffline } from "@/shared/api/offlineConnection";
 import { LoaderCircle } from "lucide-react";
 import * as React from "react";
 
@@ -34,6 +35,7 @@ export function AddAgentDialog({
   onAdd,
   currentAgentPubkeys,
 }: AddAgentDialogProps) {
+  const offline = useDeviceOffline();
   const [agents, setAgents] = React.useState<ManagedAgentSummary[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [adding, setAdding] = React.useState<string | null>(null);
@@ -173,7 +175,8 @@ export function AddAgentDialog({
                 <li key={agent.pubkey}>
                   <button
                     className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-accent hover:text-accent-foreground disabled:opacity-50"
-                    disabled={adding !== null}
+                    disabled={offline || adding !== null}
+                    title={offline ? "Needs a connection" : undefined}
                     onClick={() => void handleAdd(agent)}
                     type="button"
                   >
