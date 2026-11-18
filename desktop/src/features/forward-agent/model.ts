@@ -20,9 +20,8 @@ export function canForwardSource(
     (message.kind === 9 || message.kind === 40002) &&
     /^[0-9a-f]{64}$/.test(message.id) &&
     message.body.trim().length > 0 &&
-    [message.pubkey, message.signerPubkey].some(
-      (pk) => typeof pk === "string" && /^[0-9a-f]{64}$/.test(pk),
-    )
+    typeof message.pubkey === "string" &&
+    /^[0-9a-f]{64}$/.test(message.pubkey)
   );
 }
 const members = (c: Channel) => [
@@ -129,7 +128,9 @@ export function linkedForward(
     throw new Error("Use one line of at most 500 characters for your note.");
   const validKey = (pk: string | undefined) =>
     pk && /^[0-9a-f]{64}$/.test(pk) ? pk : undefined;
-  const author = validKey(message.pubkey) ?? validKey(message.signerPubkey);
+  const author = validKey(message.pubkey);
+  if (!author)
+    throw new Error("The original author identity is not available yet.");
   const signer = validKey(message.signerPubkey) ?? author;
   const reference = neventEncode({
     id: message.id,

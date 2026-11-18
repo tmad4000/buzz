@@ -24,4 +24,4 @@ Every send reads fresh channel details and writer-side source/target rosters. Di
 Known cross-device limitation: **other devices do not show “Forwarded ↗”**, because the ACK receipt is stored only on the sending device, per relay/signer. The target forward and backlink still exist as ordinary signed messages. No new synced lane or read-state mutation is added.
 
 
-Stack refresh: merged the latest PR81head83d1462c1 into this owned branch, retaining its owner-approved Star/runtime slot reservation. The only merge conflict was DELIVERY.md; this file retains the forwarding report and the three semantic safeguards above. Final refreshed-stack typecheck is pending;30/30 focused tests pass for the forward changes. PR81 itself was not changed.
+Stack refresh: merged the latest PR81head83d1462c1 into this owned branch, retaining its owner-approved Star/runtime slot reservation. The only merge conflict was DELIVERY.md; this file retains the forwarding report and the three semantic safeguards above. Final refreshed-stack typecheck PASS;30/30 focused tests PASS for the forward changes. PR81 itself was not changed.

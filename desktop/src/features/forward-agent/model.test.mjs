@@ -186,7 +186,7 @@ test("third-party source cannot escape its data block or become the sender's not
   );
   assert.equal(
     canForwardSource(
-      { ...original, pubkey: undefined, signerPubkey: undefined },
+      { ...original, pubkey: undefined, signerPubkey: "e".repeat(64) },
       "source",
     ),
     false,
