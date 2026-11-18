@@ -1,4 +1,8 @@
 import * as React from "react";
+import {
+  createScrollPositionOwnership,
+  type ScrollPositionLease,
+} from "./scrollPositionOwnership";
 
 import { classifyTimelineMessageDelta } from "@/features/messages/lib/timelineSnapshot";
 import {
@@ -62,6 +66,9 @@ type UseAnchoredScrollOptions = {
 };
 
 type UseAnchoredScrollResult = {
+  /** Yield automatic positioning until the external restore releases its lease.
+   * The caller must check lease.current before every asynchronous scroll write. */
+  beginReadingRestore: () => ScrollPositionLease | null;
   /** Pass through to the scroll container's `onScroll`. */
   onScroll: () => void;
   /** True when the user is within `AT_BOTTOM_THRESHOLD_PX` of the bottom. */
@@ -170,14 +177,31 @@ export function useAnchoredScroll({
   // Anchor lives in a ref because it must survive renders and is updated
   // both on scroll (commit-time read) and in the layout effect (post-render
   // restoration). useState would force re-renders we don't want.
+  const [readingOwner] = React.useState(createScrollPositionOwnership);
+  const visit = React.useMemo(() => ({ channelId }), [channelId]);
+  const committedVisit = React.useRef<typeof visit | null>(null);
+  const latestReadingRequest = React.useRef({ targetMessageId, messages });
+  React.useLayoutEffect(() => {
+    latestReadingRequest.current = { targetMessageId, messages };
+  });
+  React.useLayoutEffect(() => {
+    committedVisit.current = visit;
+    return () => {
+      readingOwner.retire();
+      if (committedVisit.current === visit) committedVisit.current = null;
+    };
+  }, [visit, readingOwner]);
   const anchorRef = React.useRef<AnchorState>({ kind: "at-bottom" });
   const virtualizerAtBottomRef = React.useRef(true);
   const [isAtBottom, setIsAtBottom] = React.useState(true);
   React.useLayoutEffect(() => {
-    if (shouldSettleForSplitPanel({ isAtBottom, splitPanelOpen })) {
+    if (
+      !readingOwner.blocked() &&
+      shouldSettleForSplitPanel({ isAtBottom, splitPanelOpen })
+    ) {
       virtualSettleAtBottom?.();
     }
-  }, [isAtBottom, splitPanelOpen, virtualSettleAtBottom]);
+  }, [isAtBottom, splitPanelOpen, virtualSettleAtBottom, readingOwner]);
   const [newMessageCount, setNewMessageCount] = React.useState(0);
   const [highlightedMessageId, setHighlightedMessageId] = React.useState<
     string | null
@@ -271,13 +295,14 @@ export function useAnchoredScroll({
 
   const writePinnedCenterScroll = React.useCallback(
     (container: HTMLDivElement, write: () => void) => {
+      if (readingOwner.blocked()) return;
       const scrollTopBefore = container.scrollTop;
       isWritingScrollRef.current = true;
       write();
       isWritingScrollRef.current = false;
       noteProgrammaticScroll(container, scrollTopBefore);
     },
-    [noteProgrammaticScroll],
+    [noteProgrammaticScroll, readingOwner],
   );
 
   const repinPinnedCenter = React.useCallback(() => {
@@ -323,7 +348,9 @@ export function useAnchoredScroll({
       if (targetSettleRafRef.current !== null) {
         cancelAnimationFrame(targetSettleRafRef.current);
       }
+      const epoch = readingOwner.epoch();
       targetSettleRafRef.current = requestAnimationFrame(() => {
+        if (readingOwner.epoch() !== epoch) return;
         targetSettleRafRef.current = null;
         const container = scrollContainerRef.current;
         const anchor = anchorRef.current;
@@ -348,13 +375,13 @@ export function useAnchoredScroll({
         }
       });
     },
-    [onTargetSettled, scrollContainerRef],
+    [onTargetSettled, scrollContainerRef, readingOwner],
   );
 
   const scrollToBottomImperative = React.useCallback(
     (behavior: ScrollBehavior = "auto") => {
       const container = scrollContainerRef.current;
-      if (!container) return;
+      if (!container || readingOwner.blocked()) return;
       anchorRef.current = { kind: "at-bottom" };
       // A programmatic jump-to-bottom is not atomic, even for `behavior: "auto"`:
       // the browser can emit `scroll` while the list is still settling row
@@ -376,6 +403,7 @@ export function useAnchoredScroll({
       scrollContainerRef,
       virtualScrollToBottom,
       virtualizerOwnsPrependAnchoring,
+      readingOwner,
     ],
   );
 
@@ -383,12 +411,14 @@ export function useAnchoredScroll({
   // user is. The consumer calls this right before sending so their own
   // outbound message pulls the view down even if they'd scrolled up.
   const scrollToBottomOnNextUpdate = React.useCallback(() => {
+    if (committedVisit.current !== visit) return;
+    readingOwner.retire();
     forceBottomOnNextAppendRef.current = true;
-  }, []);
+  }, [readingOwner, visit]);
 
   const settleAtBottomAfterLayout = React.useCallback(() => {
     const container = scrollContainerRef.current;
-    if (!container) return false;
+    if (!container || readingOwner.blocked()) return false;
     if (anchorRef.current.kind === "pinned-center") {
       repinPinnedCenter();
       const atBottom = isAtBottomNow(container);
@@ -413,6 +443,7 @@ export function useAnchoredScroll({
     schedulePinnedTargetSettle,
     scrollContainerRef,
     virtualizerOwnsPrependAnchoring,
+    readingOwner,
   ]);
 
   const highlightMessage = React.useCallback((messageId: string) => {
@@ -434,7 +465,7 @@ export function useAnchoredScroll({
       options: { highlight?: boolean; behavior?: ScrollBehavior } = {},
     ): boolean => {
       const container = scrollContainerRef.current;
-      if (!container) return false;
+      if (!container || readingOwner.blocked()) return false;
       const el = container.querySelector<HTMLElement>(
         `[data-message-id="${messageId}"]`,
       );
@@ -542,6 +573,7 @@ export function useAnchoredScroll({
       virtualizerOwnsPrependAnchoring,
       writePinnedCenterScroll,
       virtualScrollToMessage,
+      readingOwner,
     ],
   );
 
@@ -550,7 +582,7 @@ export function useAnchoredScroll({
   // `getBoundingClientRect` walk plus rect reads.
   const onScroll = React.useCallback(() => {
     const container = scrollContainerRef.current;
-    if (!container) return;
+    if (!container || readingOwner.blocked()) return;
     // Virtua owns anchoring and reports bottom state separately. Avoid the
     // fallback's O(N) DOM walk on every compositor-driven scroll event.
     if (virtualizerOwnsPrependAnchoring) return;
@@ -595,6 +627,7 @@ export function useAnchoredScroll({
     releasePinnedCenter,
     scrollContainerRef,
     virtualizerOwnsPrependAnchoring,
+    readingOwner,
   ]);
 
   // ---------------------------------------------------------------------------
@@ -607,6 +640,9 @@ export function useAnchoredScroll({
   React.useLayoutEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
+    // An explicit target supersedes the external reading position.
+    if (targetMessageId && readingOwner.blocked()) readingOwner.retire();
+    if (readingOwner.blocked()) return;
 
     // First render after a reset (channel switch or initial mount): jump
     // to the requested target message, or to the bottom by default.
@@ -624,7 +660,9 @@ export function useAnchoredScroll({
       // the same first-frame behavior regardless of its surrounding animation.
       const pinToBottomOnMount = () => {
         scrollToBottomImperative("auto");
+        const epoch = readingOwner.epoch();
         mountPinRafIdRef.current = requestAnimationFrame(() => {
+          if (readingOwner.epoch() !== epoch) return;
           mountPinRafIdRef.current = null;
           scrollToBottomImperative("auto");
         });
@@ -774,6 +812,7 @@ export function useAnchoredScroll({
     virtualScrollToBottom,
     virtualSettleAtBottom,
     virtualizerOwnsPrependAnchoring,
+    readingOwner,
   ]);
 
   // ---------------------------------------------------------------------------
@@ -790,7 +829,7 @@ export function useAnchoredScroll({
     if (!content || typeof ResizeObserver === "undefined") return;
     const observer = new ResizeObserver(() => {
       const container = scrollContainerRef.current;
-      if (!container) return;
+      if (!container || readingOwner.blocked()) return;
       if (settleAtBottomAfterLayout()) return;
       if (
         anchorRef.current.kind === "at-bottom" &&
@@ -815,12 +854,16 @@ export function useAnchoredScroll({
     scrollContainerRef,
     settleAtBottomAfterLayout,
     virtualizerOwnsPrependAnchoring,
+    readingOwner,
   ]);
 
+  const settleVirtualizedBottom = React.useCallback(() => {
+    if (!readingOwner.blocked()) virtualSettleAtBottom?.();
+  }, [readingOwner, virtualSettleAtBottom]);
   useVirtualizedViewportResize(
     scrollContainerRef,
     virtualizerAtBottomRef,
-    virtualizerOwnsPrependAnchoring ? virtualSettleAtBottom : undefined,
+    virtualizerOwnsPrependAnchoring ? settleVirtualizedBottom : undefined,
   );
 
   // Pinned centers survive our own corrections but release as soon as the
@@ -947,9 +990,56 @@ export function useAnchoredScroll({
     };
   }, []);
 
+  const beginReadingRestore = React.useCallback(() => {
+    const container = scrollContainerRef.current;
+    if (
+      committedVisit.current !== visit ||
+      !container?.isConnected ||
+      latestReadingRequest.current.targetMessageId
+    )
+      return null;
+    const lease = readingOwner.acquire();
+    for (const frame of [
+      mountPinRafIdRef,
+      programmaticScrollRafRef,
+      targetSettleRafRef,
+    ]) {
+      if (frame.current !== null) cancelAnimationFrame(frame.current);
+      frame.current = null;
+    }
+    try {
+      virtualCancelBottomIntent?.();
+    } catch {
+      lease.release();
+      return null;
+    }
+    if (!lease.current()) return null;
+    forceBottomOnNextAppendRef.current = false;
+    settlingRef.current = false;
+    programmaticScrollTopRef.current = null;
+    hasInitializedRef.current = true;
+    const currentMessages = latestReadingRequest.current.messages;
+    prevMessagesRef.current = currentMessages;
+    prevMessageCountRef.current = currentMessages.length;
+    prevFirstMessageIdRef.current = currentMessages[0]?.id;
+    prevLastMessageIdRef.current = currentMessages.at(-1)?.id;
+    return {
+      current: lease.current,
+      release: () => {
+        if (!lease.current()) return;
+        lease.release();
+        // Adopt the final physical position without another scroll write.
+        anchorRef.current = computeAnchor(container);
+        const bottom = anchorRef.current.kind === "at-bottom";
+        setIsAtBottom(bottom);
+        if (bottom) setNewMessageCount(0);
+      },
+    };
+  }, [visit, scrollContainerRef, readingOwner, virtualCancelBottomIntent]);
+
   const onVirtualizerAtBottomStateChange = React.useCallback(
     (atBottom: boolean) => {
-      if (!virtualizerOwnsPrependAnchoring) return;
+      if (!virtualizerOwnsPrependAnchoring || readingOwner.blocked()) return;
       virtualizerAtBottomRef.current = atBottom;
       if (atBottom) {
         anchorRef.current = { kind: "at-bottom" };
@@ -957,18 +1047,39 @@ export function useAnchoredScroll({
       }
       setIsAtBottom(atBottom);
     },
-    [virtualizerOwnsPrependAnchoring],
+    [virtualizerOwnsPrependAnchoring, readingOwner],
+  );
+
+  const scrollToBottom = React.useCallback(
+    (behavior?: ScrollBehavior) => {
+      if (committedVisit.current !== visit) return;
+      readingOwner.retire();
+      scrollToBottomImperative(behavior);
+    },
+    [visit, readingOwner, scrollToBottomImperative],
+  );
+  const scrollToMessage = React.useCallback(
+    (
+      id: string,
+      options?: { highlight?: boolean; behavior?: ScrollBehavior },
+    ) => {
+      if (committedVisit.current !== visit) return false;
+      readingOwner.retire();
+      return scrollToMessageImperative(id, options);
+    },
+    [visit, readingOwner, scrollToMessageImperative],
   );
 
   return {
+    beginReadingRestore,
     onScroll,
     isAtBottom,
     newMessageCount,
     highlightedMessageId,
-    scrollToBottom: scrollToBottomImperative,
+    scrollToBottom,
     settleAtBottomAfterLayout,
     scrollToBottomOnNextUpdate,
-    scrollToMessage: scrollToMessageImperative,
+    scrollToMessage,
     onVirtualizerAtBottomStateChange,
   };
 }
