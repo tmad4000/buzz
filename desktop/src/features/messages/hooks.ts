@@ -500,6 +500,7 @@ export function useSendMessageMutation(
       sentFromThreadRootId?: string | null;
       sentFromThreadRootExcerpt?: string | null;
       transport?: "auto" | "http";
+      expectedScope?: { relayUrl: string; signerPubkey: string };
       outbox?: import("./outbox/types").OutboxSubmission;
     },
     MessageQueryContext | undefined
@@ -516,6 +517,7 @@ export function useSendMessageMutation(
       sentFromThreadRootId,
       sentFromThreadRootExcerpt,
       transport = "auto",
+      expectedScope,
       outbox,
     }) => {
       // Prefer a channel captured by the caller at compose time. Otherwise,
@@ -542,6 +544,10 @@ export function useSendMessageMutation(
 
       if (!identity) {
         throw new Error("No identity available for sending messages.");
+      }
+
+      if (expectedScope && expectedScope.signerPubkey !== identity.pubkey) {
+        throw new Error("Captured signer no longer matches the send identity.");
       }
 
       // `mediaTags` arrives as the merged outgoing tag set (imeta + NIP-30
@@ -617,6 +623,7 @@ export function useSendMessageMutation(
       // tags, so emoji-only messages would otherwise lose their emoji tag.
       if (
         forceRest ||
+        expectedScope ||
         transport === "http" ||
         parentEventId ||
         imetaTags.length > 0 ||
@@ -651,8 +658,8 @@ export function useSendMessageMutation(
           mentionTags,
           linkPreviewTags,
           sentFromThreadTag,
-          undefined,
-          undefined,
+          expectedScope?.relayUrl,
+          expectedScope?.signerPubkey,
           suppliedRootEventId,
         );
 
@@ -707,6 +714,7 @@ export function useSendMessageMutation(
       );
     },
     onMutate: async ({
+      expectedScope,
       outbox,
       channelId: capturedChannelId,
       targetChannel,
@@ -718,7 +726,8 @@ export function useSendMessageMutation(
       sentFromThreadRootId,
       sentFromThreadRootExcerpt,
     }) => {
-      if (outbox) return undefined;
+      // Scoped message actions do not project optimism or touch source drafts.
+      if (outbox || expectedScope) return undefined;
       // Mirror mutationFn's target resolution so the optimistic message lands
       // in the cache for the same channel as the real send. A caller-supplied
       // channel remains valid even when a stale channel-list read omitted it.
@@ -780,6 +789,7 @@ export function useSendMessageMutation(
       };
     },
     onError: (error, _variables, context) => {
+      if (_variables.expectedScope) return;
       // A community timeout surfaces here as the relay's `OK false` reason.
       // Record it so the composer can show the timeout chip and block further
       // sends until it expires; other errors fall through to the caller.
@@ -795,6 +805,22 @@ export function useSendMessageMutation(
       );
     },
     onSuccess: (message, _variables, context) => {
+      if (_variables.expectedScope) {
+        // CommunityQueryProvider keys this captured client by relay, signer and
+        // signer epoch. Late ACKs never mutate the replacement client/global timeout.
+        const targetId = _variables.targetChannel?.id ?? _variables.channelId;
+        if (targetId) {
+          void queryClient.invalidateQueries({
+            queryKey: channelMessagesKey(targetId),
+            refetchType: "none",
+          });
+          void queryClient.invalidateQueries({
+            queryKey: channelWindowKey(targetId),
+            refetchType: "none",
+          });
+        }
+        return;
+      }
       // An accepted send proves the write-block is lifted; clear any recorded
       // timeout so the chip and disable state fall away immediately.
       clearTimeoutState();

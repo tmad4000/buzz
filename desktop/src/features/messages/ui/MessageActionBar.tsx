@@ -1,3 +1,4 @@
+import { ForwardToAgentAction } from "@/features/forward-agent/ForwardToAgentAction";
 import { setMessagePin } from "@/features/messages/pins/service";
 import {
   BellOff,
@@ -455,6 +456,7 @@ export const MessageActionBar = React.memo(function MessageActionBar({
 }) {
   const [isReactionPickerOpen, setIsReactionPickerOpen] = React.useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = React.useState(false);
+  const [isForwardOpen, setIsForwardOpen] = React.useState(false);
   const customEmoji = useCustomEmoji();
   const quickReactionEmojis = useQuickReactionEmojis(3, customEmoji);
   const quickReactionItems = React.useMemo(
@@ -525,7 +527,7 @@ export const MessageActionBar = React.memo(function MessageActionBar({
         "opacity-100 sm:pointer-events-none sm:opacity-0",
         "sm:group-hover/message:pointer-events-auto sm:group-hover/message:opacity-100",
         "sm:group-focus-within/message:pointer-events-auto sm:group-focus-within/message:opacity-100",
-        isReactionPickerOpen || isDropdownOpen
+        isReactionPickerOpen || isDropdownOpen || isForwardOpen
           ? "sm:pointer-events-auto sm:opacity-100"
           : "",
       )}
@@ -595,6 +597,11 @@ export const MessageActionBar = React.memo(function MessageActionBar({
           ) : null}
 
           <ProtectedMessageAction channelId={channelId} message={message} />
+          <ForwardToAgentAction
+            channelId={channelId}
+            message={message}
+            onOpenChange={setIsForwardOpen}
+          />
 
           {hasReactionAction && quickReactionItems.length > 0 ? (
             <div

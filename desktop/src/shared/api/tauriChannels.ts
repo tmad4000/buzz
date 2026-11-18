@@ -240,9 +240,16 @@ export async function hideDm(channelId: string): Promise<void> {
 
 export async function getChannelDetails(
   channelId: string,
+  options?: {
+    readYourWrites?: boolean;
+    expectedScope?: { relayUrl: string; signerPubkey: string };
+  },
 ): Promise<ChannelDetail> {
   const detail = await invokeTauri<RawChannelDetail>("get_channel_details", {
     channelId,
+    readYourWrites: options?.readYourWrites ?? false,
+    expectedRelayUrl: options?.expectedScope?.relayUrl,
+    expectedSignerPubkey: options?.expectedScope?.signerPubkey,
   });
   return fromRawChannelDetail(detail);
 }
@@ -325,7 +332,11 @@ export async function getChannelMessagesBefore(
 
 export async function getChannelMembers(
   channelId: string,
-  options?: { readYourWrites?: boolean },
+  options?: {
+    readYourWrites?: boolean;
+    requireComplete?: boolean;
+    expectedScope?: { relayUrl: string; signerPubkey: string };
+  },
 ): Promise<ChannelMember[]> {
   const response = await invokeTauri<RawChannelMembersResponse>(
     "get_channel_members",
@@ -335,8 +346,14 @@ export async function getChannelMembers(
         options?.readYourWrites ||
         shouldReadChannelMembersFromWriter(channelId) ||
         undefined,
+      expectedRelayUrl: options?.expectedScope?.relayUrl,
+      expectedSignerPubkey: options?.expectedScope?.signerPubkey,
     },
   );
+  if (options?.requireComplete && response.next_cursor !== null)
+    throw new Error(
+      "The complete writer roster is unavailable. Reopen the destination picker.",
+    );
   return response.members.map(fromRawChannelMember);
 }
 

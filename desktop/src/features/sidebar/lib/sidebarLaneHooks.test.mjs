@@ -394,6 +394,10 @@ for (const [name, modPath, hookName, dTag, idsKey, verb, field] of [
 test("sections hook: 60 s tick, reconnect, cross-tab, pending edit and in-flight unmount", async () => {
   const { renderHook, act, advance, cleanup } = await harness();
   const { useChannelSections } = await import("./useChannelSections.ts");
+  const { readSidebarLaneView } = await import("./sidebarLaneReadView.ts");
+  const { SECTIONS_LANE, projectSections } = await import(
+    "./channelSectionsSync.ts"
+  );
   const { storageKey } = await import("./channelSectionsStorage.ts");
   const legacy = (names) => ({
     version: 1,
@@ -402,9 +406,18 @@ test("sections hook: 60 s tick, reconnect, cross-tab, pending edit and in-flight
   });
   fx.heads["channel-sections"] = ev("channel-sections", legacy(["a"]), 100);
   const { result, unmount } = renderHook(() => useChannelSections(PK, RELAY));
+  assert.equal(
+    readSidebarLaneView(SECTIONS_LANE, PK, RELAY),
+    undefined,
+    "mounted cache is not yet hydrated",
+  );
   await advance(1_000);
   const names = () => result.current.sections.map((s) => s.name);
   assert.deepEqual(names(), ["a"]);
+  assert.deepEqual(
+    projectSections(readSidebarLaneView(SECTIONS_LANE, PK, RELAY)).sections,
+    result.current.sections,
+  );
 
   // Missed live event after the back-off reached 60 s (ticks at 5/15/45 s):
   // only the steady tick at 105 s picks it up.
@@ -460,6 +473,7 @@ test("sections hook: 60 s tick, reconnect, cross-tab, pending edit and in-flight
   fx.holdPublish = new Promise((r) => (release = r));
   await advance(2_000);
   unmount();
+  assert.equal(readSidebarLaneView(SECTIONS_LANE, PK, RELAY), undefined);
   release();
   await advance(1_000);
   assert.equal(fx.published.length, before);

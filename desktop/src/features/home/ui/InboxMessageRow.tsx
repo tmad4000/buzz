@@ -1,3 +1,4 @@
+import { ForwardedToAgentLine } from "@/features/forward-agent/ForwardedToAgentLine";
 import * as React from "react";
 
 import { useKnownAgentPubkeys } from "@/features/agents/useKnownAgentPubkeys";
@@ -258,6 +259,7 @@ export function InboxMessageRow({
             </div>
           )}
 
+          <ForwardedToAgentLine channelId={channelId} messageId={message.id} />
           <div
             className={isContinuation ? "mt-0" : "mt-conversation-body"}
             data-testid="message-body"
