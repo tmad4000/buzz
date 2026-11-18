@@ -5,6 +5,9 @@ import {
 } from "./timelineReadingPosition";
 import type { ThreadSummaryRenderer } from "./TimelineMessageRow";
 import * as React from "react";
+import { ConversationViewContext } from "@/features/conversations/ConversationViewContext";
+import { timelineScrollIdentity } from "@/features/conversations/timelineScrollIdentity";
+import { useTimelineView } from "@/features/channels/ui/TimelineViewContext";
 
 import {
   isDeferredTimelineSnapshotStale,
@@ -230,6 +233,8 @@ const MessageTimelineBase = React.forwardRef<
   }: MessageTimelineProps,
   ref,
 ) {
+  const conversationView = React.useContext(ConversationViewContext);
+  const { mode } = useTimelineView();
   const internalScrollRef = React.useRef<HTMLDivElement>(null);
   const scrollContainerRef = externalScrollRef ?? internalScrollRef;
   const contentRef = React.useRef<HTMLDivElement>(null);
@@ -285,15 +290,25 @@ const MessageTimelineBase = React.forwardRef<
     liveSnapshot,
   });
   const isRenderPending = deferredSnapshot !== liveSnapshot;
-  const scrollRestorationId = targetMessageId
-    ? `message-timeline:${channelId ?? "none"}:target:${targetMessageId}`
-    : `message-timeline:${channelId ?? "none"}`;
+  const { restorationId: scrollRestorationId, domKey: scrollContainerDomKey } =
+    timelineScrollIdentity({
+      channelId,
+      viewInstanceId: conversationView?.viewInstanceId,
+      mode,
+      targetMessageId,
+    });
   // Keep the scroll node's DOM lifetime scoped to a channel. TanStack Router's
   // scroll-restoration listener runs outside React and may write a saved
   // scrollTop into the current scroll element during navigation; reusing the
   // same node across channel routes can leave the newly-loaded message list
   // painted at a stale offset until the user's next scroll event forces layout.
-  const scrollContainerDomKey = channelId ?? "none";
+  const handleVirtualizerScrollerChange = React.useCallback(
+    (element: HTMLDivElement | null) => {
+      if (element) element.dataset.scrollRestorationId = scrollRestorationId;
+      setVirtualizerScrollParent(element);
+    },
+    [scrollRestorationId],
+  );
 
   React.useLayoutEffect(() => {
     // Re-read after `scrollContainerDomKey` swaps the keyed scroll DOM node.
@@ -722,7 +737,11 @@ const MessageTimelineBase = React.forwardRef<
       onToggleReaction={onToggleReaction}
       onVirtualizerApiChange={setTimelineVirtualizerApi}
       onVirtualizerRangeChanged={handleVirtualizerRangeChanged}
-      onVirtualizerScrollerChange={setVirtualizerScrollParent}
+      onVirtualizerScrollerChange={
+        conversationView
+          ? handleVirtualizerScrollerChange
+          : setVirtualizerScrollParent
+      }
       onAtBottomStateChange={handleVirtualizerAtBottomStateChange}
       personaLookup={personaLookup}
       profiles={profiles}
@@ -789,7 +808,11 @@ const MessageTimelineBase = React.forwardRef<
           data-buzz-conversation-scroll={
             useTimelineVirtualizer && showMessageList ? undefined : "true"
           }
-          data-scroll-restoration-id={scrollRestorationId}
+          data-scroll-restoration-id={
+            conversationView && useTimelineVirtualizer && showMessageList
+              ? undefined
+              : scrollRestorationId
+          }
           data-testid={
             useTimelineVirtualizer && showMessageList
               ? undefined
