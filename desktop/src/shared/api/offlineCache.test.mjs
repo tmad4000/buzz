@@ -520,12 +520,12 @@ test("R1 hydration touch queued before clear cannot recreate a cleared native ro
   }
 });
 
-test("R3 actual NIP44 rejects cross-record cross-relay splice, reorder, duplicate and omitted chunks", async () => {
+test("R3 actual NIP44 binds every chunk header and rejects cross-record cross-relay splice, reorder, duplicate and omission", async () => {
   rows.clear();
   setOfflineCipher(realCipher);
   const second = { ...scope, relayUrl: "wss://other.test/" };
-  await saveOffline(scope, "head", "bundle", { text: "A".repeat(10000) });
-  await saveOffline(second, "head", "bundle", { text: "B".repeat(10000) });
+  await saveOffline(scope, "head", "bundle", { text: "A".repeat(20000) });
+  await saveOffline(second, "head", "bundle", { text: "B".repeat(20000) });
   const id = JSON.stringify([offlineScopeKey(scope), "head", "bundle"]);
   const original = rows.get(id);
   const other = [...rows.values()].find(
@@ -548,10 +548,41 @@ test("R3 actual NIP44 rejects cross-record cross-relay splice, reorder, duplicat
     });
     assert.deepEqual(await loadOffline(scope, "head", "bundle"), []);
   }
+  // A valid NIP44 MAC is insufficient if the authenticated chunk header is wrong.
+  const envelope = JSON.parse(await realCipher.decrypt(a[1]));
+  assert.equal(envelope.scope, offlineScopeKey(scope));
+  assert.equal(envelope.id, "bundle");
+  assert.equal(envelope.index, 1);
+  assert.equal(envelope.count, a.length);
+  for (const [field, value] of Object.entries({
+    scope: offlineScopeKey(second),
+    id: "different",
+    kind: "thread",
+    index: 0,
+    count: a.length + 1,
+    bundle: "another-bundle",
+    savedAt: original.savedAt + 1,
+  })) {
+    const altered = [...a];
+    altered[1] = await realCipher.encrypt(
+      JSON.stringify({ ...envelope, [field]: value }),
+    );
+    const ciphertext = JSON.stringify(altered);
+    rows.set(id, {
+      ...original,
+      ciphertext,
+      bytes: new TextEncoder().encode(ciphertext).length,
+    });
+    assert.deepEqual(
+      await loadOffline(scope, "head", "bundle"),
+      [],
+      `authenticated ${field} mismatch must reject`,
+    );
+  }
   rows.set(id, original);
   assert.equal(
     (await loadOffline(scope, "head", "bundle"))[0].payload.text,
-    "A".repeat(10000),
+    "A".repeat(20000),
   );
 });
 

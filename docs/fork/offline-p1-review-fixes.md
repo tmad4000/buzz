@@ -83,3 +83,7 @@ Evidence: `offline-review-ui1.log`.
 TypeScript: `python3 ../scripts/run_offline_check.py 120 node node_modules/typescript/bin/tsc --noEmit` PASS, exit0/no diagnostics (`offline-review-typecheck.log`). Rust formatting completed; no cargo/Tauri/native/browser/M5 builds. Native SQL/IPC/device acceptance remains uncompiled/unexecuted under the release gate.
 
 Supplementary R1/R3 preservation: C-MODELS passes pending native put/touch vs clear/logout probes and actual NIP-44 cross-record/cross-relay splice/reorder/duplication/omission rejection. Native storage-owner clear epoch, UPDATE-only touch and sign-out suspension/drain are new source-reviewed paths, not runtime-native evidence.
+
+## R3 literal-envelope follow-up
+
+Root explicitly repeated every-chunk record/scope/index/count binding. The next candidate replaces the complete-bundle-manifest format with version-2 per-chunk NIP-44 envelopes containing scope/kind/id/timestamp, random bundle ID, index/count, whole-payload digest and piece text. Each header and whole assembled digest is validated before hydration. The real-NIP44 R3 regression now checks valid-MAC wrong-header fields as well as cross-record/cross-relay splice/reorder/duplication/omission. Earlier derived encrypted snapshots fail the version check and are disposable. The original five review-gate rows remain unchanged in requirement; coordinator receives a refreshed full head/line map before dispatch.

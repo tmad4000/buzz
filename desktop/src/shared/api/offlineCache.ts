@@ -404,23 +404,36 @@ export async function saveOffline(
     if (new TextEncoder().encode(plaintext).length > offlineCaps[kind][1])
       return;
     // 8000 UTF-16 units fit even for four-byte Unicode and escaped surrogates.
-    const chunks: string[] = [];
+    const pieces: string[] = [];
     for (let i = 0; i < plaintext.length; ) {
       let end = Math.min(i + 8000, plaintext.length);
       if (end < plaintext.length && /[\uD800-\uDBFF]/.test(plaintext[end - 1]))
         end--;
-      chunks.push(await cipher.encrypt(plaintext.slice(i, end), scope.pubkey));
+      pieces.push(plaintext.slice(i, end));
       i = end;
     }
-    chunks.unshift(
-      await cipher.encrypt(
-        JSON.stringify({
-          digest: await payloadHash(plaintext),
-          count: chunks.length,
-        }),
-        scope.pubkey,
-      ),
-    );
+    const bundle = globalThis.crypto.randomUUID();
+    const digest = await payloadHash(plaintext);
+    const chunks: string[] = [];
+    for (let index = 0; index < pieces.length; index++) {
+      chunks.push(
+        await cipher.encrypt(
+          JSON.stringify({
+            version: 2,
+            bundle,
+            scope: key,
+            kind,
+            id,
+            savedAt,
+            index,
+            count: pieces.length,
+            digest,
+            text: pieces[index],
+          }),
+          scope.pubkey,
+        ),
+      );
+    }
     const ciphertext = JSON.stringify(chunks);
     const now = Date.now();
     const [, currentStoreEpoch] = await Promise.all([
@@ -489,13 +502,37 @@ export async function loadOffline<T>(
       const decrypted = await Promise.all(
         chunks.map((c) => cipher.decrypt(c, scope.pubkey)),
       );
-      const manifest = JSON.parse(decrypted[0]);
-      const text = decrypted.slice(1).join("");
+      const parts = decrypted.map((part) => JSON.parse(part));
+      const first = parts[0];
       if (
-        manifest.count !== chunks.length - 1 ||
-        manifest.digest !== (await payloadHash(text))
+        !first ||
+        first.version !== 2 ||
+        typeof first.bundle !== "string" ||
+        !first.bundle ||
+        first.bundle.length > 128 ||
+        typeof first.digest !== "string" ||
+        !/^[a-f0-9]{64}$/.test(first.digest)
       )
         continue;
+      if (
+        parts.some(
+          (part, index) =>
+            !part ||
+            part.version !== 2 ||
+            part.scope !== key ||
+            part.kind !== kind ||
+            part.id !== row.id ||
+            part.savedAt !== row.savedAt ||
+            part.bundle !== first.bundle ||
+            part.digest !== first.digest ||
+            part.index !== index ||
+            part.count !== parts.length ||
+            typeof part.text !== "string",
+        )
+      )
+        continue;
+      const text = parts.map((part) => part.text).join("");
+      if (first.digest !== (await payloadHash(text))) continue;
       const value = JSON.parse(text);
       if (
         value.scope === key &&

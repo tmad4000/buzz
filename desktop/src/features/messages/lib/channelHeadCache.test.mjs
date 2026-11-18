@@ -118,10 +118,17 @@ function install(entries, { loadDelayMs = 0 } = {}) {
           });
           const ciphertext = JSON.stringify([
             JSON.stringify({
-              digest: createHash("sha256").update(plaintext).digest("hex"),
+              version: 2,
+              bundle: "fixture",
+              scope,
+              kind: "head",
+              id: entry.channelId,
+              savedAt: entry.savedAt,
+              index: 0,
               count: 1,
+              digest: createHash("sha256").update(plaintext).digest("hex"),
+              text: plaintext,
             }),
-            plaintext,
           ]);
           return {
             scope,
