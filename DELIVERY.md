@@ -49,3 +49,9 @@ Fresh PASS:18 focused model tests,15 DOM tests,whole-desktop tsc --noEmit exit0/
 PR67 remote readback3a and body explicitly record restore/freeze and independent GO comments6971137524 and6971162662. Requested PR67 expected183 lease push was no-op Everything up-to-date because remote already held3a. PR84 and PR87 are left untouched at their observed current heads,76e8ddaee andde2bf4765.
 
 PR88 requested force-with-lease expectede021fa3677a1042f0a6e434d6e0227252f98ce68 differs from observed remote4f29b77b06760b539f9b21c6607fcbe421f88968 (our earlier normal-merge validation receipt). Candidate is prepared; push must preserve the requested lease guard. No silent replacement with a different expected SHA. Exact push outcome/needed decision will be recorded in Stream and root handoff. No live/native/release claim.
+
+## Lease decision resolved and final publication
+
+Root's latest Proceed now instruction authorizes the rebased PR88 publication with force-with-lease, superseding the earlier stale literal expectedSHA. Fresh remote readback is4f29b77b06760b539f9b21c6607fcbe421f88968; use THAT exact lease to preserve concurrent-write protection. The earlier expectede021 rejection remains historical and unchanged. PR67 is final3a; no parent-GO wait remains.
+
+Post-push fresh checks and exact-head publication receipt are recorded at /home/dev/code/buzz-pr88-final-rebase-publish-20261118/RECEIPT.json (plus model.log,dom.log,typecheck.log). Product/test source remains identical to the tested quote-only rebase; this publication update is documentation only. Keep final pushed head frozen for reviewer6754eb26 via root. PR84 andPR87 stay at their existing correction heads for reviewersbe986aea andf087a4d0, respectively. No other source/head changes.
