@@ -1,53 +1,33 @@
-# Agent reply UX — .9 source candidate
+# Agent Stop / Continue client — Phase 2
 
-Owner: d809bb50-03b8-41d2-ba83-e2a18cb86a89. Workspace: `/home/dev/agent-worktrees/buzz-agent-reply-ux-20261118`.
-Base: `buzz-ideaflow-v0.5.28-ideaflow.8`, annotated tag object `69eda1ff`, peeled commit `16fa57dfc97f115d00382fcb75128295b5fb3def`.
+Owner: d809bb50-03b8-41d2-ba83-e2a18cb86a89. Own worktree `/home/dev/agent-worktrees/buzz-agent-controls-20261118`, branch `agent-stop-resume-client-20261118`. Separate draft PR stacked on PR67 branch `agent-reply-ux-20261118`, frozen base `18346c781cae213dc333fa5b009021cc962c5c0c`.
 
-Jacob's original asks, recovered by the root dispatch and `buzz-request-audit-20261117/REPORT.md`:
-- 2026-11-16 23:48 / 2026-11-17 08:19 DM: show which agent is working, with a link and less noise.
-- 2026-11-17 15:43 DM: agent answers should visibly attach to the exact answered message even in expanded inline threads.
+Jacob's ask: “a way to stop a running agent on Buzz.” Root assigned Phase2 after PR67's review verdict; no PR67 changes allowed. Verified3857fd1d's completed NO at oldd6d53c6d7 (owner-edit provenance), already fixed in frozen183 with an independent later source review at7d5893bd0. Parent worktree remains clean at183; this task does not change it or assert the old verdict reviewed new code. Parent source delivery is retained in `git show 18346c781:DELIVERY.md`.
 
-Draft PR: https://github.com/tmad4000/buzz/pull/67 (base `sol/buzz8-release`, .9 bucket).
+## Behavior
 
-## Source delivery
+Same default-OFF **Agent reply context** experiment. Recognized bridge-signed reports expose a compact **Stop…** control when appropriate; it opens the shared accessible confirmation dialog identifying the exact attributed worker. Only confirmation sends a literal `stop` reply to the **card event**, using the existing signed kind9 message path. A bridge-confirmed resumable stopped report exposes **Continue**, sending literal `continue` to that same card. No reaction toggle, new protocol/event kind, or client Paseo call.
 
-Settings → Experiments → **Agent reply context** opts into compact reported-status cards and native-parent quotes. Default OFF. Expanding the compact summary opts into details and the agent link. The shared MessageRow renders recognized bridge cards compactly across channel/thread surfaces, with executor and opt-in Open agent, report provenance/model, full original card text and copyable IDs. Unknown formats and substantive answer content retain the normal renderer. No runtime subscription, worker wakeup, inferred completion or seen-state write is added.
+Controls are hidden for Root's exact UUID, nonbridge create/effective-edit signers, other active identities, unavailable/locked/lost identities, pending cards, unknown/ambiguous channel scope, and stopped cards explicitly reporting unavailable continuation. Root cards retain ordinary read-only report rendering. Only Jacob's established pubkey is eligible; the native sender receives both expected relay and expected signer fences.
 
-Parent display reuses reviewed PR54's native NIP-10 parent≠root quote plus guarded owning-pane jump; it never uses capped paint depth or retargets an existing draft. Root replies remain visually attached to their root without a redundant quote. Missing parents show a noninteractive “reply to earlier message” stub; no parent fetch or navigation is attempted.
+Lifecycle labels change only when the signed bridge card changes. Existing bridge control source `jacob` and UTC headers are rendered verbatim: Stopped by Jacob, Already idle when Jacob asked to stop, Interruption acknowledged; new activity exists, Continuation queued by Jacob. No optimistic stopped/running/continued claim. Submission success says Request sent / Waiting for bridge. An uncertain send is held without automatic retries. The bridge remains authoritative for latest ledger revision, private scope, binding generation, current turn, stop cycle and continuation proof.
 
-## Reused source / integration order
+Confirmation is bound to the current card/body/attribution/signer/identity/community. Rebinding dismisses the old confirmation. Community switches and unmount before native publication suppress the stale operation. Repeated clicks share a synchronous in-flight fence. No composer reply-target, draft, read receipt, agent lifecycle or queue mutations occur outside the existing user-request message publication.
 
-Apply each prerequisite once; this branch contains additive signed-off cherry-picks:
-- PR54 `533f8d23c`, `1d284379b`, `89bb4f3b` → local `236e128a6`, `74afcc34d`, `b6cf5bc55`.
-- PR58 `7472d44a5`, `b04b419e` → local `ea3230b15`, `314103027`.
-- Then this branch's compact-card/experiment commit. If integrating PR54/58 separately, omit the duplicated prerequisite cherry-picks. The opt-in wrapper is intentional and needs retaining around ThreadParentQuoteChip.
+The fallback also recognizes the existing exact attributed project-card wrapper, preserving all original project text in expanded details. Unrecognized/malformed bodies stay normal content. Machine-tag parsing stays preferred; no unconfirmed new control-tag schema is invented. Live control reports currently use the bridge's existing body envelope. Future machine control states require075's writer contract; unsupported tagged envelopes fail closed.
 
-PR58's established main-window GCP/M4/M5 host + exact UUID opener capability is reused unchanged. No new hosts, relay kinds, dependencies, lockfiles, listeners or service changes.
+## Exact bridge contract / coordination
 
-## Contract coordination and remaining work
+Read `/home/dev/code/buzz-agent-control-20261118/PLAN.md`, including review corrections, and `FINISH.json`. FINISH reports `SHIPPED_BACKEND_ENABLED`, source manifest `199b91d8a07277b7a86ba3ba9604547840482996860835bde8665d73db2e90a9`, runtime64 files manifest `775b20ed7420cf2e41c45f99191dfaed6ba16fb9fb4b7db75e4d600c04084a35`. Source-only inspection of sole writer075's `listener/status_agent_metadata.py`, `project_status.py`, `agent_control.py`: accepted exact Jacob-signed 🛑 reaction or direct `stop` reply; direct `continue` reply only. This implementation chooses the reply form for both, with parent=card and signed native root preserved. No listener files changed. Wording/forms proposal sent075; its response/any newer machine-tag contract is not assumed.
 
-Read-only source contract: `/home/dev/code/paseo-buzz-bridge-20261114/listener/status_agent_metadata.py` (`render`, `link`, `normalize_status`), `status_cards.py`, `status_card_transport.py`. Existing ordinary kind9 reply + kind edit transport, established raw bridge signer, exact four-line envelope plus optional stale-metadata line. Full-body envelope recognition is bounded to 2048 characters. Delegated display authors do not establish signer trust.
+FINISH explicitly records no real-user interrupt/resume probe by the backend owner. Backend enabled is not a live end-to-end client qualification. This task also sends **no real trigger**, cancels/resumes no agent, makes no direct Buzz post, and performs no M5/browser/native/Tauri/cargo build.
 
-Root approved compatibility and proposed machine binding. Sent the additive tags/snapshot proposal in STATUS-CARD-TAGS.md to bridge owner075fe13; listener remains untouched. Client prefers valid machine tags; old untagged cards use the body fallback. Production edit formatting replaces machine snapshots only for bridge-signed edits and records the edit signer so other-author edits cannot masquerade as bridge reports. Activation/contract response remains pending075. 445b5cb9 confirmed PR54 reuse and guarded callback requirement; implemented it. fd0 integration owner received prerequisite/pick-order notices.
+## Validation and delivery
 
-**Compatibility limitation, still open:** the transport contains ordinary status reply messages, not a structured count-neutral message-level work projection. This slice compacts the existing card in its existing position; it does not move it into the originating-request footer, keep it visible with collapsed replies, remove legacy reply counts/notifications, or verify active task-bound execution. Labels explicitly say Reported working/done and details say live activity unverified. Full quiet footer semantics from DESIGN.md §280 remain an adapter/transport integration item with 075fe13/root, and must not be reported as completed by this PR.
+All tests and tsc use inherited `validation/run-bounded.py`: setsid, parent timeout and process-group SIGKILL cleanup. No dependency/lock/version or native capability changes. Reuses existing installed dependency tree via ignored node_modules symlink.
 
-## Validation
+Final checks: **48 focused unit/model tests PASS, 11 DOM tests PASS, whole-desktop `tsc --noEmit` PASS (exit0, no diagnostics).** Biome and whitespace checks pass (test style infos only). Typecheck receipt: `validation/control-typecheck-receipt.json`.
 
-Only bounded light checks; each test/typecheck uses `setsid` with a parent timeout and process-group SIGKILL cleanup. Reused the existing installed desktop dependency tree by symlink; no dependency installation/update.
-- 44 focused model/unit tests PASS: bridge envelope/signature identity, tag precedence/duplicate-malformed rejection, production edit snapshot/immutable-ancestry behavior, report edits/watchdog/stale metadata, exact native parent tags, parent quote scope, Page/thread guarded navigation, Markdown transform/opener callback, native permission scope.
-- 6 focused DOM tests PASS: compact card original text/link/edit identity, shared thread-row native quote/navigation/body identity, default-off quote gate and no-fetch unloaded-parent stub; production sidebar-panel default-off legacy context and on-state deduplication.
-- Whole-desktop TypeScript `tsc --noEmit`: PASS, exit 0; `validation/typecheck.log` is empty (no diagnostics).
-- Biome on added/changed components and models PASS; whitespace check PASS.
+Focused checks: production native-message wrapper argument assertions (literal stop/continue, exact parent/root, expected Jacob+relay), signer/Root/pending/channel eligibility, bridge control labels/UTC/unavailable continuation, project wrapper, actual confirmation cancel/accept, disabled feature/wrong identity, no optimistic lifecycle, ambiguous-send hold, card/community change and unmount races, plus inherited parser/edit/parent guards. See `validation/control-model-tests.log`, `control-dom-tests.log`, `control-typecheck.log` for final receipts.
 
-Evidence: `validation/model-tests.log`, `validation/dom-tests.log`, `validation/typecheck.log`. The bounded runner is reproduced in `validation/run-bounded.py`.
-
-No browser/native/Tauri/cargo builds, M5 actions, release, install or Buzz posts. Native OS-handler behavior and human acceptance remain unverified. Draft/source review only; no buzz-review-completed attestation.
-
-## Review / manual acceptance for the release owner
-
-Independent Sol review by87017e7a at fde7c66fe found one P2: default-off deep-sidebar context was removed by prerequisite PR54. Restored the original context while disabled, with a mounted production-panel off/on regression; optional reported-label wording also applied. First review: https://github.com/tmad4000/buzz/pull/67#pullrequestreview-5951545364. Focused recheck completed at exact source `7d5893bd07395d2ec22676eef94ad2e4940ffd43`: no blockers, scores9/9/9; https://github.com/tmad4000/buzz/pull/67#pullrequestreview-5951577042. Reviewer independently reran5DOM tests. Final author tsc completed exit0; see validation/typecheck-receipt.json. Subsequent delivery-receipt-only commits do not change reviewed application code. Keep draft pending release captain authorization for heavier validation and native/human acceptance.
-
-After an authorized build, enable Agent reply context. Expand a native reply-to-reply: verify its quote names the exact parent's first line and opens/highlights that parent through the guarded owning pane; preserve any newer draft. Collapse/reopen and verify exact-observed/read authority is unchanged. Show a bridge status card: verify compact reported executor + Open agent, raw original text in details, and an edit updates the same report. Confirm a non-bridge lookalike and a substantive answer stay ordinary content. Disable the experiment to restore ordinary status-body rendering and hide parent quotes.
-
-Root follow-up: count-neutral means this renderer adds no events/counter/read/notification mutations; exclusion of legacy card replies from relay counts remains unverified and is not claimed. See STATUS-CARD-TAGS.md for exact proposed fields and activation boundary.
+Independent Sol review is requested **via root** after the separate draft PR exists. Keep draft; no review-completed attestation, native/human acceptance, release or deployment claim. The parent chip's separate footer/count-neutral projection remains open; it is not addressed or marked complete here.

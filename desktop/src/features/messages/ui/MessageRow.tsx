@@ -389,7 +389,12 @@ export const MessageRow = React.memo(
     const renderBody = () => {
       if (statusCard) {
         return (
-          <AgentStatusChip card={statusCard} originalBody={message.body} />
+          <AgentStatusChip
+            card={statusCard}
+            originalBody={message.body}
+            message={message}
+            channelId={channelId ?? undefined}
+          />
         );
       }
       switch (message.kind) {
