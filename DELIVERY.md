@@ -45,3 +45,11 @@ The actual Stop button is now Radix's AlertDialogTrigger. Cancel and Escape rest
 The wire has no control generation/revision token available to this client. Identical same-minute control reports cannot prove a new cycle and conservatively retain the hold. Storage synchronization is not a cross-window transactional exactly-once guarantee; the bridge's durable action/cycle barriers remain authoritative. No recovery/delete-hold UI is introduced.
 
 Current correction checks: **15 focused model tests, 10 production DOM tests, whole-desktop tsc --noEmit PASS**. Logs: validation/control-fix-model.log, control-fix-dom.log, control-fix-typecheck.log. All runs bounded with process-group cleanup. These supersede only the corrected paths; original wider checks remain historical. Re-review through root is pending. No live stop/continue qualification.
+
+## Fresh stack validation after parent GO
+
+Root requested a fresh stack/check/push against frozen PR67 head3a1e41ec74e6de8b261fbb7b4e6667333b8c0e8a. Verified live parent SHA and exact merge-base3a. PR84 already contains that parent via normal mergef8c21ea63; no history rewrite or source restack is necessary. This receipt-only commit preserves application sourcec788a2cbf unchanged.
+
+Fresh verification PASS:15 focused model tests,10 production DOM tests, whole-desktop tsc --noEmit exit0 with no diagnostics. Logs validation/restack-model.log, restack-dom.log, restack-typecheck.log; receipt restack-receipt.json. Runs use existing setsid/timeout/process-group-kill harness (60s tests,90s tsc). Diff whitespace check PASS. Quote follow-up PR88 and PR67 stay untouched.
+
+Ready for root-routed samebe986 independent recheck of delta3a..new head. First review NO at6ed remains historical; no current source GO is claimed until recheck. No real trigger, native/human, deployment or release acceptance.
