@@ -1,5 +1,8 @@
 # Mobile sidebar sections — .9 candidate
 
+Draft PR: https://github.com/tmad4000/buzz/pull/68
+Implementation commit: `9ff53852fd192b72d17e25e6b20e19a3cc578b17`.
+
 Jacob's original ask (2026-11-18 00:48Z): “when I rearranged the sections on my computer it didn’t rearrange them on my phone in buzz.” Root dispatch: d3caa262; implementation session: 4bb04859.
 
 Source baseline: tag `buzz-ideaflow-v0.5.28-ideaflow.8`, resolved locally to `16fa57dfc97f115d00382fcb75128295b5fb3def`. Dispatch reference `69eda1ff` is an ancestor. Own worktree `/home/dev/agent-worktrees/buzz-mobile-sections-20261118`; branch `sol/mobile-sidebar-sections`. Intended for the .9 bucket; draft PR base is the released .8 branch `sol/buzz8-release`.
