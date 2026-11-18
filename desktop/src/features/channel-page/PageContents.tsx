@@ -89,7 +89,7 @@ export function PageContentsRail({
       )}
     >
       <Button
-        size="icon-sm"
+        size="icon-xs"
         variant="ghost"
         aria-label={action}
         title={action}
