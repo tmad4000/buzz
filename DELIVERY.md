@@ -53,3 +53,17 @@ Root requested a fresh stack/check/push against frozen PR67 head3a1e41ec74e6de8b
 Fresh verification PASS:15 focused model tests,10 production DOM tests, whole-desktop tsc --noEmit exit0 with no diagnostics. Logs validation/restack-model.log, restack-dom.log, restack-typecheck.log; receipt restack-receipt.json. Runs use existing setsid/timeout/process-group-kill harness (60s tests,90s tsc). Diff whitespace check PASS. Quote follow-up PR88 and PR67 stay untouched.
 
 Ready for root-routed samebe986 independent recheck of delta3a..new head. First review NO at6ed remains historical; no current source GO is claimed until recheck. No real trigger, native/human, deployment or release acceptance.
+
+## Revision-ordered HOLD reconciliation
+
+The completed be986 re-review atc788 confirms all original3failures fixed, but reproduces a residualP2: an older signed queued report in a second view clears a newer ambiguous Continue HOLD. Its updated REVIEW-SOL.md is retained in the independent review worktree. This correction addresses that finding too.
+
+The formatter now retains the selected edit event ID alongside its signer/content and exposes bodyRevision(eventId,createdAt) from the selected verified event. Original bodies use original event metadata; unsigned local cache rewrites have no revision evidence until a signed edit is applied. MessageRow's memo compares revision metadata. These are additive fields; no edit-selection, authorization, read/count/composer semantics change.
+
+Each durable operation record stores action, unique operationID, baseline token AND baseline body revision, under stable scoped card/agent identity. Reconciliation requires the existing relevant bridge control state plus a distinct event ID and strictly later valid created_at than baseline. Old snapshots, equal timestamps and missing/invalid revision evidence retain the HOLD. Preexisting persisted holds without revision evidence also stay held; no reset/eviction/retry. This uses existing event metadata, no new wire protocol or inferred authority from a display timestamp. It is conservative freshness evidence, not a global exactly-once or bridge-cycle proof.
+
+Checked-in regressions include the reviewer stale-second-view case with actual revision metadata, equal-time and unversioned variants, and a genuinely newer report releasing the hold. Formatter→parser assertions verify original/selected owner/bridge revision metadata and absent local-cache provenance. Original Cancel/Escape, display-edit/remount/second-view cases remain passing.
+
+Final bounded checks PASS:15 focused model tests,11 production DOM tests,whole-desktop tsc --noEmit exit0. Also copied the unchanged independent reviewer six-case harness to our OWN temporary file and ran it against this source:6/6 PASS (including original3failures and residual stale-report case). Reviewer source was only read; copy SHA256 daa40b669c03d344808e12671f7e075a3c7f87c62d5809392a14773c49cb1fdd matches original. Own temporary copy removed after verification. Logs validation/revision-model.log, revision-dom.log, revision-reviewer-probe.log, revision-typecheck.log; structured receipt revision-receipt.json. Setsid/timeouts/process-group kill throughout. No heavy/native/live trigger.
+
+Owner445 notified about additive formatter/types/row changes. PR67 stays3a; quotePR88 separate31a unchanged. Ready for samebe986 re-review via root; keep draft/head frozen after push.

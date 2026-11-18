@@ -61,6 +61,7 @@ export function AgentCardControls({
     message.body,
     message.tags,
     message.editSignerPubkey,
+    message.bodyRevision,
     identity?.pubkey,
   ]);
   const currentKey = React.useRef(key);
@@ -77,8 +78,8 @@ export function AgentCardControls({
   const invoker = React.useRef<HTMLButtonElement>(null);
   React.useEffect(() => {
     if (enabled && card && identity?.pubkey && relayScope)
-      reconcileHold(holdKey, token, card.source, card.state);
-  }, [enabled, holdKey, token, relayScope]);
+      reconcileHold(holdKey, token, card.source, card.state, message.bodyRevision);
+  }, [enabled, holdKey, token, relayScope, message.bodyRevision?.eventId, message.bodyRevision?.createdAt]);
   if (!enabled || !target || !communityId || !relayScope || activeCommunityId !== communityId)
     return null;
   const submit = async () => {
@@ -91,7 +92,7 @@ export function AgentCardControls({
     )
       return;
     setConfirmation(null);
-    const attemptId = claimHold(holdKey, target.command, token);
+    const attemptId = claimHold(holdKey, target.command, token, message.bodyRevision);
     if (!attemptId) return;
     let publishing = false;
     try {

@@ -1,6 +1,7 @@
 // Persist intent before publication. Never evict unresolved attempts or retry them.
 export const HOLD_STORAGE_KEY = "buzz.agent-control-holds.v1";
-type Hold = { id: string; intent: "stop" | "continue"; baseline: string; status: "sending" | "sent" | "unknown" };
+type Revision = {eventId: string; createdAt: number};
+type Hold = { revision?: Revision; id: string; intent: "stop" | "continue"; baseline: string; status: "sending" | "sent" | "unknown" };
 const listeners = new Set<() => void>();
 export const subscribeHolds = (notify: () => void) => {
   listeners.add(notify);
@@ -27,12 +28,12 @@ export function getHold(key: string): Hold | null {
   try { return read()[key] ?? null; }
   catch { return { id: "", intent: "stop", baseline: "", status: "unknown" }; }
 }
-export function claimHold(key: string, intent: Hold["intent"], baseline: string) {
+export function claimHold(key: string, intent: Hold["intent"], baseline: string, revision?: Revision) {
   try {
     const records = read();
     if (records[key] || Object.keys(records).length >= 128) return null;
     const id = crypto.randomUUID();
-    records[key] = { id, intent, baseline, status: "sending" };
+    records[key] = { id, intent, baseline, revision: validRevision(revision) ? revision : undefined, status: "sending" };
     write(records);
     return id;
   } catch { return null; }
@@ -46,9 +47,17 @@ export function updateHold(key: string, id: string, status: Hold["status"] | nul
     write(records);
   } catch { /* Retain the original durable intent when persistence fails. */ }
 }
-export function reconcileHold(key: string, token: string, source: string, state: string) {
+function validRevision(revision: Revision | undefined): revision is Revision {
+  return !!revision && /^[0-9a-f]{64}$/.test(revision.eventId) &&
+    Number.isSafeInteger(revision.createdAt) && revision.createdAt > 0;
+}
+export function reconcileHold(key: string, token: string, source: string, state: string, revision?: Revision) {
   const hold = getHold(key);
-  if (!hold || hold.baseline === token || source !== "jacob") return;
+  if (!hold || hold.baseline === token || source !== "jacob" ||
+      !validRevision(hold.revision) || !validRevision(revision) ||
+      revision.eventId === hold.revision.eventId ||
+      revision.createdAt <= hold.revision.createdAt) return;
+  // Ties, missing metadata and old views cannot establish a newer control cycle.
   if (hold.intent === "stop" ? ["stopped", "idle", "interrupted"].includes(state) : state === "continuation")
     updateHold(key, hold.id, null);
 }
