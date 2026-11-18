@@ -205,7 +205,7 @@ export function ChannelPage({
   void tick;
   return (
     <section
-      className="flex min-h-0 flex-1 flex-col gap-3"
+      className="flex h-full min-h-0 flex-col gap-3"
       aria-label="Channel Page"
     >
       <div className="flex items-center justify-between gap-2">
@@ -292,7 +292,7 @@ export function ChannelPage({
           sandbox="allow-scripts"
           referrerPolicy="no-referrer"
           srcDoc={pageDocument(html ?? "")}
-          className="min-h-96 w-full flex-1 border-0 bg-white"
+          className="min-h-0 w-full flex-1 border-0 bg-white"
         />
       ) : (
         <p className="text-sm text-muted-foreground">
