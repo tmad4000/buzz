@@ -1,3 +1,4 @@
+import { AgentRuntimeMenu } from "@/features/agent-runtime/AgentRuntimeMenu";
 import {
   Archive,
   Bell,
@@ -235,6 +236,7 @@ export function ChannelContextMenuItems({
 
   return (
     <>
+      <AgentRuntimeMenu channel={channel} />
       <CopyChannelSubmenu channel={channel} />
       {showMove ? (
         <MoveToSectionSubmenu

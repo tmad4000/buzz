@@ -3,6 +3,7 @@ import test, { beforeEach } from "node:test";
 import {
   isJacobSidebarScope,
   decodeSidebarDefaults,
+  upgradeDirectAgentsDefault,
 } from "./jacobChannelSectionDefaults.ts";
 import { SECTIONS_LANE, projectSections } from "./channelSectionsSync.ts";
 import { LaneStore, decodeDoc, encodeDoc } from "./sidebarLaneStore.ts";
@@ -127,4 +128,45 @@ test("a delayed legacy relay head overrides bootstrap placeholders", () => {
     projectSections(store.get()).sections.find((s) => s.id === "projects").name,
     "Renamed remotely",
   );
+});
+
+test("Direct agents updates only exact untouched seed section; authored edits and P2 survive", () => {
+  const defaults = decodeSidebarDefaults(payload);
+  const upgraded = upgradeDirectAgentsDefault(defaults, defaults);
+  assert.equal(
+    projectSections(upgraded).sections.find((s) => s.id === "paseo").name,
+    "Direct agents",
+  );
+  assert.deepEqual(upgraded.a, defaults.a);
+  assert.equal(
+    projectSections(mergeTrees(upgraded, defaults)).sections.find(
+      (s) => s.id === "paseo",
+    ).name,
+    "Direct agents",
+  );
+  assert.equal(upgradeDirectAgentsDefault(upgraded, defaults), upgraded);
+  for (const [field, value] of [
+    ["name", "My agents"],
+    ["name", "Paseo"],
+    ["order", 4],
+    ["icon", "⭐"],
+    ["live", false],
+  ]) {
+    const edited = setRegs(
+      field === "name" && value === "Paseo"
+        ? setRegs(defaults, [[["s", "paseo", "name"], "Temporary"]])
+        : defaults,
+      [[["s", "paseo", field], value]],
+      true,
+    );
+    assert.equal(upgradeDirectAgentsDefault(edited, defaults), edited);
+  }
+  const unrelated = decodeSidebarDefaults(
+    JSON.stringify({
+      version: 1,
+      sections: [{ id: "user", name: "Paseo", order: 0 }],
+      assignments: {},
+    }),
+  );
+  assert.equal(upgradeDirectAgentsDefault(unrelated, defaults), unrelated);
 });

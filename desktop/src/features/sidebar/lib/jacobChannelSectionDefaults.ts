@@ -1,7 +1,7 @@
 import { normalizeRelayUrl } from "@/shared/lib/normalizeRelayUrl";
 import { SECTIONS_LANE } from "./channelSectionsSync";
 import { decodeDoc } from "./sidebarLaneStore";
-import type { Tree } from "./sidebarLwwMap";
+import { isReg, LEGACY_DEV, type Tree } from "./sidebarLwwMap";
 
 const JACOB =
   "3eb6491e9fecd5e2c0221f76b79685a1478b591bf90ea155f5352ebe12672e1f";
@@ -24,4 +24,30 @@ export function decodeSidebarDefaults(plaintext: string): Tree {
     throw new Error("Invalid sidebar defaults");
   }
   return doc.tree;
+}
+
+/** Rename only the seed's untouched baseline, never an authored/legacy section. */
+export function upgradeDirectAgentsDefault(tree: Tree, defaults: Tree): Tree {
+  const sections = tree.s;
+  const baseline = defaults.s;
+  if (!sections || isReg(sections) || !baseline || isReg(baseline)) return tree;
+  let next = sections;
+  for (const [id, seed] of Object.entries(baseline)) {
+    if (!seed || isReg(seed) || !isReg(seed.name) || seed.name[2] !== "Paseo")
+      continue;
+    const node = sections[id];
+    if (!node || isReg(node) || !isReg(node.name) || node.name[2] !== "Paseo")
+      continue;
+    if (
+      !Object.values(node).every(
+        (r) => isReg(r) && r[0] === 0 && r[1] === LEGACY_DEV,
+      )
+    )
+      continue;
+    next = {
+      ...next,
+      [id]: { ...node, name: [0, "0000000000000001", "Direct agents"] },
+    };
+  }
+  return next === sections ? tree : { ...tree, s: next };
 }

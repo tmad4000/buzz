@@ -2,6 +2,7 @@ import * as React from "react";
 import { loadSidebarSectionDefaults } from "@/shared/api/tauri";
 import {
   decodeSidebarDefaults,
+  upgradeDirectAgentsDefault,
   isJacobSidebarScope,
 } from "./jacobChannelSectionDefaults";
 
@@ -69,7 +70,9 @@ export function useChannelSections(
           const defaults = decodeSidebarDefaults(plaintext);
           // Stable IDs/version-zero registers never overwrite authored edits or
           // tombstones. The existing lane persists and self-encrypts the result.
-          edit((prev) => mergeTrees(defaults, prev));
+          edit((prev) =>
+            upgradeDirectAgentsDefault(mergeTrees(defaults, prev), defaults),
+          );
         })
         .catch(() => {
           // The bundled encrypted seed remains the durable retry source. Surface
