@@ -99,7 +99,6 @@ export function ChannelScreen({
   targetMessageEvents, targetMessageId,
   ...searchTarget
 }: ChannelScreenProps) {
-  const { pageOpen, closePage, pageHeaderActions, pagePanel, requirePageEditResolution } = useChannelPageSurface(activeChannel, headerEndActions, registerPageLeaveGuard);
   const queryClient = useQueryClient();
   const { goHome } = useAppNavigation();
   const { activeCommunity } = useCommunities();
@@ -141,7 +140,10 @@ export function ChannelScreen({
     setProfilePanelView,
   } = useChannelPanelHistoryState();
   const [channelContentRef, channelContentWidthPx] =
-    useElementWidth<HTMLDivElement>();
+    useElementWidth<HTMLElement>();
+  const isNarrowPanelViewport = channelContentWidthPx > 0 && channelContentWidthPx < AUXILIARY_PANEL_SINGLE_COLUMN_BREAKPOINT_PX;
+  const { pageOpen, pageExpanded, onPageKeyDown, closePage, pageHeaderActions, pagePanel, requirePageEditResolution } =
+    useChannelPageSurface(activeChannel, headerEndActions, registerPageLeaveGuard, !isNarrowPanelViewport);
   const {
     canReset: canResetThreadPanelWidth,
     onResetWidth: handleThreadPanelWidthReset,
@@ -685,13 +687,9 @@ export function ChannelScreen({
   const shouldShowThreadSkeleton = Boolean(
     effectiveOpenThreadHeadId && activeChannel && !displayedThreadHeadMessage,
   );
-  const isNarrowPanelViewport =
-    channelContentWidthPx > 0 &&
-    channelContentWidthPx < AUXILIARY_PANEL_SINGLE_COLUMN_BREAKPOINT_PX;
-  const isSinglePanelView =
-    isNarrowPanelViewport &&
-    activeChannel?.channelType !== "forum" &&
-    hasAuxiliaryPanel;
+  const isSinglePanelView = pageExpanded ||
+    (isNarrowPanelViewport && activeChannel?.channelType !== "forum" && hasAuxiliaryPanel);
+  const pageTitle = pageExpanded ? `${activeChannelTitle} › Page` : "Page";
   const shouldCompactHeaderActions =
     hasAuxiliaryPanel &&
     channelContentWidthPx > 0 &&
@@ -801,9 +799,9 @@ export function ChannelScreen({
           }}
           open={emptyDeleteId !== null}
         />
-        <div
+        <section
           className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
-          ref={channelContentRef}
+          ref={channelContentRef} aria-label="Conversation content" onKeyDown={onPageKeyDown}
         >
           {activeChannel ? (
             activeChannel.channelType === "forum" ? (
@@ -812,7 +810,7 @@ export function ChannelScreen({
                 canResetPanelWidth={canResetThreadPanelWidth} channel={activeChannel}
                 currentPubkey={currentPubkey}
                 header={channelHeader}
-                pagePanel={pageOpen ? pagePanel : undefined} onClosePage={closePage} pageSinglePanel={isNarrowPanelViewport}
+                pagePanel={pageOpen ? pagePanel : undefined} onClosePage={closePage} pageSinglePanel={isNarrowPanelViewport} pageExpanded={pageExpanded} pageTitle={pageTitle}
                 onClosePost={onCloseForumPost} onCloseProfilePanel={handleCloseProfilePanel}
                 onOpenDm={handleOpenDm}
                 onOpenProfilePanel={handleOpenProfilePanel}
@@ -853,7 +851,7 @@ export function ChannelScreen({
                   idleAuxiliaryHeaderActions={pageOpen ? undefined : idleAuxiliaryHeaderActions}
                   idleAuxiliaryOverridesThread={pageOpen || idleAuxiliaryOverridesThread}
                   idleAuxiliaryPanel={pageOpen ? pagePanel : idleAuxiliaryPanel}
-                  idleAuxiliaryTitle={pageOpen ? "Page" : idleAuxiliaryTitle}
+                  idleAuxiliaryTitle={pageOpen ? pageTitle : idleAuxiliaryTitle}
                   {...{ onAddFiles }}
                   onAddAgent={handleOpenAddBot}
                   onBrowseChannels={openBrowseChannels}
@@ -882,7 +880,7 @@ export function ChannelScreen({
                   isMessageUnreadById={isMessageUnread}
                   isFollowingThread={isNotifiedForEffectiveThread}
                   isSending={sendMessageMutation.isPending}
-                  isSinglePanelView={isSinglePanelView}
+                  isSinglePanelView={isSinglePanelView} pageExpanded={pageExpanded}
                   isTimelineError={messagesQuery.isError} isTimelineLoading={isTimelineLoading}
                   onRetryTimeline={() => void messagesQuery.refetch()} messages={timelineMessages}
                   threadSummaries={threadSummaries}
@@ -984,7 +982,7 @@ export function ChannelScreen({
           ) : (
             <ChannelScreenEmptyState />
           )}
-        </div>
+        </section>
         <MembersSidebar
           channel={activeChannel}
           currentPubkey={currentPubkey}

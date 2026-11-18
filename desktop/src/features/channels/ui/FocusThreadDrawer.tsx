@@ -13,6 +13,7 @@ type FocusThreadDrawerProps = {
   children: React.ReactNode;
   /** Prevent a covered drawer from handling Escape before its overlay. */
   escapeEnabled?: boolean;
+  expanded?: boolean;
   /** Accessible name for the drawer. Channel threads leave the default. */
   label?: string;
   hasActiveEdit?: boolean;
@@ -187,6 +188,7 @@ export function FocusThreadDrawer({
   channelName,
   children,
   escapeEnabled = true,
+  expanded = false,
   label = "Thread",
   hasActiveEdit = false,
   onClose,
@@ -254,30 +256,32 @@ export function FocusThreadDrawer({
       ref={overlayRef}
       style={{ right: viewportRightInsetPx }}
     >
-      <motion.button
-        animate={{ opacity: 1 }}
-        aria-label={`Back to #${channelName}`}
-        className={cn(
-          "absolute inset-0 cursor-pointer transition-colors duration-150",
-          FOCUS_SCRIM_CLASS,
-          FOCUS_SCRIM_HOVER_CLASS,
-        )}
-        data-testid="focus-thread-drawer-scrim"
-        exit={{
-          opacity: 0,
-          transition: prefersReducedMotion
-            ? REDUCED_MOTION_TRANSITION
-            : { duration: SCRIM_EXIT_SECONDS, ease: "linear" },
-        }}
-        initial={{ opacity: 0 }}
-        onClick={onClose}
-        transition={
-          prefersReducedMotion
-            ? REDUCED_MOTION_TRANSITION
-            : { duration: SCRIM_ENTER_SECONDS, ease: "linear" }
-        }
-        type="button"
-      />
+      {!expanded && (
+        <motion.button
+          animate={{ opacity: 1 }}
+          aria-label={`Back to #${channelName}`}
+          className={cn(
+            "absolute inset-0 cursor-pointer transition-colors duration-150",
+            FOCUS_SCRIM_CLASS,
+            FOCUS_SCRIM_HOVER_CLASS,
+          )}
+          data-testid="focus-thread-drawer-scrim"
+          exit={{
+            opacity: 0,
+            transition: prefersReducedMotion
+              ? REDUCED_MOTION_TRANSITION
+              : { duration: SCRIM_EXIT_SECONDS, ease: "linear" },
+          }}
+          initial={{ opacity: 0 }}
+          onClick={onClose}
+          transition={
+            prefersReducedMotion
+              ? REDUCED_MOTION_TRANSITION
+              : { duration: SCRIM_ENTER_SECONDS, ease: "linear" }
+          }
+          type="button"
+        />
+      )}
 
       <motion.div
         animate={{ opacity: 1, x: 0 }}
@@ -288,7 +292,8 @@ export function FocusThreadDrawer({
           // share a radius — a smaller one here would put two radii on one
           // element. `shadow-panel-left` draws the left edge and its corners;
           // see the token for why a `border-l` cannot.
-          "absolute inset-y-0 right-0 flex flex-col overflow-hidden rounded-l-2xl bg-background shadow-panel-left outline-hidden",
+          "absolute inset-y-0 right-0 flex flex-col overflow-hidden bg-background outline-hidden",
+          !expanded && "rounded-l-2xl shadow-panel-left",
         )}
         aria-label={label}
         data-testid="focus-thread-drawer"
@@ -303,7 +308,7 @@ export function FocusThreadDrawer({
           x: travelPx,
         }}
         initial={{ opacity: 0, x: travelPx }}
-        style={{ left: THREAD_FOCUS_SLIVER_WIDTH_PX }}
+        style={{ left: expanded ? 0 : THREAD_FOCUS_SLIVER_WIDTH_PX }}
         transition={
           prefersReducedMotion ? REDUCED_MOTION_TRANSITION : ENTER_TRANSITION
         }

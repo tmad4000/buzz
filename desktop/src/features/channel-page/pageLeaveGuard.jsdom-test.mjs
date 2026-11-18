@@ -66,6 +66,7 @@ test("background Page veto targets only its own view, protects saves, and unregi
       channel,
       React.createElement("span", null, `Pane controls ${id}`),
       registrations[id],
+      true,
     );
     surfaces.set(id, surface);
     return React.createElement(
@@ -73,7 +74,7 @@ test("background Page veto targets only its own view, protects saves, and unregi
       { value: { viewInstanceId: id, focused: id === "b", visible: true } },
       React.createElement(
         "section",
-        { "data-view": id },
+        { "data-view": id, onKeyDown: surface.onPageKeyDown },
         surface.pageHeaderActions,
         surface.pagePanel,
       ),
@@ -101,6 +102,17 @@ test("background Page veto targets only its own view, protects saves, and unregi
     );
   await click("a", "Page");
   await click("b", "Page");
+  await click("a", "Expand");
+  assert.equal(surfaces.get("a").pageExpanded, true);
+  assert.equal(surfaces.get("b").pageExpanded, false);
+  await click("b", "Expand");
+  await act(async () =>
+    scope("a").dispatchEvent(
+      new dom.window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+    ),
+  );
+  assert.equal(surfaces.get("a").pageExpanded, false);
+  assert.equal(surfaces.get("b").pageExpanded, true);
   await click("a", "Create Page");
   await click("b", "Create Page");
   assert.equal(guards.get("a")(), true, "unchanged editor can leave");

@@ -7,9 +7,17 @@ const LINK_BRIDGE = `document.addEventListener('click', function(event) {
  if (!event.isTrusted || !href) return;
  if (href.startsWith('#')) { const target = document.getElementById(href.slice(1)); if (target) target.scrollIntoView(); return; }
  if (href.startsWith('https://') || href.startsWith('http://')) parent.postMessage({type:'buzz-page-link',href}, '*');
-}, true);`;
+}, true);
+document.addEventListener('keydown', function(event) {
+ if (!event.isTrusted || event.defaultPrevented || event.repeat) return;
+ if (event.key === 'Escape') parent.postMessage({type:'buzz-page-shortcut',action:'restore'}, '*');
+ if (event.metaKey && event.shiftKey && event.key.toLowerCase() === 'f') {
+   event.preventDefault();
+   parent.postMessage({type:'buzz-page-shortcut',action:'toggle'}, '*');
+ }
+});`;
 export const PAGE_CSP =
-  "default-src 'none'; script-src 'sha256-IfRkfubpC97dNSmIZE4pwWQJfp0RlfPFU83hJlJfJUs='; style-src 'unsafe-inline'; img-src data:; font-src data:; connect-src 'none'; media-src data:; frame-src 'none'; worker-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'";
+  "default-src 'none'; script-src 'sha256-9kWzf9rnNY44dqkcUTBs+h3nNmgjAbE8prQ0Ddx0SFk='; style-src 'unsafe-inline'; img-src data:; font-src data:; connect-src 'none'; media-src data:; frame-src 'none'; worker-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'";
 export function pageDocument(html: string): string {
   // A template is inert: parsing must not start image/frame requests before CSP applies.
   const template = document.createElement("template");

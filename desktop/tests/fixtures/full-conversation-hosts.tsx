@@ -80,7 +80,7 @@ const channel =
     ? { ...general, channelType: pageHost }
     : general;
 if (pageHost) {
-  const html = "<h1>Shared page</h1>";
+  const html = "<h1>Shared page</h1><button>Page control</button>";
   const publication = "00000000-0000-4000-8000-000000000001";
   const chunk = {
     id: "a".repeat(64),
