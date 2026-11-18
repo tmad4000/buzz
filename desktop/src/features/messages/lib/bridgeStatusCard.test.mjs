@@ -288,3 +288,34 @@ test("reviewer P1 reproduction: latest owner-signed Done body never inherits the
     "an edited TimelineMessage without provenance fails closed",
   );
 });
+
+test("current producer unsigned fixture projects exact body and lowest-ID equal-time edit independently of input order", async () => {
+  const {readFileSync} = await import("node:fs");
+  const fixture = JSON.parse(readFileSync(new URL("./bridgeStatusCard.contract-fixture.json", import.meta.url)));
+  assert.equal(fixture.cryptographicVerification, false);
+  const {formatTimelineMessages} = await import("./formatTimelineMessages.ts");
+  const original = fixture.original;
+  const low = {...fixture.revisions[0], id:"1".repeat(64)};
+  const high = {...fixture.revisions[1], id:"f".repeat(64), created_at:low.created_at};
+  for (const edits of [[low,high],[high,low]]) {
+    const result = formatTimelineMessages([original,...edits],null).find(m=>m.id===original.id);
+    assert.equal(result.body,low.content);
+    assert.equal(parseBridgeStatusCard(result).label,"✅ Reported done");
+  }
+  const later = {...high,created_at:low.created_at+1};
+  const selectedLater = formatTimelineMessages([original,low,later],null).find(m=>m.id===original.id);
+  assert.equal(selectedLater.body,later.content);
+  const deletion = {id:"9".repeat(64),kind:5,pubkey:original.pubkey,created_at:low.created_at+2,content:"",tags:[["e",low.id]]};
+  const reverted = formatTimelineMessages([original,high,low,deletion],null).find(m=>m.id===original.id);
+  assert.equal(reverted.body,high.content);
+  const originalMessage = formatTimelineMessages([original],null)[0];
+  assert.equal(parseBridgeStatusCard(originalMessage).agentId, fixture.expected.afterFirstRevision.agentId);
+  assert.ok(parseBridgeStatusCard({...originalMessage,body:fixture.metadataUnavailableExampleContent}).metadataUnavailable);
+  for (const body of [
+    original.content+"\n",
+    original.content.replace("Example agent","x".repeat(161)),
+    original.content.replace("example-model","x".repeat(81)),
+    original.content.replace("example-provider","x".repeat(41)),
+    original.content.replace("Example agent","bad\tlabel"),
+  ]) assert.equal(parseBridgeStatusCard({...originalMessage,body}),null);
+});

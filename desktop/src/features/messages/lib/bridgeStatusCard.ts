@@ -46,6 +46,11 @@ export function parseBridgeStatusCard(message: TimelineMessage) {
   if (!source) return null;
   const header = /^(.*?) — (.+) · (.+) \((.+)\)$/.exec(lines[0]);
   if (!header || !Object.hasOwn(LABELS, header[1])) return null;
+  if ([160, 80, 40].some((limit, index) => {
+    const label = header[index + 2];
+    return !label.trim() || label.length > limit ||
+      Array.from(label).some(char => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127);
+  })) return null;
   if (
     (header[1] === "❓ Needs Jacob" ||
       header[1] === "✅ Done" ||
@@ -56,7 +61,7 @@ export function parseBridgeStatusCard(message: TimelineMessage) {
   if (header[1] === "⚠️ Agent response overdue" && source !== "watchdog")
     return null;
   if (
-    lines[4] &&
+    lines.length === 5 &&
     !/^Metadata unavailable; last verified at Unix \d+$/.test(lines[4])
   )
     return null;
