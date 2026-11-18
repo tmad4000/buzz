@@ -4,6 +4,7 @@ import { threadParentQuote } from "./threadParentQuote.ts";
 
 const parent = {
   id: "parent",
+  tags: [["h","channel"]],
   body: "Latest edited first line\nPrivate second line",
 };
 const messages = new Map([[parent.id, parent]]);
@@ -57,4 +58,21 @@ test("cross-channel or ambiguous channel tags never expose a parent chip", () =>
     ),
     null,
   );
+});
+
+test("conflicting or duplicate ancestry never asserts a jump; out-of-scope loaded parents become neutral stubs", () => {
+  for (const tag of [
+    ["e","other","","reply"], ["e","other","","root"],
+    ["e","parent","","reply"], ["e","root","","root"],
+  ]) assert.equal(threadParentQuote({...reply,tags:[...reply.tags,tag]},messages,"channel"),null);
+  assert.equal(threadParentQuote({...reply,kind:40003},messages,"channel"),null);
+  for(const candidate of [
+    {...parent,tags:[["h","other"]]},
+    {...parent,tags:[["h","channel"],["h","channel"]]},
+    {...parent,id:"wrong"},
+  ]) {
+    const quote=threadParentQuote(reply,new Map([["parent",candidate]]),"channel");
+    assert.equal(quote.parentLoaded,false);
+    assert.equal(quote.excerpt,"reply to earlier message");
+  }
 });
