@@ -1,7 +1,7 @@
 # Forward to agent — separate .9 source delivery
 
 Draft PR: https://github.com/tmad4000/buzz/pull/85
-Initial feature commit: `78e71a621`. Current follow-up addresses all nine review findings; exact head is the PR branch tip.
+Initial feature commit: `78e71a621`. Current TS-only checkpoint implements root’s C1 roster-authority plan. C3 PENDING NATIVE CHECK; no new Rust source change in this checkpoint.
 
 Owner: Sol session5e7bc9da. Worktree `/home/dev/agent-worktrees/forward-to-agent-20261118`; branch `sol/forward-to-agent-20261118`. Stacked on Direct Agents PR81 via included display-only product fix `daf6e9dbbb4d8874a38bf41bb0e018f7c765dacf`. Current PR81 head7998e81a8 adds only expanded tests/evidence/docs over independently SOURCE-GO18f8599a; no product-source difference. That base descends from the requested .8 tag69eda1ff (peeled source16fa57df).
 
@@ -73,3 +73,14 @@ Note/recovery interaction: confirmed marker-save failure no longer tells users t
 Merged PR81 exact7998e81a88134a03f578175c29eed20daecef5e0 (expanded production regression/validation/M5 documentation only; display-only product code unchanged). Independent19ed01b1 SOURCE GO/P1 resolved at that exact base: https://github.com/tmad4000/buzz/pull/81#issuecomment-6972530035 . It independently confirmed historical RED → stamp1 RED → display-only GREEN. Only DELIVERY.md conflicted; this forwarding report was preserved. Updated forward stack reruns the three new label-convergence regressions alongside its91 focused checks. The PR81 source gate is resolved; PR85 still needs14632ddb exact-head source disposition and separate captain native/release acceptance.
 
 Final restacked validation PASS: TypeScript and94/94 focused tests (91 forward/shared/API/sidebar checks plus3 PR81 production label regressions), under the existing bounded process-group runner. Rustfmt/Biome/diff PASS. Af293993 and fd0be4cf rechecked exact staged scope/key-set/legacy compatibility corrections and found no additional concrete blocker in their bounded ownership review; no native jobs run. Independent14632ddb exact-head review remains required. All product behavior is still default-OFF; native compile/actual IPC acceptance remains explicitly unverified.
+
+
+## TS-first checkpoint — C3 PENDING NATIVE CHECK
+
+Root directed C1 to work entirely in TypeScript against the ACTUAL native detail IPC: member_count0, missing participant_pubkeys/member arrays. The complete authoritative writer kind39002 roster alone supplies count, signer presence, unique member keys and normalized targetChannel member/DM participant arrays. Metadata count/roster hints are not membership authority. Forwarding requires terminal next_cursor:null and refuses partial or malformed roster completion. C2 unconditional consent and C4 reference-only primary/cancel-dismiss-success note clearing remain unchanged and tested.
+
+The zero-count IPC test was RED before this change and now covers the real API → audience validation → production DM recipient path. This checkpoint changes ONLY TS/tests/docs relative to published94e4d2c, leaving its previously SOURCE-reviewed native code untouched. It is NOT native validation: C3 remains pending a captain-approved check. The separate LOCAL branch sol/forward-agent-c3-pending-20261118 at155b3f11fe4dded6f739b7512adff64597f33b4e narrows native C3 by removing C1 model/converter changes; it is not pushed. Its three projection/model/test files match frozen7998 exactly, and only commands/channels.rs differs natively from the base.
+
+Captain9888b74e explicitly returned HOLD: no cargo, no installs, no alternate-Mac/native grant; GTK3/WebKitGTK4.1/ALSA dev prerequisites are absent. No cargo was invoked. Per root's delayed-slot option this TS-only checkpoint is pushed clearly marked C3 PENDING NATIVE CHECK; root/captain must scope an existing-toolchain/cache audit and meaningful offline C3 subset or leave native validation pending. Keep draft/default-OFF/no integration.
+
+TS-first checkpoint validation: typecheck and95/95 focused tests PASS with bounded process-group cleanup; changed-file Biome/diff PASS. This commit adds no Rust changes over94e4d2c. Existing absolute1.95 toolchain binaries were found by read-only audit, but exact locked serde/serde_json subset sources/archives are absent from default and activated Hermit Cargo homes; no cargo command or installer was invoked. Captain HOLD continues, C3 PENDING NATIVE CHECK, no integration/release acceptance.

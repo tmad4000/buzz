@@ -10,6 +10,7 @@ const self = "a".repeat(64),
 function api() {
   const calls = [];
   let visibility = "private";
+  let nextCursor = null;
   // Raw IPC detail contract, not a pre-populated frontend Channel fixture.
   const raw = (id) => ({
     id,
@@ -19,10 +20,7 @@ function api() {
     description: "",
     topic: null,
     purpose: null,
-    member_count: 2,
-    member_pubkeys: [self, agent],
-    participants: id === "dm" ? [self, agent] : [],
-    participant_pubkeys: id === "dm" ? [self, agent] : [],
+    member_count: 0, // Actual old native IPC: no participant/member arrays.
     archived_at: null,
     created_by: self,
     created_at: "2026-11-18",
@@ -56,7 +54,7 @@ function api() {
                       is_agent: true,
                     },
                   ],
-                  next_cursor: null,
+                  next_cursor: nextCursor,
                 };
               throw Error(command);
             },
@@ -68,6 +66,9 @@ function api() {
   return {
     io: module.exports,
     calls,
+    partial: () => {
+      nextCursor = "more";
+    },
     open: () => {
       visibility = "open";
     },
@@ -225,5 +226,14 @@ test("legacy metadata-only reads retain zero count and omit the newly added rost
   assert.equal(
     (detail.match(/skip_serializing_if = "Vec::is_empty"/g) ?? []).length,
     3,
+  );
+});
+
+test("complete-roster preflight refuses a paginated response from the actual native API boundary", async () => {
+  const h = api();
+  h.partial();
+  await assert.rejects(
+    readForwardAudiences("p2", "dm", self, "https://relay.test", h.io),
+    /complete writer roster/,
   );
 });
