@@ -9,6 +9,16 @@ import 'package:uuid/uuid.dart';
 
 import '../../../shared/relay/relay.dart';
 
+/// Runs recipient consent only after the raw authored capture is durable.
+typedef OutboxPreparation = Future<Map<String, dynamic>?> Function();
+
+/// Raw capture is safe, but an interrupted preflight must be reviewed explicitly.
+class OutboxNeedsReview implements Exception {
+  const OutboxNeedsReview();
+  @override
+  String toString() => 'Saved in Outbox. Review before sending.';
+}
+
 /// An attachment whose original bytes must be committed before clearing a draft.
 class OutboxAttachment {
   final XFile file;
@@ -150,8 +160,9 @@ class MessageOutbox extends ChangeNotifier {
   /// Copy every selected byte, then commit metadata; only then may the UI clear.
   Future<OutboxItem> enqueue(
     Map<String, dynamic> message,
-    List<OutboxAttachment> files,
-  ) async {
+    List<OutboxAttachment> files, {
+    OutboxPreparation? prepare,
+  }) async {
     await open();
     final row = await _mutate(() async {
       final id = const Uuid().v4();
@@ -171,7 +182,8 @@ class MessageOutbox extends ChangeNotifier {
         'attachments': attachments,
         'signedIds': <String>[],
         'signed': null,
-        'state': 'waiting',
+        'state': prepare == null ? 'waiting' : 'editing',
+        'needsReview': prepare != null,
         'retryAt': 0,
         'attempts': 0,
         'uncertain': false,
@@ -179,8 +191,36 @@ class MessageOutbox extends ChangeNotifier {
       await _write(row);
       return row;
     });
+    final prepared = await _prepareCapture(row, prepare);
     wake();
-    return row;
+    return prepared;
+  }
+
+  Future<OutboxItem> _prepareCapture(
+    OutboxItem row,
+    OutboxPreparation? prepare,
+  ) async {
+    if (prepare == null) return row;
+    try {
+      if (_closed) throw const OutboxNeedsReview();
+      final payload = await prepare();
+      if (_closed || payload == null) throw const OutboxNeedsReview();
+      final next = row.patch({
+        // Preparation can change recipients, never the captured destination/bytes.
+        'mentions': payload['mentions'],
+        'mediaTags': payload['mediaTags'],
+        'mentionKeys': payload['mentionKeys'],
+        'needsReview': false,
+        'state': 'waiting',
+        'error': null,
+      });
+      await _checkpoint(row, next);
+      return next;
+    } catch (_) {
+      // Initial checkpoint is paused and recoverable even if preparation fails,
+      // the editor disappears, or the process stops during its asynchronous work.
+      throw const OutboxNeedsReview();
+    }
   }
 
   Future<List<Map<String, dynamic>>> _copyFiles(
@@ -219,6 +259,11 @@ class MessageOutbox extends ChangeNotifier {
       _checkMutable(id);
       final row = _rows[id];
       if (row == null) return;
+      if (row.data['needsReview'] == true) {
+        throw StateError(
+          'Review recipients before sending this saved capture.',
+        );
+      }
       await _write(
         row.patch({'state': 'waiting', 'error': null, 'retryAt': 0}),
       );
@@ -246,8 +291,9 @@ class MessageOutbox extends ChangeNotifier {
   Future<void> edit(
     OutboxItem expected,
     Map<String, dynamic> payload,
-    List<OutboxAttachment> files,
-  ) async {
+    List<OutboxAttachment> files, {
+    OutboxPreparation? prepare,
+  }) async {
     final attachments = await _copyFiles(
       Directory('${directory.path}/${expected.id}'),
       files,
@@ -255,7 +301,8 @@ class MessageOutbox extends ChangeNotifier {
     final next = expected.patch({
       ...payload,
       'attachments': attachments,
-      'state': 'waiting',
+      'state': prepare == null ? 'waiting' : 'editing',
+      'needsReview': prepare != null,
       'error': null,
       'retryAt': 0,
       'signed': null,
@@ -263,6 +310,7 @@ class MessageOutbox extends ChangeNotifier {
       'uncertain': false,
     });
     await _checkpoint(expected, next);
+    await _prepareCapture(next, prepare);
     wake();
   }
 

@@ -962,6 +962,7 @@ class ThreadDetailPage extends HookConsumerWidget {
                               mediaTags = const [],
                               attachments = const <OutboxAttachment>[],
                               mentionKeys = const <String, String>{},
+                              prepare,
                             }) async {
                               final author = queueAuthor;
                               if (author == null) {
@@ -985,7 +986,11 @@ class ThreadDetailPage extends HookConsumerWidget {
                                 rootId: effectiveRootId,
                               );
                               final outbox = await durableOutbox;
-                              await outbox.enqueue(message, attachments);
+                              await outbox.enqueue(
+                                message,
+                                attachments,
+                                prepare: prepare,
+                              );
                             },
                         onSend:
                             (

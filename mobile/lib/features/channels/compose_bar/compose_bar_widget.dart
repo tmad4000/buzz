@@ -577,55 +577,78 @@ class ComposeBar extends HookConsumerWidget {
         // refuse to run after a switch, so an Invite answered after a switch
         // cannot add people in the new community.
         final channelActions = ref.read(channelActionsProvider);
-        final _NonMemberMentionScan scan;
-        try {
-          scan = onQueue != null && sessionStatus != SessionStatus.connected
-              ? _NonMemberMentionScan(
-                  channelId: channelId,
-                  outside: const [],
-                  canAddMembers: false,
-                  isDm: false,
-                )
-              : await _scanNonMemberMentions(
-                  ref,
-                  channelId: channelId,
-                  selectedMentions: selectedMentions,
-                  currentPubkey: currentPubkey,
-                );
-        } catch (_) {
-          // Nothing was sent and the draft is untouched, so Retry sends it again.
-          messenger?.showSnackBar(
-            SnackBar(
-              content: const Text(
-                'Message not sent: could not check who is in this channel',
-              ),
-              action: SnackBarAction(
-                label: 'Retry',
-                onPressed: () => unawaited(send()),
-              ),
-            ),
+        Future<_NonMemberMentionScan?> prepareMentionScan() =>
+            _prepareComposerMentionScan(
+              context: context,
+              ref: ref,
+              channelId: channelId,
+              selectedMentions: selectedMentions,
+              currentPubkey: currentPubkey,
+              sessionStatus: sessionStatus,
+              durable: onQueue != null,
+              outgoing: outgoing,
+              messenger: messenger,
+              retry: () => unawaited(send()),
+            );
+
+        if (onQueue case final queue?) {
+          final keys = {
+            for (final entry in mentionMap.value.entries)
+              entry.key: entry.value.pubkey,
+          };
+          final capturedDraft = (
+            keys: keys,
+            pubkeys: List<String>.of(outgoing.pubkeys),
+            tags: buildCustomEmojiTags(text, customEmoji),
+            retire: ref
+                .read(composeDraftsProvider.notifier)
+                .captureRetirement(draftKey, controller.text, keys),
           );
+          final lease = entryLease!;
+          entryLease = null;
+          isSending.value = true;
+          try {
+            await _handoffDurableDraft(
+              lease: lease,
+              context: context,
+              queue: queue,
+              text: text,
+              attachments: capturedFiles,
+              draft: capturedDraft,
+              isDraftCurrent: () =>
+                  draftRevision.value == submittedDraftRevision,
+              clearComposer: clearComposer,
+              prepare: () async {
+                // Called by the writer AFTER its paused raw-byte checkpoint.
+                final scan = await prepareMentionScan();
+                if (scan == null ||
+                    !context.mounted ||
+                    draftRevision.value != submittedDraftRevision)
+                  return null;
+                await outgoing.addNonMembers(
+                  channelActions,
+                  scan: scan,
+                  messenger: messenger,
+                );
+                if (!context.mounted ||
+                    draftRevision.value != submittedDraftRevision)
+                  return null;
+                return (
+                  keys: keys,
+                  pubkeys: List<String>.of(outgoing.pubkeys),
+                  tags: [...capturedDraft.tags, ...outgoing.referenceTags],
+                  retire: capturedDraft.retire,
+                );
+              },
+            );
+          } catch (error) {
+            if (context.mounted)
+              uploadError.value = _composeSendErrorMessage(error);
+          }
           return;
         }
-
-        // DMs keep outside mentions as references; channels ask before inviting.
-        if (scan.outside.isNotEmpty && scan.isDm) {
-          outgoing.resolveOutsideChoice(
-            _NonMemberMentionChoice.sendWithoutInviting,
-            scan.outside,
-          );
-        } else if (scan.outside.isNotEmpty) {
-          if (!context.mounted) return;
-          final choice = await _promptNonMemberMention(
-            context,
-            names: [for (final candidate in scan.outside) candidate.label],
-            canInvite: scan.canAddMembers,
-          );
-          if (choice == null) {
-            return;
-          }
-          outgoing.resolveOutsideChoice(choice, scan.outside);
-        }
+        final scan = await prepareMentionScan();
+        if (scan == null) return;
 
         final queuedAttachments = capturedFiles;
 
@@ -638,43 +661,6 @@ class ComposeBar extends HookConsumerWidget {
         isSending.value = true;
         try {
           if (!context.mounted) return;
-          if (onQueue case final queue?) {
-            final lease = entryLease!;
-            entryLease = null;
-            await _handoffDurableDraft(
-              lease: lease,
-              context: context,
-              queue: queue,
-              text: text,
-              attachments: queuedAttachments,
-              isDraftCurrent: () =>
-                  draftRevision.value == submittedDraftRevision,
-              clearComposer: clearComposer,
-              prepare: () async {
-                await addMentionedNonMembers();
-                if (!context.mounted ||
-                    draftRevision.value != submittedDraftRevision) {
-                  return null;
-                }
-                final keys = {
-                  for (final entry in mentionMap.value.entries)
-                    entry.key: entry.value.pubkey,
-                };
-                return (
-                  keys: keys,
-                  pubkeys: List<String>.of(outgoing.pubkeys),
-                  tags: [
-                    ...buildCustomEmojiTags(text, customEmoji),
-                    ...outgoing.referenceTags,
-                  ],
-                  retire: ref
-                      .read(composeDraftsProvider.notifier)
-                      .captureRetirement(draftKey, controller.text, keys),
-                );
-              },
-            );
-            return;
-          }
           if (queuedAttachments.isEmpty) {
             if (!context.mounted) return;
             await _sendTextOnlyDraft(

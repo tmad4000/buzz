@@ -16,15 +16,10 @@ Future<void> _handoffDurableDraft({
   required OutboxFileLease lease,
   required bool Function() isDraftCurrent,
   required VoidCallback clearComposer,
+  required _DurableDraft draft,
   required Future<_DurableDraft?> Function() prepare,
 }) async {
   try {
-    final draft = await prepare();
-    if (draft == null) {
-      lease.release();
-      if (!context.mounted) await _deleteOwnedAttachments(attachments);
-      return;
-    }
     final files = [
       for (final file in attachments)
         OutboxAttachment(file.file, file.kind.name, duration: file.duration),
@@ -35,6 +30,16 @@ Future<void> _handoffDurableDraft({
       attachments: files,
       mediaTags: draft.tags,
       mentionKeys: draft.keys,
+      prepare: () async {
+        final prepared = await prepare();
+        return prepared == null
+            ? null
+            : {
+                'mentions': prepared.pubkeys,
+                'mediaTags': prepared.tags,
+                'mentionKeys': prepared.keys,
+              };
+      },
     );
     Future<void> detachedCommitted() async {
       try {
@@ -47,11 +52,19 @@ Future<void> _handoffDurableDraft({
 
     try {
       await commit();
+    } on OutboxNeedsReview {
+      // This is a durable paused row, not a failed copy. Never enqueue it again.
     } catch (_) {
       if (!context.mounted) {
         unawaited(
           recoverDetachedOutboxCapture(
-            commit: commit,
+            commit: () async {
+              try {
+                await commit();
+              } on OutboxNeedsReview {
+                // A retry finished copying but could not finish preparation.
+              }
+            },
             committed: detachedCommitted,
           ),
         );

@@ -80,7 +80,9 @@ class OutboxRows extends ConsumerWidget {
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
-                                    row.state == 'editing'
+                                    row.data['needsReview'] == true
+                                        ? 'Review before sending — saved here'
+                                        : row.state == 'editing'
                                         ? 'Editing — send paused'
                                         : row.error != null
                                         ? 'Waiting to retry'
@@ -109,7 +111,9 @@ class OutboxRows extends ConsumerWidget {
                             Wrap(
                               children: [
                                 TextButton(
-                                  onPressed: outbox.publishing.contains(row.id)
+                                  onPressed:
+                                      row.data['needsReview'] == true ||
+                                          outbox.publishing.contains(row.id)
                                       ? null
                                       : () => _action(
                                           context,
@@ -123,7 +127,11 @@ class OutboxRows extends ConsumerWidget {
                                           outbox.publishing.contains(row.id)
                                       ? null
                                       : () => _edit(context, ref, outbox, row),
-                                  child: const Text('Edit'),
+                                  child: Text(
+                                    row.data['needsReview'] == true
+                                        ? 'Review'
+                                        : 'Edit',
+                                  ),
                                 ),
                                 TextButton(
                                   onPressed: outbox.publishing.contains(row.id)
@@ -226,13 +234,19 @@ class OutboxRows extends ConsumerWidget {
                     mediaTags = const [],
                     attachments = const [],
                     mentionKeys = const {},
+                    prepare,
                   }) async {
-                    await outbox.edit(paused, {
-                      'text': text,
-                      'mentions': mentions,
-                      'mediaTags': mediaTags,
-                      'mentionKeys': mentionKeys,
-                    }, attachments);
+                    await outbox.edit(
+                      paused,
+                      {
+                        'text': text,
+                        'mentions': mentions,
+                        'mediaTags': mediaTags,
+                        'mentionKeys': mentionKeys,
+                      },
+                      attachments,
+                      prepare: prepare,
+                    );
                     if (sheetContext.mounted) Navigator.of(sheetContext).pop();
                   },
             ),

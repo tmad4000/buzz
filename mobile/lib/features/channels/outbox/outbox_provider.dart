@@ -12,6 +12,7 @@ import '../channel.dart';
 import '../channel_messages_provider.dart';
 import '../send_message_provider.dart';
 import 'message_outbox.dart';
+import 'deletion_receipt.dart';
 
 /// Application-owned, independent of any composer/channel lifetime or cache.
 final messageOutboxProvider = FutureProvider<MessageOutbox>((ref) async {
@@ -225,22 +226,28 @@ class _MobileOutboxTransport implements OutboxTransport {
         NostrFilter(
           kinds: const [5, 9005],
           tags: {'#e': ids.skip(offset).take(100).toList()},
-          limit: 1,
+          limit: 100,
           extensions: const {'consistency': 'strong'},
         ),
       ]);
       check(item);
-      for (final receipt in receipts) {
-        verifyOutboxReceipt(receipt);
-      }
-      if (receipts.any(
-        (event) =>
-            (event.kind == 5 || event.kind == 9005) &&
-            event.tags.any(
-              (tag) => tag.length > 1 && tag[0] == 'e' && ids.contains(tag[1]),
-            ),
-      )) {
+      final authorities = [
+        for (final receipt in receipts)
+          verifiedOutboxDeletion(
+            receipt,
+            owner: item.author,
+            channel: item.channelId,
+            signedIds: ids.skip(offset).take(100).toSet(),
+          ),
+      ];
+      if (authorities.contains(OutboxDeletion.owner)) {
         return (event: null, deleted: true);
+      }
+      if (authorities.contains(OutboxDeletion.authorityUnknown) ||
+          receipts.length >= 100) {
+        throw StateError(
+          'Deletion authority or coverage is unresolved; original data retained.',
+        );
       }
     }
     return (event: null, deleted: false);
@@ -254,6 +261,24 @@ class _MobileOutboxTransport implements OutboxTransport {
 
   @override
   void accepted(OutboxItem item, NostrEvent event) => onAccepted(item, event);
+}
+
+/// Only an authenticated, correctly scoped owner receipt can retire raw data.
+OutboxDeletion verifiedOutboxDeletion(
+  NostrEvent event, {
+  required String owner,
+  required String channel,
+  required Set<String> signedIds,
+}) {
+  verifyOutboxReceipt(event);
+  return outboxDeletionAuthority(
+    kind: event.kind,
+    author: event.pubkey,
+    tags: event.tags,
+    owner: owner,
+    channel: channel,
+    signedIds: signedIds,
+  );
 }
 
 /// Invalid relay evidence must fail lookup, never authorize replacement signing.

@@ -127,6 +127,85 @@ void main() {
   });
 
   test(
+    'preflight sees a durable paused capture and Retry cannot bypass consent',
+    () async {
+      var queue = await store();
+      final original = await File(
+        '${directory.path}/camera.png',
+      ).writeAsBytes([4, 5, 6]);
+      final entered = Completer<void>();
+      final decision = Completer<Map<String, dynamic>?>();
+      final pending = queue.enqueue(
+        message('caption', parent: 'parent', root: 'root'),
+        [OutboxAttachment(XFile(original.path), 'image')],
+        prepare: () async {
+          entered.complete();
+          return decision.future;
+        },
+      );
+      final result = expectLater(pending, throwsA(isA<OutboxNeedsReview>()));
+      await entered.future;
+      final capture = queue.items.single;
+      expect(capture.state, 'editing');
+      expect(capture.data['needsReview'], isTrue);
+      expect(
+        await File(capture.attachments.single['path'] as String).readAsBytes(),
+        [4, 5, 6],
+      );
+      expect(
+        await File('${directory.path}/${capture.id}/message.json').exists(),
+        isTrue,
+      );
+      await expectLater(queue.retry(capture.id), throwsStateError);
+      // Navigation cancels the UI preflight; its own original may now disappear.
+      await original.delete();
+      decision.complete(null);
+      await result;
+      await queue.close();
+      queue = await store();
+      expect(queue.items.single.text, 'caption');
+      expect(queue.items.single.parentId, 'parent');
+      expect(queue.items.single.rootId, 'root');
+      expect(queue.items.single.data['needsReview'], isTrue);
+      await expectLater(queue.retry(capture.id), throwsStateError);
+      final paused = await queue.pause(capture.id);
+      await queue.edit(
+        paused,
+        {'text': 'reviewed caption'},
+        [],
+        prepare: () async => {
+          'mentions': <String>[],
+          'mediaTags': <List<String>>[],
+          'mentionKeys': <String, String>{},
+        },
+      );
+      expect(queue.items.single.data['needsReview'], isFalse);
+      expect(queue.items.single.state, 'waiting');
+      expect(queue.items.single.text, 'reviewed caption');
+    },
+  );
+
+  test(
+    'preflight exception retains its original capture without publishing',
+    () async {
+      final queue = await store();
+      final transport = Transport();
+      queue.useTransport(transport);
+      await expectLater(
+        queue.enqueue(
+          message('retain after check failure'),
+          [],
+          prepare: () async => throw StateError('membership unavailable'),
+        ),
+        throwsA(isA<OutboxNeedsReview>()),
+      );
+      expect(queue.items.single.data['needsReview'], isTrue);
+      expect(transport.published, isEmpty);
+      await expectLater(queue.retry(queue.items.single.id), throwsStateError);
+    },
+  );
+
+  test(
     'raw bytes and text survive closing and reopening independently of source file',
     () async {
       final original = File('${directory.path}/source.png');

@@ -528,6 +528,11 @@ Future<_NonMemberMentionScan> _scanNonMemberMentions(
   final channel = (await ref.read(
     channelsProvider.future,
   )).firstWhere((candidate) => candidate.id == channelId);
+  if (!ref.context.mounted) {
+    throw StateError(
+      'Composer closed; review the saved capture before sending.',
+    );
+  }
 
   // A DM decides who is inside it the way its send does: by current
   // membership, or by the channel metadata when membership is unavailable.
@@ -638,10 +643,74 @@ class _OutgoingMentions {
       canAddMembers: scan.canAddMembers,
     );
     demote(outcome.notAdded);
-    if (outcome.errors.isNotEmpty) {
+    if (outcome.errors.isNotEmpty && messenger?.mounted == true) {
       messenger?.showSnackBar(
         SnackBar(content: Text(outcome.errors.join(' '))),
       );
     }
   }
+}
+
+Future<_NonMemberMentionScan?> _prepareComposerMentionScan({
+  required BuildContext context,
+  required WidgetRef ref,
+  required String channelId,
+  required List<MentionCandidate> selectedMentions,
+  required String? currentPubkey,
+  required SessionStatus sessionStatus,
+  required bool durable,
+  required _OutgoingMentions outgoing,
+  required ScaffoldMessengerState? messenger,
+  required VoidCallback retry,
+}) async {
+  if (!context.mounted) return null;
+  final _NonMemberMentionScan scan;
+  try {
+    scan = durable && sessionStatus != SessionStatus.connected
+        ? _NonMemberMentionScan(
+            channelId: channelId,
+            outside: const [],
+            canAddMembers: false,
+            isDm: false,
+          )
+        : await _scanNonMemberMentions(
+            ref,
+            channelId: channelId,
+            selectedMentions: selectedMentions,
+            currentPubkey: currentPubkey,
+          );
+  } catch (_) {
+    // Nothing was sent and the draft is untouched, so Retry sends it again.
+    if (!durable && context.mounted)
+      messenger?.showSnackBar(
+        SnackBar(
+          content: const Text(
+            'Message not sent: could not check who is in this channel',
+          ),
+          action: SnackBarAction(label: 'Retry', onPressed: retry),
+        ),
+      );
+    return null;
+  }
+
+  // DMs keep outside mentions as references; channels ask before inviting.
+  if (scan.outside.isNotEmpty && scan.isDm) {
+    outgoing.resolveOutsideChoice(
+      _NonMemberMentionChoice.sendWithoutInviting,
+      scan.outside,
+    );
+  } else if (scan.outside.isNotEmpty) {
+    if (!context.mounted) return null;
+    final choice = await _promptNonMemberMention(
+      context,
+      names: [for (final candidate in scan.outside) candidate.label],
+      canInvite: scan.canAddMembers,
+    );
+    if (choice == null) {
+      return null;
+    }
+    outgoing.resolveOutsideChoice(choice, scan.outside);
+  }
+
+  return scan;
 }

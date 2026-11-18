@@ -88,4 +88,5 @@ typedef ComposeBarOnQueue =
       List<List<String>> mediaTags,
       List<OutboxAttachment> attachments,
       Map<String, String> mentionKeys,
+      OutboxPreparation? prepare,
     });

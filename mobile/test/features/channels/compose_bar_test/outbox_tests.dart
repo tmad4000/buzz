@@ -19,6 +19,7 @@ void outboxTests() {
                 mediaTags = const [],
                 attachments = const [],
                 mentionKeys = const {},
+                prepare,
               }) async {
                 captured.add(text);
                 await commit.future;
@@ -64,6 +65,7 @@ void outboxTests() {
               mediaTags = const [],
               attachments = const [],
               mentionKeys = const {},
+              prepare,
             }) async {
               throw const FileSystemException('disk unavailable');
             },
@@ -103,6 +105,7 @@ void outboxTests() {
                 mediaTags = const [],
                 attachments = const [],
                 mentionKeys = const {},
+                prepare,
               }) async {
                 started.complete(attachments);
                 await commit.future;
@@ -129,6 +132,94 @@ void outboxTests() {
         await Future<void>.delayed(const Duration(milliseconds: 100));
       });
       expect(OutboxFileLease.owns(files.single.file.path), isFalse);
+    },
+  );
+  testWidgets(
+    'detach during preflight keeps the already copied capture paused',
+    (tester) async {
+      final directory = await Directory.systemTemp.createTemp(
+        'buzz-preflight-widget-',
+      );
+      final outbox = MessageOutbox(directory);
+      final copied = Completer<void>();
+      final continuePreparation = Completer<void>();
+      final queued = Completer<void>();
+      final service = MediaUploadService(
+        baseUrl: 'https://relay.example',
+        nsec: nostr.Keys.generate().nsec,
+        pickGalleryImage: () async => null,
+        pickGalleryVideo: () async => null,
+        pickGalleryImages: () async => [
+          XFile.fromData(_pngBytes, name: 'camera.png'),
+        ],
+      );
+      await tester.pumpWidget(
+        _buildComposeBar(
+          uploadService: service,
+          onSend: (_, _, {mediaTags = const []}) async => fail('Legacy send'),
+          onQueue:
+              (
+                text,
+                mentions, {
+                mediaTags = const [],
+                attachments = const [],
+                mentionKeys = const {},
+                prepare,
+              }) async {
+                try {
+                  await outbox.enqueue(
+                    {
+                      'relay': 'https://relay.example',
+                      'author': 'author',
+                      'channelId': 'channel',
+                      'parentId': 'parent',
+                      'rootId': 'root',
+                      'text': text,
+                      'mentions': mentions,
+                      'mediaTags': mediaTags,
+                      'mentionKeys': mentionKeys,
+                    },
+                    attachments,
+                    prepare: () async {
+                      copied.complete();
+                      await continuePreparation.future;
+                      return prepare!();
+                    },
+                  );
+                } finally {
+                  queued.complete();
+                }
+              },
+        ),
+      );
+      await _openSystemPhotoPicker(tester);
+      await tester.pumpAndSettle();
+      await _expandComposer(tester);
+      await tester.enterText(
+        find.byType(TextField),
+        'saved before membership check',
+      );
+      await tester.tap(find.byIcon(BuzzIcons.arrowUp));
+      await tester.runAsync(
+        () async => copied.future.timeout(const Duration(seconds: 5)),
+      );
+      expect(outbox.items.single.data['needsReview'], isTrue);
+      await tester.pumpWidget(const SizedBox.shrink());
+      continuePreparation.complete();
+      await tester.runAsync(() async {
+        await queued.future.timeout(const Duration(seconds: 5));
+        final row = outbox.items.single;
+        expect(row.text, 'saved before membership check');
+        expect(row.parentId, 'parent');
+        expect(row.rootId, 'root');
+        expect(
+          await File(row.attachments.single['path'] as String).readAsBytes(),
+          _pngBytes,
+        );
+        await expectLater(outbox.retry(row.id), throwsStateError);
+        await outbox.close();
+        await directory.delete(recursive: true);
+      });
     },
   );
 }
