@@ -89,6 +89,8 @@ export function useUnreadSidebarThread({
   const community = React.useMemo(loadActiveCommunityId, []);
   const viewScope = React.useContext(ConversationViewContext);
   const storage = useThreadExpansionStorage();
+  const persistVisitManual =
+    visitOnly && viewScope !== null && storage.persistManualInVisits === true;
   const key = enabled
     ? threadExpansionKey(
         community,
@@ -99,14 +101,19 @@ export function useUnreadSidebarThread({
       )
     : null;
   const [saved, setSaved] = React.useState<State>(() =>
-    empty(key, initialMode, storage.load, visitOnly),
+    empty(key, initialMode, storage.load, visitOnly && !persistVisitManual),
   );
   const state = React.useMemo(
     () =>
       saved.key === key
         ? saved
-        : empty(key, initialMode, storage.load, visitOnly),
-    [saved, key, initialMode, storage, visitOnly],
+        : empty(
+            key,
+            initialMode,
+            storage.load,
+            visitOnly && !persistVisitManual,
+          ),
+    [saved, key, initialMode, storage, visitOnly, persistVisitManual],
   );
   const index = React.useMemo(
     () => indexOverride ?? buildThreadPanelIndex(messages),
@@ -409,14 +416,29 @@ export function useUnreadSidebarThread({
     .sort(
       (a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id),
     )[0]?.id;
-  const commit = (next: ThreadExpansion, reveal: Reveal) => {
+  const commit = (
+    next: ThreadExpansion,
+    reveal: Reveal,
+    manualChoice?: readonly [string, boolean],
+  ) => {
     const current = live.current;
     if (current.key !== key) return;
     const updated = { ...current, branches: next, reveal };
     live.current = updated;
     // Persist in the interaction, before navigation or an immediate app close.
-    if (current.key && !visitOnly && current.branches !== next)
-      setPreferenceError(!storage.save(current.key, next));
+    let persisted: boolean | undefined;
+    if (current.key && current.branches !== next) {
+      if (!visitOnly) persisted = storage.save(current.key, next);
+      else if (persistVisitManual && manualChoice) {
+        // Automatic reveal ancestors live in next as well. Save only the user's
+        // explicit delta over the durable choices, never that transient overlay.
+        const durable = new Map(storage.load(current.key));
+        durable.set(manualChoice[0], manualChoice[1]);
+        persisted = storage.save(current.key, durable);
+      }
+    }
+    if (live.current !== updated) return;
+    if (persisted !== undefined) setPreferenceError(!persisted);
     setSaved(updated);
   };
   const setExpanded = (id: string, open: boolean) => {
@@ -425,6 +447,7 @@ export function useUnreadSidebarThread({
     commit(
       next,
       withoutRevealedBranches(live.current.reveal, new Set([id]), true),
+      [id, open],
     );
   };
   const toggle = (message: TimelineMessage) => {
@@ -434,6 +457,7 @@ export function useUnreadSidebarThread({
     commit(
       next,
       withoutRevealedBranches(live.current.reveal, new Set([message.id]), true),
+      [message.id, next.get(message.id) === true],
     );
   };
   const revealMessage = (id: string) => {
