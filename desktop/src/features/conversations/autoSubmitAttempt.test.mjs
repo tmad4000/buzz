@@ -18,6 +18,51 @@ function deferred() {
   return { promise, resolve };
 }
 
+test("retirement inside initial admission cannot cross into trigger clearing", async () => {
+  let attempt,
+    clears = 0,
+    sends = 0;
+  attempt = new ConversationAutoSubmitAttempt({
+    target: target(),
+    admit: () => {
+      attempt.retire();
+      return true;
+    },
+    clearTrigger: async () => {
+      clears++;
+      return true;
+    },
+    submit: async () => {
+      sends++;
+    },
+  });
+  assert.equal(await attempt.run(), "ineligible");
+  assert.deepEqual([clears, sends], [0, 0]);
+});
+
+test("retirement inside post-clear admission cannot cross into submit", async () => {
+  let attempt,
+    admissions = 0,
+    clears = 0,
+    sends = 0;
+  attempt = new ConversationAutoSubmitAttempt({
+    target: target(),
+    admit: () => {
+      if (++admissions === 2) attempt.retire();
+      return true;
+    },
+    clearTrigger: async () => {
+      clears++;
+      return true;
+    },
+    submit: async () => {
+      sends++;
+    },
+  });
+  assert.equal(await attempt.run(), "ineligible");
+  assert.deepEqual([clears, sends], [1, 0]);
+});
+
 test("command captures its target and awaits confirmed trigger clearing before normal submit", async () => {
   const original = target(),
     clearing = deferred(),

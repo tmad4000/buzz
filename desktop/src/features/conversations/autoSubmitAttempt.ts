@@ -41,17 +41,25 @@ export class ConversationAutoSubmitAttempt {
     this.retired = true;
   }
 
+  private admitted() {
+    if (this.retired) return false;
+    const allowed = this.admit(this.target);
+    // Admission can synchronously retire this command through a scope/owner
+    // subscriber. Its returned boolean cannot revive the retired attempt.
+    return allowed && !this.retired;
+  }
+
   async run(): Promise<Result> {
     // Claim before any callback or await: reentrant/parallel calls cannot retry.
     if (this.attempted) return "already-attempted";
     this.attempted = true;
-    if (this.retired || !this.admit(this.target)) return "ineligible";
+    if (!this.admitted()) return "ineligible";
     try {
       if (!(await this.clearTrigger(this.target))) return "clear-failed";
     } catch {
       return "clear-failed";
     }
-    if (this.retired || !this.admit(this.target)) return "ineligible";
+    if (!this.admitted()) return "ineligible";
     await this.submit(this.target);
     return "submitted";
   }
