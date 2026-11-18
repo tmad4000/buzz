@@ -1,0 +1,76 @@
+TAP version 13
+# Subtest: Stop requires confirmation, publishes exact card reply once, and waits for signed bridge state
+ok 1 - Stop requires confirmation, publishes exact card reply once, and waits for signed bridge state
+  ---
+  duration_ms: 548.196773
+  type: 'test'
+  ...
+# Subtest: wrong identity, feature OFF, Root and nonbridge cards have no controls
+ok 2 - wrong identity, feature OFF, Root and nonbridge cards have no controls
+  ---
+  duration_ms: 10.67445
+  type: 'test'
+  ...
+# Subtest: card reassignment and community switch during confirmation never emit a stale trigger
+ok 3 - card reassignment and community switch during confirmation never emit a stale trigger
+  ---
+  duration_ms: 136.415838
+  type: 'test'
+  ...
+# Subtest: ambiguous send never changes lifecycle state or automatically retries
+ok 4 - ambiguous send never changes lifecycle state or automatically retries
+  ---
+  duration_ms: 13.26497
+  type: 'test'
+  ...
+# Subtest: unmount while capturing relay scope prevents a late control publication
+ok 5 - unmount while capturing relay scope prevents a late control publication
+  ---
+  duration_ms: 5.60624
+  type: 'test'
+  ...
+# Subtest: compact card exposes exact agent link, signed original text, and in-place report edits
+ok 6 - compact card exposes exact agent link, signed original text, and in-place report edits
+  ---
+  duration_ms: 70.459769
+  type: 'test'
+  ...
+# Subtest: read callbacks contain only committed rows and never descendants hidden by a collapsed root
+ok 7 - read callbacks contain only committed rows and never descendants hidden by a collapsed root
+  ---
+  duration_ms: 1585.986889
+  type: 'test'
+  ...
+# Subtest: focused panel restores branch/root disclosure focus for local and synchronized collapses without stealing outside focus
+ok 8 - focused panel restores branch/root disclosure focus for local and synchronized collapses without stealing outside focus
+  ---
+  duration_ms: 162.492358
+  type: 'test'
+  ...
+# Subtest: deep sidebar retains existing parent context when experiment is off and avoids duplicate context when on
+ok 9 - deep sidebar retains existing parent context when experiment is off and avoids duplicate context when on
+  ---
+  duration_ms: 49.354389
+  type: 'test'
+  ...
+# Subtest: thread row keeps native quote jump, accessible first line and body identity across pending/ack and quote removal
+ok 10 - thread row keeps native quote jump, accessible first line and body identity across pending/ack and quote removal
+  ---
+  duration_ms: 114.935318
+  type: 'test'
+  ...
+# Subtest: quote presentation remains off when experiment is disabled
+ok 11 - quote presentation remains off when experiment is disabled
+  ---
+  duration_ms: 22.095159
+  type: 'test'
+  ...
+1..11
+# tests 11
+# suites 0
+# pass 11
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 4508.03634

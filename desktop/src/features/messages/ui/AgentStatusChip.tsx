@@ -1,3 +1,5 @@
+import type { TimelineMessage } from "../types";
+import { AgentCardControls } from "./AgentCardControls";
 import type { parseBridgeStatusCard } from "@/features/messages/lib/bridgeStatusCard";
 import { copyTextToClipboard } from "@/shared/lib/clipboard";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -9,9 +11,13 @@ type Card = NonNullable<ReturnType<typeof parseBridgeStatusCard>>;
 export function AgentStatusChip({
   card,
   originalBody,
+  message,
+  channelId,
 }: {
   card: Card;
   originalBody: string;
+  message?: TimelineMessage;
+  channelId?: string;
 }) {
   return (
     <div className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
@@ -59,6 +65,9 @@ export function AgentStatusChip({
           </button>
         </div>
       </details>
+      {message ? (
+        <AgentCardControls message={message} channelId={channelId} />
+      ) : null}
     </div>
   );
 }

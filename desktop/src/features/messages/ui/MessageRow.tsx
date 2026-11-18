@@ -389,7 +389,12 @@ export const MessageRow = React.memo(
     const renderBody = () => {
       if (statusCard) {
         return (
-          <AgentStatusChip card={statusCard} originalBody={message.body} />
+          <AgentStatusChip
+            card={statusCard}
+            originalBody={message.body}
+            message={message}
+            channelId={channelId ?? undefined}
+          />
         );
       }
       switch (message.kind) {
@@ -955,6 +960,8 @@ export const MessageRow = React.memo(
     prev.message.pubkey === next.message.pubkey &&
     prev.message.body === next.message.body &&
     prev.message.editSignerPubkey === next.message.editSignerPubkey &&
+    prev.message.bodyRevision?.eventId === next.message.bodyRevision?.eventId &&
+    prev.message.bodyRevision?.createdAt === next.message.bodyRevision?.createdAt &&
     prev.message.author === next.message.author &&
     prev.message.isAgent === next.message.isAgent &&
     prev.message.ownerPubkey === next.message.ownerPubkey &&

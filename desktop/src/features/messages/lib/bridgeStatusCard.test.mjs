@@ -155,6 +155,7 @@ test("production formatter applies only bridge-signed status snapshots and prese
       (m) => m.id === original.id,
     );
   const updated = format(edit);
+  assert.deepEqual(updated.bodyRevision,{eventId:edit.id,createdAt:edit.created_at});
   assert.equal(parseBridgeStatusCard(updated).label, "✅ Reported done");
   assert.equal(parseBridgeStatusCard(updated).requestId, requestId);
   assert.equal(updated.parentId, requestId);
@@ -228,6 +229,8 @@ test("reviewer P1 reproduction: latest owner-signed Done body never inherits the
   const format = (events) =>
     formatTimelineMessages(events, null, undefined, null, profiles)[0];
   const ownerEdited = format([original, edit]);
+  assert.deepEqual(format([original]).bodyRevision,{eventId:original.id,createdAt:original.created_at});
+  assert.deepEqual(ownerEdited.bodyRevision,{eventId:edit.id,createdAt:edit.created_at});
   assert.equal(ownerEdited.signerPubkey, bridge);
   assert.equal(
     ownerEdited.body,
@@ -272,6 +275,8 @@ test("reviewer P1 reproduction: latest owner-signed Done body never inherits the
     content: doneBody,
     localEditedContent: true,
   };
+  assert.equal(format([localPatch]).bodyRevision,undefined);
+  assert.deepEqual(format([localPatch,bridgeEdit]).bodyRevision,{eventId:bridgeEdit.id,createdAt:bridgeEdit.created_at});
   assert.equal(
     parseBridgeStatusCard(format([localPatch])),
     null,
@@ -287,4 +292,16 @@ test("reviewer P1 reproduction: latest owner-signed Done body never inherits the
     null,
     "an edited TimelineMessage without provenance fails closed",
   );
+});
+
+test("bridge body revision selection uses lowest event ID for equal signed created_at in either input order", async () => {
+  const {formatTimelineMessages}=await import("./formatTimelineMessages.ts");
+  const original={id:"f".repeat(64),kind:9,pubkey:message.signerPubkey,created_at:1,content:body(),tags:[["h","channel"],["e","b".repeat(64),"","reply"]]};
+  const low={id:"1".repeat(64),kind:40003,pubkey:message.signerPubkey,created_at:2,content:body("✅ Done"),tags:[["e",original.id],["h","channel"]]};
+  const high={...low,id:"e".repeat(64),content:body()};
+  for(const edits of [[low,high],[high,low]]) {
+    const projected=formatTimelineMessages([original,...edits],null)[0];
+    assert.equal(projected.body,low.content);
+    assert.deepEqual(projected.bodyRevision,{eventId:low.id,createdAt:low.created_at});
+  }
 });

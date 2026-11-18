@@ -1,0 +1,8 @@
+{
+  "command": "python3 ../validation/run-bounded.py 180 node node_modules/typescript/bin/tsc --noEmit",
+  "exitCode": 0,
+  "diagnostics": "control-typecheck.log empty",
+  "evidenceType": "author observed process completion",
+  "stackBase": "18346c781cae213dc333fa5b009021cc962c5c0c",
+  "recordedAt": "2026-11-18T06:22:29.965124+00:00"
+}

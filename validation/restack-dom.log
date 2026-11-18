@@ -1,0 +1,18 @@
+✔ Stop requires confirmation, publishes exact card reply once, and waits for signed bridge state (807.87729ms)
+✔ wrong identity, feature OFF, Root and nonbridge cards have no controls (32.234019ms)
+✔ card reassignment and community switch during confirmation never emit a stale trigger (193.187477ms)
+✔ ambiguous send never changes lifecycle state or automatically retries (24.374949ms)
+✔ unmount while capturing relay scope prevents a late control publication (32.73745ms)
+✔ Cancel and Escape restore focus to the actual Stop trigger (161.076688ms)
+✔ Uncertain intent survives display edits, remount, and a second view (35.63134ms)
+✔ compact card exposes exact agent link, signed original text, and in-place report edits (99.263529ms)
+✔ thread row keeps native quote jump, accessible first line and body identity across pending/ack and quote removal (130.517148ms)
+✔ quote presentation remains off when experiment is disabled (24.931ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4284.261845

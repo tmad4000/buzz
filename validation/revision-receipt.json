@@ -1,0 +1,29 @@
+{
+  "at": "2026-11-18T07:12:50.106792+00:00",
+  "parent": "3a1e41ec74e6de8b261fbb7b4e6667333b8c0e8a",
+  "priorSourceNo": "c788a2cbfada80990935819aef792537eadeff37",
+  "modelTests": {
+    "pass": 15,
+    "fail": 0,
+    "timeoutSeconds": 60
+  },
+  "domTests": {
+    "pass": 11,
+    "fail": 0,
+    "timeoutSeconds": 60
+  },
+  "unchangedReviewerProbe": {
+    "pass": 6,
+    "fail": 0,
+    "timeoutSeconds": 45,
+    "sha256": "daa40b669c03d344808e12671f7e075a3c7f87c62d5809392a14773c49cb1fdd"
+  },
+  "wholeDesktopTypecheck": {
+    "exitCode": 0,
+    "diagnostics": 0,
+    "timeoutSeconds": 90
+  },
+  "isolation": "setsid and process-group kill cleanup",
+  "realControlPublication": false,
+  "independentSourceRecheck": "pending root-routed be986"
+}

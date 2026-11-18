@@ -1,0 +1,23 @@
+✔ only signer-scoped attributed Jacob cards expose exact control intent; Root is hidden (4.23999ms)
+✔ bridge-owned control state is read back verbatim and Continue requires resumable Stopped (3.1698ms)
+✔ existing private project card attribution works without inventing a reply parent (0.58773ms)
+✔ production native sender emits only exact direct-card stop/continue replies with tenant+signer fence (0.84746ms)
+✔ durable claim blocks duplicates and late outcomes cannot overwrite a newer intent (7.61501ms)
+✔ denied or corrupt storage fails closed; full storage never evicts unresolved attempts (18.47542ms)
+✔ relay scope normalizes transport and rejects credential-bearing URLs (0.97245ms)
+✔ report preserves exact executor and host without claiming live work (2.64834ms)
+✔ unknown, impersonated and substantive content retain original body (1.21117ms)
+✔ edits, watchdog source and stale metadata stay explicit (0.58853ms)
+✔ root+reply tags retain exact answered event (1.524201ms)
+✔ structured bridge tags outrank body and bind exact originating request (1.282401ms)
+✔ malformed machine envelopes cannot downgrade into legacy body trust (0.55846ms)
+✔ production formatter applies only bridge-signed status snapshots and preserves immutable ancestry (288.182226ms)
+✔ reviewer P1 reproduction: latest owner-signed Done body never inherits the original bridge signer (9.32335ms)
+ℹ tests 15
+ℹ suites 0
+ℹ pass 15
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1585.11229

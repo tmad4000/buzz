@@ -31,21 +31,43 @@ export function parseBridgeStatusCard(message: TimelineMessage) {
     return null;
   if (message.tags?.some((tag) => tag[0] === "buzz-status"))
     return parseTaggedCard(message.tags);
-  if (!message.parentId || message.body.length > 2048) return null;
-  const lines = message.body.split("\n");
-  if (lines.length !== 4 && lines.length !== 5) return null;
+  if (message.body.length > 8192) return null;
+  let body = message.body;
+  // ProjectCards.render_text appends the same attribution envelope. Only its
+  // exact bridge-owned Item prefix permits an unthreaded project card.
+  const isProject =
+    /^(?:Item: [^\n]+\n\n|(?:⏳ Working|❓ Waiting on Jacob|✅ Shipped|⚠️ Stale — no update for 2 hours)\nItem: [^\n]+\n\n)/.test(
+      body,
+    );
+  if (isProject) body = body.slice(body.lastIndexOf("\n\n") + 2);
+  if ((!message.parentId && !isProject) || body.length > 2048) return null;
+  const lines = body.split("\n");
+  if (lines.length < 4 || lines.length > 6) return null;
   const identity = IDENTITY.exec(lines[1]);
   if (!identity) return null;
   const [, agentId, serverId] = identity;
   const href = `paseo://h/${serverId}/agent/${agentId}`;
   if (!isPaseoAgentLink(href) || lines[2] !== `[Open agent](${href})`)
     return null;
-  const source = /^Reported status · source: (root|listener|watchdog)$/.exec(
-    lines[3],
-  )?.[1];
+  const source =
+    /^Reported status · source: (root|listener|watchdog|jacob)$/.exec(
+      lines[3],
+    )?.[1];
   if (!source) return null;
   const header = /^(.*?) — (.+) · (.+) \((.+)\)$/.exec(lines[0]);
-  if (!header || !Object.hasOwn(LABELS, header[1])) return null;
+  if (!header) return null;
+  const control =
+    /^(🛑 Stopped by Jacob|Already idle when Jacob asked to stop|Interruption acknowledged; new activity exists|Continuation queued by Jacob) at ((?:[01]\d|2[0-3]):[0-5]\d UTC)$/.exec(
+      header[1],
+    );
+  const controlStates: Readonly<Record<string, string>> = {
+    "🛑 Stopped by Jacob": "stopped",
+    "Already idle when Jacob asked to stop": "idle",
+    "Interruption acknowledged; new activity exists": "interrupted",
+    "Continuation queued by Jacob": "continuation",
+  };
+  if (Boolean(control) !== (source === "jacob")) return null;
+  if (!control && !Object.hasOwn(LABELS, header[1])) return null;
   if (
     (header[1] === "❓ Needs Jacob" ||
       header[1] === "✅ Done" ||
@@ -55,13 +77,34 @@ export function parseBridgeStatusCard(message: TimelineMessage) {
     return null;
   if (header[1] === "⚠️ Agent response overdue" && source !== "watchdog")
     return null;
+  const extras = lines.slice(4);
+  const metadataLines = extras.filter((line) =>
+    /^Metadata unavailable; last verified at Unix \d+$/.test(line),
+  );
+  const unavailable =
+    "Continuation unavailable: the interrupted instruction was not verified.";
   if (
-    lines[4] &&
-    !/^Metadata unavailable; last verified at Unix \d+$/.test(lines[4])
+    metadataLines.length > 1 ||
+    extras.filter((line) => line === unavailable).length > 1 ||
+    extras.some(
+      (line) => line !== unavailable && !metadataLines.includes(line),
+    ) ||
+    (extras.includes(unavailable) && control?.[1] !== "🛑 Stopped by Jacob")
   )
     return null;
+  const states: Readonly<Record<string, string>> = {
+    "👀 Seen": "seen",
+    "⏳ Working": "progress",
+    "❓ Needs Jacob": "waiting",
+    "✅ Done": "done",
+    "👍 Noted · no action": "ack",
+    "⚠️ Agent response overdue": "overdue",
+  };
+  const state = control ? controlStates[control[1]] : states[header[1]];
   return {
-    label: LABELS[header[1]],
+    label: control ? header[1] : LABELS[header[1]],
+    state,
+    resumeAvailable: state === "stopped" && !extras.includes(unavailable),
     title: header[2],
     model: header[3],
     provider: header[4],
@@ -69,7 +112,7 @@ export function parseBridgeStatusCard(message: TimelineMessage) {
     serverId,
     href,
     source,
-    metadataUnavailable: lines[4] ?? null,
+    metadataUnavailable: metadataLines[0] ?? null,
   };
 }
 
@@ -130,6 +173,8 @@ function parseTaggedCard(tags: string[][]) {
     return null;
   return {
     label: TAG_LABELS[status[1]],
+    state: status[1],
+    resumeAvailable: false,
     title,
     agentId: agent[1],
     serverId: agent[2],

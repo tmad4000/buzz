@@ -1,0 +1,14 @@
+✔ review: cancel restores focus to Stop trigger (408.196855ms)
+✔ review: unknown delivery remains held after ordinary bridge metadata edit (22.0858ms)
+✔ review: unknown delivery survives timeline row remount (24.95135ms)
+✔ review: keyboard focus trap, labels, Escape, and rapid Continue clicks (118.111228ms)
+✔ review: older signed queued report in another view cannot reconcile a new Continue HOLD (18.20067ms)
+✔ review: Stop submission restores focus to controls fallback while trigger disabled (88.460369ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2609.986047

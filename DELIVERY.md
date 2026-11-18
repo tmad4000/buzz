@@ -1,63 +1,79 @@
-> Current P1 follow-up: root requested exact3857 reproduction and current-effective-body provenance recheck. Prior source reviews below are historical; same-reviewer recheck of the new head is pending.
+# Agent Stop / Continue client — Phase 2
 
-# Agent reply UX — .9 source candidate
+Owner: d809bb50-03b8-41d2-ba83-e2a18cb86a89. Own worktree `/home/dev/agent-worktrees/buzz-agent-controls-20261118`, branch `agent-stop-resume-client-20261118`. Separate draft PR stacked on PR67 branch `agent-reply-ux-20261118`, reviewed base `3a1e41ec74e6de8b261fbb7b4e6667333b8c0e8a`.
 
-Owner: d809bb50-03b8-41d2-ba83-e2a18cb86a89. Workspace: `/home/dev/agent-worktrees/buzz-agent-reply-ux-20261118`.
-Base: `buzz-ideaflow-v0.5.28-ideaflow.8`, annotated tag object `69eda1ff`, peeled commit `16fa57dfc97f115d00382fcb75128295b5fb3def`.
+Jacob's ask: “a way to stop a running agent on Buzz.” Phase 2 is stacked on PR67, now including reviewed parent 3a1e41ec74e6de8b261fbb7b4e6667333b8c0e8a (same3857 SOURCE GO: issuecomment-6971137524). This child does not modify the parent worktree.
 
-Jacob's original asks, recovered by the root dispatch and `buzz-request-audit-20261117/REPORT.md`:
-- 2026-11-16 23:48 / 2026-11-17 08:19 DM: show which agent is working, with a link and less noise.
-- 2026-11-17 15:43 DM: agent answers should visibly attach to the exact answered message even in expanded inline threads.
+Draft PR: https://github.com/tmad4000/buzz/pull/84, stacked on PR67 branch agent-reply-ux-20261118. Application change commit5a0ce1b09afcf328fe3b74aafa09f1f43880e425; subsequent delivery-only commit adds this receipt.
 
-Draft PR: https://github.com/tmad4000/buzz/pull/67 (base `sol/buzz8-release`, .9 bucket).
+## Behavior
 
-## Source delivery
+Same default-OFF **Agent reply context** experiment. Recognized bridge-signed reports expose a compact **Stop…** control when appropriate; it opens the shared accessible confirmation dialog identifying the exact attributed worker. Only confirmation sends a literal `stop` reply to the **card event**, using the existing signed kind9 message path. A bridge-confirmed resumable stopped report exposes **Continue**, sending literal `continue` to that same card. No reaction toggle, new protocol/event kind, or client Paseo call.
 
-Settings → Experiments → **Agent reply context** opts into compact reported-status cards and native-parent quotes. Default OFF. Expanding the compact summary opts into details and the agent link. The shared MessageRow renders recognized bridge cards compactly across channel/thread surfaces, with executor and opt-in Open agent, report provenance/model, full original card text and copyable IDs. Unknown formats and substantive answer content retain the normal renderer. No runtime subscription, worker wakeup, inferred completion or seen-state write is added.
+Controls are hidden for Root's exact UUID, nonbridge create/effective-edit signers, other active identities, unavailable/locked/lost identities, pending cards, unknown/ambiguous channel scope, and stopped cards explicitly reporting unavailable continuation. Root cards retain ordinary read-only report rendering. Only Jacob's established pubkey is eligible; the native sender receives both expected relay and expected signer fences.
 
-Parent display reuses reviewed PR54's native NIP-10 parent≠root quote plus guarded owning-pane jump; it never uses capped paint depth or retargets an existing draft. Root replies remain visually attached to their root without a redundant quote. Missing parents show a noninteractive “reply to earlier message” stub; no parent fetch or navigation is attempted.
+Lifecycle labels change only when the signed bridge card changes. Existing bridge control source `jacob` and UTC headers are rendered verbatim: Stopped by Jacob, Already idle when Jacob asked to stop, Interruption acknowledged; new activity exists, Continuation queued by Jacob. No optimistic stopped/running/continued claim. Submission success says Request sent / Waiting for bridge. An uncertain send is held without automatic retries. The bridge remains authoritative for latest ledger revision, private scope, binding generation, current turn, stop cycle and continuation proof.
 
-## Reused source / integration order
+Confirmation is bound to the current card/body/attribution/signer/identity/community. Rebinding dismisses the old confirmation. Community switches and unmount before native publication suppress the stale operation. Repeated clicks share a synchronous in-flight fence. No composer reply-target, draft, read receipt, agent lifecycle or queue mutations occur outside the existing user-request message publication.
 
-Apply each prerequisite once; this branch contains additive signed-off cherry-picks:
-- PR54 `533f8d23c`, `1d284379b`, `89bb4f3b` → local `236e128a6`, `74afcc34d`, `b6cf5bc55`.
-- PR58 `7472d44a5`, `b04b419e` → local `ea3230b15`, `314103027`.
-- Then this branch's compact-card/experiment commit. If integrating PR54/58 separately, omit the duplicated prerequisite cherry-picks. The opt-in wrapper is intentional and needs retaining around ThreadParentQuoteChip.
+The fallback also recognizes the existing exact attributed project-card wrapper, preserving all original project text in expanded details. Unrecognized/malformed bodies stay normal content. Machine-tag parsing stays preferred; no unconfirmed new control-tag schema is invented. Live control reports currently use the bridge's existing body envelope. Future machine control states require075's writer contract; unsupported tagged envelopes fail closed.
 
-PR58's established main-window GCP/M4/M5 host + exact UUID opener capability is reused unchanged. No new hosts, relay kinds, dependencies, lockfiles, listeners or service changes.
+## Exact bridge contract / coordination
 
-## Contract coordination and remaining work
+Read `/home/dev/code/buzz-agent-control-20261118/PLAN.md`, including review corrections, and `FINISH.json`. FINISH reports `SHIPPED_BACKEND_ENABLED`, source manifest `199b91d8a07277b7a86ba3ba9604547840482996860835bde8665d73db2e90a9`, runtime64 files manifest `775b20ed7420cf2e41c45f99191dfaed6ba16fb9fb4b7db75e4d600c04084a35`. Source-only inspection of sole writer075's `listener/status_agent_metadata.py`, `project_status.py`, `agent_control.py`: accepted exact Jacob-signed 🛑 reaction or direct `stop` reply; direct `continue` reply only. This implementation chooses the reply form for both, with parent=card and signed native root preserved. No listener files changed. Wording/forms proposal sent075; its response/any newer machine-tag contract is not assumed.
 
-Read-only source contract: `/home/dev/code/paseo-buzz-bridge-20261114/listener/status_agent_metadata.py` (`render`, `link`, `normalize_status`), `status_cards.py`, `status_card_transport.py`. Existing ordinary kind9 reply + kind edit transport, established raw bridge signer, exact four-line envelope plus optional stale-metadata line. Full-body envelope recognition is bounded to 2048 characters. Delegated display authors do not establish signer trust.
+FINISH explicitly records no real-user interrupt/resume probe by the backend owner. Backend enabled is not a live end-to-end client qualification. This task also sends **no real trigger**, cancels/resumes no agent, makes no direct Buzz post, and performs no M5/browser/native/Tauri/cargo build.
 
-Root approved compatibility and proposed machine binding. Sent the additive tags/snapshot proposal in STATUS-CARD-TAGS.md to bridge owner075fe13; listener remains untouched. Client prefers valid machine tags; old untagged cards use the body fallback. Production edit formatting replaces machine snapshots only for bridge-signed edits and records the edit signer so other-author edits cannot masquerade as bridge reports. Activation/contract response remains pending075. 445b5cb9 confirmed PR54 reuse and guarded callback requirement; implemented it. fd0 integration owner received prerequisite/pick-order notices.
+## Validation and delivery
 
-**Compatibility limitation, still open:** the transport contains ordinary status reply messages, not a structured count-neutral message-level work projection. This slice compacts the existing card in its existing position; it does not move it into the originating-request footer, keep it visible with collapsed replies, remove legacy reply counts/notifications, or verify active task-bound execution. Labels explicitly say Reported working/done and details say live activity unverified. Full quiet footer semantics from DESIGN.md §280 remain an adapter/transport integration item with 075fe13/root, and must not be reported as completed by this PR.
+All tests and tsc use inherited `validation/run-bounded.py`: setsid, parent timeout and process-group SIGKILL cleanup. No dependency/lock/version or native capability changes. Reuses existing installed dependency tree via ignored node_modules symlink.
 
-## Validation
+Initial historical checks at 6ed4e6951: **48 focused unit/model tests PASS, 11 DOM tests PASS, whole-desktop `tsc --noEmit` PASS (exit0, no diagnostics).** Biome and whitespace checks pass (test style infos only). Typecheck receipt: `validation/control-typecheck-receipt.json`.
 
-Only bounded light checks; each test/typecheck uses `setsid` with a parent timeout and process-group SIGKILL cleanup. Reused the existing installed desktop dependency tree by symlink; no dependency installation/update.
-- 45 focused model/unit tests PASS: bridge envelope/signature identity, tag precedence/duplicate-malformed rejection, production edit snapshot/immutable-ancestry behavior, report edits/watchdog/stale metadata, exact native parent tags, parent quote scope, Page/thread guarded navigation, Markdown transform/opener callback, native permission scope.
-- 6 focused DOM tests PASS: compact card original text/link/edit identity, shared thread-row native quote/navigation/body identity, default-off quote gate and no-fetch unloaded-parent stub; production sidebar-panel default-off legacy context and on-state deduplication.
-- Whole-desktop TypeScript `tsc --noEmit`: PASS, exit 0; `validation/typecheck.log` is empty (no diagnostics).
-- Biome on added/changed components and models PASS; whitespace check PASS.
+Focused checks: production native-message wrapper argument assertions (literal stop/continue, exact parent/root, expected Jacob+relay), signer/Root/pending/channel eligibility, bridge control labels/UTC/unavailable continuation, project wrapper, actual confirmation cancel/accept, disabled feature/wrong identity, no optimistic lifecycle, ambiguous-send hold, card/community change and unmount races, plus inherited parser/edit/parent guards. See `validation/control-model-tests.log`, `control-dom-tests.log`, `control-typecheck.log` for final receipts.
 
-Evidence: `validation/model-tests.log`, `validation/dom-tests.log`, `validation/typecheck.log`. The bounded runner is reproduced in `validation/run-bounded.py`.
+Independent Sol review is requested **via root** after the separate draft PR exists. Keep draft; no review-completed attestation, native/human acceptance, release or deployment claim. The parent chip's separate footer/count-neutral projection remains open; it is not addressed or marked complete here.
 
-No browser/native/Tauri/cargo builds, M5 actions, release, install or Buzz posts. Native OS-handler behavior and human acceptance remain unverified. Draft/source review only; no buzz-review-completed attestation.
+Parent updated to reviewed PR67 3a1e41ec7, including effective-body provenance hardening.
 
-## Review / manual acceptance for the release owner
+## First review corrections
 
-Independent Sol review by87017e7a at fde7c66fe found one P2: default-off deep-sidebar context was removed by prerequisite PR54. Restored the original context while disabled, with a mounted production-panel off/on regression; optional reported-label wording also applied. First review: https://github.com/tmad4000/buzz/pull/67#pullrequestreview-5951545364. Focused recheck completed at exact source `7d5893bd07395d2ec22676eef94ad2e4940ffd43`: no blockers, scores9/9/9; https://github.com/tmad4000/buzz/pull/67#pullrequestreview-5951577042. Reviewer independently reran5DOM tests. Final author tsc completed exit0; see validation/typecheck-receipt.json. Subsequent delivery-receipt-only commits do not change reviewed application code. Keep draft pending release captain authorization for heavier validation and native/human acceptance.
+Independent Sol be986aea first reviewed6ed4e6951: NO-GO with two P2 blockers, preserved at https://github.com/tmad4000/buzz/pull/84#issuecomment-6971199864.
 
-After an authorized build, enable Agent reply context. Expand a native reply-to-reply: verify its quote names the exact parent's first line and opens/highlights that parent through the guarded owning pane; preserve any newer draft. Collapse/reopen and verify exact-observed/read authority is unchanged. Show a bridge status card: verify compact reported executor + Open agent, raw original text in details, and an edit updates the same report. Confirm a non-bridge lookalike and a substantive answer stay ordinary content. Disable the experiment to restore ordinary status-body rendering and hide parent quotes.
+The actual Stop button is now Radix's AlertDialogTrigger. Cancel and Escape restore focus to it; a disabled invoker falls back to the controls group. An unresolved intent is persisted before publication, outside row lifetime, scoped by community, normalized relay, Jacob identity, channel, exact card, server and agent. Shared subscribers block a second mounted view; storage events synchronize other windows. Display labels/model changes never clear a hold. Only a changed bridge-signed relevant control report releases it: stopped/idle/interrupted for Stop; continuation queued for Continue. Late native results cannot overwrite a newer intent. Proven pre-publication cancellation can release its own intent. Unknown publication, corrupt/denied storage and quota failure fail closed. No timeout eviction or automatic retry. Up to128 unresolved intents are retained; capacity exhaustion prevents another send.
 
-Root follow-up: count-neutral means this renderer adds no events/counter/read/notification mutations; exclusion of legacy card replies from relay counts remains unverified and is not claimed. See STATUS-CARD-TAGS.md for exact proposed fields and activation boundary.
+The wire has no control generation/revision token available to this client. Identical same-minute control reports cannot prove a new cycle and conservatively retain the hold. Storage synchronization is not a cross-window transactional exactly-once guarantee; the bridge's durable action/cycle barriers remain authoritative. No recovery/delete-hold UI is introduced.
 
-## P1 effective-body provenance follow-up
+Current correction checks: **15 focused model tests, 10 production DOM tests, whole-desktop tsc --noEmit PASS**. Logs: validation/control-fix-model.log, control-fix-dom.log, control-fix-typecheck.log. All runs bounded with process-group cleanup. These supersede only the corrected paths; original wider checks remain historical. Re-review through root is pending. No live stop/continue qualification.
 
-Reviewer3857fd1d's NO-GO at oldd6d53c6d7 is retained: https://github.com/tmad4000/buzz/pull/67#issuecomment-6970480074. The canonical formatter already records the latest applied edit signer, and the compact parser requires original bridge author plus current effective edit signer=bridge. This follow-up adds the exact untagged ordinary-original→owner-signed Done-envelope reproduction with a conditional bridge owner mapping, verifies ordinary owner edits remain authorized content but never compact reports, and covers newer owner/bridge edit ordering plus unrelated edits.
+## Fresh stack validation after parent GO
 
-Also closes the concrete local-cache gap: the on-success edit patch mutates raw cached content before signed edit projection. It now marks localEditedContent; formatter treats this as unknown effective signer until an actual signed applied edit is available. Unknown edited TimelineMessage provenance also fails closed. This preserves owner edit permission and normal text; no signing identity, hook configuration or relay protocol changes.
+Root requested a fresh stack/check/push against frozen PR67 head3a1e41ec74e6de8b261fbb7b4e6667333b8c0e8a. Verified live parent SHA and exact merge-base3a. PR84 already contains that parent via normal mergef8c21ea63; no history rewrite or source restack is necessary. This receipt-only commit preserves application sourcec788a2cbf unchanged.
 
-Final author checks for this follow-up:45model/unit+6DOM PASS; whole-desktop tsc exit0/no diagnostics; all bounded setsid+timeout+process-group cleanup. Exact source hashes recorded in validation/typecheck-receipt.json. Same3857 reviewer requested on the new source head. Quiet footer/count-neutral projection remainsOPEN; PR84 child remains frozen6ed4e6951 until parent disposition/restack.
+Fresh verification PASS:15 focused model tests,10 production DOM tests, whole-desktop tsc --noEmit exit0 with no diagnostics. Logs validation/restack-model.log, restack-dom.log, restack-typecheck.log; receipt restack-receipt.json. Runs use existing setsid/timeout/process-group-kill harness (60s tests,90s tsc). Diff whitespace check PASS. Quote follow-up PR88 and PR67 stay untouched.
+
+Ready for root-routed samebe986 independent recheck of delta3a..new head. First review NO at6ed remains historical; no current source GO is claimed until recheck. No real trigger, native/human, deployment or release acceptance.
+
+## Revision-ordered HOLD reconciliation
+
+The completed be986 re-review atc788 confirms all original3failures fixed, but reproduces a residualP2: an older signed queued report in a second view clears a newer ambiguous Continue HOLD. Its updated REVIEW-SOL.md is retained in the independent review worktree. This correction addresses that finding too.
+
+The formatter now retains the selected edit event ID alongside its signer/content and exposes bodyRevision(eventId,createdAt) from the selected verified event. Original bodies use original event metadata; unsigned local cache rewrites have no revision evidence until a signed edit is applied. MessageRow's memo compares revision metadata. These are additive fields; no edit-selection, authorization, read/count/composer semantics change.
+
+Each durable operation record stores action, unique operationID, baseline token AND baseline body revision, under stable scoped card/agent identity. Reconciliation requires the existing relevant bridge control state plus a distinct event ID and strictly later valid created_at than baseline. Old snapshots, equal timestamps and missing/invalid revision evidence retain the HOLD. Preexisting persisted holds without revision evidence also stay held; no reset/eviction/retry. This uses existing event metadata, no new wire protocol or inferred authority from a display timestamp. It is conservative freshness evidence, not a global exactly-once or bridge-cycle proof.
+
+Checked-in regressions include the reviewer stale-second-view case with actual revision metadata, equal-time and unversioned variants, and a genuinely newer report releasing the hold. Formatter→parser assertions verify original/selected owner/bridge revision metadata and absent local-cache provenance. Original Cancel/Escape, display-edit/remount/second-view cases remain passing.
+
+Final bounded checks PASS:15 focused model tests,11 production DOM tests,whole-desktop tsc --noEmit exit0. Also copied the unchanged independent reviewer six-case harness to our OWN temporary file and ran it against this source:6/6 PASS (including original3failures and residual stale-report case). Reviewer source was only read; copy SHA256 daa40b669c03d344808e12671f7e075a3c7f87c62d5809392a14773c49cb1fdd matches original. Own temporary copy removed after verification. Logs validation/revision-model.log, revision-dom.log, revision-reviewer-probe.log, revision-typecheck.log; structured receipt revision-receipt.json. Setsid/timeouts/process-group kill throughout. No heavy/native/live trigger.
+
+Owner445 notified about additive formatter/types/row changes. PR67 stays3a; quotePR88 separate31a unchanged. Ready for samebe986 re-review via root; keep draft/head frozen after push.
+
+## Strict post-intent freshness fence
+
+Root clarified that a reconciliation snapshot must be newer than the persisted intent, not just its signed baseline. Hold records now persist intentAfter (Unix seconds sampled before any publication). A relevant signed control revision clears a hold only when its valid created_at is STRICTLY greater than both baseline.createdAt and intentAfter. An old record without intent timing, a pre-intent snapshot, or a same-second report stays held. Clock uncertainty can delay reconciliation; it cannot permit a retry. This remains conservative client freshness evidence, not a new bridge operation/generation protocol or global exactly-once proof.
+
+The formatter also selects the lowest edit event ID on equal created_at for bridge-authored originals, matching075's canonical projection (the same seam used by separate PR87). Nonbridge selection and ordinary owner authorization remain unchanged. A canonical equal-time winner alone does not prove post-intent freshness and cannot release a hold.
+
+Current checks PASS:17 focused model tests,11 production DOM tests,6 unchanged reviewer-harness tests replayed by author,whole-desktop tsc --noEmit exit0/no diagnostics. New regressions cover a signed revision newer than baseline but older than intent, same-second cutoff, legacy missing intent timing, and both equal-time edit input orders. Original stale queued-second-view repro remains checked in and passing. Logs validation/intent-model.log,intent-dom.log,intent-reviewer-probe.log,intent-typecheck.log; structured intent-receipt.json. Setsid/timeouts/process-group kill throughout. Reviewer harness hash matches unchanged original; own temporary copy removed.
+
+Ready for samebe986 re-review via root of this final head. Earlier ee80 receipt remains historical, superseded by this intent fence. PR67 frozen3a and PR87/88 unchanged. No live/native/release acceptance.

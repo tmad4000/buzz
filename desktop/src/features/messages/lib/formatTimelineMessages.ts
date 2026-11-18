@@ -270,6 +270,7 @@ export function formatTimelineMessages(
       content: string;
       tags: string[][];
       createdAt: number;
+      eventId: string;
       signerPubkey: string;
     }
   >();
@@ -297,9 +298,16 @@ export function formatTimelineMessages(
     }
 
     const existing = editsByTargetId.get(targetId);
-    if (!existing || event.created_at > existing.createdAt) {
+    if (
+      !existing ||
+      event.created_at > existing.createdAt ||
+      (normalizePubkey(target.pubkey) === BRIDGE_STATUS_SIGNER &&
+        event.created_at === existing.createdAt &&
+        event.id < existing.eventId)
+    ) {
       editsByTargetId.set(targetId, {
         content: event.content,
+        eventId: event.id,
         signerPubkey: normalizePubkey(event.pubkey),
         tags: event.tags,
         createdAt: event.created_at,
@@ -490,6 +498,11 @@ export function formatTimelineMessages(
       renderKey: event.localKey ?? event.id,
       localSendIntent: event.localSendIntent,
       createdAt: event.created_at,
+      bodyRevision: edit
+        ? { eventId: edit.eventId, createdAt: edit.createdAt }
+        : event.localEditedContent
+          ? undefined
+          : { eventId: event.id, createdAt: event.created_at },
       pubkey: authorPubkey,
       signerPubkey: normalizePubkey(event.pubkey),
       // A local cache patch has not carried a signed edit through this projection yet.
