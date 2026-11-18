@@ -1,0 +1,16 @@
+{
+  "check": "whole-desktop TypeScript after P1 effective-body follow-up",
+  "command": "python3 ../validation/run-bounded.py 180 node node_modules/typescript/bin/tsc --noEmit",
+  "exitCode": 0,
+  "diagnostics": "typecheck.log empty",
+  "evidenceType": "author observed process completion",
+  "baseBeforeFollowup": "18346c781cae213dc333fa5b009021cc962c5c0c",
+  "sourceFilesSHA256": {
+    "desktop/src/features/messages/hooks.ts": "df57212629e6190f03490367b69d69910e6471085328ca076486314dbd03cde0",
+    "desktop/src/features/messages/lib/bridgeStatusCard.ts": "556d9522581fb63a2f9bdfcbbbba79ccae255a70493377bc8b27509f41c22590",
+    "desktop/src/features/messages/lib/bridgeStatusCard.test.mjs": "033f05e8fb9868b3efefd4e5395d51a855117cfd397440caf9c99296b4dc0e97",
+    "desktop/src/features/messages/lib/formatTimelineMessages.ts": "1039d22afa2bb246058a99ae871adcc91f8efb316e0625948828f3dbdab25be3",
+    "desktop/src/shared/api/types.ts": "618cc223b3ed23c0c19acc57a3e8c58b98d66685436f25644c625c30d22a8d73"
+  },
+  "recordedAt": "2026-11-18T06:32:58.009257+00:00"
+}

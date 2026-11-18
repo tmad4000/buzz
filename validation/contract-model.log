@@ -1,0 +1,17 @@
+✔ report preserves exact executor and host without claiming live work (1.7412ms)
+✔ unknown, impersonated and substantive content retain original body (0.657539ms)
+✔ edits, watchdog source and stale metadata stay explicit (2.102299ms)
+✔ root+reply tags retain exact answered event (1.018119ms)
+✔ structured bridge tags outrank body and bind exact originating request (0.665319ms)
+✔ malformed machine envelopes cannot downgrade into legacy body trust (0.424071ms)
+✔ production formatter applies only bridge-signed status snapshots and preserves immutable ancestry (140.597359ms)
+✔ reviewer P1 reproduction: latest owner-signed Done body never inherits the original bridge signer (3.75509ms)
+✔ current producer unsigned fixture projects exact body and lowest-ID equal-time edit independently of input order (6.36951ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 735.754261

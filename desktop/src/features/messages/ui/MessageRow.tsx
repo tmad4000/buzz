@@ -1,3 +1,6 @@
+import { useFeatureEnabled } from "@/shared/features";
+import { parseBridgeStatusCard } from "@/features/messages/lib/bridgeStatusCard";
+import { AgentStatusChip } from "./AgentStatusChip";
 import * as React from "react";
 import { AlertTriangle } from "lucide-react";
 import {
@@ -381,7 +384,14 @@ export const MessageRow = React.memo(
     const getTag = (name: string) =>
       message.tags?.find((tag) => tag[0] === name)?.[1];
 
+    const agentReplyUx = useFeatureEnabled("agentReplyUx");
+    const statusCard = agentReplyUx ? parseBridgeStatusCard(message) : null;
     const renderBody = () => {
+      if (statusCard) {
+        return (
+          <AgentStatusChip card={statusCard} originalBody={message.body} />
+        );
+      }
       switch (message.kind) {
         case KIND_STREAM_MESSAGE_DIFF:
           return (
@@ -944,6 +954,7 @@ export const MessageRow = React.memo(
     prev.message.id === next.message.id &&
     prev.message.pubkey === next.message.pubkey &&
     prev.message.body === next.message.body &&
+    prev.message.editSignerPubkey === next.message.editSignerPubkey &&
     prev.message.author === next.message.author &&
     prev.message.isAgent === next.message.isAgent &&
     prev.message.ownerPubkey === next.message.ownerPubkey &&

@@ -1,0 +1,89 @@
+{
+  "fixtureType": "SYNTHETIC_UNSIGNED_PURE_RENDERER_OUTPUT",
+  "producerSha256": "727064b73428de375205981750ca331a415f33b5259eb80377d768993cecb760",
+  "pythonUnicodeVersion": "15.0.0",
+  "noMetadataResolutionOrWrites": true,
+  "cases": [
+    {
+      "name": "escaped-title-81",
+      "content": "\u23f3 Working \u2014 \\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\* \u00b7 model (provider)\nAgent `11111111-1111-4111-8111-111111111111` \u00b7 server `srv_KIFHQ_zsBnI2`\n[Open agent](paseo://h/srv_KIFHQ_zsBnI2/agent/11111111-1111-4111-8111-111111111111)\nReported status \u00b7 source: root",
+      "expectedLabels": {
+        "title": "*********************************************************************************",
+        "model": "model",
+        "provider": "provider"
+      }
+    },
+    {
+      "name": "escaped-title-limit",
+      "content": "\u23f3 Working \u2014 \\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\*\\* \u00b7 model (provider)\nAgent `11111111-1111-4111-8111-111111111111` \u00b7 server `srv_KIFHQ_zsBnI2`\n[Open agent](paseo://h/srv_KIFHQ_zsBnI2/agent/11111111-1111-4111-8111-111111111111)\nReported status \u00b7 source: root",
+      "expectedLabels": {
+        "title": "****************************************************************************************************************************************************************",
+        "model": "model",
+        "provider": "provider"
+      }
+    },
+    {
+      "name": "astral-limits",
+      "content": "\u23f3 Working \u2014 \ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00 \u00b7 \ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80 (\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1)\nAgent `11111111-1111-4111-8111-111111111111` \u00b7 server `srv_KIFHQ_zsBnI2`\n[Open agent](paseo://h/srv_KIFHQ_zsBnI2/agent/11111111-1111-4111-8111-111111111111)\nReported status \u00b7 source: root",
+      "expectedLabels": {
+        "title": "\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00",
+        "model": "\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80\ud83d\ude80",
+        "provider": "\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1\ud83d\udca1"
+      }
+    },
+    {
+      "name": "all-escapes",
+      "content": "\u23f3 Working \u2014 \\\\\\`\\*\\_\\{\\}\\[\\]\\(\\)\\<\\>\\#\\!\\| \u00b7 m\\(odel\\) (p\\[rovider\\])\nAgent `11111111-1111-4111-8111-111111111111` \u00b7 server `srv_KIFHQ_zsBnI2`\n[Open agent](paseo://h/srv_KIFHQ_zsBnI2/agent/11111111-1111-4111-8111-111111111111)\nReported status \u00b7 source: root",
+      "expectedLabels": {
+        "title": "\\`*_{}[]()<>#!|",
+        "model": "m(odel)",
+        "provider": "p[rovider]"
+      }
+    },
+    {
+      "name": "unicode-sanitized",
+      "content": "\u23f3 Working \u2014 A B C D E F \u00b7 model (provider)\nAgent `11111111-1111-4111-8111-111111111111` \u00b7 server `srv_KIFHQ_zsBnI2`\n[Open agent](paseo://h/srv_KIFHQ_zsBnI2/agent/11111111-1111-4111-8111-111111111111)\nReported status \u00b7 source: root",
+      "expectedLabels": {
+        "title": "A B C D E F",
+        "model": "model",
+        "provider": "provider"
+      }
+    },
+    {
+      "name": "unicode-line-separator",
+      "content": "\u23f3 Working \u2014 A\u2028B\u2029C \u00b7 model (provider)\nAgent `11111111-1111-4111-8111-111111111111` \u00b7 server `srv_KIFHQ_zsBnI2`\n[Open agent](paseo://h/srv_KIFHQ_zsBnI2/agent/11111111-1111-4111-8111-111111111111)\nReported status \u00b7 source: root",
+      "expectedLabels": {
+        "title": "A\u2028B\u2029C",
+        "model": "model",
+        "provider": "provider"
+      }
+    },
+    {
+      "name": "empty-after-sanitizing",
+      "content": "\u23f3 Working \u2014  \u00b7 model (provider)\nAgent `11111111-1111-4111-8111-111111111111` \u00b7 server `srv_KIFHQ_zsBnI2`\n[Open agent](paseo://h/srv_KIFHQ_zsBnI2/agent/11111111-1111-4111-8111-111111111111)\nReported status \u00b7 source: root",
+      "expectedLabels": {
+        "title": "",
+        "model": "model",
+        "provider": "provider"
+      }
+    },
+    {
+      "name": "truncated-space",
+      "content": "\u23f3 Working \u2014 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  \u00b7 model (provider)\nAgent `11111111-1111-4111-8111-111111111111` \u00b7 server `srv_KIFHQ_zsBnI2`\n[Open agent](paseo://h/srv_KIFHQ_zsBnI2/agent/11111111-1111-4111-8111-111111111111)\nReported status \u00b7 source: root",
+      "expectedLabels": {
+        "title": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ",
+        "model": "model",
+        "provider": "provider"
+      }
+    },
+    {
+      "name": "joiner-sanitized",
+      "content": "\u23f3 Working \u2014 \ud83d\udc69 \ud83d\udcbb \u00b7 model (provider)\nAgent `11111111-1111-4111-8111-111111111111` \u00b7 server `srv_KIFHQ_zsBnI2`\n[Open agent](paseo://h/srv_KIFHQ_zsBnI2/agent/11111111-1111-4111-8111-111111111111)\nReported status \u00b7 source: root",
+      "expectedLabels": {
+        "title": "\ud83d\udc69 \ud83d\udcbb",
+        "model": "model",
+        "provider": "provider"
+      }
+    }
+  ]
+}

@@ -943,7 +943,12 @@ export function useEditMessageMutation(channel: Channel | null) {
           mediaTags !== undefined || editTags.length > 0
             ? applyEditTagOverlay(message.tags, editTags)
             : message.tags;
-        return { ...message, content, tags: nextTags };
+        return {
+          ...message,
+          content,
+          tags: nextTags,
+          localEditedContent: true,
+        };
       };
 
       // The WINDOW STORE is the source of truth: every live merge

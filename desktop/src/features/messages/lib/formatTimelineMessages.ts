@@ -1,3 +1,7 @@
+import {
+  BRIDGE_STATUS_SIGNER,
+  overlayBridgeStatusTags,
+} from "./bridgeStatusCard";
 import type {
   Channel,
   ChannelMember,
@@ -262,7 +266,13 @@ export function formatTimelineMessages(
   // the original (`h`, `p` mentions, etc.) stay untouched.
   const editsByTargetId = new Map<
     string,
-    { content: string; tags: string[][]; createdAt: number }
+    {
+      content: string;
+      tags: string[][];
+      createdAt: number;
+      eventId: string;
+      signerPubkey: string;
+    }
   >();
   for (const event of events) {
     if (
@@ -288,9 +298,17 @@ export function formatTimelineMessages(
     }
 
     const existing = editsByTargetId.get(targetId);
-    if (!existing || event.created_at > existing.createdAt) {
+    if (
+      !existing ||
+      event.created_at > existing.createdAt ||
+      (normalizePubkey(target.pubkey) === BRIDGE_STATUS_SIGNER &&
+        event.created_at === existing.createdAt &&
+        event.id < existing.eventId)
+    ) {
       editsByTargetId.set(targetId, {
         content: event.content,
+        eventId: event.id,
+        signerPubkey: normalizePubkey(event.pubkey),
         tags: event.tags,
         createdAt: event.created_at,
       });
@@ -482,6 +500,9 @@ export function formatTimelineMessages(
       createdAt: event.created_at,
       pubkey: authorPubkey,
       signerPubkey: normalizePubkey(event.pubkey),
+      // A local cache patch has not carried a signed edit through this projection yet.
+      editSignerPubkey:
+        edit?.signerPubkey ?? (event.localEditedContent ? "" : undefined),
       author,
       isAgent,
       ownerPubkey,
@@ -517,7 +538,12 @@ export function formatTimelineMessages(
       // Logic lives in `applyEditTagOverlay.mjs` so prod and tests share
       // a single source.
       tags: (() => {
-        const effectiveTags = applyEditTagOverlay(event.tags, edit?.tags);
+        const baseTags =
+          normalizePubkey(event.pubkey) === BRIDGE_STATUS_SIGNER &&
+          edit?.signerPubkey === BRIDGE_STATUS_SIGNER
+            ? overlayBridgeStatusTags(event.tags, edit.tags)
+            : event.tags;
+        const effectiveTags = applyEditTagOverlay(baseTags, edit?.tags);
         if (
           hasLinkPreviewSuppression(event.tags) ||
           previewSuppressedTargetIds.has(event.id)
