@@ -31,6 +31,8 @@ const ReadingContext = React.createContext<{
   restored: (key: string) => boolean;
   beginRestore: (key: string) => void;
   completeRestore: (key: string) => void;
+  interacted: (key: string) => boolean;
+  interaction: (key: string) => void;
 } | null>(null);
 
 /** Context only: preserve existing thread/composer DOM ancestry. */
@@ -43,6 +45,7 @@ export function ConversationReadingPositionsProvider({
   const [value] = React.useState(() => {
     const active = new Map<string, number>();
     const restored = new Set<string>();
+    const interactions = new Set<string>();
     return {
       read: (key: string) =>
         readPosition(current.current.readingPositions, key),
@@ -64,6 +67,7 @@ export function ConversationReadingPositionsProvider({
           else {
             active.delete(key);
             restored.delete(key);
+            interactions.delete(key);
           }
         };
       },
@@ -73,6 +77,10 @@ export function ConversationReadingPositionsProvider({
       },
       completeRestore: (key: string) => {
         if (active.has(key)) restored.add(key);
+      },
+      interacted: (key: string) => interactions.has(key),
+      interaction: (key: string) => {
+        if (active.has(key)) interactions.add(key);
       },
     };
   });
@@ -116,7 +124,9 @@ export function useCaptureConversationReadingPosition({
     };
     const stop = scope.register(key, capture);
     const gesture = () => {
+      if (!mounted) return;
       interacted = true;
+      scope.interaction(key);
     };
     const save = () => {
       const position = capture();
@@ -206,7 +216,7 @@ export function useRestoreConversationReadingPosition({
       attempted.current = { key, element, started: false };
     const attempt = attempted.current;
     if (attempt.started) return;
-    if (explicitTarget) {
+    if (explicitTarget || scope.interacted(key)) {
       attempt.started = true;
       scope.completeRestore(key);
       return;

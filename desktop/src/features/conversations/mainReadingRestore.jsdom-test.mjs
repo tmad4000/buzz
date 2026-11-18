@@ -10,13 +10,17 @@ import {
 import { ConversationViewContext } from "./ConversationViewContext.tsx";
 import { readingPositionKey } from "./layout/readingPositions.ts";
 
-async function fixture({ covered = false, explicit = false } = {}) {
+async function fixture({
+  covered = false,
+  explicit = false,
+  focused = true,
+} = {}) {
   const host = document.createElement("div"),
     mount = document.createElement("div"),
     viewport = document.createElement("div");
   host.append(mount, viewport);
   document.body.append(host);
-  host.dataset.focusedConversation = "true";
+  host.dataset.focusedConversation = focused ? "true" : "false";
   if (covered) host.setAttribute("inert", "");
   viewport.getClientRects = () => [{ width: 400, height: 500 }];
   viewport.getBoundingClientRect = () => ({ top: 100 });
@@ -38,9 +42,9 @@ async function fixture({ covered = false, explicit = false } = {}) {
     key: readingPositionKey("main", mode),
     position: { id: `saved-${mode}`, offset: -2, pixel: 500, neighbors: [] },
   }));
-  const view = {
+  let view = {
     viewInstanceId: "a",
-    focused: true,
+    focused,
     visible: true,
     interactive: true,
     rootRef: { current: host },
@@ -105,6 +109,11 @@ async function fixture({ covered = false, explicit = false } = {}) {
     },
     explicit: async (next) => {
       explicitTarget = next;
+      await render();
+    },
+    focus: async () => {
+      host.dataset.focusedConversation = "true";
+      view = { ...view, focused: true };
       await render();
     },
     close: async () => {
@@ -185,6 +194,23 @@ test("explicit route targets suppress saved restoration even after the target cl
     assert.equal(h.calls.length, 0);
     await h.mode("timeline");
     assert.equal(h.calls.length, 1);
+  } finally {
+    await h.close();
+  }
+});
+
+test("a reading gesture before first focus consumes the old restore opportunity", async () => {
+  const h = await fixture({ focused: false });
+  try {
+    assert.equal(h.calls.length, 0);
+    h.viewport.dispatchEvent(new Event("wheel"));
+    await h.focus();
+    assert.equal(
+      h.calls.length,
+      0,
+      "focus must not overwrite a reader's newer position",
+    );
+    assert.ok(h.readers.get(h.key())());
   } finally {
     await h.close();
   }
