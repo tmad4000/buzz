@@ -17,6 +17,8 @@ import {
   type CreateId,
   type SplitAxis,
 } from "./model";
+import { updateReadingPosition as mergeReadingPosition } from "./readingPositions";
+import type { TimelineReadingPosition } from "@/features/messages/ui/timelineReadingPosition";
 import { canSplit, type Size } from "./geometry";
 import type { ConversationVisitCache } from "./visitCache";
 import { restoreVisitCache, saveVisitCache } from "./visitCacheStorage";
@@ -290,6 +292,31 @@ export class ConversationLayoutController {
     return this.change(
       updateViewPresentation(this.snapshot.layout, viewId, channelId, patch),
     );
+  }
+  updateReadingPosition(
+    viewId: string,
+    channelId: string,
+    visit: number | undefined,
+    key: string,
+    position: TimelineReadingPosition,
+  ) {
+    const view = this.snapshot.layout.views[viewId];
+    if (
+      !this.current() ||
+      !view ||
+      view.channelId !== channelId ||
+      visit === undefined ||
+      this.visits.get(viewId) !== visit
+    )
+      return false;
+    const readingPositions = mergeReadingPosition(
+      view.readingPositions,
+      key,
+      position,
+    );
+    if (!readingPositions) return false;
+    if (readingPositions === view.readingPositions) return true;
+    return this.update(viewId, channelId, visit, { readingPositions });
   }
   close(paneId: string, wholeSplit = false) {
     if (!this.current()) return false;

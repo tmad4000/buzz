@@ -2,6 +2,10 @@ import {
   copyExplicitExpansion,
   type ExplicitExpansionSnapshot,
 } from "./explicitExpansion";
+import {
+  copyReadingPositions,
+  type ViewReadingPositions,
+} from "./readingPositions";
 // Tree shape and normalized-size operations adapted from Paseo, Apache-2.0.
 // Copyright (c) 2025-present Mohamed Boudra. See docs/conversation-layout-provenance.md.
 import {
@@ -40,6 +44,7 @@ export type ConversationView = {
   legacyExpansionOwner?: boolean;
   timelineAnchor: ScrollAnchor | null;
   threadAnchor: ScrollAnchor | null;
+  readingPositions?: ViewReadingPositions;
 };
 export type PaneNode = { kind: "pane"; id: string; viewInstanceId: string };
 export type GroupNode = {
@@ -91,6 +96,9 @@ export function createConversationView(
       ? { preferences: copyViewPreferences(seed.preferences) }
       : {}),
     timelineAnchor: seed?.timelineAnchor ? { ...seed.timelineAnchor } : null,
+    ...(seed?.readingPositions
+      ? { readingPositions: copyReadingPositions(seed.readingPositions) }
+      : {}),
     threadAnchor: seed?.threadAnchor ? { ...seed.threadAnchor } : null,
   };
 }
@@ -328,6 +336,7 @@ export function navigateView(
     | "threadAnchor"
     | "preferences"
     | "explicitExpansion"
+    | "readingPositions"
   >,
 ): ConversationLayout {
   if (!Object.hasOwn(layout.views, viewId)) return layout;
@@ -351,6 +360,11 @@ export function navigateView(
     timelineAnchor: presentation?.timelineAnchor
       ? { ...presentation.timelineAnchor }
       : null,
+    ...(presentation?.readingPositions
+      ? {
+          readingPositions: copyReadingPositions(presentation.readingPositions),
+        }
+      : {}),
     threadAnchor: presentation?.threadAnchor
       ? { ...presentation.threadAnchor }
       : null,
@@ -371,6 +385,7 @@ export function updateViewPresentation(
       | "threadAnchor"
       | "preferences"
       | "explicitExpansion"
+      | "readingPositions"
     >
   >,
 ): ConversationLayout {
@@ -381,6 +396,9 @@ export function updateViewPresentation(
   const next = {
     ...view,
     ...patch,
+    ...(patch.readingPositions
+      ? { readingPositions: copyReadingPositions(patch.readingPositions) }
+      : {}),
     ...(patch.explicitExpansion
       ? { explicitExpansion: copyExplicitExpansion(patch.explicitExpansion) }
       : {}),

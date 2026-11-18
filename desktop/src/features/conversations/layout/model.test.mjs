@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  readingPositionKey,
+  updateReadingPosition,
+} from "./readingPositions.ts";
+import {
   createConversationView,
   createSingleLayout,
   splitPane,
@@ -25,6 +29,25 @@ function setup() {
   const view = createConversationView("same-chat", ids);
   return { ids, view, initial: createSingleLayout(view, ids) };
 }
+
+test("duplicate and navigation copy all reading contexts without sharing neighbors", () => {
+  const { ids, view, initial } = setup();
+  const key = readingPositionKey("main", "threads");
+  view.readingPositions = updateReadingPosition(undefined, key, {
+    id: "message",
+    offset: 1,
+    pixel: 2,
+    neighbors: ["neighbor"],
+  });
+  const duplicate = createConversationView(view.channelId, ids, view);
+  duplicate.readingPositions[0].position.neighbors.push("only-duplicate");
+  assert.deepEqual(view.readingPositions[0].position.neighbors, ["neighbor"]);
+  const next = navigateView(initial, view.id, "return-chat", view);
+  next.views[view.id].readingPositions[0].position.neighbors.push(
+    "only-return",
+  );
+  assert.deepEqual(view.readingPositions[0].position.neighbors, ["neighbor"]);
+});
 
 test("duplicate chat split has fresh instance and independent copied presentation, capped at two", () => {
   const { ids, view, initial } = setup();

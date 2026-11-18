@@ -5,6 +5,106 @@ import { bindVisitPreferences } from "./visitPreferences.ts";
 import { listPanes } from "./model.ts";
 import { layoutStorageKey } from "./storage.ts";
 import { visitCacheStorageKey } from "./visitCacheStorage.ts";
+import { readingPositionKey, readPosition } from "./readingPositions.ts";
+
+test("reading positions merge live per-view contexts and reject retired visits", () => {
+  const h = setup();
+  const controller = h.controller;
+  try {
+    const a = panes(controller)[0].viewInstanceId;
+    const visit = controller.visitToken(a);
+    const main = readingPositionKey("main", "threads");
+    const timeline = readingPositionKey("main", "timeline");
+    const thread = readingPositionKey("thread", "focus", "root");
+    const snapshot = (id) => ({
+      id,
+      offset: -4,
+      pixel: 200,
+      neighbors: ["neighbor"],
+    });
+    assert.equal(
+      controller.updateReadingPosition(
+        a,
+        "chat",
+        visit,
+        main,
+        snapshot("main-a"),
+      ),
+      true,
+    );
+    assert.equal(
+      controller.updateReadingPosition(
+        a,
+        "chat",
+        visit,
+        thread,
+        snapshot("thread-a"),
+      ),
+      true,
+    );
+    assert.equal(
+      controller.updateReadingPosition(
+        a,
+        "chat",
+        visit,
+        timeline,
+        snapshot("timeline-a"),
+      ),
+      true,
+    );
+    split(controller);
+    const b = panes(controller).find(
+      (pane) => pane.viewInstanceId !== a,
+    ).viewInstanceId;
+    assert.equal(
+      controller.updateReadingPosition(
+        b,
+        "chat",
+        controller.visitToken(b),
+        main,
+        snapshot("main-b"),
+      ),
+      true,
+    );
+    const aPositions =
+      controller.getSnapshot().layout.views[a].readingPositions;
+    assert.equal(readPosition(aPositions, main).id, "main-a");
+    assert.equal(readPosition(aPositions, thread).id, "thread-a");
+    assert.equal(readPosition(aPositions, timeline).id, "timeline-a");
+    controller.navigate(a, "dm");
+    controller.navigate(a, "chat");
+    assert.equal(
+      controller.updateReadingPosition(
+        a,
+        "chat",
+        visit,
+        main,
+        snapshot("stale"),
+      ),
+      false,
+    );
+    assert.equal(
+      readPosition(
+        controller.getSnapshot().layout.views[a].readingPositions,
+        main,
+      ).id,
+      "main-a",
+    );
+    h.invalidate();
+    assert.equal(
+      controller.updateReadingPosition(
+        a,
+        "chat",
+        controller.visitToken(a),
+        main,
+        snapshot("invalid"),
+      ),
+      false,
+    );
+  } finally {
+    controller.dispose();
+  }
+});
 
 const bounds = { width: 1000, height: 800 };
 const scope = {

@@ -1,4 +1,5 @@
 import { copyExplicitExpansion } from "./explicitExpansion";
+import { copyReadingPositions } from "./readingPositions";
 import {
   copyPanelState,
   copyViewPreferences,
@@ -52,11 +53,17 @@ export type VisitPresentation = Pick<
   | "threadAnchor"
   | "preferences"
   | "explicitExpansion"
+  | "readingPositions"
 >;
 
 function copy(presentation: VisitPresentation): VisitPresentation {
   return {
     panelState: copyPanelState(presentation.panelState),
+    ...(presentation.readingPositions
+      ? {
+          readingPositions: copyReadingPositions(presentation.readingPositions),
+        }
+      : {}),
     ...(presentation.explicitExpansion
       ? {
           explicitExpansion: copyExplicitExpansion(
