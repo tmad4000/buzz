@@ -1,5 +1,8 @@
 # Forward to agent — separate .9 source delivery
 
+Draft PR: https://github.com/tmad4000/buzz/pull/85
+Feature commit: `78e71a621` (stacked on unchanged PR81).
+
 Owner: Sol session5e7bc9da. Worktree `/home/dev/agent-worktrees/forward-to-agent-20261118`; branch `sol/forward-to-agent-20261118`. Stacked on Direct Agents PR81 at `02eb5541275f27464c1ffe8375c6ac1ce98a82c9`, which remains unchanged. That base descends from the requested .8 tag69eda1ff (peeled source16fa57df).
 
 Original ask: Jacob, Buzz P2 2026-11-18 05:50Z, one-click forwarding to another orchestrator alongside Send to thread. Root's approved nonrecursive contract: Paseo DM→P2(later), P2→Paseo DM(now), plus existing Direct agents picker; quote/backlink sent by Jacob's own client; original Forwarded-to-target marker; no new relay kind; default OFF; separate .9 draft and independent Sol review via root.
