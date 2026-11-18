@@ -1,7 +1,7 @@
 # Direct agents — .9 source delivery
 
 Draft PR: https://github.com/tmad4000/buzz/pull/81
-Base branch: `sol/direct-agents-base-ideaflow8-20261118` (frozen .8 tag source).
+Base branch: `sol/buzz8-release` at16fa57df (root-designated .9 review base; matches the .8 tag source).
 
 Owner: Sol session5e7bc9da, worktree `/home/dev/agent-worktrees/direct-agents-20261118`, branch `sol/direct-agents-20261118`.
 
@@ -17,7 +17,7 @@ Validation: TypeScript `tsc --noEmit`; focused actual model/UI/hook/defaults/ope
 
 Open integration work: listener owner075fe138 received the exact agent-key publisher contract for startup/health ticks. The M4 launcher owner must verify and publish the Hermes card; no new cloud-to-Mac access was attempted. Hermes/Buzz DM section membership remains with the existing private sidebar seed/device owner36ce8949; this PR cannot identify private DMs from source without inventing IDs. Both sidebar and composed-integration owners were notified before additive shared-file changes. Publisher examples and acceptance steps are in `docs/fork/direct-agents.md`.
 
-Independent Sol review requested from rootd3caa262, with exact-head request to follow the draft PR URL. This remains draft; no release, native/human acceptance or completed-review attestation is claimed. Integration should cherry-pick the two prerequisite opener commits only if absent, followed by this feature commit, into .9. A task-owned frozen .8 base branch makes the draft diff reviewable without unrelated release history.
+Independent Sol review requested from rootd3caa262, with exact-head request to follow the draft PR URL. This remains draft; no release, native/human acceptance or completed-review attestation is claimed. Integration should cherry-pick the two prerequisite opener commits only if absent, followed by this feature commit, into .9. Root designated `sol/buzz8-release` as the canonical .9 draft base; it matches the .8 source exactly.
 
 ## Sidebar ownership follow-up (2026-11-18)
 
@@ -26,3 +26,6 @@ Root requested exact-diff confirmation from owner36ce8949. The complete committe
 Owner identified a composition overlap with PR46head3481a9fb: its Star toggle is `right-6`, while runtime actions were `right-7`. This follow-up changes only both runtime wrappers to `right-14`, reserving separate sibling slots. Owner confirmed positional composition, and received the exact two-line diff before follow-up push. Follow-up typecheck and24/24 focused UI/model tests pass; narrow native rows, keyboard focus and hit targets remain captain-gated acceptance, not Linux verification.
 
 Captain9888b74e explicitly granted exactly one read-only `nice -n 10 paseo status --host ssh://m5 --json`, with20s timeout/output cap/no retries. At2026-11-18T06:31:07Z it returned a status error without a serverId. Owned process group was cleaned. No retry, alternate endpoint, bridge setup or Mac mutation followed. Captain then explicitly held further M5 work. Therefore `srv_xmGYpGqxNnXR` remains the previously reviewed allowlist value, **not live-confirmed by this task**.
+
+
+Root base/writer clarification: PR81 now targets `sol/buzz8-release` (same16fa57df source as the annotated69eda1ff tag). Forwarding PR85 stays stacked on PR81 to isolate its feature diff. Listener self-signed publication is a writer contract/examples handoff exclusively to075fe13; this worktree never changes/deploys the listener. Hermes M4 launcher integration is contract-only with no M4 deployment. Root assigns the independent exact-head Sol reviewer.
