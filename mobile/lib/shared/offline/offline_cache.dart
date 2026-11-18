@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:pointycastle/digests/sha256.dart';
 
 import '../crypto/nip44.dart';
+import '../crypto/ecdh.dart' show secureRandomBytes;
 
 /// One seam for the recommended all-payload NIP-44-to-self policy.
 abstract interface class OfflinePayloadCipher {
@@ -25,9 +26,11 @@ class Nip44OfflineCipher implements OfflinePayloadCipher {
       compute(_open, (conversationKey, ciphertext));
 }
 
+// Version 2 puts authenticated routing and position inside EVERY NIP-44 chunk.
+// Legacy manifest-only snapshots are optional cache misses, never partially read.
 String _seal((Uint8List, Map<String, dynamic>) args) {
   final text = jsonEncode(args.$2);
-  final chunks = <String>[];
+  final parts = <String>[];
   for (var start = 0; start < text.length;) {
     var end = (start + 8000).clamp(0, text.length);
     if (end < text.length &&
@@ -35,17 +38,25 @@ String _seal((Uint8List, Map<String, dynamic>) args) {
         text.codeUnitAt(end - 1) <= 0xdbff) {
       end--;
     }
-    chunks.add(nip44Encrypt(args.$1, text.substring(start, end)));
+    parts.add(text.substring(start, end));
     start = end;
   }
-  chunks.insert(
-    0,
-    nip44Encrypt(
-      args.$1,
-      jsonEncode({'digest': offlineHash(text), 'count': chunks.length}),
-    ),
-  );
-  return jsonEncode(chunks);
+  final binding = {
+    'version': 2,
+    'scope': args.$2['scope'] as String,
+    'kind': args.$2['kind'] as String,
+    'id': args.$2['id'] as String,
+    'bundleId': base64UrlEncode(secureRandomBytes(32)),
+    'count': parts.length,
+    'digest': offlineHash(text),
+  };
+  return jsonEncode([
+    for (var index = 0; index < parts.length; index++)
+      nip44Encrypt(
+        args.$1,
+        jsonEncode({...binding, 'index': index, 'data': parts[index]}),
+      ),
+  ]);
 }
 
 Map<String, dynamic> _open((Uint8List, String) args) {
@@ -53,16 +64,51 @@ Map<String, dynamic> _open((Uint8List, String) args) {
   if (chunks.isEmpty || chunks.length > 140) {
     throw const FormatException('Invalid offline chunks');
   }
-  final manifest = jsonDecode(nip44Decrypt(args.$1, chunks.first)) as Map;
-  final text = chunks
-      .skip(1)
-      .map((chunk) => nip44Decrypt(args.$1, chunk))
-      .join();
-  if (manifest['count'] != chunks.length - 1 ||
-      manifest['digest'] != offlineHash(text)) {
+  Map<String, dynamic>? binding;
+  final text = StringBuffer();
+  for (var index = 0; index < chunks.length; index++) {
+    final chunk =
+        jsonDecode(nip44Decrypt(args.$1, chunks[index]))
+            as Map<String, dynamic>;
+    final expected = binding ??= chunk;
+    if (chunk['version'] != 2 ||
+        chunk['scope'] is! String ||
+        chunk['kind'] is! String ||
+        chunk['id'] is! String ||
+        chunk['bundleId'] is! String ||
+        (chunk['bundleId'] as String).length != 44 ||
+        chunk['digest'] is! String ||
+        chunk['count'] is! int ||
+        chunk['count'] != chunks.length ||
+        chunk['index'] is! int ||
+        chunk['index'] != index ||
+        chunk['data'] is! String ||
+        (chunk['data'] as String).length > 8000 ||
+        [
+          'scope',
+          'kind',
+          'id',
+          'bundleId',
+          'count',
+          'digest',
+        ].any((field) => chunk[field] != expected[field])) {
+      throw const FormatException('Offline chunk binding mismatch');
+    }
+    text.write(chunk['data']);
+  }
+  final joined = text.toString();
+  if (binding!['digest'] != offlineHash(joined)) {
     throw const FormatException('Offline chunk integrity mismatch');
   }
-  return jsonDecode(text) as Map<String, dynamic>;
+  final envelope = jsonDecode(joined) as Map<String, dynamic>;
+  if ([
+    'scope',
+    'kind',
+    'id',
+  ].any((field) => envelope[field] != binding![field])) {
+    throw const FormatException('Offline record binding mismatch');
+  }
+  return envelope;
 }
 
 String offlineHash(String value) => SHA256Digest()

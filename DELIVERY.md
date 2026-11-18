@@ -15,3 +15,5 @@ PR90 mobile takeover: Paseo `01d56bc1` owns b–f fixes and review coordination,
 PR90 follow-up strengthens fresh post-clear head/thread event, OFF sign-out filesystem-fault, warm/cold all-kind/index temp, and partial-write/rename evidence. See the follow-up section and `pr90-followup-combined-verified.log` / `pr90-followup-final-analyze.log`; original a027 ACK remains historical.
 
 PR90 remaining M-OFF delta after reviewer comment6974045086: feature-gated channel route predicate (deferred mounted/cancel safety preserved), ON-only thread relayConfig watch, covered-route/readiness mounted regression and ON/OFF scope-watch regression. See the detailed mobile handoff and `pr90-off-*` evidence.
+
+Root superseded mobile pause: resume independently in parallel; same43467fd2 reviewer via coordinator. Mobile literal R3 now places authenticated scope/record/kind/index/count/random-bundle-ID headers in EVERY NIP44 chunk, with real tamper/splice/reorder/omit/duplicate/cross-bundle regressions. See the final literal-R3 handoff and `pr90-r3-*` receipts.

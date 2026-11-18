@@ -1,0 +1,4 @@
+00:00 +0: loading /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channel_detail_page_test.dart
+00:00 +0: P1 cached channel bodies never advance read markers on open
+00:03 +1: P1 OFF covered channel readiness retains baseline read and observed-unread update
+00:04 +2: All tests passed!

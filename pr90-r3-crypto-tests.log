@@ -1,0 +1,32 @@
+00:00 +0: loading /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_chunk_binding_p1_test.dart
+00:00 +0: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_chunk_binding_p1_test.dart: every real NIP44 chunk authenticates routing, index, count and unique bundle
+00:00 +1: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_chunk_binding_p1_test.dart: real NIP44 reassembly rejects splice-record
+00:00 +2: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_chunk_binding_p1_test.dart: real NIP44 reassembly rejects splice-scope
+00:00 +3: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_chunk_binding_p1_test.dart: real NIP44 reassembly rejects splice-kind
+00:00 +4: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_chunk_binding_p1_test.dart: real NIP44 reassembly rejects cross-bundle
+00:00 +5: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_chunk_binding_p1_test.dart: real NIP44 reassembly rejects reorder
+00:00 +6: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_cache_p1_test.dart: actual NIP44 file roundtrip survives new store, Unicode chunks, and isolates scopes
+00:00 +7: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_cache_p1_test.dart: actual NIP44 file roundtrip survives new store, Unicode chunks, and isolates scopes
+00:00 +8: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_cache_p1_test.dart: actual NIP44 file roundtrip survives new store, Unicode chunks, and isolates scopes
+00:00 +9: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_cache_p1_test.dart: actual NIP44 file roundtrip survives new store, Unicode chunks, and isolates scopes
+00:00 +10: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_cache_p1_test.dart: actual NIP44 file roundtrip survives new store, Unicode chunks, and isolates scopes
+00:00 +11: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_cache_p1_test.dart: actual NIP44 file roundtrip survives new store, Unicode chunks, and isolates scopes
+00:00 +12: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_cache_p1_test.dart: actual NIP44 file roundtrip survives new store, Unicode chunks, and isolates scopes
+00:00 +13: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_cache_p1_test.dart: actual NIP44 file roundtrip survives new store, Unicode chunks, and isolates scopes
+00:00 +14: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_cache_p1_test.dart: actual NIP44 file roundtrip survives new store, Unicode chunks, and isolates scopes
+00:00 +15: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_cache_p1_test.dart: actual NIP44 file roundtrip survives new store, Unicode chunks, and isolates scopes
+00:00 +16: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_cache_p1_test.dart: actual NIP44 file roundtrip survives new store, Unicode chunks, and isolates scopes
+00:00 +17: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_cache_p1_test.dart: actual NIP44 file roundtrip survives new store, Unicode chunks, and isolates scopes
+00:00 +18: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_cache_p1_test.dart: actual NIP44 file roundtrip survives new store, Unicode chunks, and isolates scopes
+00:00 +19: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_cache_p1_test.dart: actual NIP44 file roundtrip survives new store, Unicode chunks, and isolates scopes
+00:00 +20: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_cache_p1_test.dart: actual NIP44 file roundtrip survives new store, Unicode chunks, and isolates scopes
+00:00 +21: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_cache_p1_test.dart: actual NIP44 file roundtrip survives new store, Unicode chunks, and isolates scopes
+00:00 +22: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_cache_p1_test.dart: actual NIP44 file roundtrip survives new store, Unicode chunks, and isolates scopes
+00:01 +23: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_cache_p1_test.dart: actual NIP44 file roundtrip survives new store, Unicode chunks, and isolates scopes
+00:01 +24: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_chunk_binding_p1_test.dart: store rejects whole ciphertext swapped to another scope, record or kind
+00:01 +25: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_cache_p1_test.dart: file model caps heads/threads and rejects oversized complete units
+00:01 +26: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_cache_p1_test.dart: file model caps heads/threads and rejects oversized complete units
+00:08 +27: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_cache_p1_test.dart: production LRU enforces byte budget and retired scopes cannot refill
+00:08 +28: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_cache_p1_test.dart: clear fences encryption in flight and leaves no committed payload
+00:08 +29: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_cache_p1_test.dart: late encryption cannot replace a newer committed unit
+00:08 +30: All tests passed!
