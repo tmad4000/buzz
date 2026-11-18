@@ -7,16 +7,14 @@ import { configureMockup, type Scenario } from "./runtime";
 import "./mockup.css";
 import { waitFor } from "./presentation";
 
-const scenarios = import.meta.glob<{ default: Scenario }>("./scenarios/*.tsx", {
-  eager: true,
-});
+const scenarios = import.meta.glob<{ default: Scenario }>("./scenarios/*.tsx");
 const params = new URLSearchParams(location.search);
 const slug = params.get("scenario") ?? "shell";
-const scenario = scenarios[`./scenarios/${slug}.tsx`]?.default;
 const relayUrl = "wss://buzz-mockup.invalid";
 const communityId = "buzz-mockup";
 
 async function bootstrap() {
+  const scenario = (await scenarios[`./scenarios/${slug}.tsx`]?.())?.default;
   if (!scenario) throw new Error(`Unknown Buzz scenario: ${slug}`);
   const theme = params.get("theme") === "dark" ? "buzz-dark" : "buzz";
   document.title = `Buzz · ${scenario.title}`;

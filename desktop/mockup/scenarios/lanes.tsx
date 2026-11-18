@@ -1,5 +1,15 @@
 import { type ReactNode, useState, useSyncExternalStore } from "react";
-import { Columns3, Ellipsis, Maximize2, Minimize2, Search } from "lucide-react";
+import {
+  CircleCheck,
+  CircleHelp,
+  Columns3,
+  Ellipsis,
+  Hourglass,
+  Maximize2,
+  Minimize2,
+  Search,
+  ThumbsUp,
+} from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import {
   DropdownMenu,
