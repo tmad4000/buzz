@@ -297,7 +297,7 @@ export function ChannelMenuButton({
   const button = (
     <SidebarMenuButton
       className={cn(
-        "data-[active=true]:font-normal",
+        "data-[active=true]:font-normal has-[[data-runtime-route]]:h-auto has-[[data-runtime-route]]:min-h-8",
         isActive
           ? "group-hover/menu-item:bg-sidebar-active group-hover/menu-item:text-sidebar-active-foreground"
           : "group-hover/menu-item:bg-sidebar-accent group-hover/menu-item:text-sidebar-foreground",
