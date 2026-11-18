@@ -1,4 +1,5 @@
 import { CHANNEL, JACOB, NORA, SOL, channels, message } from "../fixtures";
+import { waitFor } from "../presentation";
 import type { Scenario } from "../runtime";
 
 export default {
@@ -26,5 +27,8 @@ export default {
         12,
       ),
     ],
+  },
+  async prepare() {
+    await waitFor('[data-testid="message-row"]');
   },
 } satisfies Scenario;
