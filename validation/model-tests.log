@@ -1,0 +1,106 @@
+TAP version 13
+# Subtest: owning pane rejects quote navigation before changing any state when Page or thread edit guard refuses
+ok 1 - owning pane rejects quote navigation before changing any state when Page or thread edit guard refuses
+  ---
+  duration_ms: 71.216168
+  type: 'test'
+  ...
+# Subtest: same-thread parent jump exposes an exact target without retargeting the newer composer draft
+ok 2 - same-thread parent jump exposes an exact target without retargeting the newer composer draft
+  ---
+  duration_ms: 7.002089
+  type: 'test'
+  ...
+# Subtest: opening a different thread sets only its root as the default composer target, not the navigation parent
+ok 3 - opening a different thread sets only its root as the default composer target, not the navigation parent
+  ---
+  duration_ms: 5.4295
+  type: 'test'
+  ...
+# Subtest: allowed owning-pane jump closes the covering Page before opening the parent target
+ok 4 - allowed owning-pane jump closes the covering Page before opening the parent target
+  ---
+  duration_ms: 10.711439
+  type: 'test'
+  ...
+# Subtest: report preserves exact executor and host without claiming live work
+ok 5 - report preserves exact executor and host without claiming live work
+  ---
+  duration_ms: 2.36915
+  type: 'test'
+  ...
+# Subtest: unknown, impersonated and substantive content retain original body
+ok 6 - unknown, impersonated and substantive content retain original body
+  ---
+  duration_ms: 1.38569
+  type: 'test'
+  ...
+# Subtest: edits, watchdog source and stale metadata stay explicit
+ok 7 - edits, watchdog source and stale metadata stay explicit
+  ---
+  duration_ms: 0.592619
+  type: 'test'
+  ...
+# Subtest: root+reply tags retain exact answered event
+ok 8 - root+reply tags retain exact answered event
+  ---
+  duration_ms: 1.12701
+  type: 'test'
+  ...
+# Subtest: native nested reply quotes only the parent's current first line, independent of presentation depth
+ok 9 - native nested reply quotes only the parent's current first line, independent of presentation depth
+  ---
+  duration_ms: 1.92865
+  type: 'test'
+  ...
+# Subtest: root replies, self references and messages without native reply tags have no quote
+ok 10 - root replies, self references and messages without native reply tags have no quote
+  ---
+  duration_ms: 0.3772
+  type: 'test'
+  ...
+# Subtest: unloaded and nontext parents keep exact native jump identity without inventing a quote
+ok 11 - unloaded and nontext parents keep exact native jump identity without inventing a quote
+  ---
+  duration_ms: 0.26734
+  type: 'test'
+  ...
+# Subtest: cross-channel or ambiguous channel tags never expose a parent chip
+ok 12 - cross-channel or ambiguous channel tags never expose a parent chip
+  ---
+  duration_ms: 0.25354
+  type: 'test'
+  ...
+# Subtest: actual Markdown transform preserves canonical local and remote session hrefs
+ok 13 - actual Markdown transform preserves canonical local and remote session hrefs
+  ---
+  duration_ms: 1.9431
+  type: 'test'
+  ...
+# Subtest: arbitrary schemes, other Paseo actions and malformed routes stay sanitized
+ok 14 - arbitrary schemes, other Paseo actions and malformed routes stay sanitized
+  ---
+  duration_ms: 0.49237
+  type: 'test'
+  ...
+# Subtest: production link click opens exact session through native opener and respects cancellation
+ok 15 - production link click opens exact session through native opener and respects cancellation
+  ---
+  duration_ms: 178.541158
+  type: 'test'
+  ...
+# Subtest: native capability only grants the main window's canonical agent route
+ok 16 - native capability only grants the main window's canonical agent route
+  ---
+  duration_ms: 0.94769
+  type: 'test'
+  ...
+1..16
+# tests 16
+# suites 0
+# pass 16
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2398.61946

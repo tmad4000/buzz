@@ -1,3 +1,4 @@
+import { useFeatureEnabled } from "@/shared/features";
 import { useAppNavigation } from "@/app/navigation/useAppNavigation";
 import { threadParentQuote } from "@/features/messages/lib/threadParentQuote";
 import type { TimelineMessage } from "@/features/messages/types";
@@ -14,8 +15,9 @@ export function ThreadParentQuoteChip({
   onJumpToThreadMessage?: (rootId: string, messageId: string) => void;
 }) {
   const { goChannel } = useAppNavigation();
+  const enabled = useFeatureEnabled("agentReplyUx");
   const quote = threadParentQuote(message, messages, channelId);
-  if (!quote) return null;
+  if (!enabled || !quote) return null;
   return (
     <div className="min-w-0 pb-0.5 pl-14 pt-1">
       <button

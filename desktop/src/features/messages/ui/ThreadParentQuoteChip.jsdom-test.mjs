@@ -9,6 +9,8 @@ const calls = [];
 globalThis.__quoteJump = (...args) => calls.push(args);
 registerHooks({
   resolve(specifier, context, next) {
+    if (specifier === "@/shared/features")
+      return { shortCircuit: true, url: "quote-test:features" };
     if (specifier === "@/app/navigation/useAppNavigation")
       return { shortCircuit: true, url: "quote-test:navigation" };
     if (
@@ -19,6 +21,13 @@ registerHooks({
     return next(specifier, context);
   },
   load(url, context, next) {
+    if (url === "quote-test:features")
+      return {
+        shortCircuit: true,
+        format: "module",
+        source:
+          "export const useFeatureEnabled=()=>globalThis.__quoteFeatureEnabled !== false;",
+      };
     if (url === "quote-test:navigation")
       return {
         shortCircuit: true,
@@ -113,5 +122,46 @@ test("thread row keeps native quote jump, accessible first line and body identit
     await act(() => root.unmount());
     dom.window.close();
     delete globalThis.__quoteJump;
+  }
+});
+
+test("quote presentation remains off when experiment is disabled", async () => {
+  const dom = new JSDOM('<div id="root"></div>');
+  Object.assign(globalThis, {
+    window: dom.window,
+    document: dom.window.document,
+    IS_REACT_ACT_ENVIRONMENT: true,
+    __quoteFeatureEnabled: false,
+  });
+  const root = createRoot(document.getElementById("root"));
+  try {
+    await act(() =>
+      root.render(
+        React.createElement(MessageThreadRow, {
+          channelId: "channel",
+          message: {
+            id: "child",
+            body: "Answer",
+            tags: [
+              ["h", "channel"],
+              ["e", "root", "", "root"],
+              ["e", "parent", "", "reply"],
+            ],
+          },
+          parentMessages: new Map([
+            ["parent", { id: "parent", body: "Question" }],
+          ]),
+        }),
+      ),
+    );
+    assert.equal(
+      document.querySelector('[data-testid="thread-parent-quote"]'),
+      null,
+    );
+    assert.match(document.body.textContent, /Answer/);
+  } finally {
+    await act(() => root.unmount());
+    dom.window.close();
+    globalThis.__quoteFeatureEnabled = true;
   }
 });
