@@ -17,15 +17,17 @@ void _useThreadReplyReadState(
   useEffect(() {
     if (!admitted || !readState.isReady || replies.isEmpty) return null;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!context.mounted ||
-          ModalRoute.of(context)?.isCurrent == false ||
-          !ref.read(readAdmissionProvider(sourceId)))
+      if (ref.read(offlineEnabledProvider) &&
+          (!context.mounted ||
+              ModalRoute.of(context)?.isCurrent == false ||
+              !ref.read(readAdmissionProvider(sourceId))))
         return;
       for (final reply in replies) {
-        if (reply.pubkey == ref.read(myPubkeyProvider) ||
-            ref
-                .read(pendingLocalMessagesProvider(channelId))
-                .containsKey(reply.id))
+        if (ref.read(offlineEnabledProvider) &&
+            (reply.pubkey == ref.read(myPubkeyProvider) ||
+                ref
+                    .read(pendingLocalMessagesProvider(channelId))
+                    .containsKey(reply.id)))
           continue;
         ref
             .read(readStateProvider.notifier)

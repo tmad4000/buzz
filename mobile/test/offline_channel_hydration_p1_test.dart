@@ -17,6 +17,7 @@ class CacheConfig extends RelayConfigNotifier {
 
 class CacheSession extends RelaySessionNotifier {
   final pending = Completer<List<NostrEvent>>();
+  void Function(NostrEvent)? live;
   @override
   SessionState build() =>
       const SessionState(status: SessionStatus.disconnected);
@@ -31,7 +32,11 @@ class CacheSession extends RelaySessionNotifier {
     void Function(String)? onClosed,
     void Function(RelaySubscriptionStatus)? onStatusChanged,
     Duration timeout = const Duration(seconds: 8),
-  }) async => () {};
+  }) async {
+    live = onEvent;
+    return () {};
+  }
+
   @override
   Future<List<NostrEvent>> queryRelay(
     List<NostrFilter> filters, {

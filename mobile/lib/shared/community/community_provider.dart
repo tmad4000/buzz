@@ -322,7 +322,7 @@ class CommunityListNotifier extends AsyncNotifier<List<Community>> {
           communityPushLeaseRevocationEnqueuerProvider,
         )(current[removedIndex]);
       }
-      if (removedIndex >= 0) {
+      if (removedIndex >= 0 && ref.read(offlineEnabledProvider)) {
         final removed = current[removedIndex];
         final pubkey = removed.pubkey ?? pubkeyFromNsec(removed.nsec);
         if (pubkey != null) {

@@ -1,4 +1,7 @@
 import 'dart:async';
+import 'dart:io';
+import 'package:buzz/shared/offline/offline_provider.dart';
+import 'package:buzz/shared/offline/offline_cache.dart';
 
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter/widgets.dart';
@@ -28,6 +31,44 @@ part 'channels_provider_readiness_cases.dart';
 void main() {
   _unreadReadinessCases();
   const myPk = 'me';
+
+  for (final loadFails in [false, true]) {
+    test(
+      'optional initial sidebar ${loadFails ? "load" : "initialization"} failure still recovers relay channels',
+      () async {
+        final session = _FakeRelaySession(
+          memberships: [_membership(_channelA, myPk)],
+          metadata: [_meta(id: _channelA, name: 'general')],
+        );
+        final root = await Directory.systemTemp.createTemp('pr90-sidebar-');
+        addTearDown(() => root.delete(recursive: true));
+        final container = ProviderContainer(
+          retry: (_, _) => null,
+          overrides: [
+            myPubkeyProvider.overrideWithValue(myPk),
+            relaySessionProvider.overrideWith(() => session),
+            offlineEnabledProvider.overrideWithValue(true),
+            offlineStoreProvider.overrideWith((ref) async {
+              if (!loadFails) {
+                throw FileSystemException('directory unavailable');
+              }
+              return _ThrowingSidebarStore(root);
+            }),
+          ],
+        );
+        addTearDown(container.dispose);
+        container.read(relaySessionProvider);
+        session.setStatus(SessionStatus.disconnected);
+        final result = container.read(channelsProvider.future);
+        await container.pump();
+        session.setStatus(SessionStatus.connected);
+        expect(
+          (await result.timeout(const Duration(seconds: 5))).single.name,
+          'general',
+        );
+      },
+    );
+  }
 
   test(
     'discovers open channels for a user with zero channel memberships',
@@ -3029,4 +3070,19 @@ class _FakeRelaySession extends RelaySessionNotifier {
 class _FakeAppLifecycleNotifier extends AppLifecycleNotifier {
   @override
   AppLifecycleState build() => AppLifecycleState.resumed;
+}
+
+class _ThrowingSidebarStore extends OfflineCacheStore {
+  _ThrowingSidebarStore(Directory root)
+    : super(root: root, scope: 'scope', cipher: _UnusedCipher());
+  @override
+  Future<OfflineSnapshot?> load(String kind, String id) async =>
+      throw FileSystemException('LRU write failed');
+}
+
+class _UnusedCipher implements OfflinePayloadCipher {
+  @override
+  Future<String> seal(Map<String, dynamic> payload) async => '';
+  @override
+  Future<Map<String, dynamic>> open(String ciphertext) async => {};
 }

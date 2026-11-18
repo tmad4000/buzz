@@ -1,4 +1,5 @@
 import '../../shared/offline/offline_provider.dart';
+import '../../shared/offline/offline_cache.dart';
 import '../../shared/offline/read_admission.dart';
 import '../../shared/offline/channel_codec.dart';
 import 'dart:async';
@@ -208,33 +209,37 @@ class ChannelsNotifier extends AsyncNotifier<List<Channel>> {
       // Preserve cached channels only for a reconnect within the same scope.
       if (_hasLoaded) return state.value ?? const [];
       if (ref.read(offlineEnabledProvider)) {
-        final store = await ref.read(offlineStoreProvider.future);
-        final snapshot = await store?.load('sidebar', 'sidebar');
-        if (ref.mounted &&
-            snapshot != null &&
-            ref.read(relayConfigProvider).baseUrl == relayBaseUrl &&
-            ref.read(myPubkeyProvider)?.toLowerCase() == pubkey) {
-          final cached = (snapshot.payload as List)
-              .map(
-                (row) =>
-                    Channel.fromJson(Map<String, dynamic>.from(row as Map)),
-              )
-              .toList();
-          _hasLoaded = true;
-          ref
-              .read(offlineSourceProvider('sidebar').notifier)
-              .cached(snapshot.savedAt);
-          // Publish the cached list first; a restore during decryption must not
-          // turn a failed optional refresh into a blank sidebar.
-          Timer.run(() {
-            if (ref.mounted &&
-                ref.read(networkAvailableProvider) &&
-                ref.read(relaySessionProvider).status ==
-                    SessionStatus.connected) {
-              unawaited(_backstopRefresh());
-            }
-          });
-          return cached;
+        try {
+          final store = await ref.read(offlineStoreProvider.future);
+          final snapshot = await store?.load('sidebar', 'sidebar');
+          if (ref.mounted &&
+              snapshot != null &&
+              ref.read(relayConfigProvider).baseUrl == relayBaseUrl &&
+              ref.read(myPubkeyProvider)?.toLowerCase() == pubkey) {
+            final cached = (snapshot.payload as List)
+                .map(
+                  (row) =>
+                      Channel.fromJson(Map<String, dynamic>.from(row as Map)),
+                )
+                .toList();
+            _hasLoaded = true;
+            ref
+                .read(offlineSourceProvider('sidebar').notifier)
+                .cached(snapshot.savedAt);
+            // Publish the cached list first; a restore during decryption must not
+            // turn a failed optional refresh into a blank sidebar.
+            Timer.run(() {
+              if (ref.mounted &&
+                  ref.read(networkAvailableProvider) &&
+                  ref.read(relaySessionProvider).status ==
+                      SessionStatus.connected) {
+                unawaited(_backstopRefresh());
+              }
+            });
+            return cached;
+          }
+        } catch (error) {
+          debugPrint('Offline sidebar hydration unavailable: $error');
         }
       }
       await connected.future;
@@ -248,6 +253,7 @@ class ChannelsNotifier extends AsyncNotifier<List<Channel>> {
     bool fetchLastMessage = true,
     bool fetchDirectory = false,
   }) async {
+    final writeEpoch = OfflineCacheStore.writeEpoch;
     final configAtStart = ref.read(relayConfigProvider);
     final pubkeyAtStart = ref.read(myPubkeyProvider);
     final offlineStoreFuture = ref.read(offlineEnabledProvider)
@@ -301,6 +307,7 @@ class ChannelsNotifier extends AsyncNotifier<List<Channel>> {
             'sidebar',
             'sidebar',
             channels.map(offlineChannelJson).toList(),
+            epoch: writeEpoch,
           );
         }().catchError((Object error) {
           debugPrint('Offline sidebar write failed: $error');

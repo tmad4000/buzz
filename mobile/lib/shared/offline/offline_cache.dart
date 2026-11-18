@@ -59,8 +59,9 @@ Map<String, dynamic> _open((Uint8List, String) args) {
       .map((chunk) => nip44Decrypt(args.$1, chunk))
       .join();
   if (manifest['count'] != chunks.length - 1 ||
-      manifest['digest'] != offlineHash(text))
+      manifest['digest'] != offlineHash(text)) {
     throw const FormatException('Offline chunk integrity mismatch');
+  }
   return jsonDecode(text) as Map<String, dynamic>;
 }
 
@@ -119,6 +120,12 @@ class OfflineCacheStore {
   final Directory root;
   final String scope;
   final OfflinePayloadCipher cipher;
+  static int _clearClock = 0;
+  static final _clearedAt = <String, int>{};
+
+  /// Capture synchronously when producer work is enqueued, before any awaits.
+  static int get writeEpoch => _clearClock;
+
   static final _retired = <String>{};
   static final _recordCaches =
       <String, List<({File file, String kind, int visited, int bytes})>>{};
@@ -157,11 +164,21 @@ class OfflineCacheStore {
   Future<void> _atomic(File file, String value) async {
     await file.parent.create(recursive: true);
     final temp = File('${file.path}.tmp');
-    await temp.writeAsString(value, flush: true);
-    await temp.rename(file.path);
+    try {
+      await temp.writeAsString(value, flush: true);
+      await temp.rename(file.path);
+    } finally {
+      if (await temp.exists()) await temp.delete();
+    }
   }
 
-  Future<void> save(String kind, String id, dynamic payload) async {
+  Future<void> save(
+    String kind,
+    String id,
+    dynamic payload, {
+    int? epoch,
+  }) async {
+    if ((_clearedAt[_key] ?? 0) > (epoch ?? writeEpoch)) return;
     if (_retired.contains(_key)) return;
     final cap = offlineCaps[kind];
     if (cap == null) throw ArgumentError.value(kind);
@@ -246,8 +263,9 @@ class OfflineCacheStore {
       if (utf8.encode(ciphertext).length > cap) return null;
       final generation = _generations[_key] ?? 0;
       final envelope = await cipher.open(ciphertext);
-      if (_retired.contains(_key) || (_generations[_key] ?? 0) != generation)
+      if (_retired.contains(_key) || (_generations[_key] ?? 0) != generation) {
         return null;
+      }
       if (envelope['version'] != 1 ||
           envelope['scope'] != scope ||
           envelope['kind'] != kind ||
@@ -287,6 +305,8 @@ class OfflineCacheStore {
     if (existing != null) return [...existing];
     final result = <({File file, String kind, int visited, int bytes})>[];
     if (!await _dir.exists()) return result;
+    final indexTemp = File('$_key/index.json.tmp');
+    if (await indexTemp.exists()) await indexTemp.delete();
     for (final kind in offlineCaps.keys) {
       final dir = Directory('$_key/$kind');
       if (!await dir.exists()) continue;
@@ -363,6 +383,7 @@ class OfflineCacheStore {
     bool retire = false,
   }) {
     final key = '${root.path}/${offlineHash(scope)}';
+    _clearedAt[key] = ++_clearClock;
     if (retire) _retired.add(key);
     _generations[key] = (_generations[key] ?? 0) + 1;
     final result = (_tails[key] ?? Future<void>.value()).then((_) async {

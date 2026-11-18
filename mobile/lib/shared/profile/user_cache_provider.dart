@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../offline/offline_provider.dart';
+import '../offline/offline_cache.dart';
 import 'dart:async';
 
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -21,6 +22,7 @@ class UserCacheNotifier extends Notifier<Map<String, UserProfile>> {
   static const _maximumProfilesPerQuery = 1000;
 
   final Set<String> _pending = {};
+  final Set<String> _provisional = {};
   final Set<String> _offlineRequested = {};
   Future<void> _offlineWrites = Future<void>.value();
   final _pushExport = PushPresentationExportRecovery();
@@ -37,6 +39,15 @@ class UserCacheNotifier extends Notifier<Map<String, UserProfile>> {
     _generation++;
     _profileEventOrders.clear();
     _offlineRequested.clear();
+    _provisional.clear();
+    if (ref.read(offlineEnabledProvider)) {
+      ref.listen(relaySessionProvider, (previous, next) {
+        if (next.status == SessionStatus.connected &&
+            previous?.status != SessionStatus.connected) {
+          unawaited(preload(_provisional.toList()));
+        }
+      });
+    }
     ref.onDispose(() {
       _generation++;
       _pending.clear();
@@ -62,6 +73,7 @@ class UserCacheNotifier extends Notifier<Map<String, UserProfile>> {
       );
       if (profile.pubkey != pubkey) return;
       // Cached presentation never grants verified owner/agent authority.
+      _provisional.add(pubkey);
       state = {...state, pubkey: profile};
     } catch (error) {
       debugPrint('Offline author label unavailable: $error');
@@ -71,6 +83,7 @@ class UserCacheNotifier extends Notifier<Map<String, UserProfile>> {
   void _saveOfflineProfile(UserProfile profile) {
     if (!ref.read(offlineEnabledProvider)) return;
     final generation = _generation;
+    final epoch = OfflineCacheStore.writeEpoch;
     _offlineWrites = _offlineWrites
         .then((_) async {
           if (!_isCurrent(generation)) return;
@@ -81,7 +94,7 @@ class UserCacheNotifier extends Notifier<Map<String, UserProfile>> {
             'display_name': profile.displayName,
             'avatar_url': profile.avatarUrl,
             'nip05_handle': profile.nip05Handle,
-          });
+          }, epoch: epoch);
         })
         .catchError((Object error) {
           debugPrint('Offline author label write failed: $error');
@@ -92,7 +105,12 @@ class UserCacheNotifier extends Notifier<Map<String, UserProfile>> {
   /// available, otherwise schedules a batch fetch.
   UserProfile? get(String pubkey) {
     final cached = state[pubkey.toLowerCase()];
-    if (cached != null) return cached;
+    if (cached != null) {
+      if (_provisional.contains(pubkey.toLowerCase())) {
+        _scheduleFetch(pubkey.toLowerCase());
+      }
+      return cached;
+    }
     final normalized = pubkey.toLowerCase();
     if (ref.read(offlineEnabledProvider) && _offlineRequested.add(normalized)) {
       unawaited(_hydrateOfflineProfile(normalized, _generation));
@@ -103,6 +121,7 @@ class UserCacheNotifier extends Notifier<Map<String, UserProfile>> {
 
   /// Stores a profile that was fetched or updated outside the batch loader.
   void put(UserProfile profile) {
+    _provisional.remove(profile.pubkey.toLowerCase());
     state = {...state, profile.pubkey.toLowerCase(): profile};
     _saveOfflineProfile(profile);
   }
@@ -114,7 +133,11 @@ class UserCacheNotifier extends Notifier<Map<String, UserProfile>> {
     final alreadyPending = normalized.any(_pending.contains);
     final uncached = normalized
         .map((pk) => pk.toLowerCase())
-        .where((pk) => !state.containsKey(pk) && !_pending.contains(pk))
+        .where(
+          (pk) =>
+              (!state.containsKey(pk) || _provisional.contains(pk)) &&
+              !_pending.contains(pk),
+        )
         .toList();
     if (uncached.isEmpty && !alreadyPending) return Future.value(true);
     _pending.addAll(uncached);
@@ -162,7 +185,10 @@ class UserCacheNotifier extends Notifier<Map<String, UserProfile>> {
   }
 
   void _scheduleFetch(String pubkey) {
-    if (state.containsKey(pubkey) || _pending.contains(pubkey)) return;
+    if ((state.containsKey(pubkey) && !_provisional.contains(pubkey)) ||
+        _pending.contains(pubkey)) {
+      return;
+    }
     _pending.add(pubkey);
     _batchCompleter ??= Completer<bool>();
     _scheduleBatch();
@@ -271,6 +297,7 @@ class UserCacheNotifier extends Notifier<Map<String, UserProfile>> {
       if (!_isNewer(parsed.profile.pubkey, parsed.createdAt, parsed.eventId)) {
         continue;
       }
+      _provisional.remove(parsed.profile.pubkey);
       updated[parsed.profile.pubkey] = parsed.profile;
       _saveOfflineProfile(parsed.profile);
       _profileEventOrders[parsed.profile.pubkey] = (
@@ -294,7 +321,9 @@ class UserCacheNotifier extends Notifier<Map<String, UserProfile>> {
     if (event.kind != 0) return false;
     final pubkey = event.pubkey.toLowerCase();
     if (!_isNewer(pubkey, event.createdAt, event.id)) return false;
+    _provisional.remove(pubkey);
     profiles[pubkey] = parseProfileEvent(event).profile;
+    _saveOfflineProfile(profiles[pubkey]!);
     _profileEventOrders[pubkey] = (
       createdAt: event.createdAt,
       eventId: event.id,

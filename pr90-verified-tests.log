@@ -1,0 +1,267 @@
+00:00 +0: loading /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart
+00:00 +0: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: disk label survives failed history but reconnect replaces it through production preload
+00:01 +1: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: profile queue captured before clear cannot resurrect a later queued row
+00:02 +2: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+[ChannelMessagesNotifier] channel window unavailable for general, falling back to WS history: Exception: Channel window response must contain exactly one bounds event.
+00:04 +3: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:06 +4: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_thread_commit_p1_test.dart: opened live thread persists arriving committed replies
+00:06 +5: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_thread_commit_p1_test.dart: opened live thread persists arriving committed replies
+00:06 +6: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_thread_commit_p1_test.dart: opened live thread persists arriving committed replies
+00:07 +7: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_thread_commit_p1_test.dart: opened live thread drops pre-clear debounce
+00:09 +8: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_cache_p1_test.dart: actual NIP44 file roundtrip survives new store, Unicode chunks, and isolates scopes
+00:12 +9: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_channel_hydration_p1_test.dart: production channel notifier paints encrypted heads/summaries without authoritative read admission
+[ChannelMessagesNotifier] channel window unavailable for general, falling back to WS history: Exception: Channel window response must contain exactly one bounds event.
+00:14 +10: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_cache_p1_test.dart: file model caps heads/threads and rejects oversized complete units
+00:23 +11: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_cache_p1_test.dart: file model caps heads/threads and rejects oversized complete units
+00:23 +12: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_cache_p1_test.dart: file model caps heads/threads and rejects oversized complete units
+00:24 +13: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_cache_p1_test.dart: file model caps heads/threads and rejects oversized complete units
+00:29 +14: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_cache_p1_test.dart: file model caps heads/threads and rejects oversized complete units
+00:36 +15: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_cache_p1_test.dart: file model caps heads/threads and rejects oversized complete units
+00:39 +16: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_cache_p1_test.dart: file model caps heads/threads and rejects oversized complete units
+00:39 +17: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_cache_p1_test.dart: file model caps heads/threads and rejects oversized complete units
+00:40 +18: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_cache_p1_test.dart: file model caps heads/threads and rejects oversized complete units
+00:40 +19: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/profile/user_cache_provider_test.dart: newer refresh can remove obsolete owner attribution
+00:40 +20: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_cache_p1_test.dart: production LRU enforces byte budget and retired scopes cannot refill
+00:40 +21: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_cache_p1_test.dart: production LRU enforces byte budget and retired scopes cannot refill
+00:40 +22: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/profile/user_cache_provider_test.dart: refresh merges after parsing against newer live state
+00:40 +23: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_cache_p1_test.dart: clear fences encryption in flight and leaves no committed payload
+00:40 +24: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/profile/user_cache_provider_test.dart: refresh rejects a retired parsing completion
+00:40 +25: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_cache_p1_test.dart: late encryption cannot replace a newer committed unit
+00:40 +26: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/profile/user_cache_provider_test.dart: preload merges after parsing against newer live state
+00:40 +27: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/profile/user_cache_provider_test.dart: preload rejects a retired parsing completion
+00:40 +28: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/profile/user_cache_provider_test.dart: community change rejects an old network response before parsing
+00:41 +29: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/profile/user_cache_provider_test.dart: parser failure reports refresh failure without modifying cache
+00:41 +30: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/profile/user_cache_provider_test.dart: later refresh completion cannot roll back a newer refresh
+00:41 +31: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/profile/user_cache_provider_test.dart: stale malformed profile is skipped before parsing
+00:41 +32: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/profile/user_cache_provider_test.dart: refresh and preload share one verification worker and coalesce pending lookups
+00:41 +33: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/profile/user_cache_provider_test.dart: refresh verifies real OA batch while allowing main-isolate timers
+00:43 +34: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/profile/user_cache_provider_test.dart: same-second profile tie keeps the lowest event id
+00:44 +35: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/community/community_provider_test.dart: P1 logout removes cached bytes and retires old writers before credentials disappear
+00:46 +36: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/community/community_provider_test.dart: flag OFF removal never resolves offline filesystem even with a signing identity
+00:46 +37: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/community/community_provider_test.dart: CommunityListNotifier loads empty list initially
+00:46 +38: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/community/community_provider_test.dart: CommunityListNotifier exports migrated communities on startup
+00:46 +39: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/community/community_provider_test.dart: CommunityListNotifier skips an unchanged snapshot after provider invalidation
+00:47 +40: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/community/community_provider_test.dart: CommunityListNotifier addCommunity adds to list
+00:47 +41: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/community/community_provider_test.dart: CommunityListNotifier push notifications default off and opt-in survives restart
+00:47 +42: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/community/community_provider_test.dart: CommunityListNotifier lease retry reserves beyond a locally unaccepted generation
+00:47 +43: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/community/community_provider_test.dart: CommunityListNotifier older lease success cannot regress accepted generation
+00:47 +44: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/community/community_provider_test.dart: CommunityListNotifier lease success cannot accept stale desired subscriptions
+00:47 +45: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/community/community_provider_test.dart: CommunityListNotifier opt-out tombstones an in-flight first publication
+00:47 +46: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/community/community_provider_test.dart: CommunityListNotifier opt-out persists first and publishes a higher tombstone
+00:47 +47: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/community/community_provider_test.dart: CommunityListNotifier failed opt-out tombstone retries after restart at a newer generation
+Push lease cleanup failed: Bad state: injected tombstone failure
+#0      main.<anonymous closure>.<anonymous closure>.<anonymous closure> (file:///home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/community/community_provider_test.dart:424:13)
+#1      CommunityListNotifier._retryPendingPushLeaseTombstone (package:buzz/shared/community/community_provider.dart:580:60)
+<asynchronous suspension>
+#2      CommunityListNotifier.setPushNotificationsEnabled (package:buzz/shared/community/community_provider.dart:510:9)
+<asynchronous suspension>
+#3      main.<anonymous closure>.<anonymous closure> (file:///home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/community/community_provider_test.dart:447:9)
+<asynchronous suspension>
+#4      Declarer.test.<anonymous closure>.<anonymous closure> (package:test_api/src/backend/declarer.dart:253:15)
+<asynchronous suspension>
+#5      Declarer.test.<anonymous closure> (package:test_api/src/backend/declarer.dart:250:11)
+<asynchronous suspension>
+#6      Invoker._waitForOutstandingCallbacks.<anonymous closure> (package:test_api/src/backend/invoker.dart:318:9)
+<asynchronous suspension>
+00:47 +48: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/community/community_provider_test.dart: CommunityListNotifier removeCommunity removes from list
+00:47 +49: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/community/community_provider_test.dart: CommunityListNotifier remote tombstone attempt cannot block local removal
+00:47 +50: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/community/community_provider_test.dart: CommunityListNotifier journal persistence failure keeps community credentials
+00:47 +51: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/community/community_provider_test.dart: CommunityListNotifier waits for transition teardown before removing active community
+00:47 +52: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/community/community_provider_test.dart: CommunityListNotifier renameCommunity updates name
+00:47 +53: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/community/community_provider_test.dart: CommunityListNotifier waits for transition teardown before updating active ID
+00:47 +54: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/community/community_provider_test.dart: CommunityListNotifier overlapping transitions share one callback run
+00:47 +55: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/community/community_provider_test.dart: CommunityListNotifier a later transition starts a new callback run
+00:47 +56: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/community/community_provider_test.dart: CommunityListNotifier transition callback failure does not block the active ID update
+00:47 +57: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/community/community_provider_test.dart: CommunityListNotifier switchCommunity updates active ID
+00:48 +58: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/community/community_provider_test.dart: activeCommunityProvider returns null when no communities
+00:48 +59: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/community/community_provider_test.dart: activeCommunityProvider returns community matching active ID
+00:48 +60: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/community/community_provider_test.dart: activeCommunityProvider falls back without persisting when active ID is missing
+00:48 +61: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/community/community_provider_test.dart: activeCommunityProvider falls back to first community if active ID is invalid
+00:50 +62: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: retired unread completion cannot overwrite destination settlement
+[ChannelsNotifier] batched unread catch-up failed; using bounded websocket fallback: Exception: unread catch-up fetch failed
+00:50 +63: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: destination unread deadline permits degraded landing
+[ChannelsNotifier] batched unread catch-up hit the deadline
+00:50 +64: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: destination unread exception permits degraded landing
+[ChannelsNotifier] batched unread catch-up failed; using bounded websocket fallback: Bad state: Unread history unavailable
+00:50 +65: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: destination unread read-state unavailable permits degraded landing
+[ChannelsNotifier] unread catch-up failed: ProviderException: Tried to use a provider that is in error state.
+
+A provider threw the following exception:
+Bad state: Destination read state unavailable
+
+The stack trace of the exception:
+#0      _UnavailableDestinationReadState.build (file:///home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_readiness_cases.dart:173:7)
+#1      $NotifierProviderElement.handleCreate (package:riverpod/src/providers/notifier.dart:93:32)
+#2      Notifier.runBuild (package:riverpod/src/providers/notifier/orphan.dart:70:22)
+#3      $ClassProviderElement.create (package:riverpod/src/core/provider/notifier_provider.dart:560:28)
+#4      ProviderElement.buildState (package:riverpod/src/core/element.dart:674:28)
+#5      ProviderElement._performRebuild (package:riverpod/src/core/element.dart:579:7)
+#6      ProviderElement.flush (package:riverpod/src/core/element.dart:637:7)
+#7      $ProviderBaseImpl._addListener (package:riverpod/src/core/provider/provider.dart:119:24)
+#8      ProviderContainer.listen (package:riverpod/src/core/provider_container.dart:960:26)
+#9      ProviderContainer.read (package:riverpod/src/core/provider_container.dart:917:17)
+#10     Ref.read (package:riverpod/src/core/ref.dart:524:30)
+#11     ChannelsNotifier._catchUpUnreadEvents (package:buzz/features/channels/channels_provider.dart:728:29)
+#12     _ChannelsNotifierLiveSubscriptions._syncLiveSubscriptions (package:buzz/features/channels/channels_provider_lifecycle.dart:164:22)
+<asynchronous suspension>
+#13     StackZoneSpecification._registerCallback.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:114:42)
+<asynchronous suspension>
+#14     ChannelsNotifier.waitForUnreadCatchUp (package:buzz/features/channels/channels_provider.dart:112:7)
+<asynchronous suspension>
+#15     _unreadReadinessCases.<anonymous closure>.<anonymous closure> (file:///home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_readiness_cases.dart:78:54)
+<asynchronous suspension>
+
+00:50 +66: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: optional initial sidebar initialization failure still recovers relay channels
+Offline sidebar hydration unavailable: FileSystemException: directory unavailable, path = ''
+Offline sidebar store unavailable: FileSystemException: directory unavailable, path = ''
+00:50 +67: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: optional initial sidebar load failure still recovers relay channels
+Offline sidebar hydration unavailable: FileSystemException: LRU write failed, path = ''
+00:51 +68: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: discovers open channels for a user with zero channel memberships
+00:51 +69: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: paginates channel discovery with a composite cursor
+00:51 +70: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: paginates memberships when the relay caps responses below limit
+00:51 +71: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: stops membership pagination when the relay repeats a page
+00:51 +72: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: stops channel discovery when the relay repeats a full page
+00:51 +73: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: directory page-cap failure is distinct from an empty directory
+[ChannelsNotifier] channel directory refresh failed; retaining cached discovery: Bad state: Channel directory exceeded 100 pages
+#0      _fetchPaginatedChannelEvents (package:buzz/features/channels/channel_directory.dart:443:7)
+<asynchronous suspension>
+#1      _ChannelRefreshCoordinator.loadDirectory (package:buzz/features/channels/channel_directory.dart:390:15)
+<asynchronous suspension>
+#2      ChannelsNotifier._fetchChannels (package:buzz/features/channels/channels_provider.dart:366:21)
+<asynchronous suspension>
+#3      ChannelsNotifier._fetch (package:buzz/features/channels/channels_provider.dart:271:22)
+<asynchronous suspension>
+#4      ChannelsNotifier.retryDirectory (package:buzz/features/channels/channels_provider.dart:1034:9)
+<asynchronous suspension>
+#5      main.<anonymous closure> (file:///home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart:246:7)
+<asynchronous suspension>
+#6      Declarer.test.<anonymous closure>.<anonymous closure> (package:test_api/src/backend/declarer.dart:253:15)
+<asynchronous suspension>
+#7      Declarer.test.<anonymous closure> (package:test_api/src/backend/declarer.dart:250:11)
+<asynchronous suspension>
+#8      Invoker._waitForOutstandingCallbacks.<anonymous closure> (package:test_api/src/backend/invoker.dart:318:9)
+<asynchronous suspension>
+
+00:51 +74: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: directory failure retains discovery while membership refreshes
+[ChannelsNotifier] channel directory refresh failed; retaining cached discovery: Exception: directory fetch failed
+#0      _FakeRelaySession.queryRelay (file:///home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart:2951:9)
+#1      _fetchPaginatedChannelEvents (package:buzz/features/channels/channel_directory.dart:419:32)
+#2      _fetchChannelDirectoryMetas (package:buzz/features/channels/channel_directory.dart:100:7)
+#3      _ChannelRefreshCoordinator.loadDirectory (package:buzz/features/channels/channel_directory.dart:390:21)
+#4      ChannelsNotifier._fetchChannels (package:buzz/features/channels/channels_provider.dart:366:47)
+<asynchronous suspension>
+#5      ChannelsNotifier._fetch (package:buzz/features/channels/channels_provider.dart:271:22)
+<asynchronous suspension>
+#6      ChannelsNotifier.retryDirectory (package:buzz/features/channels/channels_provider.dart:1034:9)
+<asynchronous suspension>
+#7      main.<anonymous closure> (file:///home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart:294:7)
+<asynchronous suspension>
+#8      Declarer.test.<anonymous closure>.<anonymous closure> (package:test_api/src/backend/declarer.dart:253:15)
+<asynchronous suspension>
+#9      Declarer.test.<anonymous closure> (package:test_api/src/backend/declarer.dart:250:11)
+<asynchronous suspension>
+#10     Invoker._waitForOutstandingCallbacks.<anonymous closure> (package:test_api/src/backend/invoker.dart:318:9)
+<asynchronous suspension>
+
+00:51 +75: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: directory retry failure retains the current channel list
+00:51 +76: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: Ordinary refresh settles a superseded directory load for retry
+00:52 +77: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: Same-scope rebuild settles a superseded directory load for retry
+00:52 +78: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: refresh disposed before directory settlement writes nothing
+00:52 +79: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: community switch discards a stale directory success from the old relay
+00:52 +80: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: community switch discards a stale directory failure from the old relay
+00:52 +81: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: identity switch discards a stale directory success from the old identity
+00:52 +82: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: identity switch discards a stale directory failure from the old identity
+00:52 +83: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: community switch after directory success discards the late refresh
+00:52 +84: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: community switch after directory success discards a late failure
+00:52 +85: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: identity switch after directory success discards the late refresh
+00:52 +86: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: identity switch after directory success discards a late failure
+00:52 +87: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: a newer ordinary refresh owns the installed membership list
+00:52 +88: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: a newer refresh owns the list over an older reconnect backstop
+00:52 +89: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: a stale request's Huddle leg writes no member snapshot
+00:52 +90: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: presentation waits for unread catch-up without delaying the channel list
+00:52 +91: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: landing waits for destination unread generation after disconnect
+00:52 +92: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: community switch discards a parked unread catch-up
+00:52 +93: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: identity switch discards a parked unread catch-up
+00:52 +94: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: community switch discards a parked catch-up failure
+[ChannelsNotifier] batched unread catch-up failed; using bounded websocket fallback: Exception: unread catch-up fetch failed
+00:52 +95: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: identity switch discards a parked catch-up failure
+[ChannelsNotifier] batched unread catch-up failed; using bounded websocket fallback: Exception: unread catch-up fetch failed
+00:52 +96: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: an ordinary membership refresh retires an older catch-up
+00:52 +97: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: a newer refresh retires a parked backstop catch-up
+00:52 +98: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: community switch discards a parked catch-up from an ordinary refresh
+00:53 +99: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: identity switch discards a parked catch-up from an ordinary refresh
+00:53 +100: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: a disconnected community switch retires a parked catch-up
+00:53 +101: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: a catch-up that records nothing does not repaint the list
+00:53 +102: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: community switch drops unread state recorded before it
+00:53 +103: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: reconnect backstop does not refetch the channel directory
+00:53 +104: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: membership refresh does not refetch a loaded directory
+00:53 +105: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: directory-aware refresh discovers open starter channels
+00:53 +106: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: deduplicates joined channels from directory discovery
+00:53 +107: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: seeds members from the channel-list snapshot during reconnect
+00:53 +108: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: subscribes once for joined non-archived channels without blocking snapshot
+00:53 +109: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: chunks live subscriptions at the relay explicit-channel cap
+00:53 +110: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: refreshing an unchanged channel set issues zero new live REQs
+00:53 +111: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: changing a live chunk replaces only that chunk
+00:53 +112: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: front-sorting membership insertion retains coverage while replacement waits
+00:53 +113: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: failed replacement keeps desired coverage and ignores departed channels
+[ChannelsNotifier] live subscription failed for 2 channels: Bad state: live subscription failed
+00:53 +114: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: terminal closure preserves fallback until reconnect retries coverage
+[ChannelsNotifier] live subscription failed for 128 channels: Bad state: live subscription failed
+[ChannelsNotifier] live subscription closed by relay: restricted: terminal closure
+00:53 +115: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: partial replacement churn keeps complete coverage with bounded fallbacks
+[ChannelsNotifier] live subscription failed for 128 channels: Bad state: live subscription failed
+[ChannelsNotifier] live subscription failed for 128 channels: Bad state: live subscription failed
+[ChannelsNotifier] live subscription failed for 128 channels: Bad state: live subscription failed
+[ChannelsNotifier] live subscription failed for 128 channels: Bad state: live subscription failed
+[ChannelsNotifier] live subscription failed for 128 channels: Bad state: live subscription failed
+[ChannelsNotifier] live subscription failed for 128 channels: Bad state: live subscription failed
+[ChannelsNotifier] live subscription failed for 128 channels: Bad state: live subscription failed
+00:54 +116: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: retired replacement cleans up even when the next generation disconnects
+00:54 +117: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: disposal retires retained and in-flight replacement chunks
+00:54 +118: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: empty channel refresh removes every retained live chunk
+00:54 +119: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: community switch retires a detached old-scope live subscription
+00:54 +120: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: persistent terminal rejection before readiness cannot amplify refreshes or retries
+00:54 +121: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: persistent terminal rejection after readiness cannot amplify refreshes or retries
+00:54 +122: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: disposal fences pending terminal closure before readiness
+00:54 +123: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: disposal fences pending terminal closure after readiness
+00:54 +124: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: terminal rejection retries only after a new connection
+[ChannelsNotifier] live subscription closed by relay: restricted: persistent rejection
+[ChannelsNotifier] live subscription closed by relay: restricted: persistent rejection
+[ChannelsNotifier] live subscription closed by relay: restricted: persistent rejection
+[ChannelsNotifier] live subscription closed by relay: restricted: persistent rejection
+00:54 +125: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: changed membership admits a new filter, not a rejected old one
+[ChannelsNotifier] live subscription closed by relay: restricted: persistent rejection
+00:54 +126: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: terminal quarantine does not cross identity scope
+[ChannelsNotifier] live subscription closed by relay: restricted: persistent rejection
+00:54 +127: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: terminal quarantine does not cross community scope
+[ChannelsNotifier] live subscription closed by relay: restricted: persistent rejection
+00:54 +128: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: retains channel-list member snapshots for immediate reuse
+00:54 +129: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: live channel events update channel lastMessageAt
+00:54 +130: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: latest-message batch failure a relay deadline never reaches the websocket fallback
+[ChannelsNotifier] batched latest-message query hit the deadline
+[ChannelsNotifier] batched unread catch-up hit the deadline
+00:54 +131: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: latest-message batch failure an ordinary failure still uses the websocket fallback
+[ChannelsNotifier] batched latest-message query failed; using bounded websocket fallback: Exception: bridge down
+[ChannelsNotifier] batched unread catch-up failed; using bounded websocket fallback: Exception: bridge down
+00:54 +132: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: deadline-unavailable channel batches a latest-message deadline keeps known timestamps
+[ChannelsNotifier] batched latest-message query hit the deadline
+00:54 +133: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: deadline-unavailable channel batches a cold-start latest-message deadline is filled by unread catch-up
+[ChannelsNotifier] batched latest-message query hit the deadline
+00:54 +134: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: deadline-unavailable channel batches unread catch-up never moves lastMessageAt backward
+00:54 +135: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: deadline-unavailable channel batches a websocket fallback deadline makes the batch unavailable
+[ChannelsNotifier] batched latest-message query failed; using bounded websocket fallback: Exception: bridge down
+[ChannelsNotifier] batched unread catch-up failed; using bounded websocket fallback: Exception: bridge down
+00:54 +136: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: loads all channel timestamps through one batched relay query
+00:54 +137: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: ephemeral (TTL) channels appear in the list
+00:54 +138: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: Huddle-linked one-hour private streams stay out of channel lists
+00:54 +139: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: Huddle-linked private streams stay hidden when relay overrides the TTL
+00:54 +140: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: forged Huddle links do not hide unrelated one-hour private streams
+00:54 +141: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: hidden DMs are filtered from the channel list
+00:54 +142: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: archived kind:39000 metadata sets Channel.isArchived (covers TTL auto-archive)
+00:54 +143: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: archive transition invalidates cached channelDetailsProvider
+00:54 +144: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: keeps cached channels and live subscriptions during reconnect
+00:54 +145: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: waits for destination channels after a disconnected community switch
+00:54 +146: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: recovers an initial fetch failure after reconnecting
+00:54 +147: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: preserves a successfully loaded empty list while disconnected
+00:54 +148: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: initial fetch issues membership + metadata queries
+00:55 +149: All tests passed!

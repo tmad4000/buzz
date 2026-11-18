@@ -52,14 +52,18 @@ void main() {
     await offlineRoot.delete(recursive: true);
   });
 
-  ProviderContainer createContainer() {
+  ProviderContainer createContainer({bool offline = false}) {
     Future<void> writeSnapshot(List<Community> communities) async {
       snapshots.add(List.of(communities));
     }
 
     return ProviderContainer(
       overrides: [
-        offlineDirectoryProvider.overrideWithValue(() async => offlineRoot),
+        offlineEnabledProvider.overrideWithValue(offline),
+        offlineDirectoryProvider.overrideWithValue(() async {
+          if (!offline) throw StateError('OFF must never resolve filesystem');
+          return offlineRoot;
+        }),
         communityStorageProvider.overrideWithValue(communityStorage),
         communitySnapshotWriterProvider.overrideWithValue(writeSnapshot),
         communityPushLeaseDeactivatorProvider.overrideWithValue(deactivator),
@@ -96,7 +100,7 @@ void main() {
         cipher: Nip44OfflineCipher(Uint8List.fromList(List.filled(32, 5))),
       );
       await store.save('head', 'general', ['cached payload']);
-      container = createContainer();
+      container = createContainer(offline: true);
       await container.read(communityListProvider.future);
       await container
           .read(communityListProvider.notifier)
@@ -105,6 +109,25 @@ void main() {
       expect(await communityStorage.loadAll(), isEmpty);
       await store.save('head', 'queued', ['pre-logout completion']);
       expect(await store.load('head', 'queued'), isNull);
+    },
+  );
+
+  test(
+    'flag OFF removal never resolves offline filesystem even with a signing identity',
+    () async {
+      final community = Community.create(
+        name: 'OFF',
+        relayUrl: 'https://off.test',
+        nsec: nostr.Keys.generate().nsec,
+      );
+      await communityStorage.save(community);
+      // createContainer's OFF directory seam throws on any access.
+      container = createContainer();
+      await container.read(communityListProvider.future);
+      await container
+          .read(communityListProvider.notifier)
+          .removeCommunity(community.id);
+      expect(await communityStorage.loadAll(), isEmpty);
     },
   );
 

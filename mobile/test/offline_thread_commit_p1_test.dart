@@ -91,64 +91,76 @@ void main() {
       await container.pump();
     },
   );
-  test('opened live thread persists arriving committed replies', () async {
-    final root = await Directory.systemTemp.createTemp('buzz-live-thread-');
-    addTearDown(() => root.delete(recursive: true));
-    final store = OfflineCacheStore(
-      root: root,
-      scope: 'scope',
-      cipher: Nip44OfflineCipher(Uint8List.fromList(List.filled(32, 7))),
+  for (final clear in [false, true]) {
+    test(
+      'opened live thread ${clear ? "drops pre-clear debounce" : "persists arriving committed replies"}',
+      () async {
+        final root = await Directory.systemTemp.createTemp('buzz-live-thread-');
+        addTearDown(() => root.delete(recursive: true));
+        final store = OfflineCacheStore(
+          root: root,
+          scope: 'scope',
+          cipher: Nip44OfflineCipher(Uint8List.fromList(List.filled(32, 7))),
+        );
+        final channel = CommitChannel();
+        final container = ProviderContainer(
+          overrides: [
+            offlineEnabledProvider.overrideWithValue(true),
+            offlineStoreProvider.overrideWith((ref) async => store),
+            relayConfigProvider.overrideWith(CommitConfig.new),
+            relaySessionProvider.overrideWith(CommitSession.new),
+            appLifecycleProvider.overrideWith(CommitLifecycle.new),
+            channelMessagesProvider('general').overrideWith(() => channel),
+          ],
+        );
+        addTearDown(container.dispose);
+        container.listen(
+          channelMessagesProvider('general'),
+          (_, _) {},
+          fireImmediately: true,
+        );
+        const args = ThreadRepliesArgs(channelId: 'general', rootId: 'root');
+        container.listen(
+          threadRepliesProvider(args),
+          (_, _) {},
+          fireImmediately: true,
+        );
+        await container.read(threadRepliesProvider(args).future);
+        channel.arrive(
+          const NostrEvent(
+            id: 'live',
+            pubkey: 'alice',
+            createdAt: 1002,
+            kind: 9,
+            tags: [
+              ['h', 'general'],
+              ['e', 'root', '', 'reply'],
+            ],
+            content: 'arriving body',
+            sig: '',
+          ),
+        );
+        if (clear) {
+          await store.clear();
+          await Future<void>.delayed(const Duration(milliseconds: 2200));
+          expect(await store.load('thread', 'general:root'), isNull);
+          return;
+        }
+        OfflineSnapshot? snapshot;
+        for (var attempt = 0; attempt < 80; attempt++) {
+          snapshot = await store.load('thread', 'general:root');
+          if (snapshot != null &&
+              (snapshot.payload as Map)['events'].length == 2)
+            break;
+          await Future<void>.delayed(const Duration(milliseconds: 50));
+        }
+        expect(
+          (snapshot?.payload as Map)['events']
+              .map((dynamic event) => event['id'])
+              .toSet(),
+          {'reply', 'live'},
+        );
+      },
     );
-    final channel = CommitChannel();
-    final container = ProviderContainer(
-      overrides: [
-        offlineEnabledProvider.overrideWithValue(true),
-        offlineStoreProvider.overrideWith((ref) async => store),
-        relayConfigProvider.overrideWith(CommitConfig.new),
-        relaySessionProvider.overrideWith(CommitSession.new),
-        appLifecycleProvider.overrideWith(CommitLifecycle.new),
-        channelMessagesProvider('general').overrideWith(() => channel),
-      ],
-    );
-    addTearDown(container.dispose);
-    container.listen(
-      channelMessagesProvider('general'),
-      (_, _) {},
-      fireImmediately: true,
-    );
-    const args = ThreadRepliesArgs(channelId: 'general', rootId: 'root');
-    container.listen(
-      threadRepliesProvider(args),
-      (_, _) {},
-      fireImmediately: true,
-    );
-    await container.read(threadRepliesProvider(args).future);
-    channel.arrive(
-      const NostrEvent(
-        id: 'live',
-        pubkey: 'alice',
-        createdAt: 1002,
-        kind: 9,
-        tags: [
-          ['h', 'general'],
-          ['e', 'root', '', 'reply'],
-        ],
-        content: 'arriving body',
-        sig: '',
-      ),
-    );
-    OfflineSnapshot? snapshot;
-    for (var attempt = 0; attempt < 80; attempt++) {
-      snapshot = await store.load('thread', 'general:root');
-      if (snapshot != null && (snapshot.payload as Map)['events'].length == 2)
-        break;
-      await Future<void>.delayed(const Duration(milliseconds: 50));
-    }
-    expect(
-      (snapshot?.payload as Map)['events']
-          .map((dynamic event) => event['id'])
-          .toSet(),
-      {'reply', 'live'},
-    );
-  });
+  }
 }

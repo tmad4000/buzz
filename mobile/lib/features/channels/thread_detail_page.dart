@@ -1,3 +1,4 @@
+import '../../shared/offline/offline_provider.dart';
 import 'pending_local_messages_provider.dart';
 import '../../shared/offline/read_admission.dart';
 import '../../shared/offline/offline_banner.dart';

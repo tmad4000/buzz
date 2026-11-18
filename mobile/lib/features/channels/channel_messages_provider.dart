@@ -1,5 +1,6 @@
 import 'dart:async';
 import '../../shared/offline/offline_provider.dart';
+import '../../shared/offline/offline_cache.dart';
 import '../../shared/offline/offline_head.dart';
 import '../../shared/offline/read_admission.dart';
 import 'package:flutter/foundation.dart';
@@ -34,6 +35,7 @@ class ChannelMessagesNotifier extends Notifier<AsyncValue<List<NostrEvent>>> {
   String? _offlineScope;
   bool _offlineHydrated = false;
   Timer? _offlineSaveTimer;
+  int _offlineSnapshotEpoch = OfflineCacheStore.writeEpoch;
   void Function()? _unsubscribe;
   bool _reachedOldest = false;
   bool _initInFlight = false;
@@ -120,9 +122,12 @@ class ChannelMessagesNotifier extends Notifier<AsyncValue<List<NostrEvent>>> {
 
   @override
   AsyncValue<List<NostrEvent>> build() {
-    final config = ref.watch(relayConfigProvider);
-    final scope = '${config.wsUrl}:${ref.watch(myPubkeyProvider)}';
-    if (_offlineScope != scope) {
+    final enabled = ref.read(offlineEnabledProvider);
+    final scope = enabled
+        ? '${ref.watch(relayConfigProvider).wsUrl}:${ref.watch(myPubkeyProvider)}'
+        : '';
+
+    if (ref.read(offlineEnabledProvider) && _offlineScope != scope) {
       _deletionOwnerQueue.pause();
       _summaryRefreshes.pause();
       _deletionOwnerQueue = _newDeletionOwnerQueue();
@@ -143,6 +148,7 @@ class ChannelMessagesNotifier extends Notifier<AsyncValue<List<NostrEvent>>> {
       _processedDeletionTargets.clear();
       _deferredDeletionTargets.clear();
     }
+    _offlineScope = scope;
     final sessionState = ref.watch(relaySessionProvider);
     final networkAvailable =
         !ref.read(offlineEnabledProvider) ||
@@ -150,7 +156,10 @@ class ChannelMessagesNotifier extends Notifier<AsyncValue<List<NostrEvent>>> {
     ref.onCancel(() {
       _hasListeners = false;
       _offlineSaveTimer?.cancel();
-      if (ref.read(offlineEnabledProvider)) unawaited(_saveOffline());
+      if (enabled) {
+        final epoch = _offlineSnapshotEpoch;
+        unawaited(Future.microtask(() => _saveOffline(epoch: epoch)));
+      }
       _deletionOwnerQueue.pause();
       _summaryRefreshes.pause();
     });
@@ -239,7 +248,8 @@ class ChannelMessagesNotifier extends Notifier<AsyncValue<List<NostrEvent>>> {
     }
   }
 
-  Future<void> _saveOffline() async {
+  Future<void> _saveOffline({int? epoch}) async {
+    epoch ??= _offlineSnapshotEpoch;
     final scope = _offlineScope;
     final events = _lastKnownMessages;
     if (!ref.mounted || events == null || !ref.read(offlineEnabledProvider)) {
@@ -282,7 +292,7 @@ class ChannelMessagesNotifier extends Notifier<AsyncValue<List<NostrEvent>>> {
                 'isCountPending': entry.value.isCountPending,
               },
         },
-      });
+      }, epoch: epoch);
     } catch (error) {
       debugPrint('Offline head write failed: $error');
     }
@@ -325,6 +335,7 @@ class ChannelMessagesNotifier extends Notifier<AsyncValue<List<NostrEvent>>> {
           .read(networkAvailableProvider.notifier)
           .generation;
       final historyVersion = ++_threadQuerySerial;
+      final writeEpoch = OfflineCacheStore.writeEpoch;
       final history = await _fetchNewestHistory(session);
       if (!_isCurrentInit(initVersion)) return;
       _confirmLocalMessages(history.map((event) => event.id));
@@ -349,6 +360,7 @@ class ChannelMessagesNotifier extends Notifier<AsyncValue<List<NostrEvent>>> {
               offlineGeneration,
               networkGeneration: offlineNetworkGeneration,
             );
+        _offlineSnapshotEpoch = writeEpoch;
         unawaited(_saveOffline());
       }
       _summaryRefreshes.resume();
@@ -439,8 +451,9 @@ class ChannelMessagesNotifier extends Notifier<AsyncValue<List<NostrEvent>>> {
   }) {
     if (ref.read(offlineEnabledProvider)) {
       _offlineSaveTimer?.cancel();
+      final epoch = _offlineSnapshotEpoch = OfflineCacheStore.writeEpoch;
       _offlineSaveTimer = Timer(const Duration(seconds: 2), () {
-        if (ref.mounted) unawaited(_saveOffline());
+        if (ref.mounted) unawaited(_saveOffline(epoch: epoch));
       });
     }
     final before = _lastKnownMessages ?? const <NostrEvent>[];

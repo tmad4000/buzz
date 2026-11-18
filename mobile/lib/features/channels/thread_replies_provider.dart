@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../../shared/offline/offline_provider.dart';
+import '../../shared/offline/offline_cache.dart';
 import '../../shared/offline/read_admission.dart';
 import '../../shared/offline/offline_head.dart';
 import 'dart:async';
@@ -51,6 +52,7 @@ threadRepliesProvider = FutureProvider.autoDispose
         }
       });
       final session = ref.read(relaySessionProvider.notifier);
+      final writeEpoch = OfflineCacheStore.writeEpoch;
       final offline = ref.read(offlineEnabledProvider);
       if (offline) {
         ref.listen(networkAvailableProvider, (previous, next) {
@@ -175,7 +177,9 @@ threadRepliesProvider = FutureProvider.autoDispose
           });
           var snapshotEvents = replies;
           Timer? saveTimer;
+          var snapshotEpoch = writeEpoch;
           void saveSnapshot() {
+            final epoch = snapshotEpoch;
             final captured = snapshotEvents;
             unawaited(
               () async {
@@ -206,6 +210,7 @@ threadRepliesProvider = FutureProvider.autoDispose
                     ].map((event) => event.toJson()).toList(),
                     'truncated': bodies.length > 200,
                   },
+                  epoch: epoch,
                 );
               }().catchError((Object error) {
                 debugPrint('Offline thread write failed: $error');
@@ -239,6 +244,7 @@ threadRepliesProvider = FutureProvider.autoDispose
                 merged,
                 offlineHeadAux(events, ids),
               );
+              snapshotEpoch = OfflineCacheStore.writeEpoch;
               saveTimer?.cancel();
               saveTimer = Timer(const Duration(seconds: 2), saveSnapshot);
             });
