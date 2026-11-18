@@ -67,6 +67,34 @@ test("cached heads and a reconnect generation never admit cached reading, includ
       await new Promise((resolve) => setTimeout(resolve, 10));
     });
     assert.equal(canRead(), true);
+    await act(() => {
+      Object.defineProperty(navigator, "onLine", {
+        configurable: true,
+        value: false,
+      });
+      window.dispatchEvent(new Event("offline"));
+    });
+    assert.equal(canRead(), false);
+    await act(() => {
+      Object.defineProperty(navigator, "onLine", {
+        configurable: true,
+        value: true,
+      });
+      window.dispatchEvent(new Event("online"));
+    });
+    assert.equal(
+      canRead(),
+      false,
+      "network restoration alone cannot refresh an already-connected socket's head",
+    );
+    await act(async () => {
+      client.setQueryData(
+        ["offline-live", "general"],
+        offlineConnectionEpoch(),
+      );
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    });
+    assert.equal(canRead(), true);
     const queuedCallback = canRead;
     // Before React can render the disconnected state, callback-time admission fails.
     relayClient.connectionStateEmitter.set("disconnected");

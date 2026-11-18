@@ -19,14 +19,21 @@ export function OfflineConversation({
   const relay = useRelayConnection({ degradedAfterMs: 2000 });
   const [online, setOnline] = React.useState(() => navigator.onLine !== false);
   React.useEffect(() => {
-    const update = () => setOnline(navigator.onLine !== false);
+    const update = () => {
+      const next = navigator.onLine !== false;
+      setOnline(next);
+      if (next && offlineCacheEnabled() && channelId)
+        void client.invalidateQueries({
+          queryKey: ["channel-messages", channelId],
+        });
+    };
     window.addEventListener("online", update);
     window.addEventListener("offline", update);
     return () => {
       window.removeEventListener("online", update);
       window.removeEventListener("offline", update);
     };
-  }, []);
+  }, [client, channelId]);
   const snapshot = useQuery<{ savedAt: number; source: "cache" } | null>({
     queryKey: ["offline-snapshot", channelId],
     queryFn: () => null,
@@ -34,30 +41,43 @@ export function OfflineConversation({
   });
   const [cachedThread, setCachedThread] = React.useState<{
     savedAt: number;
+    truncated?: boolean;
   } | null>(null);
   React.useEffect(() => {
-    const update = () =>
-      setCachedThread(
-        client
-          .getQueryCache()
-          .findAll({ queryKey: ["thread-replies", channelId] })
-          .filter((query) => query.getObserversCount() > 0)
-          .map((query) =>
-            client.getQueryData<{ savedAt: number }>([
-              "offline-source",
-              ...query.queryKey,
-            ]),
-          )
-          .filter((value): value is { savedAt: number } => !!value)
-          .sort((a, b) => a.savedAt - b.savedAt)[0] ?? null,
+    const update = () => {
+      const snapshots = client
+        .getQueryCache()
+        .findAll({ queryKey: ["thread-replies", channelId] })
+        .filter((query) => query.getObserversCount() > 0)
+        .map((query) =>
+          client.getQueryData<{ savedAt: number; truncated?: boolean }>([
+            "offline-source",
+            ...query.queryKey,
+          ]),
+        )
+        .filter(
+          (value): value is { savedAt: number; truncated?: boolean } => !!value,
+        );
+      const next = snapshots.length
+        ? {
+            savedAt: Math.min(...snapshots.map((row) => row.savedAt)),
+            truncated: snapshots.some((row) => row.truncated),
+          }
+        : null;
+      setCachedThread((previous) =>
+        previous?.savedAt === next?.savedAt &&
+        previous?.truncated === next?.truncated
+          ? previous
+          : next,
       );
+    };
     update();
     return client.getQueryCache().subscribe(update);
   }, [client, channelId]);
   const enabled = offlineCacheEnabled();
-  const liveFetch = useQuery<number>({
+  const liveFetch = useQuery<string>({
     queryKey: ["offline-live", channelId],
-    queryFn: () => 0,
+    queryFn: () => "",
     enabled: false,
   });
 
@@ -134,6 +154,14 @@ export function OfflineConversation({
             Retry
           </button>
         </div>
+      ) : null}
+      {enabled && cachedThread?.truncated ? (
+        <p
+          role="status"
+          className="border-b px-4 py-2 text-sm text-muted-foreground"
+        >
+          Showing newest 200 cached replies. Earlier replies load when online.
+        </p>
       ) : null}
       {children}
     </ConversationLiveContext.Provider>

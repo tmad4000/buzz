@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { offlineScopeKey } from "@/shared/api/offlineCache";
 import assert from "node:assert/strict";
 import { after, afterEach, before, mock, test } from "node:test";
@@ -88,6 +89,7 @@ function bounds() {
 function install(entries, { loadDelayMs = 0 } = {}) {
   channelWindowCalls = 0;
   channelWindowEvents = [replacement, bounds()];
+  relayClient.connectionStateEmitter.set("connected");
   globalThis.isTauri = true;
   window.localStorage.clear();
   window.localStorage.setItem("buzz-offline-cache-v1", "on");
@@ -95,46 +97,41 @@ function install(entries, { loadDelayMs = 0 } = {}) {
   window.__TAURI_INTERNALS__ = {
     invoke: async (command, args) => {
       if (command === "get_identity") return { pubkey: "f".repeat(64) };
-      if (command === "nip44_decrypt_from_self") return args.ciphertext;
-      if (command === "nip44_encrypt_to_self") return args.plaintext;
+      if (command === "offline_cache_decrypt") return args.ciphertext;
+      if (command === "offline_cache_encrypt") return args.plaintext;
       if (command === "offline_cache_list") {
         if (loadDelayMs > 0) {
           await new Promise((resolve) => setTimeout(resolve, loadDelayMs));
         }
-        return entries.map((entry) => ({
-          scope: offlineScopeKey({
+        return entries.map((entry) => {
+          const scope = offlineScopeKey({
             pubkey: "f".repeat(64),
             relayUrl: "wss://relay",
-          }),
-          kind: "head",
-          id: entry.channelId,
-          savedAt: entry.savedAt,
-          lastVisitedAt: entry.lastVisitedAt,
-          bytes: new TextEncoder().encode(
-            JSON.stringify([
-              JSON.stringify({
-                scope: offlineScopeKey({
-                  pubkey: "f".repeat(64),
-                  relayUrl: "wss://relay",
-                }),
-                kind: "head",
-                id: entry.channelId,
-                payload: entry.events,
-              }),
-            ]),
-          ).length,
-          ciphertext: JSON.stringify([
+          });
+          const plaintext = JSON.stringify({
+            scope,
+            kind: "head",
+            id: entry.channelId,
+            savedAt: entry.savedAt,
+            payload: entry.events,
+          });
+          const ciphertext = JSON.stringify([
             JSON.stringify({
-              scope: offlineScopeKey({
-                pubkey: "f".repeat(64),
-                relayUrl: "wss://relay",
-              }),
-              kind: "head",
-              id: entry.channelId,
-              payload: entry.events,
+              digest: createHash("sha256").update(plaintext).digest("hex"),
+              count: 1,
             }),
-          ]),
-        }));
+            plaintext,
+          ]);
+          return {
+            scope,
+            kind: "head",
+            id: entry.channelId,
+            savedAt: entry.savedAt,
+            lastVisitedAt: entry.lastVisitedAt,
+            bytes: new TextEncoder().encode(ciphertext).length,
+            ciphertext,
+          };
+        });
       }
       if (command === "get_channel_window") {
         channelWindowCalls += 1;

@@ -37,7 +37,25 @@ test("folded head reparses with bounded rows, committed live events, aux and rep
     event("new", 5),
     { ...event("pending", 6), pending: true },
   ];
+  store.liveAux = [
+    { ...event("edit-root", 6), kind: 40003, tags: [["e", "new"]] },
+    { ...event("delete-edit", 8), kind: 5, tags: [["e", "edit-root"]] },
+    {
+      ...event("edit-unopened-reply", 7),
+      kind: 40003,
+      tags: [["e", "unopened-reply"]],
+      content: "uncached reply body",
+    },
+  ];
   let snapshot = offlineHeadSnapshot(store, "general", 100);
+  assert.equal(
+    snapshot.some((event) => event.id === "edit-root"),
+    true,
+  );
+  assert.equal(
+    snapshot.some((event) => event.id === "edit-unopened-reply"),
+    false,
+  );
   let page = parseChannelWindowResponse(snapshot, "general", null);
   assert.deepEqual(
     page.rows.map((row) => row.event.id),

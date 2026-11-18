@@ -13,11 +13,13 @@ export function offlineNeedsConnection(): boolean {
 }
 /** Reuse relay state, plus the browser's network-loss signal. */
 export function useDeviceOffline(): boolean {
-  const relay = useRelayConnection();
+  const [enabled] = React.useState(offlineCacheEnabled);
+  const relay = useRelayConnection({ enabled });
   const [online, setOnline] = React.useState(
     () => typeof navigator === "undefined" || navigator.onLine !== false,
   );
   React.useEffect(() => {
+    if (!enabled) return;
     const update = () => setOnline(navigator.onLine !== false);
     window.addEventListener("online", update);
     window.addEventListener("offline", update);
@@ -25,11 +27,33 @@ export function useDeviceOffline(): boolean {
       window.removeEventListener("online", update);
       window.removeEventListener("offline", update);
     };
-  }, []);
-  return offlineCacheEnabled() && (!online || relay !== "connected");
+  }, [enabled]);
+  return enabled && (!online || relay !== "connected");
 }
 
-/** Reuse the relay's existing generation fence; community teardown cannot remove it. */
-export function offlineConnectionEpoch(): number {
-  return relayClient.getConnectionGeneration();
+let trackedWindow: Window | null = null;
+let networkGeneration = 0;
+let lastOnline = true;
+const advanceNetwork = () => {
+  const online = typeof navigator === "undefined" || navigator.onLine !== false;
+  if (online !== lastOnline) {
+    networkGeneration++;
+    lastOnline = online;
+  }
+};
+/** A browser network gap also invalidates authority when the socket has not noticed it yet. */
+export function offlineConnectionEpoch(): string {
+  if (
+    offlineCacheEnabled() &&
+    typeof window !== "undefined" &&
+    trackedWindow !== window
+  ) {
+    trackedWindow?.removeEventListener("online", advanceNetwork);
+    trackedWindow?.removeEventListener("offline", advanceNetwork);
+    trackedWindow = window;
+    lastOnline = typeof navigator === "undefined" || navigator.onLine !== false;
+    window.addEventListener("online", advanceNetwork);
+    window.addEventListener("offline", advanceNetwork);
+  }
+  return `${relayClient.getConnectionGeneration()}:${networkGeneration}`;
 }

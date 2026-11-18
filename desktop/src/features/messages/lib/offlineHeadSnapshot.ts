@@ -23,12 +23,33 @@ export function offlineHeadSnapshot(
   const lastPage = store.pages[Math.min(1, store.pages.length - 1)];
   const hasMore = all.length > limit || lastPage.hasMore;
   const last = rows.at(-1);
+  const ids = new Set(rows.map((event) => event.id));
   const aux = new Map<string, RelayEvent>();
-  for (const event of [
+  const candidatesAux = [
     ...store.pages.slice(0, 2).flatMap((page) => page.aux),
     ...store.liveAux,
-  ])
-    if (!event.pending) aux.set(event.id, event);
+  ].filter((event) => !event.pending);
+  // Include deletion-of-reaction/edit closure, without retaining unopened reply bodies.
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const event of candidatesAux) {
+      if (aux.has(event.id)) continue;
+      const targets = event.tags
+        .filter((tag) => tag[0] === "e")
+        .map((tag) => tag[1]);
+      const selected =
+        event.kind === 5 || event.kind === 9005
+          ? targets.some((target) => ids.has(target))
+          : (event.kind === 7 || event.kind === 40003) &&
+            ids.has(targets.at(-1) ?? "");
+      if (selected) {
+        aux.set(event.id, event);
+        ids.add(event.id);
+        changed = true;
+      }
+    }
+  }
   const meta = (
     kind: number,
     id: string,

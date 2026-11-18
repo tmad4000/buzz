@@ -1,3 +1,4 @@
+import { useDeviceOffline } from "@/shared/api/offlineConnection";
 import { listen } from "@tauri-apps/api/event";
 import { Headphones } from "lucide-react";
 import * as React from "react";
@@ -51,6 +52,7 @@ export function HuddleIndicator({
   onStart,
   startDisabled,
 }: HuddleIndicatorProps) {
+  const offline = useDeviceOffline();
   const { activeEphemeralChannelId, joinHuddle, isStarting } = useHuddle();
   const queryClient = useQueryClient();
   const [activeHuddle, setActiveHuddle] = React.useState<ActiveHuddle | null>(
@@ -273,7 +275,8 @@ export function HuddleIndicator({
         <DropdownMenuItem
           className={className}
           data-testid="channel-start-huddle-trigger"
-          disabled={startDisabled || isStarting}
+          disabled={offline || startDisabled || isStarting}
+          title={offline ? "Needs a connection" : undefined}
           onSelect={() => onStart()}
         >
           <Headphones />
@@ -293,7 +296,8 @@ export function HuddleIndicator({
               aria-label="Start huddle"
               className={className}
               data-testid="channel-start-huddle-trigger"
-              disabled={startDisabled || isStarting}
+              disabled={offline || startDisabled || isStarting}
+              title={offline ? "Needs a connection" : undefined}
               onClick={() => onStart()}
               size="icon"
               type="button"
@@ -303,7 +307,9 @@ export function HuddleIndicator({
             </Button>
           </span>
         </TooltipTrigger>
-        <TooltipContent>Huddle</TooltipContent>
+        <TooltipContent>
+          {offline ? "Needs a connection" : "Huddle"}
+        </TooltipContent>
       </Tooltip>
     );
   }
@@ -337,7 +343,8 @@ export function HuddleIndicator({
       <DropdownMenuItem
         className={className}
         data-testid="channel-start-huddle-trigger"
-        disabled={isJoining || isStarting}
+        disabled={offline || isJoining || isStarting}
+        title={offline ? "Needs a connection" : undefined}
         onSelect={() => void doJoin()}
       >
         <Headphones />
@@ -355,7 +362,8 @@ export function HuddleIndicator({
         <Button
           aria-label={`Join active huddle (${participantCount} participant${participantCount !== 1 ? "s" : ""})`}
           className={cn("relative", className)}
-          disabled={isJoining || isStarting}
+          disabled={offline || isJoining || isStarting}
+          title={offline ? "Needs a connection" : undefined}
           onClick={() => void doJoin()}
           size="icon"
           type="button"

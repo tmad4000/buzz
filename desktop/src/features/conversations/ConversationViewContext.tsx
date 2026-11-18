@@ -1,4 +1,8 @@
-import { offlineNeedsConnection } from "@/shared/api/offlineConnection";
+import {
+  offlineNeedsConnection,
+  offlineConnectionEpoch,
+} from "@/shared/api/offlineConnection";
+import { offlineCacheEnabled } from "@/shared/api/offlineCache";
 import * as React from "react";
 
 export type ConversationViewAdmission = {
@@ -47,14 +51,18 @@ export function useConversationReadAdmission() {
     liveAuthoritative &&
     foreground &&
     (view === null || (view.focused && view.visible));
+  const epoch = offlineConnectionEpoch();
+  const committedEpoch = React.useRef(epoch);
   const currentAdmission = React.useRef(admitted);
-  currentAdmission.current = admitted;
+  // Deny immediately; granting waits for the DOM commit below.
+  if (!admitted) currentAdmission.current = false;
   React.useLayoutEffect(() => {
     currentAdmission.current = admitted;
+    committedEpoch.current = epoch;
     return () => {
       currentAdmission.current = false;
     };
-  }, [admitted]);
+  }, [admitted, epoch]);
   // Recheck document state at callback time: an observer may already be queued
   // when the document becomes hidden, before React commits the visibility event.
   const canRead = React.useCallback(
@@ -63,6 +71,8 @@ export function useConversationReadAdmission() {
       admitted &&
       documentVisible() &&
       !offlineNeedsConnection() &&
+      (!offlineCacheEnabled() ||
+        committedEpoch.current === offlineConnectionEpoch()) &&
       (typeof liveAdmission === "function" ? liveAdmission() : liveAdmission),
     [admitted, liveAdmission],
   );

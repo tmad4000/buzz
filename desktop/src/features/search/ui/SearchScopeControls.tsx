@@ -1,3 +1,4 @@
+import { useDeviceOffline } from "@/shared/api/offlineConnection";
 import { Search, X } from "lucide-react";
 import type * as React from "react";
 
@@ -42,6 +43,7 @@ export function SearchDialogInputRow({
   query,
   scopeLabel,
 }: SearchDialogInputRowProps) {
+  const offline = useDeviceOffline();
   return (
     <div
       className="flex h-12 items-center gap-3 border-b border-border/70 px-4"
@@ -75,6 +77,8 @@ export function SearchDialogInputRow({
           aria-label={
             scopeLabel ? `Search in ${scopeLabel}` : "Search everything"
           }
+          disabled={offline}
+          title={offline ? "Needs a connection" : undefined}
           autoCapitalize="none"
           autoCorrect="off"
           className="relative z-10 w-full min-w-0 bg-transparent text-base text-foreground outline-none"

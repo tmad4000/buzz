@@ -1,3 +1,5 @@
+import { offlineNeedsConnection } from "@/shared/api/offlineConnection";
+import { OfflineReadUnavailableError } from "@/shared/api/offlineRead";
 import { offlineConnectionEpoch } from "@/shared/api/offlineConnection";
 import { hydrateChannelHeadForNavigation } from "./lib/channelHeadCache";
 import { offlineCacheEnabled } from "@/shared/api/offlineCache";
@@ -289,11 +291,16 @@ export function reconcileFetchedChannelWindow(
   queryClient.setQueryData(["offline-live", channelId], offlineEpoch);
   const scope = channelHeadCacheScope(queryClient);
   if (scope) {
-    void storeChannelHeadCache(scope, channelId, events).then(() => {
-      queryClient.setQueryData(["offline-cached-at", channelId], { savedAt: Date.now() });
-    }).catch((error) => {
-      console.warn("Failed to persist channel head", channelId, error);
-    });
+    const capturedAt = Date.now();
+    void storeChannelHeadCache(scope, channelId, events)
+      .then(() => {
+        queryClient.setQueryData(["offline-cached-at", channelId], {
+          savedAt: capturedAt,
+        });
+      })
+      .catch((error) => {
+        console.warn("Failed to persist channel head", channelId, error);
+      });
   }
   return reconcileChannelWindowMessages(next, previousMessages);
 }
@@ -310,14 +317,21 @@ export function useChannelMessagesQuery(channel: Channel | null) {
       // opened during boot takes the hydrated path instead of racing it with
       // a cold relay fetch.
       await channelHeadHydration(queryClient);
-      await hydrateChannelHeadForNavigation(queryClient, channel.id).catch(error => console.warn("Offline head hydration failed", error));
+      await hydrateChannelHeadForNavigation(queryClient, channel.id).catch(
+        (error) => console.warn("Offline head hydration failed", error),
+      );
       if (consumeHydratedChannel(queryClient, channel.id)) {
         return queryClient.getQueryData<RelayEvent[]>(queryKey) ?? [];
       }
+      if (offlineNeedsConnection()) throw new OfflineReadUnavailableError();
       const previousMessages =
         queryClient.getQueryData<RelayEvent[]>(queryKey) ?? [];
       const offlineEpoch = offlineConnectionEpoch();
-      const events = await getChannelWindowEvents(channel.id, null, offlineCacheEnabled() ? 100 : 50);
+      const events = await getChannelWindowEvents(
+        channel.id,
+        null,
+        offlineCacheEnabled() ? 100 : 50,
+      );
       return reconcileFetchedChannelWindow(
         queryClient,
         channel.id,

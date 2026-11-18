@@ -18,8 +18,11 @@ export function OfflineStorageSettings() {
   const [busy, setBusy] = React.useState(false);
   const scope = async () => {
     if (!activeCommunity) throw new Error("Select a community first");
+    const identity = await getIdentity();
+    if (identity.locked || identity.lost)
+      throw new Error("Offline cache identity unavailable");
     return {
-      pubkey: (await getIdentity()).pubkey,
+      pubkey: identity.pubkey,
       relayUrl: activeCommunity.relayUrl,
     };
   };
@@ -36,7 +39,7 @@ export function OfflineStorageSettings() {
           setBytes(rows.flat().reduce((sum, row) => sum + row.bytes, 0));
       })
       .catch(() => {
-        if (current) setBytes(null);
+        if (current) setBytes(0);
       });
     return () => {
       current = false;

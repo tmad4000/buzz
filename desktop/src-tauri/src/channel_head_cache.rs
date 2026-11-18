@@ -1,4 +1,4 @@
-//! Persistent native cache for recently visited channel head pages.
+//! Legacy head-cache compatibility. New snapshots use the encrypted offline_cache module.
 //!
 //! The cache is a paint accelerator only: the renderer always replaces a
 //! hydrated page with an authoritative relay response after subscribing.
@@ -8,13 +8,17 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use rusqlite::{params, Connection, OptionalExtension, Transaction};
+#[cfg(test)]
+use rusqlite::{params, Transaction};
+use rusqlite::{Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tauri::{AppHandle, Manager, State};
 
 const SCHEMA_VERSION: i64 = 1;
+#[cfg(test)]
 const CHANNELS_PER_SCOPE_CAP: i64 = 32;
+#[cfg(test)]
 const ROW_BYTES_CAP: usize = 1024 * 1024;
 
 /// Serializes cache mutations on the blocking pool.
@@ -127,6 +131,7 @@ where
         .map_err(|error| format!("channel-head cache db task failed: {error}"))?
 }
 
+#[cfg(test)]
 fn load_from_path(
     path: &Path,
     scope: &ChannelHeadScope,
@@ -171,6 +176,7 @@ fn load_from_path(
     Ok(entries)
 }
 
+#[cfg(test)]
 fn store_in_transaction(
     transaction: &Transaction<'_>,
     scope: &str,
@@ -211,6 +217,7 @@ fn store_in_transaction(
     Ok(())
 }
 
+#[cfg(test)]
 fn store_at(
     path: &Path,
     scope: &ChannelHeadScope,
@@ -253,8 +260,9 @@ pub(crate) async fn channel_head_cache_load(
     limit: u32,
     app: AppHandle,
 ) -> Result<Vec<ChannelHeadEntry>, String> {
-    let path = db_path(&app)?;
-    run_blocking(move || load_from_path(&path, &scope, limit)).await
+    let _ = (scope, limit, app);
+    // Old bundles may still call the command; never expose legacy plaintext as an offline snapshot.
+    Ok(Vec::new())
 }
 
 /// Stores one raw channel-window response, dropping payloads above one MiB.
@@ -266,19 +274,8 @@ pub(crate) async fn channel_head_cache_store(
     app: AppHandle,
     store: State<'_, ChannelHeadCacheStore>,
 ) -> Result<(), String> {
-    let path = db_path(&app)?;
-    let write_lock = Arc::clone(&store.write_lock);
-    run_blocking(move || {
-        let _guard = write_lock.lock().map_err(|error| error.to_string())?;
-        store_at(
-            &path,
-            &scope,
-            &channel_id,
-            &events,
-            chrono::Utc::now().timestamp(),
-        )
-    })
-    .await
+    let _ = (scope, channel_id, events, app, store);
+    Err("Legacy plaintext cache writes are disabled; use encrypted offline cache".into())
 }
 
 /// Clears all persisted channel heads for one identity and relay.

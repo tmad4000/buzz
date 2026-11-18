@@ -1,5 +1,5 @@
 import { isTauri } from "@tauri-apps/api/core";
-import { invokeTauri, nip44DecryptFromSelf, nip44EncryptToSelf } from "./tauri";
+import { invokeTauri } from "./tauri";
 
 export type OfflineScope = { pubkey: string; relayUrl: string };
 export type OfflineKind = "head" | "thread" | "sidebar" | "profile";
@@ -11,8 +11,10 @@ export type OfflineRecord = {
   savedAt: number;
   lastVisitedAt: number;
   bytes: number;
+  cacheEpoch?: number;
 };
 export interface OfflineCacheAdapter {
+  epoch(): Promise<number>;
   list(scope: string, kind: OfflineKind): Promise<OfflineRecord[]>;
   put(record: OfflineRecord): Promise<void>;
   clear(scope: string): Promise<void>;
@@ -46,8 +48,8 @@ export function offlineScopeKey(scope: OfflineScope): string {
 }
 /** Replaceable signer seam: every platform uses NIP-44-to-self, including web. */
 export interface OfflineCipher {
-  encrypt(plaintext: string): Promise<string>;
-  decrypt(ciphertext: string): Promise<string>;
+  encrypt(plaintext: string, expectedPubkey: string): Promise<string>;
+  decrypt(ciphertext: string, expectedPubkey: string): Promise<string>;
 }
 type BrowserSigner = {
   getPublicKey(): Promise<string>;
@@ -62,18 +64,43 @@ function browserSigner(): BrowserSigner {
     throw new Error("A NIP-44 browser signer is required for offline cache");
   return signer;
 }
-let cipher: OfflineCipher = {
-  async encrypt(plaintext) {
-    if (isTauri()) return nip44EncryptToSelf(plaintext);
-    const signer = browserSigner();
-    return signer.nip44!.encrypt(await signer.getPublicKey(), plaintext);
-  },
-  async decrypt(ciphertext) {
-    if (isTauri()) return nip44DecryptFromSelf(ciphertext);
-    const signer = browserSigner();
-    return signer.nip44!.decrypt(await signer.getPublicKey(), ciphertext);
-  },
-};
+/** Default identity-fenced bridge cipher; exposed for adapter-level regression tests. */
+export function createOfflineCipher(): OfflineCipher {
+  return {
+    async encrypt(plaintext, expectedPubkey) {
+      if (isTauri())
+        return invokeTauri<string>("offline_cache_encrypt", {
+          plaintext,
+          expectedPubkey,
+        });
+      throw new Error(
+        "An identity-bound NIP-44 browser cipher must be configured",
+      );
+    },
+    async decrypt(ciphertext, expectedPubkey) {
+      if (isTauri())
+        return invokeTauri<string>("offline_cache_decrypt", {
+          ciphertext,
+          expectedPubkey,
+        });
+      throw new Error(
+        "An identity-bound NIP-44 browser cipher must be configured",
+      );
+    },
+  };
+}
+async function payloadHash(text: string): Promise<string> {
+  return Array.from(
+    new Uint8Array(
+      await globalThis.crypto.subtle.digest(
+        "SHA-256",
+        new TextEncoder().encode(text),
+      ),
+    ),
+    (byte) => byte.toString(16).padStart(2, "0"),
+  ).join("");
+}
+let cipher: OfflineCipher = createOfflineCipher();
 async function assertOwner(scope: OfflineScope): Promise<void> {
   const identity = isTauri()
     ? await invokeTauri<{ pubkey: string; locked?: boolean; lost?: boolean }>(
@@ -91,24 +118,53 @@ async function assertOwner(scope: OfflineScope): Promise<void> {
   )
     throw new Error("Offline cache identity is unavailable");
 }
+/** Browser hosts must atomically bind each operation to expectedPubkey; active-account NIP-07 alone is insufficient. */
 export function setOfflineCipher(next: OfflineCipher): void {
   cipher = next;
 }
+let nativeOperations: Promise<unknown> = Promise.resolve();
+function nativeCacheOperation<T>(operation: () => Promise<T>): Promise<T> {
+  const result = nativeOperations.then(operation);
+  nativeOperations = result.catch(() => {});
+  return result;
+}
 const nativeAdapter: OfflineCacheAdapter = {
-  list: (scope, kind) => invokeTauri("offline_cache_list", { scope, kind }),
-  put: (record) => invokeTauri("offline_cache_put", { record }),
-  clear: (scope) => invokeTauri("offline_cache_clear", { scope }),
+  epoch: async () => globalGeneration,
+  list: (scope, kind) =>
+    nativeCacheOperation(() =>
+      invokeTauri<OfflineRecord[]>("offline_cache_list", { scope, kind }),
+    ),
+  put: (record) =>
+    nativeCacheOperation(() =>
+      invokeTauri<void>("offline_cache_put", { record }),
+    ),
+  clear: (scope) =>
+    nativeCacheOperation(() =>
+      invokeTauri<void>("offline_cache_clear", { scope }),
+    ),
 };
 const generations = new Map<string, number>();
+const pendingWrites = new Map<string, symbol>();
 let globalGeneration = 0;
+let logoutInProgress = false;
 let database: Promise<IDBDatabase> | undefined;
 function db(): Promise<IDBDatabase> {
   return (database ??= new Promise((resolve, reject) => {
-    const request = indexedDB.open("buzz-offline-cache-v1", 1);
-    request.onupgradeneeded = () =>
-      request.result.createObjectStore("records", {
-        keyPath: ["scope", "kind", "id"],
-      });
+    const request = indexedDB.open("buzz-offline-cache-v1", 3);
+    request.onupgradeneeded = () => {
+      const transaction = request.transaction;
+      if (!transaction)
+        throw new Error("Offline cache upgrade transaction missing");
+      const records = request.result.objectStoreNames.contains("records")
+        ? transaction.objectStore("records")
+        : request.result.createObjectStore("records", {
+            keyPath: ["scope", "kind", "id"],
+          });
+      if (!request.result.objectStoreNames.contains("epochs"))
+        request.result.createObjectStore("epochs", { keyPath: "id" });
+      if (!records.indexNames.contains("scope"))
+        records.createIndex("scope", "scope");
+    };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => {
       database = undefined;
@@ -135,25 +191,52 @@ export function offlineEvictions(rows: OfflineRecord[]): OfflineRecord[] {
   }
   return evicted;
 }
-async function mutate(scope: string, record?: OfflineRecord): Promise<void> {
+async function mutate(
+  scope: string | null,
+  record?: OfflineRecord,
+): Promise<void> {
   const database = await db();
   await new Promise<void>((resolve, reject) => {
-    const tx = database.transaction("records", "readwrite");
+    const tx = database.transaction(["records", "epochs"], "readwrite");
     const store = tx.objectStore("records");
-    const request = store.getAll();
-    request.onsuccess = () => {
-      let rows = (request.result as OfflineRecord[]).filter(
-        (r) => r.scope === scope,
-      );
-      if (!record) {
-        for (const row of rows) store.delete([scope, row.kind, row.id]);
+    const epochs = tx.objectStore("epochs");
+    const epochRequest = epochs.get("global");
+    epochRequest.onsuccess = () => {
+      const current =
+        (epochRequest.result as { value: number } | undefined)?.value ?? 0;
+      // A clear in another tab fences a signer/encryption promise captured before that clear.
+      if (record && record.cacheEpoch !== current) return;
+      if (!record) epochs.put({ id: "global", value: current + 1 });
+      if (scope === null) {
+        store.clear();
         return;
       }
-      rows = rows.filter((r) => r.kind !== record.kind || r.id !== record.id);
-      rows.push(record);
-      store.put(record);
-      for (const row of offlineEvictions(rows))
-        store.delete([scope, row.kind, row.id]);
+      const request = store.index("scope").getAll(scope);
+      request.onsuccess = () => {
+        let rows = (request.result as OfflineRecord[]).filter(
+          (row) => row.scope === scope,
+        );
+        if (!record) {
+          for (const row of rows) store.delete([scope, row.kind, row.id]);
+          return;
+        }
+        if (
+          rows.some(
+            (row) =>
+              row.kind === record.kind &&
+              row.id === record.id &&
+              row.savedAt > record.savedAt,
+          )
+        )
+          return;
+        rows = rows.filter(
+          (row) => row.kind !== record.kind || row.id !== record.id,
+        );
+        rows.push(record);
+        store.put(record);
+        for (const row of offlineEvictions(rows))
+          store.delete([scope, row.kind, row.id]);
+      };
     };
     tx.oncomplete = () => resolve();
     tx.onabort = tx.onerror = () =>
@@ -161,13 +244,26 @@ async function mutate(scope: string, record?: OfflineRecord): Promise<void> {
   });
 }
 export const indexedDbOfflineAdapter: OfflineCacheAdapter = {
+  async epoch() {
+    const database = await db();
+    return new Promise((resolve, reject) => {
+      const request = database
+        .transaction("epochs")
+        .objectStore("epochs")
+        .get("global");
+      request.onsuccess = () =>
+        resolve((request.result as { value: number } | undefined)?.value ?? 0);
+      request.onerror = () => reject(request.error);
+    });
+  },
   async list(scope, kind) {
     const database = await db();
     return new Promise((resolve, reject) => {
       const request = database
         .transaction("records")
         .objectStore("records")
-        .getAll();
+        .index("scope")
+        .getAll(scope);
       request.onsuccess = () =>
         resolve(
           (request.result as OfflineRecord[])
@@ -190,40 +286,73 @@ export async function saveOffline(
   id: string,
   payload: unknown,
 ): Promise<void> {
-  if (!offlineCacheEnabled()) return;
-  await assertOwner(scope);
+  if (!offlineCacheEnabled() || logoutInProgress) return;
   const key = offlineScopeKey(scope);
-  const generation = generations.get(key) ?? 0;
-  const globalAtStart = globalGeneration;
-  const plaintext = JSON.stringify({ scope: key, kind, id, payload });
-  if (new TextEncoder().encode(plaintext).length > offlineCaps[kind][1]) return;
-  // 8000 UTF-16 units fit even for four-byte Unicode and escaped surrogates.
-  const chunks: string[] = [];
-  for (let i = 0; i < plaintext.length; ) {
-    let end = Math.min(i + 8000, plaintext.length);
-    if (end < plaintext.length && /[\uD800-\uDBFF]/.test(plaintext[end - 1]))
-      end--;
-    chunks.push(await cipher.encrypt(plaintext.slice(i, end)));
-    i = end;
+  const savedAt = Date.now();
+  const writeKey = JSON.stringify([key, kind, id]);
+  const token = Symbol();
+  pendingWrites.set(writeKey, token);
+  try {
+    const generation = generations.get(key) ?? 0;
+    const globalAtStart = globalGeneration;
+    const [, storeEpoch] = await Promise.all([
+      assertOwner(scope),
+      offlineAdapter().epoch(),
+    ]);
+    const plaintext = JSON.stringify({
+      scope: key,
+      kind,
+      id,
+      savedAt,
+      payload,
+    });
+    if (new TextEncoder().encode(plaintext).length > offlineCaps[kind][1])
+      return;
+    // 8000 UTF-16 units fit even for four-byte Unicode and escaped surrogates.
+    const chunks: string[] = [];
+    for (let i = 0; i < plaintext.length; ) {
+      let end = Math.min(i + 8000, plaintext.length);
+      if (end < plaintext.length && /[\uD800-\uDBFF]/.test(plaintext[end - 1]))
+        end--;
+      chunks.push(await cipher.encrypt(plaintext.slice(i, end), scope.pubkey));
+      i = end;
+    }
+    chunks.unshift(
+      await cipher.encrypt(
+        JSON.stringify({
+          digest: await payloadHash(plaintext),
+          count: chunks.length,
+        }),
+        scope.pubkey,
+      ),
+    );
+    const ciphertext = JSON.stringify(chunks);
+    const now = Date.now();
+    const [, currentStoreEpoch] = await Promise.all([
+      assertOwner(scope),
+      offlineAdapter().epoch(),
+    ]);
+    if (
+      pendingWrites.get(writeKey) !== token ||
+      currentStoreEpoch !== storeEpoch ||
+      (generations.get(key) ?? 0) !== generation ||
+      globalAtStart !== globalGeneration ||
+      !offlineCacheEnabled()
+    )
+      return;
+    await offlineAdapter().put({
+      scope: key,
+      kind,
+      id,
+      ciphertext,
+      cacheEpoch: storeEpoch,
+      savedAt,
+      lastVisitedAt: now,
+      bytes: new TextEncoder().encode(ciphertext).length,
+    });
+  } finally {
+    if (pendingWrites.get(writeKey) === token) pendingWrites.delete(writeKey);
   }
-  const ciphertext = JSON.stringify(chunks);
-  const now = Date.now();
-  await assertOwner(scope);
-  if (
-    (generations.get(key) ?? 0) !== generation ||
-    globalAtStart !== globalGeneration ||
-    !offlineCacheEnabled()
-  )
-    return;
-  await offlineAdapter().put({
-    scope: key,
-    kind,
-    id,
-    ciphertext,
-    savedAt: now,
-    lastVisitedAt: now,
-    bytes: new TextEncoder().encode(ciphertext).length,
-  });
 }
 export async function loadOffline<T>(
   scope: OfflineScope,
@@ -231,11 +360,14 @@ export async function loadOffline<T>(
   id?: string | readonly string[],
   limit: number = offlineCaps[kind][0],
 ): Promise<Array<{ id: string; payload: T; savedAt: number }>> {
-  if (!offlineCacheEnabled()) return [];
-  await assertOwner(scope);
+  if (!offlineCacheEnabled() || logoutInProgress) return [];
   const key = offlineScopeKey(scope);
   const readGeneration = generations.get(key) ?? 0;
   const readGlobal = globalGeneration;
+  const [, storeEpoch] = await Promise.all([
+    assertOwner(scope),
+    offlineAdapter().epoch(),
+  ]);
   const result: Array<{ id: string; payload: T; savedAt: number }> = [];
   for (const row of (await offlineAdapter().list(key, kind))
     .filter(
@@ -258,11 +390,23 @@ export async function loadOffline<T>(
         chunks.some((c) => typeof c !== "string")
       )
         continue;
-      const text = (
-        await Promise.all(chunks.map((c) => cipher.decrypt(c)))
-      ).join("");
+      const decrypted = await Promise.all(
+        chunks.map((c) => cipher.decrypt(c, scope.pubkey)),
+      );
+      const manifest = JSON.parse(decrypted[0]);
+      const text = decrypted.slice(1).join("");
+      if (
+        manifest.count !== chunks.length - 1 ||
+        manifest.digest !== (await payloadHash(text))
+      )
+        continue;
       const value = JSON.parse(text);
-      if (value.scope === key && value.kind === kind && value.id === row.id) {
+      if (
+        value.scope === key &&
+        value.kind === kind &&
+        value.id === row.id &&
+        value.savedAt === row.savedAt
+      ) {
         if (
           (generations.get(key) ?? 0) !== readGeneration ||
           readGlobal !== globalGeneration
@@ -273,14 +417,22 @@ export async function loadOffline<T>(
           payload: value.payload,
           savedAt: row.savedAt,
         });
-        await offlineAdapter().put({ ...row, lastVisitedAt: Date.now() });
+        await offlineAdapter().put({
+          ...row,
+          cacheEpoch: storeEpoch,
+          lastVisitedAt: Date.now(),
+        });
       }
     } catch {
       /* Corrupt/wrong-identity rows are disposable snapshots, never live data. */
     }
   }
-  await assertOwner(scope);
+  const [, finalStoreEpoch] = await Promise.all([
+    assertOwner(scope),
+    offlineAdapter().epoch(),
+  ]);
   if (
+    finalStoreEpoch !== storeEpoch ||
     (generations.get(key) ?? 0) !== readGeneration ||
     readGlobal !== globalGeneration
   )
@@ -298,14 +450,10 @@ export async function clearOffline(scope: OfflineScope): Promise<void> {
 }
 /** Fence in-flight encryption before identity reset; browser payloads are removed too. */
 export async function clearOfflineForLogout(): Promise<void> {
+  logoutInProgress = true;
   globalGeneration++;
+  await nativeOperations;
   if (isTauri()) return; // Native reset removes App Support and WebKit as one operation.
   if (typeof indexedDB === "undefined") return;
-  const database = await db();
-  await new Promise<void>((resolve, reject) => {
-    const tx = database.transaction("records", "readwrite");
-    tx.objectStore("records").clear();
-    tx.oncomplete = () => resolve();
-    tx.onabort = tx.onerror = () => reject(tx.error);
-  });
+  await mutate(null);
 }

@@ -1,3 +1,4 @@
+import { OfflineSidebarStatus } from "./OfflineSidebarStatus";
 // biome-ignore format: keep compact to stay within file size limit
 import * as React from "react";
 import { FeatureGate } from "@/shared/features";
@@ -541,6 +542,7 @@ export function AppSidebar({
             />
           ) : null}
 
+          <OfflineSidebarStatus />
           <SidebarContent
             className="buzz-sidebar-scrollbar overscroll-none [overflow-anchor:none]"
             data-sidebar-background

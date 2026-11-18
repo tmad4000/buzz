@@ -1,3 +1,4 @@
+import { offlineProfileLabels } from "./offlineProfileLabels";
 import { offlineHeadSnapshot } from "./offlineHeadSnapshot";
 import type { ChannelWindowStore } from "./channelWindowStore";
 import type { QueryClient } from "@tanstack/react-query";
@@ -36,10 +37,12 @@ export function persistOfflineQueries(
   scope: OfflineScope,
 ): () => void {
   let batchEpoch = 0;
+  const profileFingerprints = new Map<string, string>();
   const clearPending = (event: Event) => {
     if ((event as CustomEvent<string>).detail !== offlineScopeKey(scope))
       return;
     batchEpoch++;
+    profileFingerprints.clear();
     for (const timer of timers.values()) clearTimeout(timer);
     timers.clear();
   };
@@ -57,10 +60,15 @@ export function persistOfflineQueries(
       .find({ queryKey: ["channel-messages", channelId], exact: true })
       ?.getObserversCount();
     const events = offlineHeadSnapshot(store, channelId, active ? 100 : 50);
+    const capturedAt = Date.now();
     if (events)
-      void saveOffline(scope, "head", channelId, events).catch((error) =>
-        console.warn("Offline head write failed", error),
-      );
+      void saveOffline(scope, "head", channelId, events)
+        .then(() => {
+          client.setQueryData(["offline-cached-at", channelId], {
+            savedAt: capturedAt,
+          });
+        })
+        .catch((error) => console.warn("Offline head write failed", error));
   };
   const unsubscribe = client.getQueryCache().subscribe((event) => {
     if (
@@ -96,7 +104,16 @@ export function persistOfflineQueries(
             2000,
           )) {
             if (epoch !== batchEpoch) return;
-            await saveOffline(scope, "profile", pubkey, profile);
+            const labels = offlineProfileLabels(profile);
+            const fingerprint = JSON.stringify(labels);
+            if (profileFingerprints.get(pubkey) === fingerprint) continue;
+            await saveOffline(scope, "profile", pubkey, labels);
+            profileFingerprints.delete(pubkey);
+            profileFingerprints.set(pubkey, fingerprint);
+            while (profileFingerprints.size > 2000)
+              profileFingerprints.delete(
+                profileFingerprints.keys().next().value as string,
+              );
           }
         })().catch((error) =>
           console.warn("Offline profile write failed", error),
@@ -119,9 +136,13 @@ export function persistOfflineQueries(
     if (type === "channels" && query.queryKey.length === 1) {
       kind = "sidebar";
       id = "sidebar";
+      client.setQueryData(["offline-source", "channels"], {
+        savedAt: Date.now(),
+      });
     } else if (type === "user-profile" && typeof channel === "string") {
       kind = "profile";
       id = channel;
+      payload = offlineProfileLabels(payload);
     } else if (
       type === "thread-replies" &&
       typeof channel === "string" &&
@@ -136,10 +157,11 @@ export function persistOfflineQueries(
         truncated: payload.length > 200,
       };
     } else return;
-    client.removeQueries({
-      queryKey: ["offline-source", ...query.queryKey],
-      exact: true,
-    });
+    if (kind !== "sidebar")
+      client.removeQueries({
+        queryKey: ["offline-source", ...query.queryKey],
+        exact: true,
+      });
     void saveOffline(scope, kind, id, payload).catch((error) =>
       console.warn("Offline snapshot write failed", error),
     );
@@ -191,7 +213,7 @@ export async function hydrateOfflineProfiles(
   const profiles = Object.fromEntries(
     rows
       .filter((row) => wanted.has(row.id))
-      .map((row) => [row.id, row.payload]),
+      .map((row) => [row.id, offlineProfileLabels(row.payload)]),
   );
   if (
     Object.keys(profiles).length &&

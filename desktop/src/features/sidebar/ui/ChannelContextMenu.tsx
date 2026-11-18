@@ -1,4 +1,8 @@
 import {
+  useDeviceOffline,
+  offlineNeedsConnection,
+} from "@/shared/api/offlineConnection";
+import {
   Archive,
   Bell,
   BellOff,
@@ -199,6 +203,7 @@ export function ChannelContextMenuItems({
     channel.channelType !== "dm" && Boolean(onDeleteChannel);
   const membersQuery = useChannelMembersQuery(channel.id, canLoadOwnerActions);
   const currentPubkey = useIdentityQuery().data?.pubkey;
+  const offline = useDeviceOffline();
   const archiveChannel = useArchiveChannelMutation(channel.id);
   const {
     canDeleteChannel,
@@ -249,8 +254,11 @@ export function ChannelContextMenuItems({
       {showReadToggle ? <ContextMenuSeparator /> : null}
       {hasProjectedUnread && onMarkChannelRead ? (
         <ContextMenuItem
+          disabled={offline}
+          title={offline ? "Needs a connection" : undefined}
           onSelect={() =>
             deferMenuAction(() => {
+              if (offlineNeedsConnection()) return;
               for (const itemId of channelUnreadOverrideIds) {
                 feedItemState.undoUnread(itemId);
               }
@@ -326,6 +334,8 @@ export function ChannelContextMenuItems({
       {onLeaveChannel ? (
         <ContextMenuItem
           className="text-destructive focus:text-destructive"
+          disabled={offline}
+          title={offline ? "Needs a connection" : undefined}
           onSelect={() => deferMenuAction(() => onLeaveChannel(channel))}
         >
           <ContextMenuIconSlot>
@@ -352,7 +362,8 @@ export function ChannelContextMenuItems({
       {canManageChannel ? (
         <ContextMenuItem
           data-testid={`archive-channel-${channel.name}`}
-          disabled={archiveChannel.isPending}
+          disabled={offline || archiveChannel.isPending}
+          title={offline ? "Needs a connection" : undefined}
           onSelect={() => deferMenuAction(() => archiveChannel.mutate())}
         >
           <ContextMenuIconSlot>
@@ -365,6 +376,8 @@ export function ChannelContextMenuItems({
         <ContextMenuItem
           className="text-destructive focus:text-destructive"
           data-testid={`delete-channel-${channel.name}`}
+          disabled={offline}
+          title={offline ? "Needs a connection" : undefined}
           onSelect={() => deferMenuAction(() => onDeleteChannel?.(channel))}
         >
           <ContextMenuIconSlot>
