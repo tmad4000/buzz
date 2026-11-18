@@ -492,7 +492,9 @@ export function formatTimelineMessages(
       createdAt: event.created_at,
       pubkey: authorPubkey,
       signerPubkey: normalizePubkey(event.pubkey),
-      editSignerPubkey: edit?.signerPubkey,
+      // A local cache patch has not carried a signed edit through this projection yet.
+      editSignerPubkey:
+        edit?.signerPubkey ?? (event.localEditedContent ? "" : undefined),
       author,
       isAgent,
       ownerPubkey,

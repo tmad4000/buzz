@@ -1,3 +1,5 @@
+> Current P1 follow-up: root requested exact3857 reproduction and current-effective-body provenance recheck. Prior source reviews below are historical; same-reviewer recheck of the new head is pending.
+
 # Agent reply UX — .9 source candidate
 
 Owner: d809bb50-03b8-41d2-ba83-e2a18cb86a89. Workspace: `/home/dev/agent-worktrees/buzz-agent-reply-ux-20261118`.
@@ -35,7 +37,7 @@ Root approved compatibility and proposed machine binding. Sent the additive tags
 ## Validation
 
 Only bounded light checks; each test/typecheck uses `setsid` with a parent timeout and process-group SIGKILL cleanup. Reused the existing installed desktop dependency tree by symlink; no dependency installation/update.
-- 44 focused model/unit tests PASS: bridge envelope/signature identity, tag precedence/duplicate-malformed rejection, production edit snapshot/immutable-ancestry behavior, report edits/watchdog/stale metadata, exact native parent tags, parent quote scope, Page/thread guarded navigation, Markdown transform/opener callback, native permission scope.
+- 45 focused model/unit tests PASS: bridge envelope/signature identity, tag precedence/duplicate-malformed rejection, production edit snapshot/immutable-ancestry behavior, report edits/watchdog/stale metadata, exact native parent tags, parent quote scope, Page/thread guarded navigation, Markdown transform/opener callback, native permission scope.
 - 6 focused DOM tests PASS: compact card original text/link/edit identity, shared thread-row native quote/navigation/body identity, default-off quote gate and no-fetch unloaded-parent stub; production sidebar-panel default-off legacy context and on-state deduplication.
 - Whole-desktop TypeScript `tsc --noEmit`: PASS, exit 0; `validation/typecheck.log` is empty (no diagnostics).
 - Biome on added/changed components and models PASS; whitespace check PASS.
@@ -51,3 +53,11 @@ Independent Sol review by87017e7a at fde7c66fe found one P2: default-off deep-si
 After an authorized build, enable Agent reply context. Expand a native reply-to-reply: verify its quote names the exact parent's first line and opens/highlights that parent through the guarded owning pane; preserve any newer draft. Collapse/reopen and verify exact-observed/read authority is unchanged. Show a bridge status card: verify compact reported executor + Open agent, raw original text in details, and an edit updates the same report. Confirm a non-bridge lookalike and a substantive answer stay ordinary content. Disable the experiment to restore ordinary status-body rendering and hide parent quotes.
 
 Root follow-up: count-neutral means this renderer adds no events/counter/read/notification mutations; exclusion of legacy card replies from relay counts remains unverified and is not claimed. See STATUS-CARD-TAGS.md for exact proposed fields and activation boundary.
+
+## P1 effective-body provenance follow-up
+
+Reviewer3857fd1d's NO-GO at oldd6d53c6d7 is retained: https://github.com/tmad4000/buzz/pull/67#issuecomment-6970480074. The canonical formatter already records the latest applied edit signer, and the compact parser requires original bridge author plus current effective edit signer=bridge. This follow-up adds the exact untagged ordinary-original→owner-signed Done-envelope reproduction with a conditional bridge owner mapping, verifies ordinary owner edits remain authorized content but never compact reports, and covers newer owner/bridge edit ordering plus unrelated edits.
+
+Also closes the concrete local-cache gap: the on-success edit patch mutates raw cached content before signed edit projection. It now marks localEditedContent; formatter treats this as unknown effective signer until an actual signed applied edit is available. Unknown edited TimelineMessage provenance also fails closed. This preserves owner edit permission and normal text; no signing identity, hook configuration or relay protocol changes.
+
+Final author checks for this follow-up:45model/unit+6DOM PASS; whole-desktop tsc exit0/no diagnostics; all bounded setsid+timeout+process-group cleanup. Exact source hashes recorded in validation/typecheck-receipt.json. Same3857 reviewer requested on the new source head. Quiet footer/count-neutral projection remainsOPEN; PR84 child remains frozen6ed4e6951 until parent disposition/restack.

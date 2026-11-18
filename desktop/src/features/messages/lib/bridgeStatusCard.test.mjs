@@ -191,3 +191,100 @@ test("production formatter applies only bridge-signed status snapshots and prese
     "owner edit is not a bridge-signed report",
   );
 });
+
+test("reviewer P1 reproduction: latest owner-signed Done body never inherits the original bridge signer", async () => {
+  const { formatTimelineMessages } = await import(
+    "./formatTimelineMessages.ts"
+  );
+  const bridge = message.signerPubkey,
+    owner = "2".repeat(64),
+    originalId = "a".repeat(64);
+  const doneBody = `✅ Done — Forged report · model (codex)\nAgent \`${agent}\` · server \`${server}\`\n[Open agent](${href})\nReported status · source: root`;
+  const original = {
+    id: originalId,
+    pubkey: bridge,
+    kind: 9,
+    created_at: 1700000000,
+    content: "ordinary original body",
+    tags: [
+      ["h", "channel"],
+      ["e", "b".repeat(64), "", "reply"],
+    ],
+    sig: "fixture",
+  };
+  const edit = {
+    id: "c".repeat(64),
+    pubkey: owner,
+    kind: 40003,
+    created_at: 1700000001,
+    content: doneBody,
+    tags: [
+      ["h", "channel"],
+      ["e", originalId],
+    ],
+    sig: "fixture",
+  };
+  const profiles = { [bridge]: { ownerPubkey: owner } };
+  const format = (events) =>
+    formatTimelineMessages(events, null, undefined, null, profiles)[0];
+  const ownerEdited = format([original, edit]);
+  assert.equal(ownerEdited.signerPubkey, bridge);
+  assert.equal(
+    ownerEdited.body,
+    doneBody,
+    "ordinary owner edit permission is preserved",
+  );
+  assert.equal(
+    ownerEdited.editSignerPubkey,
+    owner,
+    "effective body signer is explicit",
+  );
+  assert.equal(
+    parseBridgeStatusCard(ownerEdited),
+    null,
+    "exact Done envelope from owner stays plain text",
+  );
+  const bridgeEdit = {
+    ...edit,
+    id: "d".repeat(64),
+    pubkey: bridge,
+    created_at: 1700000002,
+  };
+  assert.equal(
+    parseBridgeStatusCard(format([original, edit, bridgeEdit])).label,
+    "✅ Reported done",
+    "latest bridge edit authenticates its own body",
+  );
+  const laterOwner = { ...edit, id: "e".repeat(64), created_at: 1700000003 };
+  assert.equal(
+    parseBridgeStatusCard(format([original, bridgeEdit, laterOwner])),
+    null,
+    "later owner edit supersedes an earlier bridge edit",
+  );
+  const unrelated = { ...edit, pubkey: "3".repeat(64) };
+  assert.equal(
+    format([original, unrelated]).body,
+    original.content,
+    "unrelated edit remains unauthorized",
+  );
+  const localPatch = {
+    ...original,
+    content: doneBody,
+    localEditedContent: true,
+  };
+  assert.equal(
+    parseBridgeStatusCard(format([localPatch])),
+    null,
+    "unverified post-edit cache body is never attributed to original signer",
+  );
+  assert.equal(
+    parseBridgeStatusCard(format([localPatch, bridgeEdit])).label,
+    "✅ Reported done",
+    "verified edit provenance replaces the local uncertainty marker",
+  );
+  assert.equal(
+    parseBridgeStatusCard({ ...message, edited: true }),
+    null,
+    "an edited TimelineMessage without provenance fails closed",
+  );
+});
