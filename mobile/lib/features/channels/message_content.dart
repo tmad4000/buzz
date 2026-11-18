@@ -614,6 +614,7 @@ class _MessageImagePreview extends HookConsumerWidget {
             child: ClipRRect(
               borderRadius: BorderRadius.circular(Radii.md),
               child: MediaImage(
+                offlinePlaceholder: true,
                 url: url,
                 decodeWidth: previewDecodeWidth,
                 fit: layout.fit,

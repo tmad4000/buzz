@@ -1,0 +1,6 @@
+00:00 +0: loading /home/dev/agent-worktrees/buzz-offline-p1-mobile-20261118/mobile/test/offline_read_admission_p1_test.dart
+00:00 +0: /home/dev/agent-worktrees/buzz-offline-p1-mobile-20261118/mobile/test/offline_read_admission_p1_test.dart: cached reading and connected-before-fetch cannot advance admission; scope and generation are fenced
+00:00 +1: /home/dev/agent-worktrees/buzz-offline-p1-mobile-20261118/mobile/test/offline_read_admission_p1_test.dart: feature defaults off
+00:01 +2: /home/dev/agent-worktrees/buzz-offline-p1-mobile-20261118/mobile/test/offline_thread_commit_p1_test.dart: live thread authority follows AsyncData commit and never waits for optional cache initialization
+00:03 +3: /home/dev/agent-worktrees/buzz-offline-p1-mobile-20261118/mobile/test/offline_banner_p1_test.dart: cached banner names truncation and waits for authoritative recovery before toast
+00:05 +4: All tests passed!

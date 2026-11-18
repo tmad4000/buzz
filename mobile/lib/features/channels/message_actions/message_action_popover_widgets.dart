@@ -135,19 +135,26 @@ class _MessageActionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final foreground = action.destructive
+    final foreground = action.disabled
+        ? context.colors.onSurface.withValues(alpha: 0.45)
+        : action.destructive
         ? context.colors.error
         : context.colors.onSurface;
     return Semantics(
       button: true,
-      label: action.title,
+      enabled: !action.disabled,
+      label: action.disabled
+          ? '${action.title} · Needs a connection'
+          : action.title,
       excludeSemantics: true,
       child: InkWell(
         key: ValueKey('message-action-${action.id}'),
-        onTap: () {
-          unawaited(HapticFeedback.lightImpact());
-          onSelected(action.id);
-        },
+        onTap: action.disabled
+            ? null
+            : () {
+                unawaited(HapticFeedback.lightImpact());
+                onSelected(action.id);
+              },
         child: SizedBox(
           height: height,
           child: Padding(

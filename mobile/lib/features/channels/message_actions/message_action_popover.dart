@@ -144,7 +144,9 @@ Future<bool> _showMessageActionsPopover({
       snapshot.dispose();
       return false;
     }
-    final useIosNativeActionSurface = await nativeActionSurfaceSupport;
+    final useIosNativeActionSurface =
+        await nativeActionSurfaceSupport &&
+        !ref.read(offlineConnectionRequiredProvider);
     if (!context.mounted) {
       snapshot.dispose();
       return false;
@@ -205,6 +207,16 @@ Future<bool> _showMessageActionsPopover({
 
     for (final action in actions) {
       if (action.id != selectedActionId) continue;
+      if (action.disabled ||
+          (ref.read(offlineConnectionRequiredProvider) &&
+              {
+                'markRead',
+                'markUnread',
+                'edit',
+                'delete',
+              }.contains(action.id))) {
+        return true;
+      }
       await Future<void>.sync(action.onSelected);
       break;
     }
@@ -313,6 +325,7 @@ List<_PopoverMessageAction> _buildPopoverMessageActions({
       actions.add(
         _PopoverMessageAction(
           id: unread ? 'markRead' : 'markUnread',
+          disabled: ref.read(offlineConnectionRequiredProvider),
           title: unread ? 'Mark read' : 'Mark unread',
           icon: unread ? BuzzIcons.mailCheck : BuzzIcons.mailOpen,
           group: _PopoverMessageActionGroup.primary,
@@ -368,6 +381,7 @@ List<_PopoverMessageAction> _buildPopoverMessageActions({
     actions.add(
       _PopoverMessageAction(
         id: 'edit',
+        disabled: ref.read(offlineConnectionRequiredProvider),
         title: 'Edit message',
         icon: BuzzIcons.pencil,
         group: _PopoverMessageActionGroup.primary,
@@ -385,6 +399,7 @@ List<_PopoverMessageAction> _buildPopoverMessageActions({
     actions.add(
       _PopoverMessageAction(
         id: 'delete',
+        disabled: ref.read(offlineConnectionRequiredProvider),
         title: 'Delete message',
         icon: BuzzIcons.trash2,
         group: _PopoverMessageActionGroup.destructive,
@@ -428,6 +443,7 @@ class _PopoverMessageAction {
   final IconData icon;
   final _PopoverMessageActionGroup group;
   final bool destructive;
+  final bool disabled;
   final FutureOr<void> Function() onSelected;
 
   const _PopoverMessageAction({
@@ -437,6 +453,7 @@ class _PopoverMessageAction {
     required this.group,
     required this.onSelected,
     this.destructive = false,
+    this.disabled = false,
   });
 
   String get iosSymbol => switch (id) {

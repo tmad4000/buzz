@@ -94,6 +94,7 @@ class _MessageVideoPreview extends HookConsumerWidget {
               children: [
                 if (posterUrl != null)
                   MediaImage(
+                    offlinePlaceholder: true,
                     url: posterUrl,
                     fit: BoxFit.cover,
                     frameBuilder: (context, child, frame, synchronous) =>

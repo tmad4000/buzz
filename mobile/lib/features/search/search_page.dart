@@ -1,3 +1,4 @@
+import '../../shared/offline/offline_provider.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
@@ -346,9 +347,12 @@ class SearchPage extends HookConsumerWidget {
               child: SizedBox(
                 key: const Key('search-field-container'),
                 child: BuzzSearchField(
+                  enabled: !ref.watch(offlineConnectionRequiredProvider),
                   controller: textController,
                   focusNode: focusNode,
-                  hintText: 'Search messages, channels, and people',
+                  hintText: ref.watch(offlineConnectionRequiredProvider)
+                      ? 'Needs a connection'
+                      : 'Search messages, channels, and people',
                   iconColor: searchPrimaryColor,
                   inputColor: searchPrimaryColor,
                   placeholderColor: searchPlaceholderColor,

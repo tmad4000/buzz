@@ -1,3 +1,6 @@
+import 'package:buzz/shared/offline/read_admission.dart';
+import 'package:buzz/shared/offline/offline_provider.dart';
+import 'package:buzz/shared/offline/offline_cache.dart';
 import 'dart:async';
 import 'package:buzz/features/channels/channel_actions_sheet.dart';
 
@@ -79,6 +82,7 @@ import 'package:buzz/shared/widgets/tabler_star_icon.dart';
 import 'package:buzz/shared/widgets/skeleton.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+part 'offline_p1_read_admission_cases.dart';
 part 'thread_reply_refresh_cases.dart';
 part 'thread_title_capsule_cases.dart';
 part 'channel_detail_page_test/loading_review_tests.dart';
@@ -241,6 +245,9 @@ Widget _buildTestable({
   List<DirectoryUser>? directoryUsers,
   ChannelActions Function(Ref ref)? createChannelActions,
   ReadStateNotifier? readStateNotifier,
+  bool denyCachedReading = false,
+  bool offlineCacheEnabled = false,
+  OfflineCacheStore? offlineStore,
   _FakeMessagesNotifier? messagesNotifier,
   _FakeTypingNotifier? typingNotifier,
   _FakeTypingNotifier? huddleTypingNotifier,
@@ -278,6 +285,11 @@ Widget _buildTestable({
   return ProviderScope(
     retry: providerRetry ?? (disableRetries ? (_, _) => null : null),
     overrides: [
+      offlineEnabledProvider.overrideWithValue(offlineCacheEnabled),
+      if (offlineStore != null)
+        offlineStoreProvider.overrideWith((ref) async => offlineStore),
+      if (denyCachedReading)
+        readAdmissionProvider('head:$_channelId').overrideWith((ref) => false),
       if (videoPreviewLoader != null)
         videoPreviewFrameLoaderProvider.overrideWithValue(videoPreviewLoader),
       channelMessagesProvider(
@@ -501,6 +513,7 @@ double? effectiveFontSizeForText(
 }
 
 void main() {
+  _offlineP1ReadAdmissionTests();
   _loadingReviewTests();
   threadReplyRefreshTests();
   threadTitleCapsuleTests();

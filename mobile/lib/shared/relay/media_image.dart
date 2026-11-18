@@ -1,3 +1,6 @@
+import '../offline/offline_provider.dart';
+import 'relay_session.dart';
+import 'app_lifecycle_provider.dart';
 import 'dart:async';
 import 'dart:ui' as ui;
 
@@ -187,6 +190,7 @@ class MediaImage extends ConsumerWidget {
   final FilterQuality filterQuality;
   final double? decodeWidth;
   final bool boundDecodeToLayout;
+  final bool offlinePlaceholder;
   final ValueChanged<Uint8List>? onBytesLoaded;
 
   const MediaImage({
@@ -201,11 +205,17 @@ class MediaImage extends ConsumerWidget {
     this.filterQuality = FilterQuality.medium,
     this.decodeWidth,
     this.boundDecodeToLayout = true,
+    this.offlinePlaceholder = false,
     this.onBytesLoaded,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final offline =
+        offlinePlaceholder &&
+        ref.watch(offlineEnabledProvider) &&
+        (!ref.watch(networkAvailableProvider) ||
+            ref.watch(relaySessionProvider).status != SessionStatus.connected);
     final provider = MediaImageProvider(
       url: url,
       auth: ref.watch(mediaGetAuthServiceProvider),
@@ -214,10 +224,14 @@ class MediaImage extends ConsumerWidget {
     );
 
     if (decodeWidth != null) {
-      return _image(provider, _physicalWidth(context, decodeWidth!));
+      return _image(
+        provider,
+        _physicalWidth(context, decodeWidth!),
+        offline: offline,
+      );
     }
     if (!boundDecodeToLayout) {
-      return _image(provider, null);
+      return _image(provider, null, offline: offline);
     }
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -225,7 +239,7 @@ class MediaImage extends ConsumerWidget {
         final cacheWidth = maxWidth.isFinite && maxWidth > 0
             ? _physicalWidth(context, maxWidth)
             : null;
-        return _image(provider, cacheWidth);
+        return _image(provider, cacheWidth, offline: offline);
       },
     );
   }
@@ -234,14 +248,21 @@ class MediaImage extends ConsumerWidget {
     return (logicalWidth * MediaQuery.devicePixelRatioOf(context)).ceil();
   }
 
-  Widget _image(MediaImageProvider provider, int? cacheWidth) {
+  Widget _image(
+    MediaImageProvider provider,
+    int? cacheWidth, {
+    bool offline = false,
+  }) {
     return Image(
       image: ResizeImage.resizeIfNeeded(cacheWidth, null, provider),
       fit: fit,
       width: width,
       height: height,
       semanticLabel: semanticLabel,
-      errorBuilder: errorBuilder,
+      errorBuilder: offline
+          ? (context, error, stack) =>
+                const Center(child: Text('Available when online'))
+          : errorBuilder,
       frameBuilder: frameBuilder,
       filterQuality: filterQuality,
       gaplessPlayback: true,

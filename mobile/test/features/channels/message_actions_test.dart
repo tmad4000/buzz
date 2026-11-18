@@ -1,3 +1,4 @@
+import 'package:buzz/shared/offline/offline_provider.dart';
 import 'package:buzz/shared/widgets/sheet_action_section.dart';
 import 'package:buzz/shared/widgets/app_list_card.dart';
 import 'dart:async';
@@ -143,11 +144,13 @@ Future<void> _pumpSheet(
   bool nativePresentation = false,
   String? currentPubkey = 'self',
   bool listChannel = false,
+  bool offline = false,
 }) async {
   Future<void>? presentation;
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        if (offline) offlineConnectionRequiredProvider.overrideWithValue(true),
         savedPrefsProvider.overrideWithValue(prefs),
         myPubkeyProvider.overrideWithValue('self'),
         readStateProvider.overrideWith(
@@ -420,6 +423,41 @@ void main() {
           (_) async => null,
         );
   });
+
+  testWidgets(
+    'offline message sheet preserves edit/delete layout and blocks invocation',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      final prefs = await SharedPreferences.getInstance();
+      await _pumpSheet(
+        tester,
+        message: _message(),
+        prefs: prefs,
+        canManageMessage: true,
+        offline: true,
+      );
+      expect(find.text('Edit message'), findsOneWidget);
+      expect(find.text('Delete message'), findsOneWidget);
+      expect(
+        find.ancestor(
+          of: find.text('Edit message'),
+          matching: find.byType(AbsorbPointer),
+        ),
+        findsWidgets,
+      );
+      expect(
+        find.ancestor(
+          of: find.text('Delete message'),
+          matching: find.byType(AbsorbPointer),
+        ),
+        findsWidgets,
+      );
+      await tester.tap(find.text('Edit message'), warnIfMissed: false);
+      await tester.pumpAndSettle();
+      expect(find.byType(TextField), findsNothing);
+      expect(find.text('Edit message'), findsOneWidget);
+    },
+  );
 
   testWidgets(
     'message long press keeps taps and scrolling while repeated holds win',

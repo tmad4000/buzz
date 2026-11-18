@@ -1,0 +1,217 @@
+An unexpected error was encountered by the Analysis Server.
+Please file an issue at https://github.com/dart-lang/sdk/issues/new/choose with the following details:
+
+Internal error: Failed to handle request: analysis.setAnalysisRoots
+OS Error: Too many open files, errno = 24
+#0      _FileSystemWatcher._initWatcher (dart:io-patch/file_patch.dart:471)
+#1      _InotifyFileSystemWatcher._ensureWatcherIsRunning (dart:io-patch/file_patch.dart:552)
+#2      _MultiplexingFileSystemWatcher._startWatching (dart:io-patch/file_patch.dart:516)
+#3      _FileSystemWatcher._watchImpl.<anonymous closure> (dart:io-patch/file_patch.dart:350)
+#4      _MultiStream.listen.<anonymous closure> (dart:async/stream_impl.dart:1178)
+#5      _runGuarded (dart:async/stream_controller.dart:838)
+#6      _StreamController._subscribe.<anonymous closure> (dart:async/stream_controller.dart:716)
+#7      _BufferingStreamSubscription._guardCallback (dart:async/stream_impl.dart:457)
+#8      _StreamController._subscribe (dart:async/stream_controller.dart:715)
+#9      _MultiStream.listen (dart:async/stream_impl.dart:1180)
+#10     new _SinkTransformerStreamSubscription (dart:async/stream_transformers.dart:49)
+#11     _BoundSinkStream.listen (dart:async/stream_transformers.dart:179)
+#12     new NativeWatch (package:watcher/src/directory_watcher/linux/native_watch.dart:93)
+#13     WatchTree._watch (package:watcher/src/directory_watcher/linux/watch_tree.dart:80)
+#14     new WatchTree (package:watcher/src/directory_watcher/linux/watch_tree.dart:54)
+#15     new WatchTreeRoot (package:watcher/src/directory_watcher/linux/watch_tree_root.dart:28)
+#16     new _LinuxDirectoryWatcher (package:watcher/src/directory_watcher/linux/linux_directory_watcher.dart:45)
+#17     new ResubscribableWatcher.<anonymous closure> (package:watcher/src/resubscribable.dart:52)
+#18     _runGuarded (dart:async/stream_controller.dart:838)
+#19     _BroadcastStreamController._subscribe (dart:async/broadcast_stream_controller.dart:220)
+#20     _ControllerStream._createSubscription (dart:async/stream_controller.dart:854)
+#21     _StreamImpl.listen (dart:async/stream_impl.dart:516)
+#22     new _ForwardingStreamSubscription (dart:async/stream_pipe.dart:141)
+#23     _ForwardingStream._createSubscription (dart:async/stream_pipe.dart:105)
+#24     _ForwardingStream.listen (dart:async/stream_pipe.dart:96)
+#25     new _SinkTransformerStreamSubscription (dart:async/stream_transformers.dart:49)
+#26     _BoundSinkStream.listen (dart:async/stream_transformers.dart:179)
+#27     ContextManagerImpl._createAnalysisContexts.performContextRebuildGuarded.<anonymous closure> (package:analysis_server/src/context_manager.dart:695)
+#28     MappedIterable.elementAt (dart:_internal/iterable.dart:402)
+#29     ListIterator.moveNext (dart:_internal/iterable.dart:371)
+#30     new _GrowableList._ofEfficientLengthIterable (dart:core-patch/growable_array.dart:194)
+#31     new _GrowableList.of (dart:core-patch/growable_array.dart:154)
+#32     new List.of (dart:core-patch/array_patch.dart:39)
+#33     ListIterable.toList (dart:_internal/iterable.dart:224)
+#34     ContextManagerImpl._createAnalysisContexts.performContextRebuildGuarded (package:analysis_server/src/context_manager.dart:713)
+#35     _CancellingTaskQueue.queue.<anonymous closure> (package:analysis_server/src/context_manager.dart:1040)
+#36     _rootRunUnary (dart:async/zone_root.dart:48)
+#37     _CustomZone.runUnary (dart:async/zone.dart:733)
+<asynchronous suspension>
+#38     _CancellingTaskQueue.queue.<anonymous closure> (package:analysis_server/src/context_manager.dart:1041)
+<asynchronous suspension>
+#39     ContextManagerImpl.setRoots (package:analysis_server/src/context_manager.dart:386)
+<asynchronous suspension>
+#40     LegacyAnalysisServer.setAnalysisRoots (package:analysis_server/src/legacy_analysis_server.dart:901)
+<asynchronous suspension>
+#41     AnalysisSetAnalysisRootsHandler.handle (package:analysis_server/src/handler/legacy/analysis_set_analysis_roots.dart:56)
+<asynchronous suspension>
+#42     LegacyAnalysisServer.handleRequest.<anonymous closure>.<anonymous closure> (package:analysis_server/src/legacy_analysis_server.dart:648)
+<asynchronous suspension>
+#43     OperationPerformanceImpl.runAsync (package:analyzer/src/util/performance/operation_performance.dart:201)
+<asynchronous suspension>
+#44     LegacyAnalysisServer.handleRequest.<anonymous closure> (package:analysis_server/src/legacy_analysis_server.dart:628)
+<asynchronous suspension>
+
+
+null
+[RequestError code: SERVER_ERROR, message: OS Error: Too many open files, errno = 24]
+
+An unexpected error was encountered by the Analysis Server.
+Please file an issue at https://github.com/dart-lang/sdk/issues/new/choose with the following details:
+
+Internal error: Failed to handle request: analysis.setAnalysisRoots
+OS Error: Too many open files, errno = 24
+#0      _FileSystemWatcher._initWatcher (dart:io-patch/file_patch.dart:471)
+#1      _InotifyFileSystemWatcher._ensureWatcherIsRunning (dart:io-patch/file_patch.dart:552)
+#2      _MultiplexingFileSystemWatcher._startWatching (dart:io-patch/file_patch.dart:516)
+#3      _FileSystemWatcher._watchImpl.<anonymous closure> (dart:io-patch/file_patch.dart:350)
+#4      _MultiStream.listen.<anonymous closure> (dart:async/stream_impl.dart:1178)
+#5      _runGuarded (dart:async/stream_controller.dart:838)
+#6      _StreamController._subscribe.<anonymous closure> (dart:async/stream_controller.dart:716)
+#7      _BufferingStreamSubscription._guardCallback (dart:async/stream_impl.dart:457)
+#8      _StreamController._subscribe (dart:async/stream_controller.dart:715)
+#9      _MultiStream.listen (dart:async/stream_impl.dart:1180)
+#10     new _SinkTransformerStreamSubscription (dart:async/stream_transformers.dart:49)
+#11     _BoundSinkStream.listen (dart:async/stream_transformers.dart:179)
+#12     new NativeWatch (package:watcher/src/directory_watcher/linux/native_watch.dart:93)
+#13     WatchTree._watch (package:watcher/src/directory_watcher/linux/watch_tree.dart:80)
+#14     new WatchTree (package:watcher/src/directory_watcher/linux/watch_tree.dart:54)
+#15     new WatchTreeRoot (package:watcher/src/directory_watcher/linux/watch_tree_root.dart:28)
+#16     new _LinuxDirectoryWatcher (package:watcher/src/directory_watcher/linux/linux_directory_watcher.dart:45)
+#17     new ResubscribableWatcher.<anonymous closure> (package:watcher/src/resubscribable.dart:52)
+#18     _runGuarded (dart:async/stream_controller.dart:838)
+#19     _BroadcastStreamController._subscribe (dart:async/broadcast_stream_controller.dart:220)
+#20     _ControllerStream._createSubscription (dart:async/stream_controller.dart:854)
+#21     _StreamImpl.listen (dart:async/stream_impl.dart:516)
+#22     new _ForwardingStreamSubscription (dart:async/stream_pipe.dart:141)
+#23     _ForwardingStream._createSubscription (dart:async/stream_pipe.dart:105)
+#24     _ForwardingStream.listen (dart:async/stream_pipe.dart:96)
+#25     new _SinkTransformerStreamSubscription (dart:async/stream_transformers.dart:49)
+#26     _BoundSinkStream.listen (dart:async/stream_transformers.dart:179)
+#27     ContextManagerImpl._createAnalysisContexts.performContextRebuildGuarded.performContextRebuild (package:analysis_server/src/context_manager.dart:625)
+<asynchronous suspension>
+#28     ContextManagerImpl._createAnalysisContexts.performContextRebuildGuarded (package:analysis_server/src/context_manager.dart:732)
+<asynchronous suspension>
+#29     _CancellingTaskQueue.queue.<anonymous closure> (package:analysis_server/src/context_manager.dart:1041)
+<asynchronous suspension>
+#30     ContextManagerImpl.setRoots (package:analysis_server/src/context_manager.dart:386)
+<asynchronous suspension>
+#31     LegacyAnalysisServer.setAnalysisRoots (package:analysis_server/src/legacy_analysis_server.dart:901)
+<asynchronous suspension>
+#32     AnalysisSetAnalysisRootsHandler.handle (package:analysis_server/src/handler/legacy/analysis_set_analysis_roots.dart:56)
+<asynchronous suspension>
+#33     LegacyAnalysisServer.handleRequest.<anonymous closure>.<anonymous closure> (package:analysis_server/src/legacy_analysis_server.dart:648)
+<asynchronous suspension>
+#34     OperationPerformanceImpl.runAsync (package:analyzer/src/util/performance/operation_performance.dart:201)
+<asynchronous suspension>
+#35     LegacyAnalysisServer.handleRequest.<anonymous closure> (package:analysis_server/src/legacy_analysis_server.dart:628)
+<asynchronous suspension>
+
+
+null
+An unexpected error was encountered by the Analysis Server.
+Please file an issue at https://github.com/dart-lang/sdk/issues/new/choose with the following details:
+
+Internal error: Bad state: Future already completed
+#0      _AsyncCompleter.complete (dart:async/future_impl.dart:97)
+#1      LegacyAnalysisServer.handleRequest.<anonymous closure> (package:analysis_server/src/legacy_analysis_server.dart:689)
+#2      _rootRunBinary (dart:async/zone_root.dart:70)
+#3      _CustomZone.runBinary (dart:async/zone.dart:740)
+#4      runZonedGuarded.<anonymous closure> (dart:async/zone_api.dart:134)
+#5      _Zone._processUncaughtError (dart:async/zone.dart:482)
+#6      _CustomZone.handleUncaughtError (dart:async/zone.dart:703)
+#7      _runGuarded (dart:async/stream_controller.dart:840)
+#8      _StreamController._subscribe.<anonymous closure> (dart:async/stream_controller.dart:716)
+#9      _BufferingStreamSubscription._guardCallback (dart:async/stream_impl.dart:457)
+#10     _StreamController._subscribe (dart:async/stream_controller.dart:715)
+#11     _MultiStream.listen (dart:async/stream_impl.dart:1180)
+#12     new _SinkTransformerStreamSubscription (dart:async/stream_transformers.dart:49)
+#13     _BoundSinkStream.listen (dart:async/stream_transformers.dart:179)
+#14     new NativeWatch (package:watcher/src/directory_watcher/linux/native_watch.dart:93)
+#15     WatchTree._watch (package:watcher/src/directory_watcher/linux/watch_tree.dart:80)
+#16     new WatchTree (package:watcher/src/directory_watcher/linux/watch_tree.dart:54)
+#17     new WatchTreeRoot (package:watcher/src/directory_watcher/linux/watch_tree_root.dart:28)
+#18     new _LinuxDirectoryWatcher (package:watcher/src/directory_watcher/linux/linux_directory_watcher.dart:45)
+#19     new ResubscribableWatcher.<anonymous closure> (package:watcher/src/resubscribable.dart:52)
+#20     _runGuarded (dart:async/stream_controller.dart:838)
+#21     _BroadcastStreamController._subscribe (dart:async/broadcast_stream_controller.dart:220)
+#22     _ControllerStream._createSubscription (dart:async/stream_controller.dart:854)
+#23     _StreamImpl.listen (dart:async/stream_impl.dart:516)
+#24     new _ForwardingStreamSubscription (dart:async/stream_pipe.dart:141)
+#25     _ForwardingStream._createSubscription (dart:async/stream_pipe.dart:105)
+#26     _ForwardingStream.listen (dart:async/stream_pipe.dart:96)
+#27     new _SinkTransformerStreamSubscription (dart:async/stream_transformers.dart:49)
+#28     _BoundSinkStream.listen (dart:async/stream_transformers.dart:179)
+#29     ContextManagerImpl._createAnalysisContexts.performContextRebuildGuarded.performContextRebuild (package:analysis_server/src/context_manager.dart:625)
+<asynchronous suspension>
+#30     ContextManagerImpl._createAnalysisContexts.performContextRebuildGuarded (package:analysis_server/src/context_manager.dart:732)
+<asynchronous suspension>
+#31     _CancellingTaskQueue.queue.<anonymous closure> (package:analysis_server/src/context_manager.dart:1041)
+<asynchronous suspension>
+#32     ContextManagerImpl.setRoots (package:analysis_server/src/context_manager.dart:386)
+<asynchronous suspension>
+#33     LegacyAnalysisServer.setAnalysisRoots (package:analysis_server/src/legacy_analysis_server.dart:901)
+<asynchronous suspension>
+#34     AnalysisSetAnalysisRootsHandler.handle (package:analysis_server/src/handler/legacy/analysis_set_analysis_roots.dart:56)
+<asynchronous suspension>
+#35     LegacyAnalysisServer.handleRequest.<anonymous closure>.<anonymous closure> (package:analysis_server/src/legacy_analysis_server.dart:648)
+<asynchronous suspension>
+#36     OperationPerformanceImpl.runAsync (package:analyzer/src/util/performance/operation_performance.dart:201)
+<asynchronous suspension>
+#37     LegacyAnalysisServer.handleRequest.<anonymous closure> (package:analysis_server/src/legacy_analysis_server.dart:628)
+<asynchronous suspension>
+
+Unhandled exception:
+Bad state: Future already completed
+#0      _AsyncCompleter.complete (dart:async/future_impl.dart:97)
+#1      LegacyAnalysisServer.handleRequest.<anonymous closure> (package:analysis_server/src/legacy_analysis_server.dart:689)
+#2      _rootRunBinary (dart:async/zone_root.dart:70)
+#3      _CustomZone.runBinary (dart:async/zone.dart:740)
+#4      runZonedGuarded.<anonymous closure> (dart:async/zone_api.dart:134)
+#5      _Zone._processUncaughtError (dart:async/zone.dart:482)
+#6      _CustomZone.handleUncaughtError (dart:async/zone.dart:703)
+#7      _runGuarded (dart:async/stream_controller.dart:840)
+#8      _StreamController._subscribe.<anonymous closure> (dart:async/stream_controller.dart:716)
+#9      _BufferingStreamSubscription._guardCallback (dart:async/stream_impl.dart:457)
+#10     _StreamController._subscribe (dart:async/stream_controller.dart:715)
+#11     _MultiStream.listen (dart:async/stream_impl.dart:1180)
+#12     new _SinkTransformerStreamSubscription (dart:async/stream_transformers.dart:49)
+#13     _BoundSinkStream.listen (dart:async/stream_transformers.dart:179)
+#14     new NativeWatch (package:watcher/src/directory_watcher/linux/native_watch.dart:93)
+#15     WatchTree._watch (package:watcher/src/directory_watcher/linux/watch_tree.dart:80)
+#16     new WatchTree (package:watcher/src/directory_watcher/linux/watch_tree.dart:54)
+#17     new WatchTreeRoot (package:watcher/src/directory_watcher/linux/watch_tree_root.dart:28)
+#18     new _LinuxDirectoryWatcher (package:watcher/src/directory_watcher/linux/linux_directory_watcher.dart:45)
+#19     new ResubscribableWatcher.<anonymous closure> (package:watcher/src/resubscribable.dart:52)
+#20     _runGuarded (dart:async/stream_controller.dart:838)
+#21     _BroadcastStreamController._subscribe (dart:async/broadcast_stream_controller.dart:220)
+#22     _ControllerStream._createSubscription (dart:async/stream_controller.dart:854)
+#23     _StreamImpl.listen (dart:async/stream_impl.dart:516)
+#24     new _ForwardingStreamSubscription (dart:async/stream_pipe.dart:141)
+#25     _ForwardingStream._createSubscription (dart:async/stream_pipe.dart:105)
+#26     _ForwardingStream.listen (dart:async/stream_pipe.dart:96)
+#27     new _SinkTransformerStreamSubscription (dart:async/stream_transformers.dart:49)
+#28     _BoundSinkStream.listen (dart:async/stream_transformers.dart:179)
+#29     ContextManagerImpl._createAnalysisContexts.performContextRebuildGuarded.performContextRebuild (package:analysis_server/src/context_manager.dart:625)
+<asynchronous suspension>
+#30     ContextManagerImpl._createAnalysisContexts.performContextRebuildGuarded (package:analysis_server/src/context_manager.dart:732)
+<asynchronous suspension>
+#31     _CancellingTaskQueue.queue.<anonymous closure> (package:analysis_server/src/context_manager.dart:1041)
+<asynchronous suspension>
+#32     ContextManagerImpl.setRoots (package:analysis_server/src/context_manager.dart:386)
+<asynchronous suspension>
+#33     LegacyAnalysisServer.setAnalysisRoots (package:analysis_server/src/legacy_analysis_server.dart:901)
+<asynchronous suspension>
+#34     AnalysisSetAnalysisRootsHandler.handle (package:analysis_server/src/handler/legacy/analysis_set_analysis_roots.dart:56)
+<asynchronous suspension>
+#35     LegacyAnalysisServer.handleRequest.<anonymous closure>.<anonymous closure> (package:analysis_server/src/legacy_analysis_server.dart:648)
+<asynchronous suspension>
+#36     OperationPerformanceImpl.runAsync (package:analyzer/src/util/performance/operation_performance.dart:201)
+<asynchronous suspension>
+#37     LegacyAnalysisServer.handleRequest.<anonymous closure> (package:analysis_server/src/legacy_analysis_server.dart:628)
+<asynchronous suspension>

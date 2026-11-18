@@ -1,0 +1,5 @@
+00:00 +0: loading /home/dev/agent-worktrees/buzz-offline-p1-mobile-20261118/mobile/test/features/channels/message_actions_test.dart
+00:00 +0: offline message sheet preserves edit/delete layout and blocks invocation
+00:01 +1: showMessageActions shows Edit/Delete only with manage rights
+00:02 +2: showMessageActions Mark read appears for unread messages and advances the message marker
+00:02 +3: All tests passed!

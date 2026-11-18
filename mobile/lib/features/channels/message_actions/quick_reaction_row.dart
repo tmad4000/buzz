@@ -48,6 +48,9 @@ class _QuickReactionRow extends ConsumerWidget {
     };
 
     void react(String value) {
+      if (ref.read(offlineConnectionRequiredProvider)) {
+        return;
+      }
       // The generic picker is also used for composing and statuses. Record
       // recency here, at the reaction call site, so only reactions drive the
       // quick-reaction row.
@@ -58,30 +61,55 @@ class _QuickReactionRow extends ConsumerWidget {
       pageRef.read(channelActionsProvider).addReaction(message.id, value);
     }
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        const desiredCircleSize = 52.0;
-        const minimumCircleSize = 44.0;
-        final itemCount = emoji.length + 1;
-        final gapCount = itemCount - 1;
-        final circleSize =
-            ((constraints.maxWidth - (Grid.twelve * gapCount)) / itemCount)
-                .clamp(minimumCircleSize, desiredCircleSize)
-                .toDouble();
-        final gap =
-            ((constraints.maxWidth - (circleSize * itemCount)) / gapCount)
-                .clamp(0.0, Grid.twelve)
-                .toDouble();
-        final circles = <Widget>[
-          for (var index = 0; index < emoji.length; index++)
+    return OfflineConnectionAction(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          const desiredCircleSize = 52.0;
+          const minimumCircleSize = 44.0;
+          final itemCount = emoji.length + 1;
+          final gapCount = itemCount - 1;
+          final circleSize =
+              ((constraints.maxWidth - (Grid.twelve * gapCount)) / itemCount)
+                  .clamp(minimumCircleSize, desiredCircleSize)
+                  .toDouble();
+          final gap =
+              ((constraints.maxWidth - (circleSize * itemCount)) / gapCount)
+                  .clamp(0.0, Grid.twelve)
+                  .toDouble();
+          final circles = <Widget>[
+            for (var index = 0; index < emoji.length; index++)
+              _ReactionItemReveal(
+                key: ValueKey('quick-reaction-${emoji[index]}'),
+                animation: presentationAnimation,
+                index: index,
+                child: _QuickReactionCircle(
+                  size: circleSize,
+                  onTap: () {
+                    void effect() => react(emoji[index]);
+
+                    final select = onSelected;
+                    if (select != null) {
+                      select(popResult, effect);
+                    } else {
+                      Navigator.of(sheetContext).pop(popResult);
+                      effect();
+                    }
+                  },
+                  child: _QuickReactionGlyph(
+                    value: emoji[index],
+                    customByShortcode: customByShortcode,
+                  ),
+                ),
+              ),
             _ReactionItemReveal(
-              key: ValueKey('quick-reaction-${emoji[index]}'),
+              key: const ValueKey('quick-reaction-more'),
               animation: presentationAnimation,
-              index: index,
+              index: emoji.length,
               child: _QuickReactionCircle(
                 size: circleSize,
                 onTap: () {
-                  void effect() => react(emoji[index]);
+                  void effect() =>
+                      showEmojiPicker(context: pageContext, onSelect: react);
 
                   final select = onSelected;
                   if (select != null) {
@@ -91,49 +119,26 @@ class _QuickReactionRow extends ConsumerWidget {
                     effect();
                   }
                 },
-                child: _QuickReactionGlyph(
-                  value: emoji[index],
-                  customByShortcode: customByShortcode,
+                child: Icon(
+                  BuzzIcons.plus,
+                  size: 24,
+                  color: context.colors.onSurfaceVariant,
                 ),
               ),
             ),
-          _ReactionItemReveal(
-            key: const ValueKey('quick-reaction-more'),
-            animation: presentationAnimation,
-            index: emoji.length,
-            child: _QuickReactionCircle(
-              size: circleSize,
-              onTap: () {
-                void effect() =>
-                    showEmojiPicker(context: pageContext, onSelect: react);
+          ];
 
-                final select = onSelected;
-                if (select != null) {
-                  select(popResult, effect);
-                } else {
-                  Navigator.of(sheetContext).pop(popResult);
-                  effect();
-                }
-              },
-              child: Icon(
-                BuzzIcons.plus,
-                size: 24,
-                color: context.colors.onSurfaceVariant,
-              ),
-            ),
-          ),
-        ];
-
-        return Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            for (var index = 0; index < circles.length; index++) ...[
-              circles[index],
-              if (index < circles.length - 1) SizedBox(width: gap),
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              for (var index = 0; index < circles.length; index++) ...[
+                circles[index],
+                if (index < circles.length - 1) SizedBox(width: gap),
+              ],
             ],
-          ],
-        );
-      },
+          );
+        },
+      ),
     );
   }
 }

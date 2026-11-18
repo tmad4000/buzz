@@ -1,3 +1,4 @@
+import '../../shared/offline/offline_storage_settings.dart';
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -122,6 +123,7 @@ class SettingsPage extends HookConsumerWidget {
               onEditProfileDescription: onEditProfileDescription,
             ),
             const _NotificationsSection(),
+            const OfflineStorageSettings(),
             _ConnectionSection(
               identityRecoveryPageBuilder: identityRecoveryPageBuilder,
             ),

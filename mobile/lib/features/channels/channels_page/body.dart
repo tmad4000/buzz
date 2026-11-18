@@ -50,6 +50,14 @@ class _ChannelsBody extends StatelessWidget {
               hitTestBehavior: HitTestBehavior.translucent,
               slivers: [
                 SliverToBoxAdapter(child: SizedBox(height: barHeight)),
+                SliverToBoxAdapter(
+                  child: OfflineBanner(
+                    sourceId: 'sidebar',
+                    onRetry: () {
+                      unawaited(onRefresh());
+                    },
+                  ),
+                ),
                 if (usesPinnedGradient)
                   _SliverChannelsList(
                     channels: loadedChannels,
@@ -154,11 +162,12 @@ class _SliverChannelsList extends HookConsumerWidget {
         seededPubkey.value == readState.pubkey && initialSeedComplete.value;
 
     useEffect(() {
-      if (!readState.isReady) {
+      if (!readState.isReady || !ref.read(readAdmissionProvider('sidebar'))) {
         return null;
       }
 
       return deferReadStateUpdate(context, () {
+        if (!ref.read(readAdmissionProvider('sidebar'))) return;
         if (seededPubkey.value != readState.pubkey) {
           seededPubkey.value = readState.pubkey;
           initialSeedComplete.value = false;
@@ -355,6 +364,7 @@ class _SliverChannelsList extends HookConsumerWidget {
                     setSortMode(sectionSortGroupKey(section.id), mode),
                 onSelectChannel: onSelectChannel,
                 onMarkChannelRead: (channel) {
+                  if (!ref.read(readAdmissionProvider('sidebar'))) return;
                   final ts = dateTimeToUnixSeconds(channel.lastMessageAt);
                   if (ts != null) {
                     ref

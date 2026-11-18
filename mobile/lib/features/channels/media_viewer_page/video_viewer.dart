@@ -459,6 +459,7 @@ class _VideoLoadingPoster extends StatelessWidget {
         children: [
           if (posterUrl != null)
             MediaImage(
+              offlinePlaceholder: true,
               url: posterUrl!,
               fit: BoxFit.cover,
               errorBuilder: (_, _, _) => _videoPlaceholder(context),

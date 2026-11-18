@@ -539,6 +539,7 @@ class MediaImageViewerPage extends HookConsumerWidget {
                                       child: MediaViewerHero(
                                         tag: image.heroTag,
                                         child: MediaImage(
+                                          offlinePlaceholder: true,
                                           key: ValueKey(
                                             'message-media-image-viewer-image:$index',
                                           ),

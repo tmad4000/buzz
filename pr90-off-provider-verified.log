@@ -1,0 +1,11 @@
+00:00 +0: loading /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_thread_commit_p1_test.dart
+00:00 +0: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_thread_commit_p1_test.dart: thread config scope watch exists only when cache is false
+00:00 +1: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_thread_commit_p1_test.dart: thread config scope watch exists only when cache is true
+00:00 +2: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_thread_commit_p1_test.dart: live thread authority follows AsyncData commit and never waits for optional cache initialization
+00:00 +3: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_thread_commit_p1_test.dart: opened live thread persists arriving committed replies
+00:01 +4: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_thread_commit_p1_test.dart: opened live thread persists arriving committed replies
+00:01 +5: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_thread_commit_p1_test.dart: opened live thread persists arriving committed replies
+00:02 +6: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_channel_hydration_p1_test.dart: production channel notifier paints encrypted heads/summaries without authoritative read admission
+[ChannelMessagesNotifier] channel window unavailable for general, falling back to WS history: Exception: Channel window response must contain exactly one bounds event.
+00:02 +7: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_thread_commit_p1_test.dart: opened live thread drops pre-clear debounce
+00:07 +8: All tests passed!

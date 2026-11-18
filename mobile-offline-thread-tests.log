@@ -1,0 +1,4 @@
+00:00 +0: loading /home/dev/agent-worktrees/buzz-offline-p1-mobile-20261118/mobile/test/offline_thread_commit_p1_test.dart
+00:00 +0: live thread authority follows AsyncData commit and never waits for optional cache initialization
+00:00 +1: opened live thread persists arriving committed replies
+00:02 +2: All tests passed!

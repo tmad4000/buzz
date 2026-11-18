@@ -1,3 +1,7 @@
+import '../../shared/offline/offline_provider.dart';
+import 'pending_local_messages_provider.dart';
+import '../../shared/offline/read_admission.dart';
+import '../../shared/offline/offline_banner.dart';
 import 'dart:async';
 import 'dart:math' as math;
 
@@ -252,6 +256,14 @@ class ThreadDetailPage extends HookConsumerWidget {
     final replies = childrenByParent[threadHead.id] ?? const [];
     final liveHead =
         allMsgs.where((m) => m.id == threadHead.id).firstOrNull ?? threadHead;
+    final offlineBannerVisible =
+        ref.watch(offlineEnabledProvider) &&
+        !ref.watch(readAdmissionProvider('thread:$channelId:${threadHead.id}'));
+    // The visible banner reserves the overlaid app bar; the list must not
+    // reserve it again. OFF retains the original full-bleed list geometry.
+    final threadListTopInset = offlineBannerVisible
+        ? 0.0
+        : frostedAppBarHeight(context);
     final itemScrollController = useMemoized(ItemScrollController.new);
     final itemPositionsListener = useMemoized(ItemPositionsListener.create);
     final listViewport = useMemoized(LaidOutViewport.new);
@@ -310,10 +322,16 @@ class ThreadDetailPage extends HookConsumerWidget {
     );
 
     void updateStickyDateHeader(Iterable<ItemPosition> positions) {
+      // Only suppress an in-flow day when its floating replacement is enabled.
+      if (offlineBannerVisible) {
+        stickyDateHeaderState.value = StickyDateHeaderState.hidden;
+        stickyDayTimestamp.value = null;
+        return;
+      }
       final update = stickyDateIndex.resolve(
         positions: positions,
         viewportHeight: viewportHeight,
-        stickyTop: frostedAppBarHeight(context) + Grid.twelve,
+        stickyTop: threadListTopInset + Grid.twelve,
         stickyHeaderHeight: StickyDateHeader.heightOf(context),
       );
       stickyDateHeaderState.value = update.state;
@@ -478,6 +496,7 @@ class ThreadDetailPage extends HookConsumerWidget {
         replies.length,
         liveHead.createdAt,
         viewportHeight,
+        offlineBannerVisible,
       ],
     );
 
@@ -485,7 +504,7 @@ class ThreadDetailPage extends HookConsumerWidget {
       stickyDateHeaderState.value = StickyDateHeaderState.hidden;
       stickyDayTimestamp.value = null;
       return null;
-    }, [threadHead.id]);
+    }, [threadHead.id, offlineBannerVisible]);
 
     void scrollToThreadLatest() {
       if (!itemScrollController.isAttached) return;
@@ -620,7 +639,7 @@ class ThreadDetailPage extends HookConsumerWidget {
     // scrolled up to read, leave them where they are.
     final previousReplyCount = useRef(replies.length);
     final topOverlayFraction = viewportHeight > 0
-        ? frostedAppBarHeight(context) / viewportHeight
+        ? threadListTopInset / viewportHeight
         : 0.0;
     final settleGeometry = (
       composerDockHeight.value,
@@ -705,7 +724,7 @@ class ThreadDetailPage extends HookConsumerWidget {
       );
       return null;
     }, [hasFetchedReplies, replies.length, settleGeometry, headHeight.value]);
-    _useThreadReplyReadState(ref, threadHead.id, replies);
+    _useThreadReplyReadState(ref, context, channelId, threadHead.id, replies);
 
     // Thread-scoped typing indicators (exclude self).
     final allTyping = ref.watch(channelTypingProvider(channelId));
@@ -839,8 +858,27 @@ class ThreadDetailPage extends HookConsumerWidget {
         children: [
           Column(
             children: [
+              Padding(
+                padding: EdgeInsets.only(
+                  top: offlineBannerVisible ? frostedAppBarHeight(context) : 0,
+                ),
+                child: OfflineBanner(
+                  sourceId: 'thread:$channelId:${threadHead.id}',
+                  onRetry: () {
+                    ref.invalidate(
+                      threadRepliesProvider(
+                        ThreadRepliesArgs(
+                          channelId: channelId,
+                          rootId: threadHead.id,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
               Expanded(
                 child: _ThreadMessageList(
+                  topInset: offlineBannerVisible ? 0 : null,
                   headHeight: headHeight.value ?? 0,
                   onHeadHeightChanged: (height) {
                     if (context.mounted) headHeight.value = height;
@@ -913,7 +951,7 @@ class ThreadDetailPage extends HookConsumerWidget {
                 ),
             ],
           ),
-          if (threadViewportVisible)
+          if (threadViewportVisible && !offlineBannerVisible)
             Positioned(
               left: 0,
               right: 0,

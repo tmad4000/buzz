@@ -1,0 +1,50 @@
+00:00 +0: loading /home/dev/agent-worktrees/buzz-offline-p1-mobile-20261118/mobile/test/features/channels/read_state/read_state_provider_test.dart
+00:00 +0: message unread → read → unread round-trips through the real notifier
+[ReadStateManager] initialize pubkey=6fa596ef… clientId=321fce9a… slotId=99b6e21c4a312d0840ffba5be3b36e19
+[ReadStateManager] live subscription established
+[ReadStateManager] initialize complete maxFetchedCreatedAt=0 contexts=0
+[ReadStateManager] publish starting slotId=99b6e21c4a312d0840ffba5be3b36e19
+[ReadStateManager] publish failed: Cannot use the Ref of NotifierProvider<RelaySessionNotifier, SessionState>#a2773 after it has been disposed. This typically happens if:
+- A provider rebuilt, but the previous "build" was still pending and is still performing operations.
+  You should therefore either use `ref.onDispose` to cancel pending work, or
+  check `ref.mounted` after async gaps or anything that could invalidate the provider.
+- You tried to use Ref inside `onDispose` or other life-cycles.
+  This is not supported, as the provider is already being disposed.
+
+00:00 +1: explicit channel-level Mark read clears forced message entries in that channel only
+[ReadStateManager] initialize pubkey=b5d75299… clientId=60ea5f2e… slotId=c1b602e9901cfe177466c736f00e5a41
+[ReadStateManager] live subscription established
+[ReadStateManager] initialize complete maxFetchedCreatedAt=0 contexts=0
+[ReadStateManager] publish starting slotId=c1b602e9901cfe177466c736f00e5a41
+[ReadStateManager] publish failed: Cannot use the Ref of NotifierProvider<RelaySessionNotifier, SessionState>#a2773 after it has been disposed. This typically happens if:
+- A provider rebuilt, but the previous "build" was still pending and is still performing operations.
+  You should therefore either use `ref.onDispose` to cancel pending work, or
+  check `ref.mounted` after async gaps or anything that could invalidate the provider.
+- You tried to use Ref inside `onDispose` or other life-cycles.
+  This is not supported, as the provider is already being disposed.
+
+00:00 +2: automatic channel-open read preserves forced message entries
+[ReadStateManager] initialize pubkey=72689b43… clientId=e54108f6… slotId=4c8dc5a3f610f02713679dc73cb9bc13
+[ReadStateManager] live subscription established
+[ReadStateManager] initialize complete maxFetchedCreatedAt=0 contexts=0
+[ReadStateManager] publish starting slotId=4c8dc5a3f610f02713679dc73cb9bc13
+[ReadStateManager] publish failed: Cannot use the Ref of NotifierProvider<RelaySessionNotifier, SessionState>#a2773 after it has been disposed. This typically happens if:
+- A provider rebuilt, but the previous "build" was still pending and is still performing operations.
+  You should therefore either use `ref.onDispose` to cancel pending work, or
+  check `ref.mounted` after async gaps or anything that could invalidate the provider.
+- You tried to use Ref inside `onDispose` or other life-cycles.
+  This is not supported, as the provider is already being disposed.
+
+00:01 +3: automatic channel-open read still clears a channel-level force for the same channel
+[ReadStateManager] initialize pubkey=f2d56a2f… clientId=1694cb16… slotId=adcaf0974a2369a3725e298760053b26
+[ReadStateManager] live subscription established
+[ReadStateManager] initialize complete maxFetchedCreatedAt=0 contexts=0
+[ReadStateManager] publish starting slotId=adcaf0974a2369a3725e298760053b26
+[ReadStateManager] publish failed: Cannot use the Ref of NotifierProvider<RelaySessionNotifier, SessionState>#a2773 after it has been disposed. This typically happens if:
+- A provider rebuilt, but the previous "build" was still pending and is still performing operations.
+  You should therefore either use `ref.onDispose` to cancel pending work, or
+  check `ref.mounted` after async gaps or anything that could invalidate the provider.
+- You tried to use Ref inside `onDispose` or other life-cycles.
+  This is not supported, as the provider is already being disposed.
+
+00:01 +4: All tests passed!

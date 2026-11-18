@@ -1,0 +1,236 @@
+00:00 +0: loading /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart
+00:00 +0: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: retired unread completion cannot overwrite destination settlement
+[ChannelsNotifier] batched unread catch-up failed; using bounded websocket fallback: Exception: unread catch-up fetch failed
+00:00 +1: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: destination unread deadline permits degraded landing
+[ChannelsNotifier] batched unread catch-up hit the deadline
+00:00 +2: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: destination unread exception permits degraded landing
+[ChannelsNotifier] batched unread catch-up failed; using bounded websocket fallback: Bad state: Unread history unavailable
+00:00 +3: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: destination unread read-state unavailable permits degraded landing
+[ChannelsNotifier] unread catch-up failed: ProviderException: Tried to use a provider that is in error state.
+
+A provider threw the following exception:
+Bad state: Destination read state unavailable
+
+The stack trace of the exception:
+#0      _UnavailableDestinationReadState.build (file:///home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_readiness_cases.dart:173:7)
+#1      $NotifierProviderElement.handleCreate (package:riverpod/src/providers/notifier.dart:93:32)
+#2      Notifier.runBuild (package:riverpod/src/providers/notifier/orphan.dart:70:22)
+#3      $ClassProviderElement.create (package:riverpod/src/core/provider/notifier_provider.dart:560:28)
+#4      ProviderElement.buildState (package:riverpod/src/core/element.dart:674:28)
+#5      ProviderElement._performRebuild (package:riverpod/src/core/element.dart:579:7)
+#6      ProviderElement.flush (package:riverpod/src/core/element.dart:637:7)
+#7      $ProviderBaseImpl._addListener (package:riverpod/src/core/provider/provider.dart:119:24)
+#8      ProviderContainer.listen (package:riverpod/src/core/provider_container.dart:960:26)
+#9      ProviderContainer.read (package:riverpod/src/core/provider_container.dart:917:17)
+#10     Ref.read (package:riverpod/src/core/ref.dart:524:30)
+#11     ChannelsNotifier._catchUpUnreadEvents (package:buzz/features/channels/channels_provider.dart:728:29)
+#12     _ChannelsNotifierLiveSubscriptions._syncLiveSubscriptions (package:buzz/features/channels/channels_provider_lifecycle.dart:164:22)
+<asynchronous suspension>
+#13     StackZoneSpecification._registerCallback.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:114:42)
+<asynchronous suspension>
+#14     ChannelsNotifier.waitForUnreadCatchUp (package:buzz/features/channels/channels_provider.dart:112:7)
+<asynchronous suspension>
+#15     _unreadReadinessCases.<anonymous closure>.<anonymous closure> (file:///home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_readiness_cases.dart:78:54)
+<asynchronous suspension>
+
+00:00 +4: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: optional initial sidebar initialization failure still recovers relay channels
+Offline sidebar hydration unavailable: FileSystemException: directory unavailable, path = ''
+Offline sidebar store unavailable: FileSystemException: directory unavailable, path = ''
+00:00 +5: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: optional initial sidebar load failure still recovers relay channels
+Offline sidebar hydration unavailable: FileSystemException: LRU write failed, path = ''
+00:00 +6: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: discovers open channels for a user with zero channel memberships
+00:00 +7: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: paginates channel discovery with a composite cursor
+00:00 +8: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: paginates memberships when the relay caps responses below limit
+00:00 +9: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: stops membership pagination when the relay repeats a page
+00:00 +10: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: stops channel discovery when the relay repeats a full page
+00:00 +11: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: directory page-cap failure is distinct from an empty directory
+[ChannelsNotifier] channel directory refresh failed; retaining cached discovery: Bad state: Channel directory exceeded 100 pages
+#0      _fetchPaginatedChannelEvents (package:buzz/features/channels/channel_directory.dart:443:7)
+<asynchronous suspension>
+#1      _ChannelRefreshCoordinator.loadDirectory (package:buzz/features/channels/channel_directory.dart:390:15)
+<asynchronous suspension>
+#2      ChannelsNotifier._fetchChannels (package:buzz/features/channels/channels_provider.dart:366:21)
+<asynchronous suspension>
+#3      ChannelsNotifier._fetch (package:buzz/features/channels/channels_provider.dart:271:22)
+<asynchronous suspension>
+#4      ChannelsNotifier.retryDirectory (package:buzz/features/channels/channels_provider.dart:1034:9)
+<asynchronous suspension>
+#5      main.<anonymous closure> (file:///home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart:247:7)
+<asynchronous suspension>
+#6      Declarer.test.<anonymous closure>.<anonymous closure> (package:test_api/src/backend/declarer.dart:253:15)
+<asynchronous suspension>
+#7      Declarer.test.<anonymous closure> (package:test_api/src/backend/declarer.dart:250:11)
+<asynchronous suspension>
+#8      Invoker._waitForOutstandingCallbacks.<anonymous closure> (package:test_api/src/backend/invoker.dart:318:9)
+<asynchronous suspension>
+
+00:01 +12: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: disk label survives failed history but reconnect replaces it through production preload
+00:01 +12: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: directory failure retains discovery while membership refreshes
+[ChannelsNotifier] channel directory refresh failed; retaining cached discovery: Exception: directory fetch failed
+#0      _FakeRelaySession.queryRelay (file:///home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart:2952:9)
+#1      _fetchPaginatedChannelEvents (package:buzz/features/channels/channel_directory.dart:419:32)
+#2      _fetchChannelDirectoryMetas (package:buzz/features/channels/channel_directory.dart:100:7)
+#3      _ChannelRefreshCoordinator.loadDirectory (package:buzz/features/channels/channel_directory.dart:390:21)
+#4      ChannelsNotifier._fetchChannels (package:buzz/features/channels/channels_provider.dart:366:47)
+<asynchronous suspension>
+#5      ChannelsNotifier._fetch (package:buzz/features/channels/channels_provider.dart:271:22)
+<asynchronous suspension>
+#6      ChannelsNotifier.retryDirectory (package:buzz/features/channels/channels_provider.dart:1034:9)
+<asynchronous suspension>
+#7      main.<anonymous closure> (file:///home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart:295:7)
+<asynchronous suspension>
+#8      Declarer.test.<anonymous closure>.<anonymous closure> (package:test_api/src/backend/declarer.dart:253:15)
+<asynchronous suspension>
+#9      Declarer.test.<anonymous closure> (package:test_api/src/backend/declarer.dart:250:11)
+<asynchronous suspension>
+#10     Invoker._waitForOutstandingCallbacks.<anonymous closure> (package:test_api/src/backend/invoker.dart:318:9)
+<asynchronous suspension>
+
+00:01 +13: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: disk label survives failed history but reconnect replaces it through production preload
+00:01 +14: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: disk label survives failed history but reconnect replaces it through production preload
+00:01 +15: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: disk label survives failed history but reconnect replaces it through production preload
+00:01 +16: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: disk label survives failed history but reconnect replaces it through production preload
+00:01 +17: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: disk label survives failed history but reconnect replaces it through production preload
+00:01 +18: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: disk label survives failed history but reconnect replaces it through production preload
+00:01 +19: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: disk label survives failed history but reconnect replaces it through production preload
+00:01 +20: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: disk label survives failed history but reconnect replaces it through production preload
+00:01 +21: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: disk label survives failed history but reconnect replaces it through production preload
+00:01 +22: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: disk label survives failed history but reconnect replaces it through production preload
+00:01 +23: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: disk label survives failed history but reconnect replaces it through production preload
+00:01 +24: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: disk label survives failed history but reconnect replaces it through production preload
+00:01 +25: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: disk label survives failed history but reconnect replaces it through production preload
+00:01 +26: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: disk label survives failed history but reconnect replaces it through production preload
+00:01 +27: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: disk label survives failed history but reconnect replaces it through production preload
+00:01 +28: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: a stale request's Huddle leg writes no member snapshot
+00:01 +29: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: profile queue captured before clear cannot resurrect a later queued row
+00:01 +30: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: profile queue captured before clear cannot resurrect a later queued row
+00:01 +31: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: profile queue captured before clear cannot resurrect a later queued row
+00:01 +32: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: profile queue captured before clear cannot resurrect a later queued row
+00:01 +33: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: profile queue captured before clear cannot resurrect a later queued row
+00:01 +33: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: community switch discards a parked catch-up failure
+[ChannelsNotifier] batched unread catch-up failed; using bounded websocket fallback: Exception: unread catch-up fetch failed
+00:01 +34: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: profile queue captured before clear cannot resurrect a later queued row
+00:01 +34: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: identity switch discards a parked catch-up failure
+[ChannelsNotifier] batched unread catch-up failed; using bounded websocket fallback: Exception: unread catch-up fetch failed
+00:01 +35: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: profile queue captured before clear cannot resurrect a later queued row
+00:01 +36: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: profile queue captured before clear cannot resurrect a later queued row
+00:02 +37: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: profile queue captured before clear cannot resurrect a later queued row
+00:02 +38: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: profile queue captured before clear cannot resurrect a later queued row
+00:02 +39: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: profile queue captured before clear cannot resurrect a later queued row
+00:02 +40: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: profile queue captured before clear cannot resurrect a later queued row
+00:02 +41: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: profile queue captured before clear cannot resurrect a later queued row
+00:02 +42: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: profile queue captured before clear cannot resurrect a later queued row
+00:02 +43: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: profile queue captured before clear cannot resurrect a later queued row
+00:02 +44: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: profile queue captured before clear cannot resurrect a later queued row
+00:02 +45: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/profile/user_cache_provider_test.dart: preload reports a profile batch failure
+00:02 +46: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/profile/user_cache_provider_test.dart: preload reports a profile batch failure
+00:02 +47: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/profile/user_cache_provider_test.dart: preload reports a profile batch failure
+00:02 +47: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+[ChannelMessagesNotifier] channel window unavailable for general, falling back to WS history: Exception: Channel window response must contain exactly one bounds event.
+00:02 +48: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/profile/user_cache_provider_test.dart: preload reports a profile batch failure
+00:02 +49: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/profile/user_cache_provider_test.dart: preload reports a profile batch failure
+00:02 +50: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:02 +51: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:02 +52: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:02 +53: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:02 +54: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:02 +55: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:02 +55: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: failed replacement keeps desired coverage and ignores departed channels
+[ChannelsNotifier] live subscription failed for 2 channels: Bad state: live subscription failed
+00:02 +56: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:02 +56: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: terminal closure preserves fallback until reconnect retries coverage
+[ChannelsNotifier] live subscription failed for 128 channels: Bad state: live subscription failed
+[ChannelsNotifier] live subscription closed by relay: restricted: terminal closure
+00:02 +57: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:02 +57: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: partial replacement churn keeps complete coverage with bounded fallbacks
+[ChannelsNotifier] live subscription failed for 128 channels: Bad state: live subscription failed
+[ChannelsNotifier] live subscription failed for 128 channels: Bad state: live subscription failed
+[ChannelsNotifier] live subscription failed for 128 channels: Bad state: live subscription failed
+[ChannelsNotifier] live subscription failed for 128 channels: Bad state: live subscription failed
+[ChannelsNotifier] live subscription failed for 128 channels: Bad state: live subscription failed
+[ChannelsNotifier] live subscription failed for 128 channels: Bad state: live subscription failed
+[ChannelsNotifier] live subscription failed for 128 channels: Bad state: live subscription failed
+00:02 +58: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:02 +59: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:02 +60: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:02 +61: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:03 +62: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:03 +63: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:03 +64: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:03 +65: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:03 +66: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:03 +67: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:03 +68: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:03 +69: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:03 +70: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:03 +71: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:03 +72: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:03 +72: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: terminal rejection retries only after a new connection
+[ChannelsNotifier] live subscription closed by relay: restricted: persistent rejection
+[ChannelsNotifier] live subscription closed by relay: restricted: persistent rejection
+[ChannelsNotifier] live subscription closed by relay: restricted: persistent rejection
+[ChannelsNotifier] live subscription closed by relay: restricted: persistent rejection
+00:03 +73: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:03 +73: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: changed membership admits a new filter, not a rejected old one
+[ChannelsNotifier] live subscription closed by relay: restricted: persistent rejection
+00:03 +74: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:03 +74: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: terminal quarantine does not cross identity scope
+[ChannelsNotifier] live subscription closed by relay: restricted: persistent rejection
+00:03 +75: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:03 +76: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:03 +76: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: terminal quarantine does not cross community scope
+[ChannelsNotifier] live subscription closed by relay: restricted: persistent rejection
+00:03 +77: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:03 +78: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:03 +79: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:03 +80: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:03 +81: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:03 +82: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:03 +83: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:03 +84: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:03 +84: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: latest-message batch failure a relay deadline never reaches the websocket fallback
+[ChannelsNotifier] batched latest-message query hit the deadline
+[ChannelsNotifier] batched unread catch-up hit the deadline
+00:03 +85: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:03 +86: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:03 +86: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: latest-message batch failure an ordinary failure still uses the websocket fallback
+[ChannelsNotifier] batched latest-message query failed; using bounded websocket fallback: Exception: bridge down
+[ChannelsNotifier] batched unread catch-up failed; using bounded websocket fallback: Exception: bridge down
+00:03 +87: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:03 +88: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:03 +88: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: deadline-unavailable channel batches a latest-message deadline keeps known timestamps
+[ChannelsNotifier] batched latest-message query hit the deadline
+00:03 +89: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:03 +89: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: deadline-unavailable channel batches a cold-start latest-message deadline is filled by unread catch-up
+[ChannelsNotifier] batched latest-message query hit the deadline
+00:03 +90: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:03 +91: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:03 +91: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channels_provider_test.dart: deadline-unavailable channel batches a websocket fallback deadline makes the batch unavailable
+[ChannelsNotifier] batched latest-message query failed; using bounded websocket fallback: Exception: bridge down
+[ChannelsNotifier] batched unread catch-up failed; using bounded websocket fallback: Exception: bridge down
+00:03 +92: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:03 +93: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:03 +94: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:03 +95: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:03 +96: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:03 +97: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:03 +98: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:03 +99: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:03 +100: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:03 +101: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:03 +102: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:03 +103: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:03 +104: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:03 +105: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:03 +106: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:04 +107: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:04 +108: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:05 +109: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:07 +110: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_thread_commit_p1_test.dart: opened live thread drops pre-clear debounce
+00:07 +111: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_thread_commit_p1_test.dart: opened live thread drops pre-clear debounce
+00:07 +112: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_thread_commit_p1_test.dart: opened live thread drops pre-clear debounce
+00:07 +113: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_thread_commit_p1_test.dart: opened live thread drops pre-clear debounce
+00:07 +114: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_thread_commit_p1_test.dart: opened live thread drops pre-clear debounce
+00:07 +115: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_thread_commit_p1_test.dart: opened live thread drops pre-clear debounce
+00:07 +116: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_thread_commit_p1_test.dart: opened live thread drops pre-clear debounce
+00:10 +117: All tests passed!

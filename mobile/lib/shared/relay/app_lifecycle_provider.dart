@@ -19,6 +19,7 @@ class AppLifecycleNotifier extends Notifier<AppLifecycleState> {
     // Watch connectivity changes to trigger reconnect on network restore.
     _connectivitySub = Connectivity().onConnectivityChanged.listen((results) {
       final hasNetwork = results.any((r) => r != ConnectivityResult.none);
+      ref.read(networkAvailableProvider.notifier).update(hasNetwork);
       if (hasNetwork && state == AppLifecycleState.resumed) {
         ref.read(relaySessionProvider.notifier).onAppResumed();
       }
@@ -52,4 +53,20 @@ class AppLifecycleNotifier extends Notifier<AppLifecycleState> {
 final appLifecycleProvider =
     NotifierProvider<AppLifecycleNotifier, AppLifecycleState>(
       AppLifecycleNotifier.new,
+    );
+
+/// Network signal owned by the existing connectivity subscription, not a second poller.
+class NetworkAvailableNotifier extends Notifier<bool> {
+  int generation = 0;
+  @override
+  bool build() => true;
+  void update(bool available) {
+    if (state != available) generation++;
+    state = available;
+  }
+}
+
+final networkAvailableProvider =
+    NotifierProvider<NetworkAvailableNotifier, bool>(
+      NetworkAvailableNotifier.new,
     );

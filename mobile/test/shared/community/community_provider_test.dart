@@ -1,3 +1,8 @@
+import 'dart:io';
+import 'dart:typed_data';
+import 'package:buzz/shared/offline/offline_provider.dart';
+import 'package:buzz/shared/offline/offline_cache.dart';
+import 'package:buzz/shared/relay/relay_provider.dart';
 import 'dart:async';
 import 'dart:convert';
 
@@ -12,6 +17,7 @@ import 'package:nostr/nostr.dart' as nostr;
 import 'community_storage_test.dart';
 
 void main() {
+  late Directory offlineRoot;
   late FakeSecureStorage fakeSecure;
   late CommunityStorage communityStorage;
   late ProviderContainer container;
@@ -23,7 +29,8 @@ void main() {
   late CommunityPushLeaseRevocationTrigger revocationTrigger;
   late CommunityPushLeaseDeactivator deactivator;
 
-  setUp(() {
+  setUp(() async {
+    offlineRoot = await Directory.systemTemp.createTemp('buzz-offline-logout-');
     fakeSecure = FakeSecureStorage();
     communityStorage = CommunityStorage(secure: fakeSecure);
     snapshots = [];
@@ -40,15 +47,23 @@ void main() {
     };
   });
 
-  tearDown(() => container.dispose());
+  tearDown(() async {
+    container.dispose();
+    await offlineRoot.delete(recursive: true);
+  });
 
-  ProviderContainer createContainer() {
+  ProviderContainer createContainer({bool offline = false}) {
     Future<void> writeSnapshot(List<Community> communities) async {
       snapshots.add(List.of(communities));
     }
 
     return ProviderContainer(
       overrides: [
+        offlineEnabledProvider.overrideWithValue(offline),
+        offlineDirectoryProvider.overrideWithValue(() async {
+          if (!offline) throw StateError('OFF must never resolve filesystem');
+          return offlineRoot;
+        }),
         communityStorageProvider.overrideWithValue(communityStorage),
         communitySnapshotWriterProvider.overrideWithValue(writeSnapshot),
         communityPushLeaseDeactivatorProvider.overrideWithValue(deactivator),
@@ -64,6 +79,57 @@ void main() {
       ],
     );
   }
+
+  test(
+    'P1 logout removes cached bytes and retires old writers before credentials disappear',
+    () async {
+      final keys = nostr.Keys.generate();
+      final community = Community.create(
+        name: 'Cached',
+        relayUrl: 'https://cached.test',
+        nsec: keys.nsec,
+      );
+      await communityStorage.save(community);
+      final scope = offlineMobileScope(
+        RelayConfig(baseUrl: community.relayUrl).wsUrl,
+        keys.public,
+      );
+      final store = OfflineCacheStore(
+        root: offlineRoot,
+        scope: scope,
+        cipher: Nip44OfflineCipher(Uint8List.fromList(List.filled(32, 5))),
+      );
+      await store.save('head', 'general', ['cached payload']);
+      container = createContainer(offline: true);
+      await container.read(communityListProvider.future);
+      await container
+          .read(communityListProvider.notifier)
+          .removeCommunity(community.id);
+      expect(await store.load('head', 'general'), isNull);
+      expect(await communityStorage.loadAll(), isEmpty);
+      await store.save('head', 'queued', ['pre-logout completion']);
+      expect(await store.load('head', 'queued'), isNull);
+    },
+  );
+
+  test(
+    'flag OFF removal never resolves offline filesystem even with a signing identity',
+    () async {
+      final community = Community.create(
+        name: 'OFF',
+        relayUrl: 'https://off.test',
+        nsec: nostr.Keys.generate().nsec,
+      );
+      await communityStorage.save(community);
+      // createContainer's OFF directory seam throws on any access.
+      container = createContainer();
+      await container.read(communityListProvider.future);
+      await container
+          .read(communityListProvider.notifier)
+          .removeCommunity(community.id);
+      expect(await communityStorage.loadAll(), isEmpty);
+    },
+  );
 
   group('CommunityListNotifier', () {
     test('loads empty list initially', () async {
@@ -454,6 +520,7 @@ void main() {
     test('journal persistence failure keeps community credentials', () async {
       container = ProviderContainer(
         overrides: [
+          offlineDirectoryProvider.overrideWithValue(() async => offlineRoot),
           communityStorageProvider.overrideWithValue(communityStorage),
           communitySnapshotWriterProvider.overrideWithValue((_) async {}),
           communityPushLeaseRevocationEnqueuerProvider.overrideWithValue((

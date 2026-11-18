@@ -1,3 +1,5 @@
+import '../../shared/offline/connection_action.dart';
+import '../../shared/offline/offline_provider.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -150,6 +152,7 @@ class ChannelActionsSheet extends HookConsumerWidget {
                         : notifier.starChannel(channel.id);
                   },
                   onToggleRead: () {
+                    if (ref.read(offlineConnectionRequiredProvider)) return;
                     close();
                     final timestamp = dateTimeToUnixSeconds(
                       channel.lastMessageAt,
@@ -183,22 +186,24 @@ class ChannelActionsSheet extends HookConsumerWidget {
               SheetActionSection(
                 children: [
                   if (!channel.isDm)
-                    ListTile(
-                      leading: const Icon(BuzzIcons.folderInput),
-                      title: const Text('Move to section…'),
-                      onTap: () async {
-                        final pageContext = Navigator.of(
-                          context,
-                          rootNavigator: true,
-                        ).context;
-                        close();
-                        await _showMoveSectionSheet(
-                          pageContext,
-                          ref,
-                          channel: channel,
-                          sectionId: sectionId,
-                        );
-                      },
+                    OfflineConnectionAction(
+                      child: ListTile(
+                        leading: const Icon(BuzzIcons.folderInput),
+                        title: const Text('Move to section…'),
+                        onTap: () async {
+                          final pageContext = Navigator.of(
+                            context,
+                            rootNavigator: true,
+                          ).context;
+                          close();
+                          await _showMoveSectionSheet(
+                            pageContext,
+                            ref,
+                            channel: channel,
+                            sectionId: sectionId,
+                          );
+                        },
+                      ),
                     ),
                   ListTile(
                     leading: Icon(isMuted ? BuzzIcons.bell : BuzzIcons.bellOff),
@@ -212,22 +217,25 @@ class ChannelActionsSheet extends HookConsumerWidget {
                     },
                   ),
                   if (!channel.isDm)
-                    ListTile(
-                      leading: const Icon(BuzzIcons.settings),
-                      title: const Text('Manage channel'),
-                      onTap: () async {
-                        final shouldClose = await showManageChannelSheet(
-                          context: context,
-                          channel: currentChannel,
-                          canEditDetails:
-                              canManageLifecycle && !currentChannel.isArchived,
-                          onChannelUpdated: (updated) =>
-                              displayedChannel.value = updated,
-                        );
-                        if (shouldClose == true && context.mounted) {
-                          Navigator.of(context).pop(true);
-                        }
-                      },
+                    OfflineConnectionAction(
+                      child: ListTile(
+                        leading: const Icon(BuzzIcons.settings),
+                        title: const Text('Manage channel'),
+                        onTap: () async {
+                          final shouldClose = await showManageChannelSheet(
+                            context: context,
+                            channel: currentChannel,
+                            canEditDetails:
+                                canManageLifecycle &&
+                                !currentChannel.isArchived,
+                            onChannelUpdated: (updated) =>
+                                displayedChannel.value = updated,
+                          );
+                          if (shouldClose == true && context.mounted) {
+                            Navigator.of(context).pop(true);
+                          }
+                        },
+                      ),
                     ),
                 ],
               ),
@@ -382,10 +390,12 @@ class _ChannelQuickActionsRow extends StatelessWidget {
       ),
       const SizedBox(width: Grid.twelve),
       Expanded(
-        child: _ChannelQuickAction(
-          icon: isUnread ? BuzzIcons.checkCheck : BuzzIcons.circleDot,
-          label: isUnread ? 'Mark Read' : 'Mark Unread',
-          onTap: onToggleRead,
+        child: OfflineConnectionAction(
+          child: _ChannelQuickAction(
+            icon: isUnread ? BuzzIcons.checkCheck : BuzzIcons.circleDot,
+            label: isUnread ? 'Mark Read' : 'Mark Unread',
+            onTap: onToggleRead,
+          ),
         ),
       ),
     ],
@@ -458,16 +468,18 @@ class _ActionTile extends StatelessWidget {
   final bool destructive;
 
   @override
-  Widget build(BuildContext context) => ListTile(
-    leading: Icon(icon, color: destructive ? context.colors.error : null),
-    title: Text(
-      label,
-      style: destructive ? TextStyle(color: context.colors.error) : null,
+  Widget build(BuildContext context) => OfflineConnectionAction(
+    child: ListTile(
+      leading: Icon(icon, color: destructive ? context.colors.error : null),
+      title: Text(
+        label,
+        style: destructive ? TextStyle(color: context.colors.error) : null,
+      ),
+      onTap: () {
+        unawaited(HapticFeedback.lightImpact());
+        onTap();
+      },
     ),
-    onTap: () {
-      unawaited(HapticFeedback.lightImpact());
-      onTap();
-    },
   );
 }
 
