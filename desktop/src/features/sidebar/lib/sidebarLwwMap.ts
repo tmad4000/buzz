@@ -12,6 +12,8 @@ export type Tree = { [key: string]: Tree | Reg | undefined };
 
 /** Device id stamped on registers imported from meta-less (legacy) data. */
 export const LEGACY_DEV = "0".repeat(16);
+/** Reserved device id for stamp-zero successor defaults, never an authored clock. */
+export const DEFAULT_DEV = "0000000000000001";
 
 const CLOCK_KEY = "buzz-sidebar-clock.v1";
 const DEV_RE = /^[0-9a-f]{16}$/;
@@ -50,7 +52,9 @@ export const isEmptyTree = (node: Tree): boolean =>
   );
 
 /** Defaults (stamp 0) and meta-less local caches (stamp 1); any remote beats them. */
-const isCachePlaceholder = (reg: Reg) => reg[0] <= 1 && reg[1] === LEGACY_DEV;
+const isCachePlaceholder = (reg: Reg) =>
+  (reg[0] <= 1 && reg[1] === LEGACY_DEV) ||
+  (reg[0] === 0 && reg[1] === DEFAULT_DEV);
 
 /**
  * Merges `b` into `a`. With `onlyMissing`, `b` only fills leaves `a` lacks or

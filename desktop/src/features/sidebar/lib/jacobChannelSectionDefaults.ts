@@ -1,7 +1,7 @@
 import { normalizeRelayUrl } from "@/shared/lib/normalizeRelayUrl";
 import { SECTIONS_LANE } from "./channelSectionsSync";
 import { decodeDoc } from "./sidebarLaneStore";
-import { isReg, LEGACY_DEV, type Tree } from "./sidebarLwwMap";
+import { isReg, LEGACY_DEV, DEFAULT_DEV, type Tree } from "./sidebarLwwMap";
 
 const JACOB =
   "3eb6491e9fecd5e2c0221f76b79685a1478b591bf90ea155f5352ebe12672e1f";
@@ -46,7 +46,9 @@ export function upgradeDirectAgentsDefault(tree: Tree, defaults: Tree): Tree {
       continue;
     next = {
       ...next,
-      [id]: { ...node, name: [0, "0000000000000001", "Direct agents"] },
+      // Reserved stamp-zero defaults beat the old seed without outranking
+      // even a stamp-one legacy cache; the merge layer keeps them placeholders.
+      [id]: { ...node, name: [0, DEFAULT_DEV, "Direct agents"] },
     };
   }
   return next === sections ? tree : { ...tree, s: next };

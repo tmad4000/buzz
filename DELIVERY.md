@@ -29,3 +29,14 @@ Captain9888b74e explicitly granted exactly one read-only `nice -n 10 paseo statu
 
 
 Root base/writer clarification: PR81 now targets `sol/buzz8-release` (same16fa57df source as the annotated69eda1ff tag). Forwarding PR85 stays stacked on PR81 to isolate its feature diff. Listener self-signed publication is a writer contract/examples handoff exclusively to075fe13; this worktree never changes/deploys the listener. Hermes M4 launcher integration is contract-only with no M4 deployment. Root assigns the independent exact-head Sol reviewer.
+
+
+## P1 delayed-legacy rename fix (independent NO-GO)
+
+Independent Sol reproduced a real defect at02eb5541/49053bd1/83d1462c1: the successor name's zero-version reserved device ID was not recognized as a cache placeholder, so a delayed meta-less authored head could not replace it. Prior owner confirmation and24 passing tests did not cover that arrival order and are superseded for this point.
+
+New production-pipeline regressions first failed on the old source, through decoder → upgraded defaults → LaneStore merge → persistence/reload. They cover names A/My authored agents/Paseo, both arrival orders and remote legacy version200000. A trial successor at[1,LEGACY_DEV] fixed the reported remote case but exposed a second failure against local-cache version1 and nameA; that trial was not published.
+
+The final change keeps the successor at[0,DEFAULT_DEV,Direct agents] and explicitly reserves that exact zero-version device stamp as a placeholder in sidebarLwwMap. It beats the original zero/LEGACY_DEV seed while losing to local-cache1 and authored remote heads. Nonzero DEFAULT_DEV registers and all genuine authored modern registers keep their previous onlyMissing protection. No general authored overwrite rule is relaxed; existing persisted zero/default successor registers also gain the correct placeholder semantics. Regression matrix includes both arrival orders, same-name rename back toPaseo, persistence/reload, and modern authored protection.
+
+Exact owned-file diff is sent to36ce8949 before push. Final typecheck PASS;37/37 focused defaults/shared-merge/runtime/opener/invalidation tests PASS with process-group deadlines, including explicit authored null/false tombstones. Biome/diff PASS. Independent exact-head re-review is required; prior NO-GO is not cleared by the builder.

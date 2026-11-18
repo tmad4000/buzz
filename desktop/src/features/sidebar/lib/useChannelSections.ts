@@ -68,7 +68,7 @@ export function useChannelSections(
         .then((plaintext) => {
           if (disposed) return;
           const defaults = decodeSidebarDefaults(plaintext);
-          // Stable IDs/version-zero registers never overwrite authored edits or
+          // Stable IDs/cache-placeholder registers never overwrite authored edits or
           // tombstones. The existing lane persists and self-encrypts the result.
           edit((prev) =>
             upgradeDirectAgentsDefault(mergeTrees(defaults, prev), defaults),
