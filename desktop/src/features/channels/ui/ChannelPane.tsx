@@ -1,4 +1,6 @@
-import { InlineAutoExpansionProvider } from "@/features/messages/ui/InlineAutoExpansion";
+import { useRoutedSendReturn } from "./useRoutedSendReturn";
+import { useTimelineView } from "./TimelineViewContext";
+import { ChannelTimelineProviders } from "./ChannelTimelineProviders";
 import { InlineChannelThread } from "./InlineChannelThread";
 import type { ThreadSummaryRenderer } from "@/features/messages/ui/TimelineMessageRow";
 import { PinnedBar } from "@/features/messages/pins/PinnedBar";
@@ -136,6 +138,8 @@ export const ChannelPane = React.memo(function ChannelPane({
   onBrowseChannels,
   onCreateChannel,
   onCloseThread,
+  onCapturePanelReturn,
+  onOpenSentReply,
   onDelete,
   onEdit,
   onEditSave,
@@ -183,6 +187,7 @@ export const ChannelPane = React.memo(function ChannelPane({
   threadHeadMessage,
   threadMessages,
   threadMessagesPending = false,
+  threadMessagesComplete = true,
   threadMessagesError = false,
   onRetryThreadReplies,
   threadPanelWidthPx,
@@ -338,19 +343,22 @@ export const ChannelPane = React.memo(function ChannelPane({
         threadHeadId: string | null;
       } | null,
       forceRest?: boolean,
+      outbox?: import("@/features/messages/outbox/types").OutboxSubmission,
     ) => {
       const shouldCompleteWelcomeBanner =
         isActiveWelcomeChannel &&
         (containsWelcomePersonaMention(content) ||
           mentionsKnownAgent(mentionPubkeys, knownAgentPubkeys));
-      messageTimelineRef.current?.scrollToBottomOnNextUpdate();
-      await onSendMessage(
+      if (!threadContext?.parentEventId)
+        messageTimelineRef.current?.scrollToBottomOnNextUpdate();
+      const published = await onSendMessage(
         content,
         mentionPubkeys,
         mediaTags,
         channelId,
         threadContext,
         forceRest,
+        outbox,
       );
       if (
         channelId &&
@@ -363,6 +371,7 @@ export const ChannelPane = React.memo(function ChannelPane({
       if (shouldCompleteWelcomeBanner) {
         completeWelcomeComposerBanner();
       }
+      return published;
     },
     [
       activeChannelId,
@@ -618,17 +627,39 @@ export const ChannelPane = React.memo(function ChannelPane({
           </IdleAuxiliaryPanel>,
         )
       : null;
+  const routedSend = useRoutedSendReturn({
+    channelId: activeChannelId,
+    channelName: activeChannel?.name ?? "channel",
+    entries: mainTimelineEntries,
+    timeline: messageTimelineRef,
+    onOpenThread,
+    onCloseThread,
+    previousThread: threadHeadMessage,
+    capturePanelReturn: onCapturePanelReturn,
+    onOpenSentReply,
+  });
   const threadHeaderLeading = useSplitAuxiliaryPane ? (
-    <ThreadViewModeToggle onChange={changeThreadViewMode} />
-  ) : undefined;
+    <>
+      {routedSend.backAction}
+      <ThreadViewModeToggle onChange={changeThreadViewMode} />
+    </>
+  ) : (
+    routedSend.backAction
+  );
   const threadLayoutProps = getThreadPanelLayout({
     headerLeading: threadHeaderLeading,
     isFocusDrawer: useFocusThreadDrawer,
     isSinglePanelView,
     useSplitAuxiliaryPane,
   });
+  const timelineView = useTimelineView();
+  const flatTimeline = timelineView.mode === "timeline" && !isHuddleTranscript;
   const timelineReplyHandler =
-    activeChannel?.archivedAt || isHuddleTranscript ? undefined : onOpenThread;
+    activeChannel?.archivedAt || isHuddleTranscript
+      ? undefined
+      : flatTimeline
+        ? timelineView.openReply
+        : onOpenThread;
   return (
     <div
       className="relative flex min-h-0 min-w-0 flex-1 flex-row overflow-hidden"
@@ -681,14 +712,24 @@ export const ChannelPane = React.memo(function ChannelPane({
               }}
             />
           ) : null}
-          {isHuddleTranscript && huddleThreadRepliesError ? (
+          {(isHuddleTranscript || flatTimeline) && huddleThreadRepliesError ? (
             <div className="px-5 pt-3">
               <ThreadRepliesErrorCard onRetry={onRetryHuddleThreadReplies} />
             </div>
           ) : null}
+          {flatTimeline && timelineView.loadingReplies ? (
+            <div
+              role="status"
+              className="px-5 py-2 text-xs text-muted-foreground"
+            >
+              Loading older replies… Channel history is shown while threads
+              load.
+            </div>
+          ) : null}
           <div className="relative isolate flex min-h-0 min-w-0 flex-1 flex-col">
-            <InlineAutoExpansionProvider
+            <ChannelTimelineProviders
               key={`${activeChannel?.id}:${currentPubkey}`}
+              onRepliesRevealed={onSidebarRepliesRevealed}
               scope={`${activeChannel?.id}:${currentPubkey}`}
               currentPubkey={currentPubkey}
             >
@@ -746,9 +787,13 @@ export const ChannelPane = React.memo(function ChannelPane({
                 onMarkUnread={onMarkUnread}
                 onMarkRead={onMarkRead}
                 onReply={timelineReplyHandler}
-                onOpenThread={isHuddleTranscript ? undefined : onOpenThread}
+                onOpenThread={
+                  isHuddleTranscript || flatTimeline ? undefined : onOpenThread
+                }
                 renderThreadSummary={
-                  isHuddleTranscript ? undefined : renderThreadSummary
+                  isHuddleTranscript || flatTimeline
+                    ? undefined
+                    : renderThreadSummary
                 }
                 channelName={activeChannel?.name}
                 channelType={activeChannel?.channelType ?? null}
@@ -769,7 +814,7 @@ export const ChannelPane = React.memo(function ChannelPane({
                 }
                 threadUnreadCounts={threadUnreadCounts}
               />
-            </InlineAutoExpansionProvider>
+            </ChannelTimelineProviders>
             {isNonMemberView ? (
               <div
                 data-testid="join-banner"
@@ -825,6 +870,9 @@ export const ChannelPane = React.memo(function ChannelPane({
                   ) : null}
                   {timeoutActive ? <ComposerTimeoutBanner /> : null}
                   <ComposerDockBackdrop gutterClassName="inset-x-5" />
+                  {routedSend.notice ? (
+                    <div className="px-5">{routedSend.notice}</div>
+                  ) : null}
                   <MessageComposer
                     channelId={activeChannel?.id ?? null}
                     channelName={activeChannel?.name ?? "channel"}
@@ -849,6 +897,7 @@ export const ChannelPane = React.memo(function ChannelPane({
                     }
                     onSend={handleSendMessage}
                     threadRoutingEntries={mainTimelineEntries}
+                    onCaptureRoutedSend={routedSend.captureSend}
                     {...{ profiles, recentMentionPubkeys: recentMentions }}
                     showBackgroundUploadProgress={false}
                     placeholder={
@@ -961,6 +1010,7 @@ export const ChannelPane = React.memo(function ChannelPane({
                 allThreadMessages={threadAllMessages}
                 onSidebarRepliesRevealed={onSidebarRepliesRevealed}
                 threadRepliesPending={threadMessagesPending}
+                threadRepliesComplete={threadMessagesComplete}
                 threadRepliesError={threadMessagesError}
                 onRetryThreadReplies={onRetryThreadReplies}
                 threadUnreadCount={threadUnreadCounts?.get(

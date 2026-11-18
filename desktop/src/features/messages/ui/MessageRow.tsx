@@ -907,6 +907,7 @@ export const MessageRow = React.memo(
               : "",
           )}
           data-message-id={message.id}
+          data-message-render-key={message.renderKey ?? message.id}
           data-testid="message-row"
           onAnimationEnd={handleEntranceAnimationEnd}
           ref={articleRef}

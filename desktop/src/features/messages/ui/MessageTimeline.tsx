@@ -1,3 +1,8 @@
+import {
+  captureReadingPosition,
+  restoreReadingPosition,
+  type TimelineReadingPosition,
+} from "./timelineReadingPosition";
 import type { ThreadSummaryRenderer } from "./TimelineMessageRow";
 import * as React from "react";
 
@@ -35,6 +40,10 @@ import {
 import { useSettleGatedPrependMessages } from "./useSettleGatedPrependMessages";
 
 export type MessageTimelineHandle = {
+  captureReadingPosition: () => TimelineReadingPosition | null;
+  restoreReadingPosition: (
+    snapshot: TimelineReadingPosition,
+  ) => (() => void) | undefined;
   scrollToBottomOnNextUpdate: () => void;
   settleAtBottom: () => boolean;
 };
@@ -361,6 +370,7 @@ const MessageTimelineBase = React.forwardRef<
     onScroll,
     scrollToBottom,
     scrollToBottomOnNextUpdate,
+    settleAtBottomAfterLayout,
     scrollToMessage,
     onVirtualizerAtBottomStateChange,
   } = useAnchoredScroll({
@@ -376,6 +386,9 @@ const MessageTimelineBase = React.forwardRef<
     virtualScrollToMessage: timelineVirtualizerApi?.scrollToMessage,
     virtualScrollToBottom: timelineVirtualizerApi?.scrollToBottom,
     virtualSettleAtBottom: timelineVirtualizerApi?.settleAtBottom,
+    virtualPreserveReadingPosition:
+      timelineVirtualizerApi?.preserveReadingPosition,
+    virtualIsBottomPinned: timelineVirtualizerApi?.isBottomPinned,
     virtualizerOwnsPrependAnchoring: useTimelineVirtualizer,
     virtualizerRenderVersion,
   });
@@ -476,14 +489,36 @@ const MessageTimelineBase = React.forwardRef<
   React.useImperativeHandle(
     ref,
     () => ({
-      scrollToBottomOnNextUpdate: prepareForOwnMessage,
-      settleAtBottom: () => {
-        if (!timelineVirtualizerApi) return false;
-        scrollToBottom("auto");
-        return true;
+      captureReadingPosition: () =>
+        activeScrollContainerRef.current
+          ? captureReadingPosition(
+              activeScrollContainerRef.current,
+              messages.map((m) => m.id),
+            )
+          : null,
+      restoreReadingPosition: (snapshot) => {
+        const container = activeScrollContainerRef.current;
+        if (!container) return;
+        // Restoring a mounted row bypasses scrollToMessage's cancellation.
+        // Reading restoration owns the viewport before any physical movement.
+        timelineVirtualizerApi?.cancelBottomIntent();
+        return restoreReadingPosition(
+          container,
+          snapshot,
+          messages.map((m) => m.id),
+          (id) => timelineVirtualizerApi?.scrollToMessage(id) ?? false,
+        );
       },
+      scrollToBottomOnNextUpdate: prepareForOwnMessage,
+      settleAtBottom: settleAtBottomAfterLayout,
     }),
-    [prepareForOwnMessage, scrollToBottom, timelineVirtualizerApi],
+    [
+      prepareForOwnMessage,
+      settleAtBottomAfterLayout,
+      timelineVirtualizerApi,
+      activeScrollContainerRef,
+      messages,
+    ],
   );
 
   // Jump-to-message is purely DOM-based now: all loaded rows are mounted, so
@@ -677,6 +712,7 @@ const MessageTimelineBase = React.forwardRef<
       alwaysShowMessageIdentity={alwaysShowMessageIdentity}
       hideAgentAccessBadges={hideAgentAccessBadges}
       threadSummaries={threadSummaries}
+      summaryMessages={deferredMessages}
       messages={renderedMessages}
       onDelete={onDelete}
       onEdit={onEdit}

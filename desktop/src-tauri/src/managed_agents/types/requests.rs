@@ -219,6 +219,10 @@ pub struct CreateManagedAgentRequest {
 #[serde(rename_all = "camelCase")]
 pub struct UpdateManagedAgentRequest {
     pub pubkey: String,
+    #[serde(default)]
+    pub expected_relay_url: Option<String>,
+    #[serde(default)]
+    pub expected_signer_pubkey: Option<String>,
     /// Absent = don't touch. Present = rename the agent.
     #[serde(default)]
     pub name: Option<String>,

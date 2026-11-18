@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { readFileSync } from "node:fs";
+import ts from "typescript";
+import { restoreReadingPosition } from "./timelineReadingPosition.ts";
 
 class EventTargetShim {
   listeners = new Map();
@@ -32,6 +35,10 @@ class ElementShim extends EventTargetShim {
     this.tagName = "DIV";
     this.nodeType = 1;
     this.namespaceURI = "http://www.w3.org/1999/xhtml";
+    this.dataset = {};
+    this.scrollTop = 0;
+    this.scrollHeight = 0;
+    this.clientHeight = 0;
   }
   get ownerDocument() {
     return globalThis.document;
@@ -55,6 +62,12 @@ class ElementShim extends EventTargetShim {
   }
   closest() {
     return null;
+  }
+  getBoundingClientRect() {
+    return { top: 0, bottom: this.clientHeight, height: this.clientHeight };
+  }
+  querySelectorAll() {
+    return [];
   }
   contains(target) {
     return this === target || this.firstElementChild?.contains(target) === true;
@@ -177,6 +190,71 @@ test("bottom intent follows arbitrarily late virtual geometry changes", async ()
   await act(async () => root.unmount());
 });
 
+test("settled geometry cannot feed another virtualizer bottom measurement loop", async () => {
+  const { content, refs, root, writes } = await mountHarness();
+  const list = refs.list.current;
+  Object.assign(list, {
+    scrollSize: 1200,
+    viewportSize: 400,
+    scrollOffset: 800,
+  });
+  refs.api.current.settle();
+  const observer = resizeObservers.find((entry) =>
+    entry.targets?.includes(content),
+  );
+  for (let index = 0; index < 20; index++) {
+    observer.callback();
+    flushAnimationFrames();
+  }
+  assert.equal(
+    writes.length,
+    0,
+    "already-settled extent needs no scroll command",
+  );
+  list.scrollSize = 1400;
+  observer.callback();
+  flushAnimationFrames();
+  assert.equal(writes.length, 1, "a genuinely new floor still settles");
+  list.scrollOffset = 1000;
+  observer.callback();
+  flushAnimationFrames();
+  assert.equal(writes.length, 1, "settlement does not trigger another pin");
+  await act(async () => root.unmount());
+});
+
+test("hovering a message retires scheduled bottom pin before its Reply action moves", async () => {
+  const { content, refs, root, scroller, writes } = await mountHarness();
+  refs.api.current.settle();
+  const observer = resizeObservers.find((entry) =>
+    entry.targets?.includes(content),
+  );
+  observer.callback();
+  const rowBody = new ElementShim();
+  content.firstElementChild = rowBody;
+  rowBody.dataset.messageId = "child";
+  rowBody.closest = (selector) =>
+    selector === "[data-message-id]" ? rowBody : null;
+  scroller.dispatchEvent({ type: "pointermove", target: rowBody });
+  flushAnimationFrames();
+  for (let index = 0; index < 20; index++) {
+    observer.callback();
+    flushAnimationFrames();
+  }
+  assert.equal(
+    writes.length,
+    1,
+    "pending row resize cannot override message interaction",
+  );
+  refs.api.current.settle();
+  assert.equal(
+    writes.length,
+    2,
+    "a later explicit own-send intent can settle again",
+  );
+  await act(async () => root.unmount());
+  assert.equal(scroller.listeners.get("pointermove")?.length, 0);
+});
+
 for (const eventType of ["pointerdown", "touchmove", "wheel", "keydown"]) {
   test(`${eventType} transfers ownership away from bottom intent`, async () => {
     const { content, refs, root, scroller, writes } = await mountHarness();
@@ -277,4 +355,101 @@ test("typing and editable navigation keys preserve bottom intent", async () => {
   flushAnimationFrames();
   assert.equal(writes.length, 2);
   await act(async () => root.unmount());
+});
+
+test("public mounted-row restoration retires bottom intent before measurement churn", async () => {
+  const source = ts.createSourceFile(
+    "MessageTimeline.tsx",
+    readFileSync(new URL("./MessageTimeline.tsx", import.meta.url), "utf8"),
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TSX,
+  );
+  let restore;
+  const visit = (node) => {
+    if (
+      ts.isPropertyAssignment(node) &&
+      node.name.getText(source) === "restoreReadingPosition"
+    )
+      restore = node.initializer.getText(source);
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  assert.ok(
+    restore,
+    "execute the actual production public restoration adapter",
+  );
+  const bind = new Function(
+    "activeScrollContainerRef",
+    "timelineVirtualizerApi",
+    "messages",
+    "restoreReadingPosition",
+    ts.transpile(`const restore = ${restore}; return restore;`, {
+      target: ts.ScriptTarget.ES2022,
+    }),
+  );
+  const { content, refs, root, scroller, writes } = await mountHarness();
+  try {
+    scroller.isConnected = true;
+    scroller.scrollHeight = 1200;
+    scroller.clientHeight = 400;
+    scroller.scrollTop = 800;
+    const row = new ElementShim();
+    row.dataset.messageId = "target";
+    row.getBoundingClientRect = () => ({
+      top: 500 - scroller.scrollTop,
+      bottom: 540 - scroller.scrollTop,
+      height: 40,
+    });
+    scroller.querySelectorAll = () => [row];
+    scroller.contains = (node) => node === row;
+    refs.api.current.settle();
+    const observer = resizeObservers.find((entry) =>
+      entry.targets?.includes(content),
+    );
+    observer.callback(); // A pending bottom correction must also be canceled.
+    const pins = writes.length;
+    const restorePublic = bind(
+      { current: scroller },
+      {
+        cancelBottomIntent: refs.api.current.cancel,
+        scrollToMessage() {
+          throw new Error("mounted row must not require index realization");
+        },
+      },
+      [{ id: "target" }],
+      restoreReadingPosition,
+    );
+    const stop = restorePublic({
+      id: "target",
+      offset: 100,
+      pixel: 400,
+      neighbors: [],
+    });
+    for (let n = 0; n < 5; n++) flushAnimationFrames();
+    assert.equal(
+      scroller.scrollTop,
+      400,
+      "restoration reaches the saved reading position",
+    );
+    assert.equal(row.getBoundingClientRect().top, 100);
+    for (let n = 0; n < 12; n++) {
+      scroller.scrollHeight += 16;
+      observer.callback();
+      flushAnimationFrames();
+    }
+    assert.equal(
+      writes.length,
+      pins,
+      "measurement churn cannot re-pin the restored reader to the tail",
+    );
+    assert.equal(
+      row.getBoundingClientRect().top,
+      100,
+      "restored row stays at its viewport Y",
+    );
+    stop();
+  } finally {
+    await act(async () => root.unmount());
+  }
 });

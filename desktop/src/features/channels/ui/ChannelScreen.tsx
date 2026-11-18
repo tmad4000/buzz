@@ -1,6 +1,10 @@
 // biome-ignore-all format: line-count ratchet requires compact forwarding in this legacy component
+import { useUnseenReplyEvidence } from "./useUnseenReplyEvidence";
+import { useUnseenThreadReplies } from "./useUnseenThreadReplies";
+import { UnseenRepliesButton } from "./UnseenRepliesButton";
 import { useChannelPageSurface } from "@/features/channel-page/useChannelPageSurface";
 import * as React from "react";
+import { TimelineViewContext, useChannelViewMode } from "./TimelineViewContext";
 import { buildContextParents } from "@/features/channels/readState/contextParentRegistry";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAppShell } from "@/app/AppShellContext";
@@ -79,7 +83,7 @@ import { useMessageProfiles } from "./useMessageProfiles";
 import { useChannelPanelHistoryState } from "./useChannelPanelHistoryState";
 import { useChannelProfilePanel } from "./useChannelProfilePanel";
 import { useChannelTargetReset } from "./useChannelTargetReset";
-import { useChannelRouteTarget } from "./useChannelRouteTarget";
+import { getThreadRouteTarget, useChannelRouteTarget } from "./useChannelRouteTarget";
 import { useChannelOpenReadState } from "./useChannelOpenReadState";
 import { useChannelUnreadState } from "./useChannelUnreadState";
 import type { ChannelScreenProps } from "./ChannelScreen.types";
@@ -99,6 +103,7 @@ export function ChannelScreen({
   targetMessageEvents, targetMessageId,
   ...searchTarget
 }: ChannelScreenProps) {
+  const { pageOpen, closePage, pageHeaderActions, pagePanel, requirePageEditResolution } = useChannelPageSurface(activeChannel, headerEndActions, registerPageLeaveGuard);
   const queryClient = useQueryClient();
   const { goHome } = useAppNavigation();
   const { activeCommunity } = useCommunities();
@@ -109,6 +114,8 @@ export function ChannelScreen({
     getChannelReadAt,
     getMessageReadAt,
     markMessageRead,
+    getThreadReplyObservedAt,
+    markThreadReplySeen,
     registerContextParents,
     openBrowseChannels,
     openCreateChannel,
@@ -122,6 +129,7 @@ export function ChannelScreen({
   } = useAppShell();
   const {
     channelManagementOpen,
+    capturePanelReturn,
     clearAutoSend,
     clearMessageRouteTarget,
     openAgentSessionChannelId,
@@ -171,6 +179,8 @@ export function ChannelScreen({
   const currentPubkey = currentIdentity?.pubkey;
   const activeChannelId = activeChannel?.id ?? null;
   const isHuddleTranscript = useIsHuddleTranscript(activeChannelId);
+  const view = useChannelViewMode(activeCommunity?.relayUrl ?? "", activeChannelId);
+  const flatTimeline = view.mode === "timeline" && !isHuddleTranscript && activeChannel?.channelType !== "forum";
   const relaySelfPubkey = useRelaySelfQuery(activeChannel !== null).data;
   const requireThreadEditResolutionRef = React.useRef<() => boolean>(
     () => true,
@@ -227,11 +237,7 @@ export function ChannelScreen({
     activeChannel?.isMember,
     activeReadAt,
   );
-  React.useLayoutEffect(() => {
-    if (!activeChannelId) return;
-    const parents = buildContextParents(activeChannelId, [...(messagesQuery.data ?? []), ...(threadRepliesQuery.data ?? []), ...(targetMessageEvents ?? [])]);
-    return registerContextParents(parents);
-  }, [activeChannelId, messagesQuery.data, threadRepliesQuery.data, targetMessageEvents, registerContextParents]);
+
 
   const {
     activeChannelTitle,
@@ -252,14 +258,19 @@ export function ChannelScreen({
     resolvedMessages,
     threadSummaries,
     threadRepliesError: huddleThreadRepliesError,
-    onRetryThreadReplies: onRetryHuddleThreadReplies,
+    onRetryThreadReplies: onRetryHuddleThreadReplies, threadRepliesLoading,
   } = useHuddleChannelMessages({
     activeChannel,
-    isHuddleTranscript,
+    isHuddleTranscript: isHuddleTranscript || flatTimeline,
     messages: messagesQuery.data ?? EMPTY_RELAY_EVENTS,
     targetMessageEvents,
     windowStore: windowQuery.data,
   });
+  React.useLayoutEffect(() => {
+    if (!activeChannelId) return;
+    const parents = buildContextParents(activeChannelId, [...resolvedMessages, ...(threadRepliesQuery.data ?? []), ...(targetMessageEvents ?? [])]);
+    return registerContextParents(parents);
+  }, [activeChannelId, resolvedMessages, threadRepliesQuery.data, targetMessageEvents, registerContextParents]);
   useHuddleReadMarker({
     activeChannelId,
     activeChannelIsMember: activeChannel?.isMember,
@@ -451,7 +462,6 @@ export function ChannelScreen({
     threadFirstUnreadReplyId,
     threadReplyTargetMessage,
     threadReplyUnreadCounts,
-    threadUnreadCounts,
     unreadCount,
   } = useChannelUnreadState({
     activeChannelId,
@@ -469,6 +479,13 @@ export function ChannelScreen({
     markMessageRead,
     isThreadMuted,
     readStateVersion,
+  });
+  const unseenEvidence = useUnseenReplyEvidence(activeChannelId, currentPubkey, threadSummaries);
+  const unseenEvidenceMessages = React.useMemo(() => [...timelineMessages, ...unseenEvidence.messages], [timelineMessages, unseenEvidence.messages]);
+  const { unseenReplies, threadUnseenCounts, markVisibleReplies } = useUnseenThreadReplies({
+    timelineMessages: unseenEvidenceMessages, panelMessages: threadPanelData.messages, currentPubkey,
+    getSeenAt: getThreadReplyObservedAt, markSeen: markThreadReplySeen,
+    markRead: markSidebarRepliesRead, readStateVersion,
   });
   const editTargetMessage = React.useMemo(
     () =>
@@ -743,7 +760,23 @@ export function ChannelScreen({
         activeDmPresenceStatus={activeDmPresenceStatus}
         chromeWrapperRef={channelHeaderChromeRef}
         currentPubkey={currentPubkey}
-        headerEndActions={pageHeaderActions}
+        headerEndActions={<>
+          <UnseenRepliesButton replies={unseenReplies} currentRoot={effectiveOpenThreadHeadId}
+            checking={unseenEvidence.pending.size > 0} failed={unseenEvidence.failed} onRetry={() => void unseenEvidence.retry()}
+            onOpen={(rootId, replyId) => {
+              if (!requireThreadEditResolution()) return;
+              handleCloseAgentSession();
+              setProfilePanelPubkey(null);
+              setChannelManagementOpen(false);
+              setOptimisticOpenThreadHeadId(rootId);
+              setOpenThreadHeadId(rootId);
+              setThreadReplyTargetId(rootId);
+              setThreadScrollTargetId(replyId);
+              setExpandedThreadReplyIds(new Set());
+              setEditTargetId(null);
+            }} />
+          {pageHeaderActions}
+        </>}
         isAddBotOpen={isAddBotOpen}
         isJoining={joinChannelMutation.isPending}
         onAddBotOpenChange={setIsAddBotOpen}
@@ -765,6 +798,16 @@ export function ChannelScreen({
       channelHeaderChromeRef,
       currentPubkey,
       pageHeaderActions,
+      unseenReplies,
+      unseenEvidence.pending.size,
+      unseenEvidence.failed,
+      unseenEvidence.retry,
+      effectiveOpenThreadHeadId,
+      handleCloseAgentSession,
+      setProfilePanelPubkey,
+      setChannelManagementOpen,
+      requireThreadEditResolution,
+      setOpenThreadHeadId,
       isAddBotOpen,
       joinChannelMutation.isPending,
       joinChannelMutation.mutateAsync,
@@ -774,7 +817,28 @@ export function ChannelScreen({
       isHuddleTranscript,
     ],
   );
+  const timelineMessageById = React.useMemo(() => new Map(timelineMessages.map((message) => [message.id, message])), [timelineMessages]);
+  const changeChannelView = React.useCallback((mode: "threads" | "timeline") => {
+    if (!requireThreadEditResolution()) return;
+    if (mode === "timeline") handleCloseThread();
+    view.changeMode(mode);
+  }, [handleCloseThread, requireThreadEditResolution, view.changeMode]);
+  const openTimelineReply = React.useCallback((message: TimelineMessage) => {
+    if (!requireThreadEditResolution()) return;
+    view.changeMode("threads");
+    handleCloseAgentSession();
+    setChannelManagementOpen(false);
+    setProfilePanelPubkey(null);
+    const rootId = message.rootId ?? message.parentId ?? message.id;
+    setOptimisticOpenThreadHeadId(rootId);
+    setOpenThreadHeadId(rootId);
+    setThreadReplyTargetId(message.id);
+    setThreadScrollTargetId(message.id);
+    setExpandedThreadReplyIds(getThreadRouteTarget(message, timelineMessageById)?.expandedReplyIds ?? new Set());
+  }, [handleCloseAgentSession, requireThreadEditResolution, setChannelManagementOpen, setOpenThreadHeadId, setProfilePanelPubkey, timelineMessageById, view.changeMode]);
+  const timelineView = React.useMemo(() => ({ mode: view.mode, changeMode: changeChannelView, messagesById: timelineMessageById, loadingReplies: threadRepliesLoading, openReply: openTimelineReply }), [view.mode, changeChannelView, timelineMessageById, threadRepliesLoading, openTimelineReply]);
   return (
+    <TimelineViewContext.Provider value={timelineView}>
     <AgentSessionProvider onOpenAgentSession={handleOpenAgentSession}>
       <ProfilePanelProvider onOpenProfilePanel={handleOpenProfilePanel}>
         <WelcomeAgentCreateDialog
@@ -925,6 +989,29 @@ export function ChannelScreen({
                   onOpenProfilePanel={handleOpenProfilePanel}
                   onResetThreadPanelWidth={handleThreadPanelWidthReset}
                   onCloseProfilePanel={handleCloseProfilePanel}
+                  onCapturePanelReturn={() => {
+                    if (!requireThreadEditResolution()) return;
+                    const restore = capturePanelReturn();
+                    return () => {
+                      if (!requireThreadEditResolution()) return false;
+                      restore();
+                      setOptimisticOpenThreadHeadId(undefined);
+                      setThreadReplyTargetId(threadReplyTargetId);
+                      setThreadScrollTargetId(threadScrollTargetId);
+                      setExpandedThreadReplyIds(new Set(expandedThreadReplyIds));
+                      return true;
+                    };
+                  }}
+                  onOpenSentReply={(root, messageId) => {
+                    if (!requireThreadEditResolution()) return;
+                    setOpenAgentSessionPubkey(null);
+                    setProfilePanelPubkey(null);
+                    setChannelManagementOpen(false);
+                    setOptimisticOpenThreadHeadId(root.id);
+                    setOpenThreadHeadId(root.id);
+                    setThreadReplyTargetId(root.id);
+                    setThreadScrollTargetId(messageId);
+                  }}
                   onOpenThread={handleOpenThreadAndCloseAgentSession}
                   onSelectThreadReplyTarget={handleSelectThreadReplyTarget}
                   onSendMessage={handleSendMessage}
@@ -956,10 +1043,11 @@ export function ChannelScreen({
                   unreadCount={unreadCount}
                   targetMessageId={mainTimelineTargetMessageId}
                   threadAllMessages={displayedThreadAllMessages}
-                  onSidebarRepliesRevealed={markSidebarRepliesRead}
+                  onSidebarRepliesRevealed={markVisibleReplies}
                   threadHeadMessage={displayedThreadHeadMessage}
                   threadMessages={displayedThreadMessages}
                   threadMessagesPending={threadRepliesQuery.isPending}
+                  threadMessagesComplete={threadRepliesQuery.isSuccess && !threadRepliesQuery.isFetching}
                   threadMessagesError={threadRepliesQuery.isError}
                   onRetryThreadReplies={() => {
                     void threadRepliesQuery.refetch();
@@ -968,7 +1056,7 @@ export function ChannelScreen({
                   threadTypingPubkeys={threadTypingPubkeys}
                   threadReplyTargetMessage={displayedThreadReplyTargetMessage}
                   threadScrollTargetId={threadScrollTargetId}
-                  threadUnreadCounts={threadUnreadCounts}
+                  threadUnreadCounts={threadUnseenCounts}
                   threadReplyUnreadCounts={threadReplyUnreadCounts}
                   threadFirstUnreadReplyId={displayedThreadFirstUnreadReplyId}
                   isJoining={joinChannelMutation.isPending}
@@ -992,6 +1080,6 @@ export function ChannelScreen({
           relayUrl={activeCommunity?.relayUrl}
         />
       </ProfilePanelProvider>
-    </AgentSessionProvider>
+    </AgentSessionProvider></TimelineViewContext.Provider>
   );
 }

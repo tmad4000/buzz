@@ -1,4 +1,10 @@
 import * as React from "react";
+import { loadSidebarSectionDefaults } from "@/shared/api/tauri";
+import {
+  decodeSidebarDefaults,
+  projectDirectAgentSections,
+  isJacobSidebarScope,
+} from "./jacobChannelSectionDefaults";
 
 import {
   maxLiveOrder,
@@ -6,7 +12,7 @@ import {
   SECTIONS_LANE,
 } from "./channelSectionsSync";
 import { useLaneSync } from "./sidebarLaneReconciler";
-import { own, setRegs, type Tree } from "./sidebarLwwMap";
+import { mergeTrees, own, setRegs, type Tree } from "./sidebarLwwMap";
 
 export type { ChannelSection } from "./channelSectionsStorage";
 
@@ -37,6 +43,8 @@ export function useChannelSections(
   pubkey: string | undefined,
   relayUrl?: string,
 ): {
+  bootstrapError: boolean;
+  retryBootstrap: () => void;
   sections: ChannelSection[];
   assignments: Record<string, string>;
   createSection: (name: string, icon?: string) => ChannelSection | null;
@@ -49,9 +57,49 @@ export function useChannelSections(
   unassignChannel: (channelId: string) => void;
 } {
   const { tree, edit } = useLaneSync(SECTIONS_LANE, pubkey, relayUrl);
+  const bootstrapScope = `${pubkey ?? ""}:${relayUrl ?? ""}`;
+  const [displayDefaults, setDisplayDefaults] = React.useState<{
+    scope: string;
+    tree: Tree;
+  } | null>(null);
+  const [bootstrapError, setBootstrapError] = React.useState(false);
+  const [bootstrapAttempt, setBootstrapAttempt] = React.useState(0);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Explicit Retry token reruns the import for the same identity.
+  React.useEffect(() => {
+    let disposed = false;
+    setBootstrapError(false);
+    setDisplayDefaults(null);
+    if (isJacobSidebarScope(pubkey, relayUrl)) {
+      void loadSidebarSectionDefaults()
+        .then((plaintext) => {
+          if (disposed) return;
+          const defaults = decodeSidebarDefaults(plaintext);
+          setDisplayDefaults({ scope: bootstrapScope, tree: defaults });
+          // The original stamp-zero seed only; the new label is projected below.
+          // Stable IDs/version-zero registers never overwrite authored edits or
+          // tombstones. The existing lane persists and self-encrypts the result.
+          edit((prev) => mergeTrees(defaults, prev));
+        })
+        .catch(() => {
+          // The bundled encrypted seed remains the durable retry source. Surface
+          // failure with Retry; a restart also retries the import.
+          if (!disposed) setBootstrapError(true);
+        });
+    }
+    return () => {
+      disposed = true;
+    };
+  }, [pubkey, relayUrl, edit, bootstrapAttempt, bootstrapScope]);
   const { sections, assignments } = React.useMemo(
-    () => projectSections(tree),
-    [tree],
+    () =>
+      projectDirectAgentSections(
+        tree,
+        displayDefaults?.scope === bootstrapScope &&
+          isJacobSidebarScope(pubkey, relayUrl)
+          ? displayDefaults.tree
+          : undefined,
+      ),
+    [tree, displayDefaults, bootstrapScope, pubkey, relayUrl],
   );
 
   const createSection = React.useCallback(
@@ -133,6 +181,8 @@ export function useChannelSections(
   );
 
   return {
+    bootstrapError: bootstrapError && isJacobSidebarScope(pubkey, relayUrl),
+    retryBootstrap: () => setBootstrapAttempt((attempt) => attempt + 1),
     sections,
     assignments,
     createSection,

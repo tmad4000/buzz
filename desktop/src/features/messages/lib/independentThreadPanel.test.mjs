@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildIndependentThreadPanel } from "./independentThreadPanel.ts";
+import {
+  buildIndependentThreadPanel,
+  mergeOwnInlineThreadLocalEvents,
+  mergeOwnThreadLocalEvents,
+} from "./independentThreadPanel.ts";
 
 const ROOT_ID = "6".repeat(64);
 const EDIT_ID = "9".repeat(64);
@@ -11,6 +15,83 @@ const AUX_DELETION_ID = "e".repeat(64);
 const REACTION_ID = "b".repeat(64);
 const AUTHOR = "f".repeat(64);
 const CHANNEL = "chan-uuid";
+
+test("inline durable admission leaves legacy optimistic replies to their query", () => {
+  const legacy = {
+    ...contentEvent("optimistic-local", "legacy pending", [
+      ["e", ROOT_ID, "", "reply"],
+    ]),
+    pending: true,
+    localKey: "optimistic-local",
+  };
+  assert.deepEqual(
+    mergeOwnInlineThreadLocalEvents([legacy], [], ROOT_ID, AUTHOR),
+    [],
+    "legacy inline rows do not appear before the authoritative thread page",
+  );
+  assert.deepEqual(
+    mergeOwnThreadLocalEvents([legacy], [], ROOT_ID, AUTHOR),
+    [legacy],
+    "the sidebar retains its existing optimistic projection",
+  );
+  const accepted = { ...legacy, id: REPLY_ID, pending: false };
+  delete accepted.localKey;
+  assert.deepEqual(
+    mergeOwnInlineThreadLocalEvents([legacy], [accepted], ROOT_ID, AUTHOR),
+    [accepted],
+  );
+});
+
+test("inline durable identity survives pending, fast ACK, query convergence and removal", () => {
+  const pending = {
+    ...contentEvent("outbox-local:uuid", "queued body", [
+      ["e", ROOT_ID, "", "reply"],
+      ["client_msg_id", "uuid"],
+    ]),
+    pending: true,
+    localKey: "outbox-local:uuid",
+    localSendIntent: {
+      id: "uuid",
+      viewInstanceId: "visit:capture",
+      threadRootId: ROOT_ID,
+    },
+  };
+  assert.deepEqual(
+    mergeOwnInlineThreadLocalEvents([pending], [], ROOT_ID, AUTHOR),
+    [pending],
+  );
+  const raw = {
+    ...pending,
+    id: REPLY_ID,
+    content: "canonical body",
+    pending: false,
+  };
+  delete raw.localKey;
+  delete raw.localSendIntent;
+  const [accepted] = mergeOwnInlineThreadLocalEvents(
+    [pending],
+    [raw],
+    ROOT_ID,
+    AUTHOR,
+  );
+  assert.equal(accepted.id, REPLY_ID);
+  assert.equal(accepted.content, "canonical body");
+  assert.equal(accepted.pending, false);
+  assert.equal(accepted.localKey, pending.localKey);
+  assert.deepEqual(accepted.localSendIntent, pending.localSendIntent);
+  assert.deepEqual(
+    mergeOwnInlineThreadLocalEvents([accepted], [raw], ROOT_ID, AUTHOR),
+    [accepted],
+  );
+  assert.deepEqual(
+    mergeOwnInlineThreadLocalEvents([], [], ROOT_ID, AUTHOR),
+    [],
+  );
+  assert.deepEqual(
+    mergeOwnInlineThreadLocalEvents([pending], [], ROOT_ID, "other"),
+    [],
+  );
+});
 
 function contentEvent(id, content, extraTags = []) {
   return {
@@ -183,4 +264,82 @@ test("does not resurrect a deleted head reaction carried in the channel window",
   const deletion = deletionEvent(AUX_DELETION_ID, REACTION_ID);
   const result = head([root, reaction, deletion], []);
   assert.equal(result?.reactions, undefined);
+});
+
+test("sidebar projection includes only this user's scoped local echo through optimistic ack and query convergence", () => {
+  const root = contentEvent(ROOT_ID, "root");
+  const branch = contentEvent(REPLY_ID, "branch", [
+    ["e", ROOT_ID, "", "reply"],
+  ]);
+  const pending = {
+    ...contentEvent("optimistic-local", "fresh own body", [
+      ["e", ROOT_ID, "", "root"],
+      ["e", REPLY_ID, "", "reply"],
+    ]),
+    pending: true,
+    localKey: "optimistic-local",
+  };
+  const project = (channel, replies) =>
+    buildIndependentThreadPanel(
+      channel,
+      replies,
+      ROOT_ID,
+      ROOT_ID,
+      new Set([ROOT_ID, REPLY_ID]),
+      null,
+      AUTHOR,
+      null,
+      undefined,
+      undefined,
+      new Map(),
+      new Map(),
+      null,
+      undefined,
+    );
+  const unrelated = {
+    ...pending,
+    id: "elsewhere",
+    tags: [["e", "other-root", "", "reply"]],
+  };
+  const otherAuthor = {
+    ...pending,
+    id: "other-author",
+    pubkey: "1".repeat(64),
+  };
+  const first = project([root, pending, unrelated, otherAuthor], [branch]);
+  assert.ok(first.messages.some((m) => m.id === pending.id && m.pending));
+  assert.equal(
+    first.messages.some(
+      (m) => m.id === unrelated.id || m.id === otherAuthor.id,
+    ),
+    false,
+  );
+  const ack = { ...pending, id: "accepted-id", pending: false };
+  const second = project([root, ack], [branch]);
+  assert.ok(
+    second.visibleReplies.some(
+      (e) =>
+        e.message.id === ack.id && e.message.renderKey === pending.localKey,
+    ),
+  );
+  const rawServerAck = { ...ack, content: "canonical server body" };
+  delete rawServerAck.localKey;
+  delete rawServerAck.pending;
+  const converged = project([root, ack], [branch, rawServerAck]);
+  assert.equal(converged.messages.filter((m) => m.id === ack.id).length, 1);
+  const row = converged.messages.find((m) => m.id === ack.id);
+  assert.equal(
+    row.renderKey,
+    pending.localKey,
+    "raw query convergence cannot remount the acknowledged row",
+  );
+  assert.equal(
+    row.body,
+    "canonical server body",
+    "server content remains authoritative",
+  );
+  assert.equal(
+    first.messages.find((m) => m.id === pending.id).renderKey,
+    row.renderKey,
+  );
 });

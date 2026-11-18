@@ -2,6 +2,7 @@ import * as React from "react";
 import { useHuddle } from "@/features/huddle/HuddleContext";
 import { huddleWindowChannelId } from "@/features/huddle/lib/huddleWindow";
 import { mergeMessages } from "@/features/messages/hooks";
+import { mergeTimelineReplyEvents } from "@/features/messages/lib/flatTimeline";
 import {
   channelWindowThreadSummaries,
   type ChannelWindowStore,
@@ -58,9 +59,9 @@ export function useHuddleChannelMessages({
   const resolvedMessages = React.useMemo(
     () =>
       isHuddleTranscript
-        ? huddleThreadReplies.events.reduce(
-            mergeMessages,
+        ? mergeTimelineReplyEvents(
             resolvedChannelMessages,
+            huddleThreadReplies.events,
           )
         : resolvedChannelMessages,
     [huddleThreadReplies.events, isHuddleTranscript, resolvedChannelMessages],
@@ -69,6 +70,9 @@ export function useHuddleChannelMessages({
   return {
     resolvedMessages,
     threadSummaries,
+    threadRepliesLoading:
+      isHuddleTranscript &&
+      (huddleThreadReplies.isPending || huddleThreadReplies.isFetching),
     // A summarized reply subtree failing must not leave the transcript reading
     // as complete: surface the aggregate failure so the consumer can show a
     // non-destructive retry alert alongside the rows that did load.

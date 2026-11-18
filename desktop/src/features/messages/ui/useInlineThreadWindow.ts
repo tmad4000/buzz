@@ -95,14 +95,11 @@ export function useInlineThreadWindow(
       let relevant = key[0] === "thread-replies" && key[2] === rootId;
       if (key[0] === "channel-messages" && Array.isArray(event.action.data)) {
         const events = event.action.data as RelayEvent[];
-        relevant = events.some(
-          (message) =>
-            previous.get(message.id) !== message &&
-            message.tags.some(
-              (tag) =>
-                tag[0] === "e" &&
-                (tag[1] === rootId || loadedIds.current.has(tag[1])),
-            ),
+        relevant = inlineThreadCacheChanged(
+          previous,
+          events,
+          rootId,
+          loadedIds.current,
         );
         previous = new Map(events.map((message) => [message.id, message]));
       }
@@ -119,4 +116,24 @@ export function useInlineThreadWindow(
     void query.refetch();
   }, [enabled, query.fetchStatus, query.refetch, revision]);
   return query;
+}
+
+/** Removal of a local pending body must repaint just like arrival/acceptance. */
+export function inlineThreadCacheChanged(
+  previous: ReadonlyMap<string, RelayEvent>,
+  events: readonly RelayEvent[],
+  rootId: string,
+  loadedIds: ReadonlySet<string>,
+) {
+  const belongs = (event: RelayEvent) =>
+    event.tags.some(
+      (tag) => tag[0] === "e" && (tag[1] === rootId || loadedIds.has(tag[1])),
+    );
+  const ids = new Set(events.map((event) => event.id));
+  return (
+    events.some(
+      (event) => previous.get(event.id) !== event && belongs(event),
+    ) ||
+    [...previous.values()].some((event) => !ids.has(event.id) && belongs(event))
+  );
 }

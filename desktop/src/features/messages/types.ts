@@ -15,6 +15,7 @@ export type TimelineMessage = {
   id: string;
   /** Stable local key used to avoid remounting optimistic rows on send ack. */
   renderKey?: string;
+  localSendIntent?: import("@/shared/api/types").LocalSendIntent;
   createdAt: number;
   pubkey?: string;
   /**

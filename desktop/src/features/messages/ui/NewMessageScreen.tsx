@@ -245,6 +245,12 @@ export function NewMessageScreen() {
       mentionPubkeys: string[],
       mediaTags?: string[][],
       targetChannelId?: string | null,
+      _threadContext?: {
+        parentEventId: string | null;
+        threadHeadId: string | null;
+      } | null,
+      _forceRest?: boolean,
+      outbox?: import("../outbox/types").OutboxSubmission,
     ) => {
       const preparedDirectMessage = preparedDirectMessageRef.current;
       const directMessage =
@@ -260,6 +266,20 @@ export function NewMessageScreen() {
       try {
         await sendMessageMutation.mutateAsync({
           targetChannel: directMessage,
+          outbox: outbox
+            ? {
+                ...outbox,
+                onQueued: () => {
+                  outbox.onQueued();
+                  void upsertCachedChannel(directMessage)
+                    .then(() => goChannel(directMessage.id, { replace: true }))
+                    .catch((error: unknown) => {
+                      if (isMountedRef.current)
+                        setSubmitErrorMessage(String(error));
+                    });
+                },
+              }
+            : undefined,
           content,
           mentionPubkeys,
           mediaTags,

@@ -1036,6 +1036,11 @@ export async function nip44DecryptFromSelf(
   return invokeTauri<string>("nip44_decrypt_from_self", { ciphertext });
 }
 
+/** Decrypt the bundled private sidebar bootstrap using the current identity. */
+export async function loadSidebarSectionDefaults(): Promise<string> {
+  return invokeTauri<string>("load_sidebar_section_defaults");
+}
+
 export async function startPairing(): Promise<string> {
   return invokeTauri<string>("start_pairing");
 }

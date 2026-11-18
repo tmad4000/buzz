@@ -1,5 +1,6 @@
 import { buildThreadPanelIndex } from "../lib/threadPanel";
 import * as React from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import type { InlineChannelThreadProps } from "@/features/channels/ui/InlineChannelThread";
 import { useChannelMembersQuery } from "@/features/channels/hooks";
 import { useMessageEventProfilePubkeys } from "@/features/channels/useMessageEventProfilePubkeys";
@@ -7,7 +8,8 @@ import { useRelaySelfQuery } from "@/features/moderation/hooks";
 import { useUsersBatchQuery } from "@/features/profile/hooks";
 import type { RelayEvent } from "@/shared/api/types";
 import { formatTimelineMessages } from "../lib/formatTimelineMessages";
-import { sortMessages } from "../lib/messageQueryKeys";
+import { channelMessagesKey, sortMessages } from "../lib/messageQueryKeys";
+import { mergeOwnInlineThreadLocalEvents } from "../lib/independentThreadPanel";
 import {
   smartThreadDecision,
   type ThreadDisplayPolicy,
@@ -34,6 +36,7 @@ export function useInlineThreadData(
     isUnread,
   } = props;
   const canonicalRoot = root.rootId ?? root.id;
+  const client = useQueryClient();
   const query = useInlineThreadWindow(
     channel.id,
     canonicalRoot,
@@ -42,12 +45,25 @@ export function useInlineThreadData(
     `${summary.replyCount}:${summary.lastReplyAt}`,
     summary.replyCount,
   );
+  // useInlineThreadWindow already subscribes to relevant channel cache writes.
+  // Reuse that repaint to include durable bodies before a server page can have
+  // them; the canonical page remains authoritative once it catches up.
+  const local =
+    client.getQueryData<RelayEvent[]>(channelMessagesKey(channel.id)) ??
+    EMPTY_EVENTS;
   const events = React.useMemo(
     () =>
-      enabled && query.data
-        ? sortMessages(query.data.pages.flatMap((page) => page.events))
+      enabled
+        ? sortMessages(
+            mergeOwnInlineThreadLocalEvents(
+              local,
+              query.data?.pages.flatMap((page) => page.events) ?? EMPTY_EVENTS,
+              canonicalRoot,
+              currentPubkey,
+            ),
+          )
         : EMPTY_EVENTS,
-    [enabled, query.data],
+    [enabled, query.data, local, canonicalRoot, currentPubkey],
   );
   const relaySelf = useRelaySelfQuery(enabled).data;
   const pubkeys = useMessageEventProfilePubkeys(

@@ -105,6 +105,9 @@ export type ChannelPaneProps = {
   onBrowseChannels?: () => void;
   onCreateChannel?: () => void;
   onCloseThread: () => void;
+  /** Snapshot current auxiliary pane through its existing history owner. */
+  onOpenSentReply?: (root: TimelineMessage, messageId: string) => void;
+  onCapturePanelReturn?: () => (() => boolean) | undefined;
   onDelete?: (message: TimelineMessage) => void;
   onEdit?: (message: TimelineMessage) => void;
   onEditSave?: (
@@ -136,7 +139,8 @@ export type ChannelPaneProps = {
       threadHeadId: string | null;
     } | null,
     forceRest?: boolean,
-  ) => Promise<void>;
+    outbox?: import("@/features/messages/outbox/types").OutboxSubmission,
+  ) => Promise<void | { id: string }>;
   onSendToChannel: (
     message: TimelineMessage,
     threadRoot: TimelineMessage,
@@ -197,6 +201,7 @@ export type ChannelPaneProps = {
   ) => void;
   threadMessages: MainTimelineEntry[];
   threadMessagesPending?: boolean;
+  threadMessagesComplete?: boolean;
   threadMessagesError?: boolean;
   onRetryThreadReplies?: () => void;
   threadPanelWidthPx: number;

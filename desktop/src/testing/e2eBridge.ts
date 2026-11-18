@@ -943,6 +943,7 @@ type RawSearchResponse = {
 };
 
 type RawSendChannelMessageResponse = {
+  signed_event?: RelayEvent;
   event_id: string;
   parent_event_id: string | null;
   root_event_id: string | null;
@@ -1583,6 +1584,8 @@ declare global {
      * cancel the in-flight promise for the cold anchor specifically.
      * Set to undefined/null to disable deferral.
      */
+    __BUZZ_E2E_HOLD_OUTBOX_PUBLISH__?: (hold: boolean) => number;
+    __BUZZ_E2E_HELD_OUTBOX_PUBLISHES__?: () => number;
     __BUZZ_E2E_DEFER_GET_EVENT__?: string | null;
     /** Flush all deferred `get_event` calls for the target ID.  Each queued
      *  request is resolved (or rejected) immediately.  Returns the number of
@@ -1764,6 +1767,8 @@ let profileReadsReleased = false;
 // sides of the hold in one page: profiles resolved normally first (so one paste
 // verifies instantly from local state), then the relay lookup pinned open (so a
 // second paste of the same label is provably still deciding).
+let holdOutboxPublish = false;
+let heldOutboxPublishes: Array<() => void> = [];
 let holdUsersBatch = false;
 let heldUsersBatchReleases: Array<() => void> = [];
 // Starts currently held behind `startManagedAgentDelayMs`, releasable early
@@ -4499,12 +4504,15 @@ function assertExpectedRelayScope(
   }
 }
 
-/** Same ws(s) normalization the app applies to community relay URLs. */
+/** HTTP publication and WebSocket sessions share one captured relay scope. */
 function normalizeMockRelayUrl(url: string): string {
-  if (!url.startsWith("ws://") && !url.startsWith("wss://")) {
-    return `wss://${url}`;
-  }
-  return url;
+  const normalized = url
+    .trim()
+    .replace(/^http:/, "ws:")
+    .replace(/^https:/, "wss:");
+  return (
+    /^wss?:\/\//.test(normalized) ? normalized : `wss://${normalized}`
+  ).replace(/\/+$/, "");
 }
 
 /**
@@ -10253,6 +10261,9 @@ async function resolveMockUploadDescriptorForBytes(
 
 async function handleSendChannelMessage(
   args: {
+    prepareOnly?: boolean;
+    clientMessageId?: string;
+    intendedCreatedAt?: number;
     channelId: string;
     content: string;
     parentEventId?: string | null;
@@ -10288,7 +10299,9 @@ async function handleSendChannelMessage(
   // `sendMessageErrors`. The real command rejects on a relay `OK false`, which
   // surfaces to callers as a thrown error carrying the relay reason.
   const sendMessageError =
-    kind === 9 ? config?.mock?.sendMessageErrors?.shift() : null;
+    kind === 9 && !args.prepareOnly
+      ? config?.mock?.sendMessageErrors?.shift()
+      : null;
   if (sendMessageError) {
     throw new Error(sendMessageError);
   }
@@ -10336,6 +10349,10 @@ async function handleSendChannelMessage(
   // All independently validated kinds end up on the stored event's tag set,
   // just like the real relay.
   const extraTags = [
+    ...(args.clientMessageId ? [["client_msg_id", args.clientMessageId]] : []),
+    ...(args.intendedCreatedAt !== undefined
+      ? [["client_written_at", String(args.intendedCreatedAt)]]
+      : []),
     ...mediaTags,
     ...emojiTags,
     ...mentionTags,
@@ -10349,19 +10366,27 @@ async function handleSendChannelMessage(
     const mockPubkey = getMockMemberPubkey(config);
 
     if (!args.parentEventId) {
-      const event = createMockEvent(kind, args.content, [
-        ...buildTopLevelMessageTags(
-          args.channelId,
-          args.mentionPubkeys,
-          mockPubkey,
-        ),
-        ...extraTags,
-      ]);
-      recordMockMessage(args.channelId, event);
-      emitOrDeferMockSendMessageLiveEcho(args.channelId, event, config);
+      const event = createMockEvent(
+        kind,
+        args.content,
+        [
+          ...buildTopLevelMessageTags(
+            args.channelId,
+            args.mentionPubkeys,
+            mockPubkey,
+          ),
+          ...extraTags,
+        ],
+        mockPubkey,
+      );
+      if (!args.prepareOnly) {
+        recordMockMessage(args.channelId, event);
+        emitOrDeferMockSendMessageLiveEcho(args.channelId, event, config);
+      }
 
       return {
         event_id: event.id,
+        ...(args.prepareOnly ? { signed_event: event } : {}),
         parent_event_id: null,
         root_event_id: null,
         depth: 0,
@@ -10421,11 +10446,14 @@ async function handleSendChannelMessage(
       sig: "mocksig".repeat(20).slice(0, 128),
     };
 
-    recordMockMessage(args.channelId, event);
-    emitOrDeferMockSendMessageLiveEcho(args.channelId, event, config);
+    if (!args.prepareOnly) {
+      recordMockMessage(args.channelId, event);
+      emitOrDeferMockSendMessageLiveEcho(args.channelId, event, config);
+    }
 
     return {
       event_id: event.id,
+      ...(args.prepareOnly ? { signed_event: event } : {}),
       parent_event_id: args.parentEventId,
       root_event_id: rootEventId,
       depth,
@@ -10448,14 +10476,25 @@ async function handleSendChannelMessage(
         relayIdentity.pubkey,
       );
 
-  const result = await submitSignedEvent(config, {
+  const template = {
     kind,
     content: args.content.trim(),
     tags: [...tags, ...extraTags],
-  });
+  };
+  const prepared = args.prepareOnly
+    ? await signWithIdentity(relayIdentity, template)
+    : undefined;
+  const result = prepared
+    ? { event_id: prepared.id }
+    : await submitSignedEvent(config, {
+        kind,
+        content: args.content.trim(),
+        tags: [...tags, ...extraTags],
+      });
 
   return {
     event_id: result.event_id,
+    ...(prepared ? { signed_event: prepared } : {}),
     parent_event_id: args.parentEventId ?? null,
     root_event_id: args.rootEventId ?? args.parentEventId ?? null,
     depth: args.parentEventId
@@ -11446,6 +11485,15 @@ export function maybeInstallE2eTauriMocks() {
   deferredThreadRepliesQueue = [];
   deferredProfileReadQueue = [];
   profileReadsReleased = false;
+  holdOutboxPublish = false;
+  heldOutboxPublishes = [];
+  window.__BUZZ_E2E_HOLD_OUTBOX_PUBLISH__ = (hold) => {
+    holdOutboxPublish = hold;
+    const queued = hold ? [] : heldOutboxPublishes.splice(0);
+    for (const release of queued) release();
+    return queued.length;
+  };
+  window.__BUZZ_E2E_HELD_OUTBOX_PUBLISHES__ = () => heldOutboxPublishes.length;
   holdUsersBatch = false;
   heldUsersBatchReleases = [];
   cancelledMediaUploadIds = new Set<string>();
@@ -14489,6 +14537,93 @@ export function maybeInstallE2eTauriMocks() {
           payload as Parameters<typeof handleGetChannelWindow>[0],
           activeConfig,
         );
+      case "find_queued_message": {
+        const args = payload as {
+          clientMessageId: string;
+          signedEventIds: string[];
+          channelId: string;
+          expectedRelayUrl: string;
+          expectedSignerPubkey: string;
+        };
+        assertExpectedRelayScope(args.expectedRelayUrl, activeConfig);
+        assertExpectedSigner(args.expectedSignerPubkey, activeConfig);
+        if (!args.signedEventIds.length) return null;
+        const events = getIdentity(activeConfig)
+          ? await relayQuery(activeConfig, [
+              {
+                ids: args.signedEventIds,
+                authors: [args.expectedSignerPubkey],
+                kinds: [9],
+                "#h": [args.channelId],
+                limit: args.signedEventIds.length,
+              },
+            ])
+          : getMockMessageStore(args.channelId);
+        const event = events.find(
+          (event) =>
+            args.signedEventIds.includes(event.id) &&
+            event.pubkey === args.expectedSignerPubkey &&
+            event.tags.some(
+              (tag) => tag[0] === "h" && tag[1] === args.channelId,
+            ) &&
+            event.tags.some(
+              (tag) =>
+                tag[0] === "client_msg_id" && tag[1] === args.clientMessageId,
+            ),
+        );
+        if (event) return { event };
+        if (getIdentity(activeConfig)) {
+          const receipts = await relayQuery(activeConfig, [
+            { kinds: [5, 9005], "#e": args.signedEventIds, limit: 1 },
+          ]);
+          if (receipts.length) return { deleted: true };
+        }
+        return null;
+      }
+      case "publish_queued_message": {
+        if (holdOutboxPublish) {
+          await new Promise<void>((resolve) =>
+            heldOutboxPublishes.push(resolve),
+          );
+        }
+        const args = payload as {
+          event: RelayEvent;
+          expectedRelayUrl: string;
+          expectedSignerPubkey: string;
+        };
+        assertExpectedRelayScope(args.expectedRelayUrl, activeConfig);
+        assertExpectedSigner(args.expectedSignerPubkey, activeConfig);
+        if (args.event.pubkey !== args.expectedSignerPubkey)
+          throw new Error("Publisher identity changed.");
+        const error = activeConfig?.mock?.sendMessageErrors?.shift();
+        if (error) throw new Error(error);
+        if (getIdentity(activeConfig)) {
+          const result = await relayJsonRequest<{
+            accepted: boolean;
+            message: string;
+          }>(activeConfig, "/events", {
+            method: "POST",
+            body: JSON.stringify(args.event),
+          });
+          if (!result.accepted) throw new Error(result.message);
+        } else {
+          const channelId = args.event.tags.find((tag) => tag[0] === "h")?.[1];
+          if (!channelId) throw new Error("Missing channel.");
+          if (
+            !getMockMessageStore(channelId).some(
+              (event) => event.id === args.event.id,
+            )
+          ) {
+            recordMockMessage(channelId, args.event);
+            emitOrDeferMockSendMessageLiveEcho(
+              channelId,
+              args.event,
+              activeConfig,
+            );
+          }
+        }
+        return null;
+      }
       case "send_channel_message":
         return handleSendChannelMessage(
           payload as Parameters<typeof handleSendChannelMessage>[0],

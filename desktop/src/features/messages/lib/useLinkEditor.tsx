@@ -429,6 +429,7 @@ export function useLinkEditor(richText: UseRichTextEditorResult) {
     showFromCursor: showCard,
     focusCardFirstControl,
     isCardOpen: cardState !== null,
+    isDialogOpen: draft !== null,
     card,
     dialog,
   };

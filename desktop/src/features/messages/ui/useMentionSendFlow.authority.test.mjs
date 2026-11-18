@@ -216,3 +216,71 @@ test("automatic addressed prefix is programmatic optimistic empty, not new autho
   assert.equal(s.store.get("thread:a").content, TEXT);
   assert.deepEqual(s.store.get("thread:a").mentionRefs, s.refs);
 });
+
+for (const outcome of ["success", "failure", "void"]) {
+  test(`publication observer requires accepted ID and retains its source across navigation: ${outcome}`, async () => {
+    const s = await setup({ lifecycle: true });
+    s.dismiss();
+    s.options.mentions.memberPubkeys = new Set([KEY]);
+    const gate = deferred();
+    const receipts = [];
+    let publishing = false;
+    s.options.onSendRef.current = async () => {
+      publishing = true;
+      await gate.promise;
+      if (outcome === "failure") throw new Error("offline");
+      return outcome === "success" ? { id: "accepted-A" } : undefined;
+    };
+    s.rerender();
+    let promise;
+    await s.act(async () => {
+      promise = s.result.current.sendMessageWithMentionFlow({
+        capturedChannelId: "general",
+        capturedThreadContext: {
+          parentEventId: "root-A",
+          threadHeadId: "root-A",
+        },
+        pendingImeta: [],
+        trimmed: TEXT,
+        recoveryDraftKey: "thread:a",
+        sentDraftKey: "thread:a",
+        onPublished: (id) => receipts.push({ origin: "A", id }),
+      });
+    });
+    assert.equal(publishing, true);
+    assert.deepEqual(receipts, []);
+    s.navigate("thread:b");
+    s.edit("new B draft", []);
+    await s.act(async () => {
+      gate.resolve();
+      await promise;
+    });
+    assert.deepEqual(
+      receipts,
+      outcome === "success" ? [{ origin: "A", id: "accepted-A" }] : [],
+    );
+    assert.equal(s.options.contentRef.current, "new B draft");
+    s.unmount();
+  });
+}
+
+test("canceling a real non-member confirmation never observes publication success", async () => {
+  const s = await setup({ lifecycle: true });
+  s.dismiss();
+  const receipts = [];
+  await s.act(async () =>
+    s.result.current.sendMessageWithMentionFlow({
+      capturedChannelId: "general",
+      pendingImeta: [],
+      trimmed: TEXT,
+      recoveryDraftKey: "thread:a",
+      sentDraftKey: "thread:a",
+      onPublished: (id) => receipts.push(id),
+    }),
+  );
+  s.dismiss();
+  await s.flush();
+  assert.deepEqual(receipts, []);
+  assert.equal(s.events("SEND").length, 0);
+  s.unmount();
+});

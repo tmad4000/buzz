@@ -1,3 +1,7 @@
+import {
+  useLocalOwnSendIntent,
+  isDurableOutboxRow,
+} from "./useLocalOwnSendIntent";
 import * as React from "react";
 import {
   initialBranchChoice,
@@ -24,7 +28,13 @@ import {
   THREAD_EXPANSION_CHANGED,
 } from "@/features/messages/lib/threadExpansionStorage";
 
-type Reveal = { external: string | null; id: string | null; handled: boolean };
+type Reveal = {
+  external: string | null;
+  id: string | null;
+  handled: boolean;
+  ancestors?: ReadonlySet<string>;
+  blocked?: ReadonlySet<string>;
+};
 
 type State = {
   key: string | null;
@@ -34,9 +44,13 @@ type State = {
   newIds: Set<string>;
   reveal: Reveal;
 };
-const empty = (key: string | null, mode?: ThreadDisplayMode): State => ({
+const empty = (
+  key: string | null,
+  mode?: ThreadDisplayMode,
+  visitOnly = false,
+): State => ({
   key,
-  branches: loadThreadExpansion(key),
+  branches: visitOnly ? new Map() : loadThreadExpansion(key),
   automatic: new Map(),
   mode,
   newIds: new Set(),
@@ -55,6 +69,8 @@ export function useUnreadSidebarThread({
   complete = true,
   autoRevealId,
   indexOverride,
+  visitOnly = false,
+  freshRevealIds,
 }: {
   enabled: boolean;
   channelId: string | null;
@@ -68,6 +84,8 @@ export function useUnreadSidebarThread({
   complete?: boolean;
   autoRevealId?: string;
   indexOverride?: ThreadPanelIndex;
+  visitOnly?: boolean;
+  freshRevealIds?: ReadonlySet<string>;
 }) {
   // Community switches remount AppReady; don't migrate storage per row render.
   const community = React.useMemo(loadActiveCommunityId, []);
@@ -75,16 +93,75 @@ export function useUnreadSidebarThread({
     ? threadExpansionKey(community, currentPubkey, channelId, root)
     : null;
   const [saved, setSaved] = React.useState<State>(() =>
-    empty(key, initialMode),
+    empty(key, initialMode, visitOnly),
   );
   const state = React.useMemo(
-    () => (saved.key === key ? saved : empty(key, initialMode)),
-    [saved, key, initialMode],
+    () => (saved.key === key ? saved : empty(key, initialMode, visitOnly)),
+    [saved, key, initialMode, visitOnly],
   );
   const index = React.useMemo(
     () => indexOverride ?? buildThreadPanelIndex(messages),
     [messages, indexOverride],
   );
+  // A new locally authored row is a reveal intent, independent of unread
+  // frontiers and smart budgets. Stable render keys bridge optimistic ack IDs.
+  const authoredVisit = React.useRef<{
+    key: string | null;
+    seen: Set<string>;
+    latestOwnKey?: string;
+  }>({ key: null, seen: new Set() });
+  const own = messages.filter(
+    (m) =>
+      currentPubkey &&
+      m.pubkey?.toLowerCase() === currentPubkey.toLowerCase() &&
+      m.id !== root,
+  );
+  const localOwnSend = useLocalOwnSendIntent(key, root, own, index.messageById);
+  const freshOwn = own.filter(
+    (m) =>
+      m.pending === true &&
+      !isDurableOutboxRow(m) &&
+      !authoredVisit.current.seen.has(m.renderKey ?? m.id),
+  );
+  const freshPaths = new Set<string>();
+  for (const message of [
+    ...freshOwn,
+    ...messages.filter((m) => freshRevealIds?.has(m.id)),
+  ]) {
+    const parents = completeThreadAncestors(
+      index.messageById,
+      root,
+      message.id,
+    );
+    if (parents) {
+      for (const id of parents) freshPaths.add(id);
+      freshPaths.add(message.id);
+    }
+  }
+  const latestOwnKey =
+    freshOwn.at(-1)?.renderKey ??
+    freshOwn.at(-1)?.id ??
+    (authoredVisit.current.key === key
+      ? authoredVisit.current.latestOwnKey
+      : undefined);
+  const legacyOwnSendTargetId = own.find(
+    (m) => (m.renderKey ?? m.id) === latestOwnKey,
+  )?.id;
+  React.useLayoutEffect(() => {
+    authoredVisit.current = {
+      latestOwnKey,
+      key,
+      seen: new Set(
+        messages
+          .filter(
+            (m) =>
+              !m.pending ||
+              completeThreadAncestors(index.messageById, root, m.id),
+          )
+          .map((m) => m.renderKey ?? m.id),
+      ),
+    };
+  }, [key, messages, latestOwnKey, index, root]);
   const unread = new Set(
     messages.filter((m) => m.id !== root && isUnread?.(m.id)).map((m) => m.id),
   );
@@ -92,8 +169,17 @@ export function useUnreadSidebarThread({
   const branchIds = [...index.directChildrenByParentId.keys()].filter((id) =>
     index.messageById.has(id),
   );
-  let automatic = state.automatic;
-  if (state.mode !== undefined && !pending) {
+  const visitAutomatic = React.useMemo(
+    () =>
+      new Map(
+        [...(root ? [root] : []), ...index.directChildrenByParentId.keys()].map(
+          (id) => [id, true] as const,
+        ),
+      ),
+    [root, index],
+  );
+  let automatic = visitOnly ? visitAutomatic : state.automatic;
+  if (!visitOnly && state.mode !== undefined && !pending) {
     let next: Map<string, boolean> | undefined;
     // The policy governs nested branches; direct replies remain visible.
     // A legacy/manual root collapse remains authoritative until explicit reveal.
@@ -127,21 +213,28 @@ export function useUnreadSidebarThread({
     automatic = next ?? automatic;
   }
   let branches =
-    state.mode === undefined
+    !visitOnly && state.mode === undefined
       ? resolveThreadExpansion(
           state.branches,
           branchIds,
           isUnread && !pending ? new Set(paths.keys()) : null,
         )
       : state.branches;
+  if (freshPaths.size) {
+    const next = new Map(branches);
+    for (const id of freshPaths) next.set(id, true);
+    branches = next;
+  }
   let reveal =
     scrollTargetId === state.reveal.external
       ? state.reveal
-      : {
-          external: scrollTargetId,
-          id: scrollTargetId,
-          handled: false,
-        };
+      : scrollTargetId === null && state.reveal.handled
+        ? { ...state.reveal, external: null }
+        : {
+            external: scrollTargetId,
+            id: scrollTargetId,
+            handled: false,
+          };
   const fulfillReveal = (preferences: ThreadExpansion, request: Reveal) => {
     if (pending || !request.id || request.handled)
       return { branches: preferences, reveal: request };
@@ -151,18 +244,27 @@ export function useUnreadSidebarThread({
       request.id,
     );
     if (!parents) return { branches: preferences, reveal: request };
-    let next: Map<string, boolean> | undefined;
-    for (const parent of parents) {
-      if (preferences.get(parent) === true) continue;
-      next ??= new Map(preferences);
-      next.set(parent, true);
-    }
+    if (
+      request.blocked?.has(request.id) ||
+      [...parents].some((id) => request.blocked?.has(id))
+    )
+      return {
+        branches: preferences,
+        reveal: { ...request, handled: true, ancestors: undefined },
+      };
+    // Programmatic navigation temporarily exposes ancestry in this view only.
+    // It must not overwrite saved collapse choices or broadcast a sibling reveal.
     return {
-      branches: next ?? preferences,
-      reveal: { ...request, handled: true },
+      branches: preferences,
+      reveal: { ...request, handled: true, ancestors: new Set(parents) },
     };
   };
   ({ branches, reveal } = fulfillReveal(branches, reveal));
+  if (localOwnSend.paths.size)
+    reveal = {
+      ...reveal,
+      ancestors: new Set([...(reveal.ancestors ?? []), ...localOwnSend.paths]),
+    };
   const newIds = new Set([...state.newIds, ...unread]);
   const stableNewIds =
     newIds.size === state.newIds.size ? state.newIds : newIds;
@@ -177,13 +279,44 @@ export function useUnreadSidebarThread({
     }),
     [key, branches, automatic, state.mode, stableNewIds, reveal],
   );
+  const withoutRevealedBranches = React.useCallback(
+    (
+      reveal: Reveal,
+      changed: ReadonlySet<string>,
+      cancelRequest = false,
+    ): Reveal => {
+      const ancestors = new Set(
+        [...(reveal.ancestors ?? [])].filter((id) => {
+          if (changed.has(id)) return false;
+          const parents = completeThreadAncestors(index.messageById, root, id);
+          return (
+            !parents || ![...parents].some((parent) => changed.has(parent))
+          );
+        }),
+      );
+      const path = reveal.id
+        ? completeThreadAncestors(index.messageById, root, reveal.id)
+        : null;
+      const relevant =
+        changed.has(root ?? "") ||
+        changed.has(reveal.id ?? "") ||
+        Boolean(path && [...path].some((id) => changed.has(id)));
+      return {
+        ...reveal,
+        handled: cancelRequest || reveal.handled || relevant,
+        ancestors,
+        blocked: new Set([...(reveal.blocked ?? []), ...changed]),
+      };
+    },
+    [index, root],
+  );
   const live = React.useRef(view);
   React.useLayoutEffect(() => {
     live.current = view;
   }, [view]);
   const [preferenceError, setPreferenceError] = React.useState(false);
   React.useEffect(() => {
-    if (!enabled || !key) return;
+    if (!enabled || !key || visitOnly) return;
     const changed = (event: Event) => {
       const change = (event as CustomEvent<ThreadExpansionChange>).detail;
       const current = live.current;
@@ -194,10 +327,22 @@ export function useUnreadSidebarThread({
         current.branches === change.branches
       )
         return;
+      for (const [id, open] of change.branches)
+        if (current.branches.get(id) !== open)
+          localOwnSend.noteManual(id, open);
       const updated = {
         ...current,
         branches: change.branches,
-        reveal: { ...current.reveal, handled: true },
+        reveal: withoutRevealedBranches(
+          current.reveal,
+          new Set(
+            [...change.branches]
+              .filter(
+                ([id, open]) => !open && current.branches.get(id) !== false,
+              )
+              .map(([id]) => id),
+          ),
+        ),
       };
       live.current = updated;
       setSaved(updated);
@@ -205,8 +350,14 @@ export function useUnreadSidebarThread({
     };
     window.addEventListener(THREAD_EXPANSION_CHANGED, changed);
     return () => window.removeEventListener(THREAD_EXPANSION_CHANGED, changed);
-  }, [enabled, key]);
-  React.useEffect(() => {
+  }, [
+    enabled,
+    key,
+    visitOnly,
+    withoutRevealedBranches,
+    localOwnSend.noteManual,
+  ]);
+  React.useLayoutEffect(() => {
     if (!enabled || !key || live.current !== view) return;
     if (
       saved.key === key &&
@@ -217,14 +368,27 @@ export function useUnreadSidebarThread({
     )
       return;
     setSaved(view);
-    if (state.branches !== view.branches)
+    if (!visitOnly && state.branches !== view.branches)
       setPreferenceError(!saveThreadExpansion(key, view.branches));
-  }, [enabled, key, saved.key, state, view]);
+  }, [enabled, key, saved.key, state, view, visitOnly]);
   const expanded = new Set(
     [...new Map([...automatic, ...branches])]
       .filter(([, open]) => open)
       .map(([id]) => id),
   );
+  // Older own replies default open as well. Explicit choices still win;
+  // only a fresh send above supersedes a pre-existing collapsed path once.
+  for (const message of own) {
+    const parents = completeThreadAncestors(
+      index.messageById,
+      root,
+      message.id,
+    );
+    if (parents)
+      for (const id of [...parents, message.id])
+        if (branches.get(id) !== false) expanded.add(id);
+  }
+  for (const id of view.reveal.ancestors ?? []) expanded.add(id);
   if (autoRevealId && !pending) {
     const parents = completeThreadAncestors(
       index.messageById,
@@ -258,20 +422,29 @@ export function useUnreadSidebarThread({
     const updated = { ...current, branches: next, reveal };
     live.current = updated;
     // Persist in the interaction, before navigation or an immediate app close.
-    if (current.key)
+    if (current.key && !visitOnly && current.branches !== next)
       setPreferenceError(!saveThreadExpansion(current.key, next));
     setSaved(updated);
   };
   const setExpanded = (id: string, open: boolean) => {
+    localOwnSend.noteManual(id, open);
     const next = new Map(live.current.branches);
     next.set(id, open);
-    commit(next, { ...live.current.reveal, handled: true });
+    commit(
+      next,
+      withoutRevealedBranches(live.current.reveal, new Set([id]), true),
+    );
   };
   const toggle = (message: TimelineMessage) => {
     const next = new Map(live.current.branches);
-    next.set(message.id, !(next.get(message.id) ?? expanded.has(message.id)));
+    const open = !expanded.has(message.id);
+    localOwnSend.noteManual(message.id, open);
+    next.set(message.id, open);
     // The user's toggle also cancels any older pending automatic reveal.
-    commit(next, { ...live.current.reveal, handled: true });
+    commit(
+      next,
+      withoutRevealedBranches(live.current.reveal, new Set([message.id]), true),
+    );
   };
   const revealMessage = (id: string) => {
     const current = live.current;
@@ -279,10 +452,13 @@ export function useUnreadSidebarThread({
       ...current.reveal,
       id,
       handled: false,
+      blocked: undefined,
     });
     commit(next.branches, next.reveal);
   };
   return {
+    ownSendTargetId: localOwnSend.targetId ?? legacyOwnSendTargetId,
+    captureOwnSendOrigin: localOwnSend.captureOrigin,
     entries,
     expanded,
     newIds: new Set([...view.newIds].filter((id) => index.messageById.has(id))),

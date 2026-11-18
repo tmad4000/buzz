@@ -1,10 +1,19 @@
 import * as React from "react";
 import { cn } from "@/shared/lib/cn";
 import { appBuild, relativeUpdated } from "@/shared/lib/appBuild";
+import { Popover, PopoverTrigger, PopoverContent } from "@/shared/ui/popover";
+import { useOptionalUpdaterContext } from "./hooks/UpdaterProvider";
 
-/** Build provenance in About; activation cannot reach conversation hotkeys. */
-export function AppStamp({ className }: { className?: string }) {
-  const [exact, setExact] = React.useState(false);
+/** Exact provenance is read-only; opening it never installs or restarts. */
+export function AppStamp({
+  className,
+  surface = "settings",
+}: {
+  className?: string;
+  surface?: "settings" | "header";
+}) {
+  const latestCheck =
+    useOptionalUpdaterContext()?.latestCheck ?? "Latest version not verified";
   const [, repaint] = React.useReducer((n) => n + 1, 0);
   React.useEffect(() => {
     const tick = () => {
@@ -17,43 +26,77 @@ export function AppStamp({ className }: { className?: string }) {
       document.removeEventListener("visibilitychange", tick);
     };
   }, []);
-  const iso =
-    appBuild.event === "commit" ? appBuild.commitTime : appBuild.buildTime;
+  const commitDate =
+    appBuild.event === "commit" && relativeUpdated(appBuild.commitTime)
+      ? appBuild.commitTime
+      : "";
+  const iso = commitDate || appBuild.buildTime;
   const relative = relativeUpdated(iso);
-  const detail = relative
-    ? `${new Date(iso).toLocaleString(undefined, { dateStyle: "full", timeStyle: "long" })} · commit ${appBuild.commit.slice(0, 9) || "unavailable"}${appBuild.event === "build" ? " (build time)" : ""}`
-    : "";
+  const exact = relative
+    ? new Date(iso).toLocaleString(undefined, {
+        dateStyle: "full",
+        timeStyle: "long",
+      })
+    : "Unavailable";
   return (
-    <button
-      type="button"
-      data-testid="settings-version"
-      className={cn(
-        "block max-w-full px-2 pb-1 text-left text-2xs text-muted-foreground tabular-nums focus-visible:outline focus-visible:outline-2",
-        className,
-      )}
-      title={detail || undefined}
-      aria-expanded={exact}
-      onClick={(event) => {
-        event.stopPropagation();
-        setExact(!exact);
-      }}
-      onKeyDown={(event) => {
-        if (event.key === "Enter" || event.key === " ") event.stopPropagation();
-      }}
-      onKeyUp={(event) => {
-        if (event.key === "Enter" || event.key === " ") event.stopPropagation();
-      }}
-    >
-      v{appBuild.version}
-      {relative ? (
-        <>
-          {" "}
-          ·{" "}
-          <time dateTime={iso} title={detail}>
-            {exact ? detail : `Updated ${relative}`}
-          </time>
-        </>
-      ) : null}
-    </button>
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          data-testid={`${surface}-version`}
+          className={cn(
+            "min-h-7 max-w-full rounded px-2 text-left text-xs text-muted-foreground tabular-nums focus-visible:ring-2 focus-visible:ring-ring",
+            surface === "header" && "whitespace-nowrap",
+            className,
+          )}
+          onClick={(event) => event.stopPropagation()}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ")
+              event.stopPropagation();
+          }}
+          onKeyUp={(event) => {
+            if (event.key === "Enter" || event.key === " ")
+              event.stopPropagation();
+          }}
+        >
+          {appBuild.version ? `v${appBuild.version}` : "Version unavailable"}
+          {relative ? (
+            <span
+              className={
+                surface === "header" ? "header-version-age" : undefined
+              }
+            >
+              {" "}
+              ·{" "}
+              <time dateTime={iso}>
+                Updated {relative}
+                {!commitDate ? " (build)" : ""}
+              </time>
+            </span>
+          ) : null}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="end"
+        className="max-w-[calc(100vw-2rem)] text-xs"
+        data-testid={`${surface}-provenance`}
+      >
+        <p className="font-medium">
+          {appBuild.version
+            ? `Buzz Ideaflow v${appBuild.version}`
+            : "Version unavailable"}
+        </p>
+        <p className="mt-2">
+          Updated means{" "}
+          {commitDate
+            ? "source commit time"
+            : "build time (source time unavailable)"}
+          , not installation time.
+        </p>
+        <p>{exact}</p>
+        <p className="break-all">Commit: {appBuild.commit || "unavailable"}</p>
+        <p className="mt-2">{latestCheck}</p>
+      </PopoverContent>
+    </Popover>
   );
 }

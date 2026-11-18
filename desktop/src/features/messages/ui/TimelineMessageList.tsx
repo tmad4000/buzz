@@ -1,3 +1,5 @@
+import { useTimelineView } from "@/features/channels/ui/TimelineViewContext";
+import { buildFlatTimelineEntries } from "../lib/flatTimeline";
 import type { ThreadSummaryRenderer } from "./TimelineMessageRow";
 import * as React from "react";
 import { VList } from "virtua";
@@ -38,7 +40,9 @@ import { useVirtualizedBottomSettle } from "./useVirtualizedBottomSettle";
 export type TimelineVirtualizerApi = {
   cancelBottomIntent: () => void;
   scrollToBottom: (behavior?: ScrollBehavior) => void;
-  settleAtBottom: () => void;
+  settleAtBottom: () => boolean;
+  preserveReadingPosition: () => boolean;
+  isBottomPinned: () => boolean;
   scrollToMessage: (
     messageId: string,
     options?: { behavior?: ScrollBehavior },
@@ -69,6 +73,8 @@ type TimelineMessageListProps = {
    *  rows, so without the relay map every summary row unmounts mid-scrollback. */
   threadSummaries?: ReadonlyMap<string, ChannelWindowThreadSummary>;
   messages: TimelineMessage[];
+  /** Current reply evidence for summaries; never changes rendered body membership. */
+  summaryMessages?: TimelineMessage[];
   onDelete?: (message: TimelineMessage) => void;
   onEdit?: (message: TimelineMessage) => void;
   onMarkUnread?: (message: TimelineMessage) => void;
@@ -143,6 +149,7 @@ export const TimelineMessageList = React.memo(function TimelineMessageList({
   messageFooters,
   mainEntries,
   threadSummaries,
+  summaryMessages,
   messages,
   onDelete,
   onEdit,
@@ -174,11 +181,20 @@ export const TimelineMessageList = React.memo(function TimelineMessageList({
   onVirtualizerRangeChanged,
   onVirtualizerScrollerChange,
 }: TimelineMessageListProps) {
+  const { mode } = useTimelineView();
   const entries = React.useMemo(
     () =>
       mainEntries ??
-      buildMainTimelineEntries(messages, undefined, threadSummaries, profiles),
-    [mainEntries, messages, profiles, threadSummaries],
+      (mode === "timeline"
+        ? buildFlatTimelineEntries(messages)
+        : buildMainTimelineEntries(
+            messages,
+            undefined,
+            threadSummaries,
+            profiles,
+            summaryMessages,
+          )),
+    [mainEntries, messages, mode, profiles, threadSummaries, summaryMessages],
   );
   // Contexts are memoized per message id so MessageRow/Markdown memo
   // comparisons hold across unrelated timeline re-renders (typing
@@ -498,8 +514,18 @@ function VirtualizedTimelineRows({
     (version: number) => version + 1,
     0,
   );
-  const { cancel: cancelBottomSettle, settle: settleAtBottom } =
-    useVirtualizedBottomSettle(hostRef, listRef, itemsLengthRef);
+  const {
+    cancel: cancelBottomSettle,
+    settle: jumpToBottom,
+    settleAfterLayout: settleAtBottom,
+    preserveReadingPosition,
+    isBottomPinned,
+  } = useVirtualizedBottomSettle(
+    hostRef,
+    listRef,
+    itemsLengthRef,
+    onAtBottomStateChange,
+  );
   const { arm: armUpwardMomentum } = useUpwardPaginationWheel(
     hostRef,
     cancelBottomSettle,
@@ -646,9 +672,9 @@ function VirtualizedTimelineRows({
     }
     if (!hasInitialPositionedRef.current && items.length > 0) {
       hasInitialPositionedRef.current = true;
-      settleAtBottom();
+      jumpToBottom();
     }
-  }, [isPrepend, items.length, keys, settleAtBottom]);
+  }, [isPrepend, items.length, keys, jumpToBottom]);
 
   const messageItemIndexById = React.useMemo(() => {
     const byId = new Map<string, number>();
@@ -685,9 +711,11 @@ function VirtualizedTimelineRows({
     const api: TimelineVirtualizerApi = {
       cancelBottomIntent: cancelBottomSettle,
       scrollToBottom() {
-        settleAtBottom();
+        jumpToBottom();
       },
       settleAtBottom,
+      preserveReadingPosition,
+      isBottomPinned,
       scrollToMessage(messageId) {
         cancelBottomSettle();
         const index = messageItemIndexByIdRef.current.get(messageId);
@@ -698,7 +726,14 @@ function VirtualizedTimelineRows({
     };
     onVirtualizerApiChange(api);
     return () => onVirtualizerApiChange(null);
-  }, [cancelBottomSettle, onVirtualizerApiChange, settleAtBottom]);
+  }, [
+    cancelBottomSettle,
+    onVirtualizerApiChange,
+    jumpToBottom,
+    settleAtBottom,
+    preserveReadingPosition,
+    isBottomPinned,
+  ]);
 
   React.useLayoutEffect(() => {
     const host = hostRef.current;

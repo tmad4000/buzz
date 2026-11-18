@@ -175,10 +175,19 @@ export type {
   ProjectRepoSyncStatus,
 } from "./projectGitTypes";
 
+/** Local client metadata, never part of a signed relay event. */
+export type LocalSendIntent = {
+  id: string;
+  /** Opaque capture token issued by the originating thread-view visit. */
+  viewInstanceId: string;
+  threadRootId: string | null;
+};
+
 export type RelayEvent = {
   id: string;
   /** Local-only render identity for optimistic events that are later acknowledged. */
   localKey?: string;
+  localSendIntent?: LocalSendIntent;
   pubkey: string;
   created_at: number;
   kind: number;
@@ -189,6 +198,7 @@ export type RelayEvent = {
 };
 
 export type SendChannelMessageResult = {
+  signedEvent?: RelayEvent;
   eventId: string;
   parentEventId: string | null;
   rootEventId: string | null;
@@ -681,6 +691,8 @@ export type RuntimeConfigSurface = {
 
 export type UpdateManagedAgentInput = {
   pubkey: string;
+  expectedRelayUrl?: string;
+  expectedSignerPubkey?: string;
   name?: string;
   model?: string | null;
   provider?: string | null;

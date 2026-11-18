@@ -1,3 +1,4 @@
+import { AgentRuntimeCard } from "@/features/agent-runtime/AgentRuntimeCard";
 import * as React from "react";
 import { isRelayRemovedError } from "@/features/agents/managedAgentRelayCleanup";
 import { toast } from "sonner";
@@ -782,6 +783,9 @@ export function UserProfilePanel({
       )}
       data-testid="user-profile-scroll-body"
     >
+      {view === "summary" && isBot && effectivePubkey ? (
+        <AgentRuntimeCard pubkey={effectivePubkey} />
+      ) : null}
       {view === "summary" ? (
         <ProfileSummaryView
           canAddToChannel={managedAgent !== undefined && isOwner === true}

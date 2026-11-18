@@ -53,6 +53,7 @@ function load(name, stubs) {
     {
       exports,
       AbortController,
+      queueMicrotask,
       Error,
       Map,
       Set,
@@ -88,6 +89,7 @@ export async function setup({ lifecycle = false } = {}) {
     },
   };
   const stubs = {
+    "../outbox/errors": { OutboxRemovedError: class extends Error {} },
     react: React,
     "@/features/messages/lib/useDrafts": draftStore,
     sonner: { toast: { error: (error) => calls.push(["error", error]) } },

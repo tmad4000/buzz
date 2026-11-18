@@ -1,3 +1,6 @@
+import { getThreadReference } from "./threading";
+import { dedupeMessagesById } from "./messageQueryKeys";
+import { reconcileIncomingMessage } from "./messageMerge";
 import {
   formatTimelineMessages,
   isTimelineContentEvent,
@@ -50,6 +53,60 @@ function headAuxEventsFromChannelWindow(
   return [...directAux, ...deletionsOfAux];
 }
 
+/** Inline threads admit durable rows without changing legacy query ownership. */
+export function mergeOwnInlineThreadLocalEvents(
+  channelEvents: RelayEvent[],
+  replyEvents: RelayEvent[],
+  rootId: string,
+  currentPubkey?: string,
+) {
+  return mergeOwnThreadLocalEvents(
+    channelEvents.filter(
+      (event) =>
+        event.localKey?.startsWith("outbox-local:") ||
+        event.localKey?.startsWith("outbox:") ||
+        event.localSendIntent != null,
+    ),
+    replyEvents,
+    rootId,
+    currentPubkey,
+  );
+}
+
+/** Reuse the channel cache's owned local echoes in independently fetched views. */
+export function mergeOwnThreadLocalEvents(
+  channelEvents: RelayEvent[],
+  replyEvents: RelayEvent[],
+  rootId: string,
+  currentPubkey?: string,
+) {
+  const replies = dedupeMessagesById(replyEvents);
+  const replyEventIds = new Set(replies.map((event) => event.id));
+  const ownLocal = channelEvents.filter((event) => {
+    if ((!event.pending && !event.localKey) || event.pubkey !== currentPubkey)
+      return false;
+    const ref = getThreadReference(event.tags);
+    return (
+      ref.rootId === rootId ||
+      ref.parentId === rootId ||
+      (ref.parentId !== null && replyEventIds.has(ref.parentId))
+    );
+  });
+  let remaining = ownLocal;
+  const canonical = replies.map((event) => {
+    // A query/live receipt may arrive before the publication ACK callback.
+    // Match its stable client ID as well as its eventual signed event ID.
+    const reconciled = reconcileIncomingMessage(remaining, event);
+    const incoming = reconciled.at(-1);
+    remaining = reconciled.slice(0, -1);
+    return incoming ?? event;
+  });
+  return [
+    ...canonical,
+    ...remaining.filter((event) => !replyEventIds.has(event.id)),
+  ];
+}
+
 export function buildIndependentThreadPanel(
   channelEvents: RelayEvent[],
   replyEvents: RelayEvent[],
@@ -73,7 +130,13 @@ export function buildIndependentThreadPanel(
         (event) => !replyEventIds.has(event.id),
       )
     : [];
-  const events = head ? [head, ...headAux, ...replyEvents] : replyEvents;
+  const replies = mergeOwnThreadLocalEvents(
+    channelEvents,
+    replyEvents,
+    rootId,
+    formatArgs[1],
+  );
+  const events = head ? [head, ...headAux, ...replies] : replies;
   const messages = formatTimelineMessages(events, ...formatArgs);
   return {
     ...buildThreadPanelData(messages, rootId, replyTargetId, expandedReplyIds),

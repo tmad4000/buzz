@@ -1,9 +1,753 @@
+import { waitForMockChannelHeadReady } from "../helpers/channelHeadReady";
 import { expect, test } from "@playwright/test";
 import fs from "node:fs";
 import { installMockBridge, TEST_IDENTITIES } from "../helpers/bridge";
 
 const shots =
   process.env.BUZZ_INLINE_SCREENSHOTS ?? "test-results/inline-threads";
+test("held durable inline publish preserves queue height, anchor and real nested Reply hit testing", async ({
+  page,
+}, info) => {
+  await installMockBridge(page);
+  await page.goto("/");
+  await page.getByTestId("channel-general").click();
+  await waitForMockChannelHeadReady(
+    page,
+    "general",
+    "9a1657ac-f7aa-5db0-b632-d8bbeb6dfb50",
+  );
+  await page.keyboard.press("ControlOrMeta+,");
+  await page.getByTestId("settings-nav-appearance").click();
+  await page.getByTestId("thread-display-channels-collapsed").click();
+  await page.getByTestId("thread-display-replies-expanded").click();
+  await page.getByTestId("settings-back-to-app").click();
+  await page.getByTestId("channel-random").click();
+  await page.getByTestId("channel-general").click();
+  await waitForMockChannelHeadReady(
+    page,
+    "general",
+    "9a1657ac-f7aa-5db0-b632-d8bbeb6dfb50",
+  );
+  const root = "f1".repeat(32),
+    child = "f2".repeat(32),
+    other = "f3".repeat(32);
+  await page.evaluate(
+    ({ root, child, other, pubkey }) => {
+      const emit = window.__BUZZ_E2E_EMIT_MOCK_MESSAGE__;
+      if (!emit) throw new Error("Missing mock emitter");
+      const createdAt = Math.floor(Date.now() / 1000) + 30;
+      const messages: [string, string, string?][] = [
+        [root, "Held inline root", undefined],
+        [child, "Held inline nested target", root],
+        ["f4".repeat(32), "Existing nested reply", child],
+        [other, "Independent panel root", undefined],
+        ["f5".repeat(32), "Independent panel reply", other],
+      ];
+      messages.forEach(([id, content, parentEventId], index) => {
+        emit({
+          id,
+          content,
+          parentEventId,
+          pubkey,
+          channelName: "general",
+          createdAt: createdAt + index,
+        });
+      });
+    },
+    { root, child, other, pubkey: TEST_IDENTITIES.bob.pubkey },
+  );
+  const inline = page.locator(
+    `[data-testid="inline-thread"][data-thread-head-id="${root}"]`,
+  );
+  await page
+    .locator(
+      `[data-testid="message-thread-summary"][data-thread-head-id="${root}"]`,
+    )
+    .click();
+  await expect(inline).toContainText("Existing nested reply");
+  await page
+    .locator(
+      `[data-testid="open-thread-side-panel"][data-thread-head-id="${other}"]`,
+    )
+    .click();
+  const editor = inline.getByTestId("message-input");
+  await editor.fill("Held pending inline reply");
+  await page.evaluate(() => window.__BUZZ_E2E_HOLD_OUTBOX_PUBLISH__?.(true));
+  try {
+    await inline.getByTestId("send-message").click();
+    await expect
+      .poll(() =>
+        page.evaluate(() => window.__BUZZ_E2E_HELD_OUTBOX_PUBLISHES__?.()),
+      )
+      .toBe(1);
+    await expect(editor).toBeEmpty();
+    const queued = inline
+      .getByRole("article", { name: "Queued message" })
+      .filter({
+        has: page.getByText("Held pending inline reply", { exact: true }),
+      });
+    await expect(queued).toHaveCount(1);
+    await expect(queued).toBeVisible();
+    const queueId = await queued.getAttribute("data-outbox-id");
+    if (!queueId) throw new Error("Missing durable queue identity");
+    const cardBefore = await queued.boundingBox();
+    if (!cardBefore) throw new Error("Missing visible pending card box");
+    const statusBefore = await queued.getByRole("status").innerText();
+    const progressBefore = await queued
+      .getByRole("progressbar")
+      .evaluateAll((elements) =>
+        elements.map((element) => element.getAttribute("aria-valuenow")),
+      );
+    const target = inline.locator(`[data-message-id="${child}"]`);
+    const composer = inline.getByTestId("message-composer");
+    await expect(composer).toHaveJSProperty("tagName", "FORM");
+    const composerFooter = composer.locator("xpath=ancestor::footer[1]");
+    await expect(composerFooter).toHaveCount(1);
+    await expect(composer).toHaveAttribute("data-compact", "true");
+    const nestedToggle = inline.locator(
+      `[data-testid="inline-branch-toggle"][data-thread-head-id="${child}"]`,
+    );
+    await expect(nestedToggle).toHaveAttribute("aria-expanded", "true");
+    await expect(
+      inline.getByText("Existing nested reply", { exact: true }),
+    ).toBeVisible();
+    const rowIdsBefore = await inline
+      .locator('[data-testid="message-row"][data-message-id]')
+      .evaluateAll((rows) =>
+        rows.map((row) => row.getAttribute("data-message-id")),
+      );
+    await target.hover();
+    const before = await target.boundingBox();
+    if (!before) throw new Error("Missing visible nested Reply target");
+    const beforeInline = await inline.boundingBox();
+    if (!beforeInline) throw new Error("Missing inline layout box");
+    const height = beforeInline.height;
+    const composerBefore = await composer.boundingBox();
+    const footerBefore = await composerFooter.boundingBox();
+    if (!composerBefore || !footerBefore)
+      throw new Error("Missing compact composer form or owning footer box");
+    const timeline = page.getByTestId("message-timeline");
+    const estimates = Number(
+      await timeline.getAttribute("data-virtua-estimate-call-count"),
+    );
+    const scroll = await timeline.evaluate((element) => element.scrollTop);
+    // A real pointer click must succeed while delivery and the queue row are held.
+    await inline.getByTestId(`reply-message-${child}`).click({ timeout: 5000 });
+    await expect(composer).toHaveAttribute("data-compact", "false");
+    await expect(inline.getByTestId("reply-target")).toContainText(
+      "Held inline nested target",
+    );
+    await expect(nestedToggle).toHaveAttribute("aria-expanded", "true");
+    await expect(
+      inline.getByText("Existing nested reply", { exact: true }),
+    ).toBeVisible();
+    await expect(queued).toBeVisible();
+    await expect
+      .poll(() =>
+        page.evaluate(() => window.__BUZZ_E2E_HELD_OUTBOX_PUBLISHES__?.()),
+      )
+      .toBe(1);
+    const samples = await target.evaluate(async (element, queueId) => {
+      const scroller = element.closest('[data-testid="message-timeline"]');
+      if (!(scroller instanceof HTMLElement))
+        throw new Error("Missing timeline owner");
+      const rows = [];
+      for (let frame = 0; frame < 12; frame++) {
+        await new Promise<void>((resolve) =>
+          requestAnimationFrame(() => resolve()),
+        );
+        const card = document.querySelector(`[data-outbox-id="${queueId}"]`);
+        if (!(card instanceof HTMLElement))
+          throw new Error("Held pending card disappeared");
+        rows.push({
+          cardHeight: card.getBoundingClientRect().height,
+          cardTop: card.getBoundingClientRect().top,
+          status: card.querySelector('[role="status"]')?.textContent?.trim(),
+          progress: [...card.querySelectorAll('[role="progressbar"]')].map(
+            (progress) => progress.getAttribute("aria-valuenow"),
+          ),
+          top: element.getBoundingClientRect().top,
+          scrollTop: scroller.scrollTop,
+          estimateCalls: Number(scroller.dataset.virtuaEstimateCallCount),
+        });
+      }
+      return rows;
+    }, queueId);
+    const afterInline = await inline.boundingBox();
+    const composerAfter = await composer.boundingBox();
+    const footerAfter = await composerFooter.boundingBox();
+    if (!afterInline || !composerAfter || !footerAfter)
+      throw new Error(
+        "Inline, composer form or owning footer disappeared during click",
+      );
+    const inlineDelta = afterInline.height - height;
+    const composerDelta = composerAfter.height - composerBefore.height;
+    const footerDelta = footerAfter.height - footerBefore.height;
+    const rowIdsAfter = await inline
+      .locator('[data-testid="message-row"][data-message-id]')
+      .evaluateAll((rows) =>
+        rows.map((row) => row.getAttribute("data-message-id")),
+      );
+    await info.attach("held-inline-layout-samples", {
+      body: JSON.stringify({
+        before,
+        height,
+        estimates,
+        scroll,
+        queueId,
+        cardBefore,
+        statusBefore,
+        progressBefore,
+        composerBefore,
+        composerAfter,
+        footerBefore,
+        footerAfter,
+        inlineDelta,
+        composerDelta,
+        footerDelta,
+        rowIdsBefore,
+        rowIdsAfter,
+        samples,
+      }),
+      contentType: "application/json",
+    });
+    expect(
+      Math.max(...samples.map((row) => row.top)) -
+        Math.min(...samples.map((row) => row.top)),
+    ).toBeLessThanOrEqual(1);
+    expect(
+      Math.max(...samples.map((row) => row.scrollTop)) -
+        Math.min(...samples.map((row) => row.scrollTop)),
+    ).toBeLessThanOrEqual(1);
+    expect(samples.at(-1)?.estimateCalls).toBe(samples[0].estimateCalls);
+    for (const sample of samples) {
+      expect(
+        Math.abs(sample.cardHeight - cardBefore.height),
+      ).toBeLessThanOrEqual(1);
+      expect(Math.abs(sample.cardTop - cardBefore.y)).toBeLessThanOrEqual(1);
+      expect(sample.status).toBe(statusBefore.trim());
+      expect(sample.progress).toEqual(progressBefore);
+    }
+    // The banner is a sibling before the form, inside this same owning footer.
+    // Only that footer may grow; the existing nested branch stays unchanged.
+    expect(rowIdsAfter).toEqual(rowIdsBefore);
+    expect(composerDelta).toBeGreaterThan(0);
+    expect(footerDelta).toBeGreaterThan(0);
+    expect(Math.abs(inlineDelta - footerDelta)).toBeLessThanOrEqual(2);
+    expect(
+      Math.abs(samples[samples.length - 1].top - before.y),
+    ).toBeLessThanOrEqual(1);
+    expect(
+      Math.abs(samples[samples.length - 1].scrollTop - scroll),
+    ).toBeLessThanOrEqual(1);
+    expect(
+      await page.evaluate(() =>
+        window.__BUZZ_E2E_HOLD_OUTBOX_PUBLISH__?.(false),
+      ),
+    ).toBe(1);
+    const pendingBody = inline
+      .getByTestId("message-body")
+      .filter({ hasText: /^Held pending inline reply$/ });
+    await expect(pendingBody).toBeVisible();
+    await expect(queued).toHaveCount(0);
+    await editor.fill("Nested send after held publish");
+    await inline.getByTestId("send-message").click();
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          (window.__BUZZ_E2E_COMMAND_PAYLOADS__ ?? [])
+            .filter((call) => call.command === "publish_queued_message")
+            .map(
+              (call) =>
+                (call.payload as { event: { tags: string[][] } }).event.tags,
+            ),
+        ),
+      )
+      .toContainEqual(
+        expect.arrayContaining([
+          ["e", root, "", "root"],
+          ["e", child, "", "reply"],
+        ]),
+      );
+    await expect(page.getByTestId("message-thread-panel")).toContainText(
+      "Independent panel root",
+    );
+  } finally {
+    await page.evaluate(() => window.__BUZZ_E2E_HOLD_OUTBOX_PUBLISH__?.(false));
+  }
+});
+
+test("incoming replies above and below a scrolled reader preserve anchor, focused draft and exact caret", async ({
+  page,
+}, info) => {
+  await installMockBridge(page);
+  await page.goto("/");
+  await page.getByTestId("channel-general").click();
+  await waitForMockChannelHeadReady(
+    page,
+    "general",
+    "9a1657ac-f7aa-5db0-b632-d8bbeb6dfb50",
+  );
+  await page.keyboard.press("ControlOrMeta+,");
+  await page.getByTestId("settings-nav-appearance").click();
+  await page.getByTestId("thread-display-channels-smart").click();
+  await page.getByTestId("thread-display-replies-expanded").click();
+  await page.getByTestId("settings-back-to-app").click();
+  await page.getByTestId("channel-random").click();
+  await page.getByTestId("channel-general").click();
+  await waitForMockChannelHeadReady(
+    page,
+    "general",
+    "9a1657ac-f7aa-5db0-b632-d8bbeb6dfb50",
+  );
+  await page
+    .getByRole("combobox", { name: "Order", exact: true })
+    .selectOption("threads");
+  await expect(
+    page.getByRole("combobox", { name: "Order", exact: true }),
+  ).toHaveValue("threads");
+  const ids = {
+    closed: "e1".repeat(32),
+    above: "e2".repeat(32),
+    anchor: "e3".repeat(32),
+    below: "e4".repeat(32),
+  };
+  await page.evaluate(
+    ({ ids, pubkey }) => {
+      const emit = window.__BUZZ_E2E_EMIT_MOCK_MESSAGE__;
+      if (!emit) throw new Error("Missing mock emitter");
+      const createdAt = Math.floor(Date.now() / 1000) + 30;
+      emit({
+        id: ids.closed,
+        content: "Quiet thread above reader",
+        pubkey,
+        createdAt,
+        channelName: "general",
+      });
+      emit({
+        id: ids.above,
+        content: "Expanded above reader",
+        pubkey,
+        createdAt: createdAt + 1,
+        channelName: "general",
+      });
+      emit({
+        id: "e5".repeat(32),
+        parentEventId: ids.above,
+        content: "Existing above reply",
+        pubkey,
+        createdAt: createdAt + 2,
+        channelName: "general",
+      });
+      // Leave a full reading gap above the app-centered navigation target.
+      for (let index = 0; index < 10; index++) {
+        emit({
+          id: (8800 + index).toString(16).padStart(64, "0"),
+          content: `Earlier spacer row ${index}`,
+          pubkey,
+          createdAt: createdAt + 3 + index,
+          channelName: "general",
+        });
+      }
+      emit({
+        id: ids.anchor,
+        content: "Reader anchor message",
+        pubkey,
+        createdAt: createdAt + 13,
+        channelName: "general",
+      });
+      for (let index = 0; index < 18; index++)
+        emit({
+          id: (9000 + index).toString(16).padStart(64, "0"),
+          content: `Middle reading row ${index}`,
+          pubkey,
+          createdAt: createdAt + 14 + index,
+          channelName: "general",
+        });
+      emit({
+        id: ids.below,
+        content: "Expanded below reader",
+        pubkey,
+        createdAt: createdAt + 32,
+        channelName: "general",
+      });
+      emit({
+        id: "e6".repeat(32),
+        parentEventId: ids.below,
+        content: "Existing below reply",
+        pubkey,
+        createdAt: createdAt + 33,
+        channelName: "general",
+      });
+      for (let index = 0; index < 17; index++)
+        emit({
+          id: (10000 + index).toString(16).padStart(64, "0"),
+          content: `Later reading row ${index}`,
+          pubkey,
+          createdAt: createdAt + 34 + index,
+          channelName: "general",
+        });
+    },
+    { ids, pubkey: TEST_IDENTITIES.bob.pubkey },
+  );
+  const timeline = page.getByTestId("message-timeline");
+  const anchor = timeline.locator(
+    `[data-testid="message-row"][data-message-id="${ids.anchor}"]`,
+  );
+  const aboveInline = timeline.locator(
+    `[data-testid="inline-thread"][data-thread-head-id="${ids.above}"]`,
+  );
+  const belowInline = timeline.locator(
+    `[data-testid="inline-thread"][data-thread-head-id="${ids.below}"]`,
+  );
+  // Wait for the whole seeded snapshot and both inline query bodies, not just
+  // the early anchor row while the deferred list is still chasing its floor.
+  const lastSeedId = (10000 + 16).toString(16).padStart(64, "0");
+  await expect(
+    timeline.locator(`[data-message-id="${lastSeedId}"]`),
+  ).toHaveCount(1);
+  await expect(anchor).toHaveCount(1);
+  await expect(aboveInline).toContainText("Existing above reply");
+  await expect(belowInline).toContainText("Existing below reply");
+  const expectedOrder = [ids.closed, ids.above, ids.anchor, ids.below];
+  const captureFixtureOrder = () =>
+    timeline.evaluate((container, fixtureIds) => {
+      const rows = [
+        ...container.querySelectorAll<HTMLElement>(
+          '[data-testid="message-row"][data-message-id]',
+        ),
+      ];
+      const selected = rows.filter((row) =>
+        fixtureIds.includes(row.dataset.messageId ?? ""),
+      );
+      return {
+        order: selected.map((row) => row.dataset.messageId),
+        positions: selected.map((row) => ({
+          id: row.dataset.messageId,
+          top: row.getBoundingClientRect().top,
+          bottom: row.getBoundingClientRect().bottom,
+        })),
+        scrollTop: container.scrollTop,
+        scrollHeight: container.scrollHeight,
+        clientHeight: container.clientHeight,
+      };
+    }, expectedOrder);
+  const orderBeforePosition = await captureFixtureOrder();
+  await info.attach("incoming-fixture-order-before-position", {
+    body: JSON.stringify(orderBeforePosition),
+    contentType: "application/json",
+  });
+  expect(orderBeforePosition.order).toEqual(expectedOrder);
+  type SetupSample = {
+    frame: number;
+    top: number;
+    scrollTop: number;
+    scrollHeight: number;
+    clientHeight: number;
+    estimateCalls: number;
+  };
+  const setupSamples: {
+    phase: string;
+    stable: boolean;
+    reason: string;
+    samples: SetupSample[];
+  }[] = [];
+  const waitForStableLayout = async (phase: string) => {
+    const result = await timeline.evaluate(async (container, anchorId) => {
+      const samples: SetupSample[] = [];
+      const deadline = performance.now() + 5000;
+      // A finite frame and wall-clock bound prevents setup from hiding churn.
+      for (let frame = 0; frame < 48; frame++) {
+        const arrived = await new Promise<boolean>((resolve) => {
+          let handle = 0;
+          const timer = window.setTimeout(
+            () => {
+              cancelAnimationFrame(handle);
+              resolve(false);
+            },
+            Math.max(1, deadline - performance.now()),
+          );
+          handle = requestAnimationFrame(() => {
+            window.clearTimeout(timer);
+            resolve(true);
+          });
+        });
+        if (!arrived)
+          return { stable: false, reason: "RAF wall cap reached", samples };
+        const row = container.querySelector<HTMLElement>(
+          `[data-testid="message-row"][data-message-id="${anchorId}"]`,
+        );
+        if (!row)
+          return {
+            stable: false,
+            reason: "anchor left mounted window",
+            samples,
+          };
+        const estimateCalls = Number(container.dataset.virtuaEstimateCallCount);
+        if (!Number.isFinite(estimateCalls))
+          return {
+            stable: false,
+            reason: "missing Virtua estimate counter",
+            samples,
+          };
+        samples.push({
+          frame,
+          top: row.getBoundingClientRect().top,
+          scrollTop: container.scrollTop,
+          scrollHeight: container.scrollHeight,
+          clientHeight: container.clientHeight,
+          estimateCalls,
+        });
+        const recent = samples.slice(-4);
+        if (
+          recent.length === 4 &&
+          (["top", "scrollTop", "scrollHeight", "clientHeight"] as const).every(
+            (key) =>
+              Math.max(...recent.map((sample) => sample[key])) -
+                Math.min(...recent.map((sample) => sample[key])) <=
+              1,
+          ) &&
+          recent.every(
+            (sample) => sample.estimateCalls === recent[0].estimateCalls,
+          )
+        ) {
+          return {
+            stable: true,
+            reason: "four consecutive stable RAF samples",
+            samples,
+          };
+        }
+      }
+      return {
+        stable: false,
+        reason: "did not settle within 48 RAF samples",
+        samples,
+      };
+    }, ids.anchor);
+    setupSamples.push({ phase, ...result });
+    await info.attach(`incoming-setup-${phase}`, {
+      body: JSON.stringify(result),
+      contentType: "application/json",
+    });
+    expect(result.stable, `Reader fixture ${phase}: ${result.reason}`).toBe(
+      true,
+    );
+    return result;
+  };
+  await waitForStableLayout("seeded");
+  // Use the existing real search-result action so navigation preserves this
+  // live view and realizes/centers the row through the shared message jump.
+  // No direct scroll writes, route mutation, or private hook reset.
+  await page.keyboard.press("ControlOrMeta+f");
+  await page.getByTestId("search-dialog-input").fill("Reader anchor message");
+  const anchorSearchResult = page
+    .getByTestId("search-results")
+    .getByRole("option")
+    .filter({ hasText: "Reader anchor message" });
+  await expect(anchorSearchResult).toHaveCount(1);
+  await expect(anchorSearchResult).toBeVisible();
+  await anchorSearchResult.click();
+  await expect(page.getByTestId("search-dialog-input")).toBeHidden();
+  const captureJumpPlacement = () =>
+    anchor.evaluate((element) => {
+      const scroller = element.closest('[data-testid="message-timeline"]');
+      if (!(scroller instanceof HTMLElement))
+        throw new Error("Missing scroll owner");
+      const row = element.getBoundingClientRect();
+      const viewport = scroller.getBoundingClientRect();
+      return {
+        top: row.top - viewport.top,
+        bottom: row.bottom - viewport.top,
+        viewportHeight: scroller.clientHeight,
+        center: (row.top + row.bottom) / 2 - viewport.top,
+      };
+    });
+  // Navigation centers within the app's visible region, which excludes its
+  // chrome/padding. Require a fully visible target in the viewport's middle
+  // third, then capture its settled offset instead of inventing an exact center.
+  await expect
+    .poll(
+      async () => {
+        const placement = await captureJumpPlacement();
+        return (
+          placement.top >= 0 &&
+          placement.bottom <= placement.viewportHeight &&
+          placement.center >= placement.viewportHeight / 3 &&
+          placement.center <= (placement.viewportHeight * 2) / 3
+        );
+      },
+      { timeout: 5000 },
+    )
+    .toBe(true);
+  await waitForStableLayout("app-jump");
+  const jumpPlacement = await captureJumpPlacement();
+  await info.attach("incoming-app-jump-placement", {
+    body: JSON.stringify(jumpPlacement),
+    contentType: "application/json",
+  });
+  expect(jumpPlacement.top).toBeGreaterThanOrEqual(0);
+  expect(jumpPlacement.bottom).toBeLessThanOrEqual(
+    jumpPlacement.viewportHeight,
+  );
+  expect(jumpPlacement.center).toBeGreaterThanOrEqual(
+    jumpPlacement.viewportHeight / 3,
+  );
+  expect(jumpPlacement.center).toBeLessThanOrEqual(
+    (jumpPlacement.viewportHeight * 2) / 3,
+  );
+  const orderAfterPosition = await captureFixtureOrder();
+  expect(orderAfterPosition.order).toEqual(expectedOrder);
+  const assertOffscreenBaseline = async () => {
+    const viewport = await timeline.boundingBox();
+    const aboveBox = await aboveInline.boundingBox();
+    const belowBox = await belowInline.boundingBox();
+    if (!viewport || !aboveBox || !belowBox)
+      throw new Error("Missing above/below reading geometry");
+    expect(aboveBox.y + aboveBox.height).toBeLessThanOrEqual(viewport.y);
+    expect(belowBox.y).toBeGreaterThanOrEqual(viewport.y + viewport.height);
+    const bottomGap = await timeline.evaluate(
+      (element) =>
+        element.scrollHeight - element.scrollTop - element.clientHeight,
+    );
+    expect(bottomGap).toBeGreaterThan(32);
+    return { viewport, aboveBox, belowBox, bottomGap };
+  };
+  await assertOffscreenBaseline();
+  const main = page
+    .getByTestId("message-composer")
+    .filter({ has: page.getByTestId("send-to-thread") });
+  const editor = main.getByTestId("message-input");
+  const draft = "Keep this exact draft and middle caret";
+  await editor.fill(draft);
+  await editor.evaluate((element) => {
+    element.focus();
+    const node = document
+      .createTreeWalker(element, NodeFilter.SHOW_TEXT)
+      .nextNode();
+    if (!node) throw new Error("Missing authored text node");
+    const range = document.createRange();
+    range.setStart(node, 7);
+    range.collapse(true);
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+  });
+  await waitForStableLayout("focused");
+  const baselineBoxes = await assertOffscreenBaseline();
+  const readingAnchor = await timeline.evaluate((container) => {
+    const viewport = container.getBoundingClientRect();
+    const rows = [
+      ...container.querySelectorAll<HTMLElement>(
+        '[data-testid="message-row"][data-message-id]',
+      ),
+    ]
+      .filter((row) => {
+        const rect = row.getBoundingClientRect();
+        return rect.bottom > viewport.top && rect.top < viewport.bottom;
+      })
+      .sort(
+        (a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top,
+      );
+    return rows[0]?.dataset.messageId;
+  });
+  if (!readingAnchor) throw new Error("Missing first visible reading anchor");
+  const capture = () =>
+    editor.evaluate((element, anchorId) => {
+      const row = document.querySelector(
+        `[data-testid="message-row"][data-message-id="${anchorId}"]`,
+      );
+      const scroller = row?.closest('[data-testid="message-timeline"]');
+      if (!(row instanceof HTMLElement) || !(scroller instanceof HTMLElement))
+        throw new Error("Reading anchor left the mounted window");
+      const selection = window.getSelection();
+      return {
+        top: row.getBoundingClientRect().top,
+        scrollTop: scroller.scrollTop,
+        focused: document.activeElement === element,
+        text: element.textContent,
+        anchorText: selection?.anchorNode?.textContent,
+        anchorOffset: selection?.anchorOffset,
+        focusText: selection?.focusNode?.textContent,
+        focusOffset: selection?.focusOffset,
+        collapsed: selection?.isCollapsed,
+      };
+    }, readingAnchor);
+  const before = await capture();
+  expect(before.focused).toBe(true);
+  expect(before.text).toBe(draft);
+  expect(before.anchorOffset).toBe(7);
+  expect(before.collapsed).toBe(true);
+  const snapshots = [];
+  for (const [index, parent] of [ids.above, ids.below, ids.closed].entries()) {
+    const arrivalBoxes = await assertOffscreenBaseline();
+    const beforeArrival = await capture();
+    await page.evaluate(
+      ({ parent, index, pubkey }) =>
+        window.__BUZZ_E2E_EMIT_MOCK_MESSAGE__?.({
+          id: (11000 + index).toString(16).padStart(64, "0"),
+          parentEventId: parent,
+          content: `Incoming scoped reply ${index}`,
+          pubkey,
+          createdAt: Math.floor(Date.now() / 1000) + 100 + index,
+          channelName: "general",
+        }),
+      { parent, index, pubkey: TEST_IDENTITIES.bob.pubkey },
+    );
+    const summary = timeline.locator(
+      `[data-testid="message-thread-summary"][data-thread-head-id="${parent}"]`,
+    );
+    await expect(summary).toHaveAttribute("data-unseen", "true");
+    await expect(summary).toContainText(
+      parent === ids.closed ? "1 reply" : "2 replies",
+    );
+    // Check visual anchoring, not raw scrollTop: height growth above may require exact compensation.
+    for (let frame = 0; frame < 12; frame++) {
+      await page.evaluate(
+        () =>
+          new Promise<void>((resolve) =>
+            requestAnimationFrame(() => resolve()),
+          ),
+      );
+      const current = await capture();
+      snapshots.push({ parent, arrivalBoxes, ...current });
+      expect(Math.abs(current.top - before.top)).toBeLessThanOrEqual(1);
+      if (parent !== ids.above) {
+        expect(
+          Math.abs(current.scrollTop - beforeArrival.scrollTop),
+        ).toBeLessThanOrEqual(1);
+      }
+      expect({
+        ...current,
+        top: before.top,
+        scrollTop: before.scrollTop,
+      }).toEqual(before);
+    }
+  }
+  const closedSummary = timeline.locator(
+    `[data-testid="message-thread-summary"][data-thread-head-id="${ids.closed}"]`,
+  );
+  await expect(closedSummary).toHaveAttribute("aria-expanded", "false");
+  await expect(closedSummary).toContainText("1 new");
+  await expect(
+    timeline.locator(
+      `[data-testid="inline-thread"][data-thread-head-id="${ids.closed}"]`,
+    ),
+  ).toHaveCount(0);
+  await info.attach("incoming-reader-anchor-and-selection", {
+    body: JSON.stringify({
+      before,
+      baselineBoxes,
+      readingAnchor,
+      snapshots,
+      orderBeforePosition,
+      orderAfterPosition,
+      jumpPlacement,
+      setupSamples,
+    }),
+    contentType: "application/json",
+  });
+});
+
 test("inline replies, scoped sends, saved expansion and side panel coexist", async ({
   page,
 }) => {
@@ -28,6 +772,11 @@ test("inline replies, scoped sends, saved expansion and side panel coexist", asy
         ),
       )
       .toBe(true);
+    await waitForMockChannelHeadReady(
+      page,
+      "general",
+      "9a1657ac-f7aa-5db0-b632-d8bbeb6dfb50",
+    );
   };
   await page.goto("/");
   await ready();
@@ -135,7 +884,7 @@ test("inline replies, scoped sends, saved expansion and side panel coexist", asy
 
   // The same inline path can create the first reply, without opening a panel.
   await toggle(fresh.id).click();
-  await expect(inline(fresh.id)).toContainText("No replies yet.");
+  await expect(inline(fresh.id)).not.toContainText("No replies yet.");
   await inline(fresh.id)
     .getByTestId("message-input")
     .fill("First reply from the channel");
@@ -207,6 +956,11 @@ test("large inline threads reveal bounded batches", async ({ page }) => {
       ),
     )
     .toBe(true);
+  await waitForMockChannelHeadReady(
+    page,
+    "general",
+    "9a1657ac-f7aa-5db0-b632-d8bbeb6dfb50",
+  );
   const rootId = (3000).toString(16).padStart(64, "0");
   await page.evaluate(
     ({ rootId, pubkey }) => {
@@ -270,6 +1024,11 @@ test("inline channel rows retain search match and active result highlighting", a
       ),
     )
     .toBe(true);
+  await waitForMockChannelHeadReady(
+    page,
+    "general",
+    "9a1657ac-f7aa-5db0-b632-d8bbeb6dfb50",
+  );
   const needle = "InlineSearchNeedle";
   const root = await page.evaluate(
     (content) =>

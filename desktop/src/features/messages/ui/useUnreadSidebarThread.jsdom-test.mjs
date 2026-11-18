@@ -253,3 +253,329 @@ test("a suspended scope render cannot redirect the committed thread's toggle", a
   );
   await app.close();
 });
+
+test("own defaults do not mistake historical hydration for a send; pending reveal survives ack/read and later collapse wins", async () => {
+  localStorage.clear();
+  const app = mount();
+  const older = { ...msg("older", "branch"), pubkey: "identity-a" };
+  const options = {
+    ...base,
+    initialMode: "collapsed",
+    isUnread: () => false,
+    complete: false,
+  };
+  await app.render({ ...options, messages: [...messages, older] });
+  assert.ok(
+    latest.expanded.has("branch"),
+    "older own reply defaults open despite collapsed automatic policy",
+  );
+  await act(() => latest.setExpanded("root", false));
+  const historical = {
+    ...msg("history", "branch"),
+    pubkey: "identity-a",
+    createdAt: 0,
+  };
+  await app.render({ ...options, messages: [...messages, older, historical] });
+  assert.equal(
+    latest.expanded.has("root"),
+    false,
+    "history load cannot override explicit collapse",
+  );
+  const pending = {
+    ...msg("optimistic-1", "branch"),
+    renderKey: "local-1",
+    pubkey: "identity-a",
+    pending: true,
+  };
+  await app.render({
+    ...options,
+    messages: [...messages, older, historical, pending],
+  });
+  assert.ok(
+    latest.entries.some((e) => e.message.id === pending.id),
+    "actual local pending send exposes collapsed ancestor path",
+  );
+  const ack = { ...pending, id: "ack-1", pending: false };
+  await app.render({
+    ...options,
+    messages: [...messages, older, historical, ack],
+    isUnread: () => true,
+  });
+  await app.render({
+    ...options,
+    messages: [...messages, older, historical, ack],
+    isUnread: () => false,
+    complete: true,
+  });
+  assert.ok(
+    latest.entries.some((e) => e.message.id === ack.id),
+    "ack and read changes retain body visibility",
+  );
+  await act(() => latest.setExpanded("root", false));
+  await app.render({
+    ...options,
+    messages: [...messages, older, historical, ack],
+  });
+  assert.equal(
+    latest.expanded.has("root"),
+    false,
+    "later manual collapse is never replayed over",
+  );
+  await app.close();
+});
+
+test("explicit navigation reveals only this view and preserves saved collapsed ancestry", async () => {
+  localStorage.clear();
+  const views = {};
+  function Host({ id, target = null, loaded = true, pending = false }) {
+    views[id] = useUnreadSidebarThread({
+      ...base,
+      messages: [
+        ...messages.filter((message) => loaded || message.id !== "leaf"),
+        msg("other", "root"),
+        msg("other-leaf", "other"),
+      ],
+      pending,
+      isUnread: () => false,
+      scrollTargetId: target,
+    });
+    return null;
+  }
+  const containers = [
+    document.createElement("div"),
+    document.createElement("div"),
+  ];
+  containers.forEach((node) => {
+    document.body.append(node);
+  });
+  const roots = containers.map((node) => createRoot(node));
+  const render = (index, target = null, loaded = true, pending = false) =>
+    act(async () =>
+      roots[index].render(
+        React.createElement(Host, { id: index, target, loaded, pending }),
+      ),
+    );
+  await render(0);
+  await render(1);
+  const before = JSON.stringify({ ...localStorage });
+  const sibling = [...views[1].expanded];
+  await render(0, "leaf");
+  assert.ok(views[0].expanded.has("root"));
+  assert.ok(views[0].expanded.has("branch"));
+  assert.deepEqual(
+    [...views[1].expanded],
+    sibling,
+    "sibling receives no preference/reveal broadcast",
+  );
+  assert.equal(
+    JSON.stringify({ ...localStorage }),
+    before,
+    "navigation does not overwrite saved collapse",
+  );
+  await act(async () => views[1].setExpanded("other", true));
+  assert.ok(
+    views[0].expanded.has("branch"),
+    "unrelated sibling preference change retains local reveal",
+  );
+  await render(0);
+  assert.ok(
+    views[0].expanded.has("branch"),
+    "resolving scroll target keeps the local reveal open for reading",
+  );
+  await act(async () => views[0].toggle(messages[1]));
+  assert.equal(
+    views[0].expanded.has("branch"),
+    false,
+    "explicit collapse wins over transient reveal",
+  );
+  assert.ok(
+    views[0].expanded.has("root"),
+    "nested toggle must not collapse untouched transient ancestor",
+  );
+  await act(async () => roots[0].unmount());
+  roots[0] = createRoot(containers[0]);
+  await render(0);
+  assert.equal(
+    views[0].expanded.has("branch"),
+    false,
+    "new view restores saved collapse",
+  );
+  await act(async () => views[1].setExpanded("other", false));
+  await render(0, "leaf", false, true);
+  await act(async () => views[1].setExpanded("other", true));
+  await render(0, "leaf", true, false);
+  assert.ok(
+    views[0].expanded.has("branch"),
+    "unrelated sibling preferences do not cancel a pending reveal before history arrives",
+  );
+  await render(0);
+  await act(async () => views[1].setExpanded("root", true));
+  await render(0, "leaf", false, true);
+  await act(async () => views[1].setExpanded("root", false));
+  await render(0, "leaf", true, false);
+  assert.equal(
+    views[0].expanded.has("root"),
+    false,
+    "explicit sibling collapse cancels a pending related reveal",
+  );
+  await render(0);
+  await act(async () => views[1].setExpanded("branch", true));
+  await render(0, "leaf", false, true);
+  await act(async () => views[1].setExpanded("branch", false));
+  await render(0, "leaf", true, false);
+  assert.equal(
+    views[0].expanded.has("branch"),
+    false,
+    "late ancestry resolution honors a collapse received while the path was unknown",
+  );
+  await act(async () =>
+    roots.forEach((root) => {
+      root.unmount();
+    }),
+  );
+  containers.forEach((node) => {
+    node.remove();
+  });
+});
+
+const durable = (
+  origin,
+  {
+    id = "outbox-local:uuid-one",
+    local = "uuid-one",
+    pending = true,
+    body = "queued",
+    parent = "branch",
+  } = {},
+) => ({
+  ...msg(id, parent),
+  pubkey: "identity-a",
+  body,
+  pending,
+  renderKey: `outbox-local:${local}`,
+  localSendIntent: { id: local, ...origin },
+});
+test("durable intent exposes only its originating view, once through pending/ACK/refetch and later manual collapse", async () => {
+  localStorage.clear();
+  const app = mount();
+  const props = { ...base, isUnread: () => false, initialMode: "smart" };
+  await app.render(props);
+  await act(() => latest.setExpanded("root", false));
+  const origin = latest.captureOwnSendOrigin();
+  assert.ok(origin);
+  const pending = durable(origin);
+  await app.render({ ...props, messages: [...messages, pending] });
+  assert.ok(latest.expanded.has("root"));
+  assert.ok(latest.expanded.has("branch"));
+  assert.equal(latest.ownSendTargetId, pending.id);
+  assert.equal(
+    latest.remembered.get("root"),
+    false,
+    "reveal must not erase saved collapse",
+  );
+  await act(() => latest.setExpanded("branch", false));
+  const accepted = {
+    ...pending,
+    id: "accepted",
+    pending: false,
+    body: "authoritative attachment URL body",
+  };
+  await app.render({ ...props, messages: [...messages, accepted] });
+  assert.equal(latest.expanded.has("branch"), false);
+  assert.equal(latest.ownSendTargetId, "accepted");
+  await app.render({
+    ...props,
+    messages: [...messages, { ...accepted }],
+    isUnread: () => true,
+  });
+  assert.equal(
+    latest.expanded.has("branch"),
+    false,
+    "read/refetch cannot spend intent again",
+  );
+  await app.close();
+  const restored = mount();
+  await restored.render({ ...props, messages: [...messages, pending] });
+  assert.equal(
+    latest.expanded.has("root"),
+    false,
+    "persisted pending hydration is never a fresh send",
+  );
+  await restored.close();
+});
+test("fast durable ACK before first paint still reveals; identical text has distinct intent identities", async () => {
+  localStorage.clear();
+  const app = mount();
+  const props = { ...base, isUnread: () => false, initialMode: "smart" };
+  await app.render(props);
+  await act(() => latest.setExpanded("root", false));
+  const firstOrigin = latest.captureOwnSendOrigin(),
+    secondOrigin = latest.captureOwnSendOrigin();
+  const a = durable(firstOrigin, {
+    id: "accepted-a",
+    local: "one",
+    pending: false,
+    body: "same text",
+  });
+  const b = durable(secondOrigin, {
+    id: "accepted-b",
+    local: "two",
+    pending: false,
+    body: "same text",
+  });
+  await app.render({ ...props, messages: [...messages, a, b] });
+  assert.ok(latest.expanded.has("root"));
+  assert.ok(latest.expanded.has("branch"));
+  assert.equal(latest.ownSendTargetId, b.id);
+  await act(() => latest.setExpanded("root", false));
+  await app.render({ ...props, messages: [...messages, { ...a }, { ...b }] });
+  assert.equal(latest.expanded.has("root"), false);
+  await app.close();
+});
+test("manual collapse after capture wins even before durable admission; unknown ancestry waits and unrelated toggles don't cancel", async () => {
+  localStorage.clear();
+  const app = mount();
+  const props = { ...base, isUnread: () => false, initialMode: "smart" };
+  await app.render(props);
+  const blocked = latest.captureOwnSendOrigin();
+  await act(() => latest.setExpanded("root", false));
+  await app.render({ ...props, messages: [...messages, durable(blocked)] });
+  assert.equal(latest.expanded.has("root"), false);
+  const waiting = latest.captureOwnSendOrigin();
+  const child = durable(waiting, {
+    id: "late-ack",
+    local: "later",
+    pending: false,
+    parent: "missing-parent",
+  });
+  await app.render({ ...props, messages: [...messages, child] });
+  assert.equal(latest.expanded.has("root"), false);
+  await act(() => latest.setExpanded("unrelated", false));
+  await app.render({
+    ...props,
+    messages: [...messages, msg("missing-parent", "branch"), child],
+  });
+  assert.ok(latest.expanded.has("root"));
+  assert.ok(latest.expanded.has("missing-parent"));
+  await app.close();
+});
+test("unrelated view/history cannot acquire an intent and retired captured origin cannot reveal a new scope", async () => {
+  localStorage.clear();
+  const app = mount();
+  const props = { ...base, isUnread: () => false, initialMode: "smart" };
+  await app.render(props);
+  await act(() => latest.setExpanded("root", false));
+  const origin = latest.captureOwnSendOrigin();
+  const foreign = durable({ ...origin, viewInstanceId: "another-view" });
+  await app.render({ ...props, messages: [...messages, foreign] });
+  assert.equal(latest.expanded.has("root"), false);
+  const capture = latest.captureOwnSendOrigin;
+  await app.render({
+    ...props,
+    channelId: "other-channel",
+    messages: [...messages, durable(origin)],
+  });
+  assert.equal(capture(), undefined, "retired view cannot mint fresh origins");
+  assert.equal(latest.ownSendTargetId, undefined);
+  await app.close();
+});

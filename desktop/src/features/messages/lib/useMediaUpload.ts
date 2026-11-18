@@ -8,7 +8,6 @@ import {
 import { uploadMediaFile } from "@/shared/api/tauriMedia";
 import type { QueuedMediaAttachment } from "./backgroundMediaUploadStore";
 import { applyImetaUpdate, compactImetaSlots } from "./imetaSlots";
-import { isVoiceNoteFile } from "./audioAttachment";
 import { useFilePicker } from "./useFilePicker";
 import { isVideoFile, videoMimeForFile } from "./videoFileType";
 
@@ -154,7 +153,7 @@ async function captureVideoPosterFrame(
 }
 
 type UseMediaUploadOptions = {
-  /** Keep newly selected videos local until the message is submitted. */
+  /** Keep newly selected files local until the message is durably queued. */
   deferUploadsUntilSend?: boolean;
 };
 
@@ -170,8 +169,7 @@ export function useMediaUpload({
     deferUploadsUntilSend &&
     (!e2eConfig || e2eConfig.mock?.deferredComposerUploads === true);
   const shouldQueueFile = React.useCallback(
-    (file: File) =>
-      queueUntilSend && (isVideoFile(file) || isVoiceNoteFile(file)),
+    (_file: File) => queueUntilSend,
     [queueUntilSend],
   );
   const [uploadState, setUploadState] = React.useState<UploadState>({
@@ -331,7 +329,12 @@ export function useMediaUpload({
             if (poster) updateQueuedVideoPoster(id, poster.posterUrl);
           });
         }
-        return { file, id, previewUrl, spoilered: false };
+        return {
+          file,
+          id,
+          previewUrl,
+          spoilered: false,
+        };
       });
 
       setQueuedAttachmentsState((current) => [...current, ...attachments]);
@@ -622,13 +625,18 @@ export function useMediaUpload({
   );
 
   const openFilePicker = useFilePicker();
+  const [isPicking, setIsPicking] = React.useState(false);
 
   const handlePaperclip = React.useCallback(async () => {
     if (queueUntilSend) {
-      openFilePicker({ multiple: true }, (files) => {
-        queueFiles(files.filter(shouldQueueFile));
-        uploadFiles(files.filter((file) => !shouldQueueFile(file)));
-      });
+      setIsPicking(true);
+      openFilePicker(
+        { multiple: true, onSettled: () => setIsPicking(false) },
+        (files) => {
+          queueFiles(files.filter(shouldQueueFile));
+          uploadFiles(files.filter((file) => !shouldQueueFile(file)));
+        },
+      );
       return;
     }
 
@@ -887,15 +895,9 @@ export function useMediaUpload({
     [beginNewDraftEpoch],
   );
 
-  /**
-   * True while any attachment upload is in flight.
-   *
-   * Send paths must gate on this: with `deferUploadsUntilSend`, videos and
-   * audio are queued locally, so an in-flight photo/file is in neither
-   * `pendingImeta` nor `queuedAttachments`. Sending mid-flight would publish
-   * the message without that attachment and land the descriptor in an
-   * already-cleared composer.
-   */
+  /** Eager replacements (for example image edits) still gate Send until
+   * their descriptor exists. Deferred files live in queuedAttachments and
+   * transfer to the durable outbox on submission. */
   const isUploading = uploadingCount > 0;
   const queuedPreviews = React.useMemo<UploadingAttachmentPreview[]>(
     () =>
@@ -919,6 +921,7 @@ export function useMediaUpload({
       handleDrop,
       handlePaperclip,
       handlePaste,
+      isPicking,
       isDragOver,
       isUploading,
       originalUrlByUrl,
@@ -949,6 +952,7 @@ export function useMediaUpload({
       handleDrop,
       handlePaperclip,
       handlePaste,
+      isPicking,
       isDragOver,
       isUploading,
       originalUrlByUrl,

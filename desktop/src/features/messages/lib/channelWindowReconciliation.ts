@@ -50,8 +50,27 @@ export function reconcileChannelWindowMessages(
   // to its relay acknowledgement while the relay row remains in its original
   // cursor position.
   let cacheOnly = retained;
+  const presentationById = new Map(
+    messages
+      .filter((event) => event.localKey || event.localSendIntent)
+      .map((event) => [event.id, event]),
+  );
   const authoritative = windowEvents.map((event) => {
-    const reconciled = reconcileIncomingMessage(cacheOnly, event);
+    const local = presentationById.get(event.id);
+    const canonical =
+      local && local.pubkey.toLowerCase() === event.pubkey.toLowerCase()
+        ? {
+            ...event,
+            localKey: event.localKey ?? local.localKey,
+            ...((event.localSendIntent ?? local.localSendIntent)
+              ? {
+                  localSendIntent:
+                    event.localSendIntent ?? local.localSendIntent,
+                }
+              : {}),
+          }
+        : event;
+    const reconciled = reconcileIncomingMessage(cacheOnly, canonical);
     const incoming = reconciled.at(-1);
     cacheOnly = reconciled.slice(0, -1);
     return incoming ?? event;

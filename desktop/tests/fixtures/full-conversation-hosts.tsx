@@ -1,3 +1,4 @@
+import { installOutboxFixture, OutboxFixtureProvider } from "./outbox-hosts";
 // Test fixture only: real ChannelScreen/ChannelPane/composer hooks over the
 // existing mock IPC bridge. No relay, native build or production account.
 import * as React from "react";
@@ -50,26 +51,33 @@ localStorage.setItem("buzz-communities", JSON.stringify([community]));
 localStorage.setItem("buzz-active-community-id", community.id);
 window.__BUZZ_E2E__ = {
   mode: "mock",
-  mock: new URLSearchParams(location.search).has("routing")
-    ? {
-        sendMessageDelayMs: 1200,
-        deferredComposerUploads: true,
-        uploadDescriptors: [
-          {
-            url: `https://mock.relay/media/${"a".repeat(64)}.pdf`,
-            sha256: "a".repeat(64),
-            size: 15,
-            type: "application/pdf",
-            uploaded: Math.floor(Date.now() / 1000),
-            filename: "routing-receipt.pdf",
-          },
-        ],
-      }
-    : undefined,
+  mock:
+    new URLSearchParams(location.search).has("routing") ||
+    new URLSearchParams(location.search).has("outbox")
+      ? {
+          sendMessageDelayMs: new URLSearchParams(location.search).has(
+            "routing",
+          )
+            ? 6000
+            : 1200,
+          deferredComposerUploads: true,
+          uploadDescriptors: [
+            {
+              url: `https://mock.relay/media/${"a".repeat(64)}.pdf`,
+              sha256: "a".repeat(64),
+              size: 15,
+              type: "application/pdf",
+              uploaded: Math.floor(Date.now() / 1000),
+              filename: "routing-receipt.pdf",
+            },
+          ],
+        }
+      : undefined,
 };
 const pageHost = new URLSearchParams(location.search).get("pageHost");
 const { maybeInstallE2eTauriMocks } = await import("@/testing/e2eBridge");
 maybeInstallE2eTauriMocks();
+installOutboxFixture();
 const identity: Identity = await getIdentity();
 const general: Channel | undefined = (await getChannels(null)).channels?.find(
   (value) => value.name === "general",
@@ -212,6 +220,7 @@ function Screen() {
       ...fallback,
       registerContextParents: read.registerContextParents,
       readStateVersion: read.readStateVersion,
+      threadReplySeenReady: read.isReady,
       getChannelReadAt: read.getEffectiveTimestamp,
       getMessageReadAt: (id: string) => read.getEffectiveTimestamp(`msg:${id}`),
       markChannelRead: (id: string, at?: string | null) => {
@@ -226,6 +235,7 @@ function Screen() {
       read.readStateVersion,
       read.getEffectiveTimestamp,
       read.seedContextRead,
+      read.isReady,
     ],
   );
   return (
@@ -302,7 +312,9 @@ if (root)
               <PoofBurstProvider>
                 <UpdaterProvider>
                   <HuddleProvider ownsAudioSession={false}>
-                    <RouterProvider router={router} />
+                    <OutboxFixtureProvider signerPubkey={identity.pubkey}>
+                      <RouterProvider router={router} />
+                    </OutboxFixtureProvider>
                   </HuddleProvider>
                 </UpdaterProvider>
               </PoofBurstProvider>

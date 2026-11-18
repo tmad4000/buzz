@@ -1,3 +1,7 @@
+import {
+  AgentRuntimeHost,
+  AgentRuntimeRowAction,
+} from "@/features/agent-runtime/AgentRuntimeRow";
 import type * as React from "react";
 import { BellOff, ChevronDown, CircleDot, X } from "lucide-react";
 
@@ -19,6 +23,7 @@ import {
   ProfileAvatarWithStatus,
   scaleProfileAvatarStatusGeometry,
 } from "@/features/profile/ui/ProfileAvatarWithStatus";
+import type { ChannelSection } from "@/features/sidebar/lib/useChannelSections";
 import type { Channel, PresenceStatus } from "@/shared/api/types";
 import { cn } from "@/shared/lib/cn";
 import { useNow } from "@/shared/lib/useNow";
@@ -264,6 +269,12 @@ export function ChannelMenuButton({
   presenceStatus?: PresenceStatus;
   onSelectChannel: (channelId: string) => void;
 }) {
+  const agentParticipant =
+    dmParticipants?.length === 1 &&
+    dmParticipants[0]?.isAgent &&
+    channel.participantPubkeys.includes(dmParticipants[0].pubkey)
+      ? dmParticipants[0].pubkey
+      : undefined;
   const resolvedLabel = label ?? channel.name;
   const ephemeralDisplay = getEphemeralChannelDisplay(channel);
   const { hasSidebarUnreadProjections, unreadThreadChannelIds } = useAppShell();
@@ -326,6 +337,7 @@ export function ChannelMenuButton({
           />
         ) : null}
       </span>
+      <AgentRuntimeHost pubkey={agentParticipant} />
       {showsEphemeralBadge && ephemeralDisplay ? (
         <EphemeralChannelBadge
           display={ephemeralDisplay}
@@ -363,13 +375,21 @@ export function ChannelMenuButton({
   );
 
   if (!activeWorking && !hasThreadUnread) {
-    return button;
+    return (
+      <>
+        {button}
+        <AgentRuntimeRowAction pubkey={agentParticipant} />
+      </>
+    );
   }
 
   return (
-    <ChannelActivityPopover activeWorking={activeWorking} channel={channel}>
-      {button}
-    </ChannelActivityPopover>
+    <>
+      <ChannelActivityPopover activeWorking={activeWorking} channel={channel}>
+        {button}
+      </ChannelActivityPopover>
+      <AgentRuntimeRowAction pubkey={agentParticipant} />
+    </>
   );
 }
 
@@ -397,6 +417,11 @@ export function SidebarSection({
   onMuteChannel,
   onUnmuteChannel,
   sectionActionsOpen,
+  sections,
+  assignments,
+  onAssignChannel,
+  onUnassignChannel,
+  onCreateSectionForChannel,
 }: {
   action?: React.ReactNode;
   activeWorkingByChannelId?: ReadonlyMap<string, ActiveChannelTurnSummary>;
@@ -424,6 +449,11 @@ export function SidebarSection({
   onMuteChannel?: (channelId: string) => void;
   onUnmuteChannel?: (channelId: string) => void;
   sectionActionsOpen?: boolean;
+  sections?: ChannelSection[];
+  assignments?: Record<string, string>;
+  onAssignChannel?: (channelId: string, sectionId: string) => void;
+  onUnassignChannel?: (channelId: string) => void;
+  onCreateSectionForChannel?: (channelId: string) => void;
 }) {
   if (items.length === 0 && !action && !emptyState) {
     return null;
@@ -532,6 +562,11 @@ export function SidebarSection({
                     <ContextMenuContent>
                       <ChannelContextMenuItems
                         channel={channel}
+                        sections={sections}
+                        assignments={assignments}
+                        onAssignChannel={onAssignChannel}
+                        onUnassignChannel={onUnassignChannel}
+                        onCreateSectionForChannel={onCreateSectionForChannel}
                         hasUnread={unreadChannelIds.has(channel.id)}
                         isMuted={mutedChannelIds?.has(channel.id)}
                         onMarkChannelRead={onMarkChannelRead}

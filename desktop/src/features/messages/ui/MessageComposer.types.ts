@@ -85,6 +85,7 @@ export type MessageComposerProps = {
   onCaptureSendContext?: () => {
     parentEventId: string | null;
     threadHeadId: string | null;
+    localSendOrigin?: Omit<import("@/shared/api/types").LocalSendIntent, "id">;
   } | null;
   onPrepareSendChannel?: (pubkeys?: string[]) => Promise<string | null>;
   onPreparingMentionSendChange?: (isPreparing: boolean) => void;
@@ -96,10 +97,19 @@ export type MessageComposerProps = {
     threadContext?: {
       parentEventId: string | null;
       threadHeadId: string | null;
+      localSendOrigin?: Omit<
+        import("@/shared/api/types").LocalSendIntent,
+        "id"
+      >;
     } | null,
     /** Route through the REST publisher even when best-effort enrichment settled empty. */
     forceRest?: boolean,
-  ) => Promise<void>;
+    outbox?: import("../outbox/types").OutboxSubmission,
+  ) => Promise<void | { id: string }>;
+  /** Presentation only: keep the mounted editor compact while empty and fully blurred. */
+  compactWhenEmpty?: boolean;
+  /** Persistent editor name, independent of its visual placeholder. */
+  accessibleLabel?: string;
   placeholder?: string;
   profiles?: UserProfileLookup;
   /** Explicit mention pubkeys from the loaded channel window, newest first. */
@@ -112,8 +122,13 @@ export type MessageComposerProps = {
   showTopBorder?: boolean;
   /** Render the app-wide upload queue above this composer dock. */
   showBackgroundUploadProgress?: boolean;
+  showOutboxRows?: boolean;
   toolbarExtraActions?: ReactNode;
   /** Loaded roots from this pane only; enables explicit routing beside Send. */
+  /** Capture an origin-bound observer before the routed-send pipeline awaits. */
+  onCaptureRoutedSend?: (
+    rootId: string,
+  ) => ((messageId?: string) => void) | undefined;
   threadRoutingEntries?: readonly import("../lib/threadPanel").MainTimelineEntry[];
   typingParentEventId?: string | null;
   typingRootEventId?: string | null;

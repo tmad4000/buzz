@@ -66,15 +66,19 @@ export type ComposerDraftOwner = {
 };
 
 export type PendingNonMemberMentionSend = {
+  /** Observer captured at submission; called only after publisher acceptance. */
+  onPublished?: (messageId?: string) => void;
   sourceOwner: ComposerDraftOwner;
   composerRevision: number;
   invitationSignal?: AbortSignal;
   addressedAgentPubkeys: string[];
   inlineAgentMentionPubkeys: string[];
+  outboxScope?: { relayUrl: string; signerPubkey: string };
   capturedChannelId: string | null;
   capturedThreadContext: {
     parentEventId: string | null;
     threadHeadId: string | null;
+    localSendOrigin?: Omit<import("@/shared/api/types").LocalSendIntent, "id">;
   } | null;
   trimmed: string;
   mentionPubkeys: string[];
@@ -99,6 +103,7 @@ export type PendingNonMemberMentionSend = {
 };
 
 export type SendMessageWithMentionFlowInput = {
+  onPublished?: (messageId?: string) => void;
   addressedAgentPubkeys?: readonly string[];
   capturedChannelId: string | null;
   capturedThreadContext?: PendingNonMemberMentionSend["capturedThreadContext"];
