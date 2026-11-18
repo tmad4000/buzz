@@ -1,0 +1,7 @@
+{
+  "extends": "../tsconfig.json",
+  "include": ["../src", "./**/*.ts", "./**/*.tsx"],
+  "exclude": ["./vite.config.ts"],
+  "compilerOptions": { "types": ["vite/client"] },
+  "references": []
+}

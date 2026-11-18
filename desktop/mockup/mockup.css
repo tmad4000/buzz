@@ -1,0 +1,46 @@
+@reference "../src/shared/styles/globals.css";
+
+[data-mockup-page-expanded] {
+  display: none;
+}
+[data-mockup-scenario="side-agents"] aside[data-testid="idle-auxiliary-panel"]:has(section[aria-label="Channel Page"]) {
+  width: 56% !important;
+  max-width: none !important;
+}
+[data-mockup-scenario="side-agents"] aside[data-testid="idle-auxiliary-panel"] aside[data-testid="idle-auxiliary-panel"] {
+  width: 100% !important;
+}
+[data-mockup-scenario="side-agents"] :has(> aside[data-testid="idle-auxiliary-panel"]) {
+  > [data-testid="channel-drop-zone"] {
+    display: none;
+  }
+  > [data-testid="thread-surface"] > aside {
+    width: 44% !important;
+    max-width: none !important;
+  }
+}
+[data-mockup-scenario="side-agents"] :has(> aside[data-testid="idle-auxiliary-panel"] [data-mockup-page-expanded="true"]) {
+  > [data-testid="thread-surface"] {
+    display: none;
+  }
+  > aside[data-testid="idle-auxiliary-panel"] {
+    width: 100% !important;
+  }
+}
+.buzz-mockup-chip {
+  @apply inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-xs text-foreground;
+}
+.buzz-mockup-option {
+  @apply w-full rounded-md px-2 py-2 text-left text-sm text-foreground outline-none hover:bg-accent focus-visible:bg-accent;
+}
+.buzz-mockup-option[data-active="true"] {
+  @apply bg-accent;
+}
+[data-mockup-scenario="annotations"] [data-testid="channel-drop-zone"]:has(~ [data-testid="thread-surface"]) {
+  display: none;
+}
+[data-mockup-scenario="annotations"] [data-testid="thread-surface"] > aside[data-testid="message-thread-panel"] {
+  width: auto !important;
+  max-width: none !important;
+  flex: 1 1 0;
+}
