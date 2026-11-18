@@ -1,4 +1,5 @@
 import * as React from "react";
+import type { ScrollPositionLayout } from "./scrollPositionOwnership";
 
 import { observeElementBlockSize } from "@/shared/layout/observeElementBlockSize";
 
@@ -27,6 +28,7 @@ export function useComposerHeightPadding(
   resetKey?: unknown,
   mode: "padding" | "css-variable" = "padding",
   settleAtBottom?: () => boolean,
+  layoutOwner?: ScrollPositionLayout,
 ) {
   const settleAtBottomRef = React.useRef(settleAtBottom);
   settleAtBottomRef.current = settleAtBottom;
@@ -52,6 +54,8 @@ export function useComposerHeightPadding(
           ) ?? scrollEl)
         : scrollEl;
 
+    let mounted = true;
+    let deferredHeight: number | null = null;
     let lastPadding: number | null = null;
     let followBottomFrame: number | null = null;
 
@@ -70,11 +74,18 @@ export function useComposerHeightPadding(
     };
 
     const followBottom = () => {
+      if (!mounted || layoutOwner?.blocked()) return;
       const target = getScrollElement();
       target.scrollTop = target.scrollHeight;
     };
 
     const applyPadding = (height: number) => {
+      if (!mounted) return;
+      if (layoutOwner?.blocked()) {
+        deferredHeight = height;
+        return;
+      }
+      deferredHeight = null;
       const padding = Math.ceil(height);
       if (lastPadding !== null && Math.abs(padding - lastPadding) <= 1) {
         return;
@@ -116,18 +127,30 @@ export function useComposerHeightPadding(
       }
     };
 
+    const unsubscribe = layoutOwner?.subscribe(() => {
+      if (
+        mounted &&
+        layoutOwner &&
+        !layoutOwner.blocked() &&
+        deferredHeight !== null
+      )
+        applyPadding(deferredHeight);
+    });
     const disconnect = observeElementBlockSize(composerEl, applyPadding);
 
     return () => {
+      mounted = false;
+      unsubscribe?.();
       disconnect();
       if (followBottomFrame !== null) {
         cancelAnimationFrame(followBottomFrame);
       }
+      if (layoutOwner?.blocked()) return;
       if (mode === "css-variable") {
         cssVariableTarget.style.removeProperty("--composer-overlay-height");
       } else {
         scrollEl.style.paddingBottom = "";
       }
     };
-  }, [scrollContainerRef, composerRef, mode, resetKey]);
+  }, [scrollContainerRef, composerRef, mode, resetKey, layoutOwner]);
 }

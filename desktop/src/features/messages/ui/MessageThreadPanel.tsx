@@ -1,5 +1,9 @@
+import { useThreadPendingJump } from "./useThreadPendingJump";
 import { useThreadReplyRenderItems } from "./useThreadReplyRenderItems";
-import { useThreadReadingCapture } from "./useThreadReadingCapture";
+import {
+  useThreadReadingScroll,
+  useThreadReadingVisit,
+} from "./useThreadReadingScroll";
 import { useAppShell } from "@/app/AppShellContext";
 import { useSidebarOpening } from "./useSidebarOpening";
 import type { EarlierReplyRun } from "./sidebarOpeningPolicy";
@@ -57,9 +61,7 @@ import { MessageThreadSummaryRow } from "./MessageThreadSummaryRow";
 import { ThreadReplyRegion } from "./MessageThreadReplyState";
 import { TypingIndicatorRow } from "./TypingIndicatorRow";
 import { UnreadDivider } from "./UnreadDivider";
-import { useComposerHeightPadding } from "./useComposerHeightPadding";
 import { useStableSendToChannel } from "./useStableSendToChannel";
-import { useAnchoredScroll } from "./useAnchoredScroll";
 import { selectDeferredListRenderState } from "@/features/messages/lib/timelineSnapshot";
 import { selectThreadRowHighlight } from "@/features/messages/lib/threadReplyHighlight";
 
@@ -241,6 +243,11 @@ export function MessageThreadPanel({
   >(null);
   const isOverlay = useIsThreadPanelOverlay();
   const threadHeadId = threadHead?.id ?? null;
+  const reading = useThreadReadingVisit(
+    threadHeadId,
+    isFocusMode,
+    !isHuddleTranscript,
+  );
   useEscapeKey(
     onClose,
     !isHuddleTranscript && (isOverlay || isSinglePanelView || isFocusMode),
@@ -396,7 +403,8 @@ export function MessageThreadPanel({
   const effectiveReplies = hasStoredDisclosure
     ? runProjection.entries
     : threadReplies;
-  const initialPositionTarget = scrollTargetId ?? opening.openingTarget;
+  const initialPositionTarget =
+    scrollTargetId ?? (reading.saved ? null : opening.openingTarget);
   const rowWindow = useThreadRowWindow(
     effectiveReplies,
     `${channelId}:${currentPubkey}:${threadHeadId}`,
@@ -508,64 +516,53 @@ export function MessageThreadPanel({
     threadRepliesPending ||
     !opening.readyToPosition ||
     repliesRenderState === "pending";
-  const {
-    isAtBottom,
-    newMessageCount,
-    onScroll,
-    scrollToBottom,
-    settleAtBottomAfterLayout,
-  } = useAnchoredScroll({
-    channelId: threadHeadId,
-    contentRef: threadContentRef,
-    isLoading: threadViewportPending,
-    messages: threadMessages,
-    highlightTargetMessage: scrollTargetHighlights,
-    onTargetReached: () => {
-      opening.positionDone();
-      if (scrollTargetId) onScrollTargetResolved();
-    },
-    onTargetSettled: onScrollTargetSettled,
-    pinTargetCentered: !scrollTargetHighlights,
-    scrollContainerRef: threadBodyRef,
-    targetMessageId: initialPositionTarget,
-  });
-  useComposerHeightPadding(
-    threadBodyRef,
-    threadComposerWrapperRef,
-    isSinglePanelView,
-    "padding",
-    settleAtBottomAfterLayout,
-  );
-  useThreadReadingCapture({
-    threadHeadId,
-    isFocusMode,
-    threadBodyRef,
-    threadMessages,
-    ready: !isHuddleTranscript && !threadViewportPending,
-  });
+  const { isAtBottom, newMessageCount, onScroll, scrollToBottom } =
+    useThreadReadingScroll(
+      {
+        channelId: threadHeadId,
+        contentRef: threadContentRef,
+        isLoading: threadViewportPending,
+        messages: threadMessages,
+        highlightTargetMessage: scrollTargetHighlights,
+        onTargetReached: () => {
+          opening.positionDone();
+          if (scrollTargetId) onScrollTargetResolved();
+        },
+        onTargetSettled: onScrollTargetSettled,
+        pinTargetCentered: !scrollTargetHighlights,
+        scrollContainerRef: threadBodyRef,
+        targetMessageId: initialPositionTarget,
+      },
+      {
+        reading,
+        projectedEntries: effectiveReplies,
+        ensureVisible: rowWindow.ensureVisible,
+        explicitTargetKey:
+          scrollTargetId ??
+          searchMessageId ??
+          (pendingJump?.root === threadHeadId ? pendingJump.id : null) ??
+          sidebar.ownSendTargetId ??
+          null,
+        ready: !isHuddleTranscript && !threadViewportPending,
+        composerRef: threadComposerWrapperRef,
+        paddingResetKey: isSinglePanelView,
+      },
+    );
   const stableSendToChannel = useStableSendToChannel(
     channelId,
     threadHead,
     onSendToChannel,
   );
-  // biome-ignore lint/correctness/useExhaustiveDependencies: committed/deferred rows trigger a retry until the revealed target exists in the DOM.
-  React.useLayoutEffect(() => {
-    if (!pendingJump || pendingJump.root !== threadHeadId) return;
-    const row = threadBodyRef.current?.querySelector<HTMLElement>(
-      `[data-message-id="${CSS.escape(pendingJump.id)}"]`,
-    );
-    if (row) {
-      row.scrollIntoView({ block: "center", behavior: "smooth" });
-      setPendingJump(null);
-    }
-  }, [
+  useThreadPendingJump({
     pendingJump,
-    threadHeadId,
-    deferredThreadReplies,
-    isThreadHeadRepliesCollapsed,
-    threadRepliesPending,
-    threadRepliesError,
-  ]);
+    root: threadHeadId,
+    container: threadBodyRef,
+    rows: deferredThreadReplies,
+    collapsed: isThreadHeadRepliesCollapsed,
+    pending: threadRepliesPending,
+    error: threadRepliesError,
+    resolved: () => setPendingJump(null),
+  });
   if (!threadHead) {
     return null;
   }

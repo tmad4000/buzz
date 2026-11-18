@@ -2,6 +2,7 @@ import * as React from "react";
 import {
   createScrollPositionOwnership,
   type ScrollPositionLease,
+  type ScrollPositionLayout,
 } from "./scrollPositionOwnership";
 
 import { classifyTimelineMessageDelta } from "@/features/messages/lib/timelineSnapshot";
@@ -71,6 +72,7 @@ type UseAnchoredScrollResult = {
   /** Yield automatic positioning until the external restore releases its lease.
    * The caller must check lease.current before every asynchronous scroll write. */
   beginReadingRestore: () => ScrollPositionLease | null;
+  readingLayout: ScrollPositionLayout;
   /** Pass through to the scroll container's `onScroll`. */
   onScroll: () => void;
   /** True when the user is within `AT_BOTTOM_THRESHOLD_PX` of the bottom. */
@@ -213,8 +215,8 @@ export function useAnchoredScroll({
     return () => {
       for (const event of events)
         container?.removeEventListener(event, gesture);
-      readingOwner.retire();
       if (committedVisit.current === visit) committedVisit.current = null;
+      readingOwner.retire(false);
     };
   }, [visit, readingOwner, deferInitialPosition, scrollContainerRef]);
   const anchorRef = React.useRef<AnchorState>({ kind: "at-bottom" });
@@ -1053,7 +1055,10 @@ export function useAnchoredScroll({
       current: lease.current,
       release: () => {
         if (!lease.current()) return;
+        const epoch = readingOwner.epoch();
         lease.release();
+        if (readingOwner.epoch() !== epoch || committedVisit.current !== visit)
+          return;
         // Adopt the final physical position without another scroll write.
         anchorRef.current = computeAnchor(container);
         const bottom = anchorRef.current.kind === "at-bottom";
@@ -1100,6 +1105,7 @@ export function useAnchoredScroll({
 
   return {
     beginReadingRestore,
+    readingLayout: readingOwner,
     onScroll,
     isAtBottom,
     newMessageCount,
