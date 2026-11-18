@@ -1,3 +1,4 @@
+import { filterOutgoingLinkPreviewTags } from "@/shared/lib/linkPreviewSnapshot";
 import { useContext } from "react";
 import { OutboxContext } from "./outbox/OutboxProvider";
 import { enqueueOutbox } from "./outbox/runtime";
@@ -552,8 +553,12 @@ export function useSendMessageMutation(
         mediaTags: imetaTags,
         emojiTags,
         mentionTags,
-        linkPreviewTags,
+        linkPreviewTags: preparedLinkPreviewTags,
       } = splitOutgoingTags(mediaTags);
+      const linkPreviewTags = filterOutgoingLinkPreviewTags(
+        preparedLinkPreviewTags,
+        content.trim(),
+      );
       const recipientPubkeys = messageMentionPubkeys(
         effectiveChannel,
         identity.pubkey,

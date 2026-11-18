@@ -177,3 +177,38 @@ export function buildLinkPreviewSnapshotTag(
     snapshot.faviconSha256,
   ];
 }
+
+/** Match relay canonical rules before submission and optimistic caching. */
+export function filterOutgoingLinkPreviewTags(
+  tags: string[][],
+  content: string,
+): string[][] {
+  const seen = new Set<string>();
+  return tags.filter((tag, index) => {
+    if (
+      tag.length !== 11 ||
+      tag[0] !== "link-preview" ||
+      tag[1] !== "snapshot" ||
+      tag[2] !== "1"
+    )
+      return true;
+    const canonical = tag[3];
+    const reason = !isValidLinkPreviewSnapshotCanonicalUrl(canonical)
+      ? "invalid_canonical_url"
+      : !content.includes(canonical)
+        ? "canonical_not_in_content"
+        : seen.has(canonical)
+          ? "duplicate_canonical_url"
+          : null;
+    if (reason) {
+      console.warn("link_preview_omitted", {
+        tag_index: index,
+        reason,
+        field_bytes: tag.map((field) => new TextEncoder().encode(field).length),
+      });
+      return false;
+    }
+    seen.add(canonical);
+    return true;
+  });
+}
