@@ -1,3 +1,4 @@
+import '../../shared/offline/offline_provider.dart';
 import 'dart:convert';
 import 'dart:math';
 

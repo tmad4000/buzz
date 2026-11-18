@@ -122,6 +122,9 @@ class ChannelActions {
   }
 
   void _ensureCommunityValid() {
+    if (offlineConnectionRequired(_ref)) {
+      throw StateError('Needs a connection');
+    }
     if (_isCommunityValid?.call() == false) {
       throw StateError(
         'Channel action cancelled because the active community changed',

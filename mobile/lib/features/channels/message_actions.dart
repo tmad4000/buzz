@@ -1,3 +1,4 @@
+import '../../shared/offline/connection_action.dart';
 import '../../shared/offline/offline_provider.dart';
 import 'dart:async';
 import 'dart:io';
@@ -221,37 +222,43 @@ Future<void> showMessageActions({
                   if (canManageMessage)
                     SheetActionSection(
                       children: [
-                        ListTile(
-                          leading: const Icon(BuzzIcons.pencil),
-                          title: const Text('Edit message'),
-                          onTap: () {
-                            Navigator.of(sheetContext).pop();
-                            _showEditSheet(
-                              context: context,
-                              ref: ref,
-                              message: message,
-                              channelId: channelId,
-                            );
-                          },
+                        OfflineConnectionAction(
+                          child: ListTile(
+                            leading: const Icon(BuzzIcons.pencil),
+                            title: const Text('Edit message'),
+                            onTap: () {
+                              Navigator.of(sheetContext).pop();
+                              _showEditSheet(
+                                context: context,
+                                ref: ref,
+                                message: message,
+                                channelId: channelId,
+                              );
+                            },
+                          ),
                         ),
-                        ListTile(
-                          leading: Icon(
-                            BuzzIcons.trash2,
-                            color: sheetContext.colors.error,
+                        OfflineConnectionAction(
+                          child: ListTile(
+                            leading: Icon(
+                              BuzzIcons.trash2,
+                              color: sheetContext.colors.error,
+                            ),
+                            title: Text(
+                              'Delete message',
+                              style: TextStyle(
+                                color: sheetContext.colors.error,
+                              ),
+                            ),
+                            onTap: () {
+                              Navigator.of(sheetContext).pop();
+                              _confirmDelete(
+                                context: context,
+                                ref: ref,
+                                channelId: channelId,
+                                messageId: message.id,
+                              );
+                            },
                           ),
-                          title: Text(
-                            'Delete message',
-                            style: TextStyle(color: sheetContext.colors.error),
-                          ),
-                          onTap: () {
-                            Navigator.of(sheetContext).pop();
-                            _confirmDelete(
-                              context: context,
-                              ref: ref,
-                              channelId: channelId,
-                              messageId: message.id,
-                            );
-                          },
                         ),
                       ],
                     ),
@@ -342,25 +349,27 @@ void showImageActions({
                 if (canManageMessage)
                   SheetActionSection(
                     children: [
-                      ListTile(
-                        leading: Icon(
-                          BuzzIcons.trash2,
-                          color: sheetContext.colors.error,
+                      OfflineConnectionAction(
+                        child: ListTile(
+                          leading: Icon(
+                            BuzzIcons.trash2,
+                            color: sheetContext.colors.error,
+                          ),
+                          title: Text(
+                            'Delete message',
+                            style: TextStyle(color: sheetContext.colors.error),
+                          ),
+                          onTap: () {
+                            Navigator.of(sheetContext).pop();
+                            _confirmDelete(
+                              context: context,
+                              ref: ref,
+                              channelId: channelId,
+                              messageId: message.id,
+                              onDeleted: onDeleted,
+                            );
+                          },
                         ),
-                        title: Text(
-                          'Delete message',
-                          style: TextStyle(color: sheetContext.colors.error),
-                        ),
-                        onTap: () {
-                          Navigator.of(sheetContext).pop();
-                          _confirmDelete(
-                            context: context,
-                            ref: ref,
-                            channelId: channelId,
-                            messageId: message.id,
-                            onDeleted: onDeleted,
-                          );
-                        },
                       ),
                     ],
                   ),
@@ -890,6 +899,9 @@ void _showEditSheet({
   required TimelineMessage message,
   required String channelId,
 }) {
+  if (ref.read(offlineConnectionRequiredProvider)) {
+    return;
+  }
   final controller = TextEditingController(text: message.content);
   showBuzzModalBottomSheet<void>(
     context: context,
@@ -958,6 +970,9 @@ void _confirmDelete({
   required String messageId,
   VoidCallback? onDeleted,
 }) {
+  if (ref.read(offlineConnectionRequiredProvider)) {
+    return;
+  }
   showBuzzDialog<void>(
     context: context,
     builder: (dialogContext) => AlertDialog(

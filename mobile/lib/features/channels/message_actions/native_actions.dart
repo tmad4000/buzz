@@ -17,6 +17,9 @@ Future<bool> _showNativeMessageActions({
   required ValueChanged<bool>? onPopoverPreviewVisibilityChanged,
   required VoidCallback? onPopoverDismissed,
 }) async {
+  if (ref.read(offlineConnectionRequiredProvider)) {
+    return false;
+  }
   if (kIsWeb || defaultTargetPlatform != TargetPlatform.iOS) return false;
   return NativeMessagePresentation.withLease(() async {
     if (captureAnchorSnapshot == null) return false;

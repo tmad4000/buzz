@@ -226,70 +226,75 @@ class _AnimatedReactionTray extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: animation,
-      child: SizedBox(
-        width: trayWidth,
-        height: _reactionTrayMaxHeight,
-        child: Padding(
-          padding: const EdgeInsets.all(Grid.xxs),
-          child: _QuickReactionRow(
-            message: message,
-            sheetContext: context,
-            pageContext: pageContext,
-            pageRef: pageRef,
-            presentationAnimation: animation,
-            popResult: popResult,
-            onSelected: onSelected,
+    return OfflineConnectionAction(
+      child: AnimatedBuilder(
+        animation: animation,
+        child: SizedBox(
+          width: trayWidth,
+          height: _reactionTrayMaxHeight,
+          child: Padding(
+            padding: const EdgeInsets.all(Grid.xxs),
+            child: _QuickReactionRow(
+              message: message,
+              sheetContext: context,
+              pageContext: pageContext,
+              pageRef: pageRef,
+              presentationAnimation: animation,
+              popResult: popResult,
+              onSelected: onSelected,
+            ),
           ),
         ),
-      ),
-      builder: (context, child) {
-        final appearance = const Interval(
-          0.04,
-          0.23,
-          curve: Curves.easeOutCubic,
-        ).transform(animation.value);
-        final expansion = const Interval(0.16, 0.92).transform(animation.value);
-        final springExpansion = _reactionSpringCurve.transform(expansion);
-        final width = lerpDouble(
-          _reactionTrayMaxHeight,
-          trayWidth,
-          springExpansion,
-        )!;
+        builder: (context, child) {
+          final appearance = const Interval(
+            0.04,
+            0.23,
+            curve: Curves.easeOutCubic,
+          ).transform(animation.value);
+          final expansion = const Interval(
+            0.16,
+            0.92,
+          ).transform(animation.value);
+          final springExpansion = _reactionSpringCurve.transform(expansion);
+          final width = lerpDouble(
+            _reactionTrayMaxHeight,
+            trayWidth,
+            springExpansion,
+          )!;
 
-        return Opacity(
-          opacity: appearance,
-          child: Transform.scale(
-            alignment: scaleAlignment,
-            scale: lerpDouble(0.95, 1, appearance)!,
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: SizedBox(
-                width: width,
-                height: _reactionTrayMaxHeight,
-                child: Material(
-                  key: trayKey,
-                  color: context.colors.surface,
-                  surfaceTintColor: Colors.transparent,
-                  elevation: 8,
-                  shadowColor: Colors.black.withValues(alpha: 0.2),
-                  shape: const StadiumBorder(),
-                  clipBehavior: Clip.antiAlias,
-                  child: OverflowBox(
-                    alignment: Alignment.centerLeft,
-                    minWidth: trayWidth,
-                    maxWidth: trayWidth,
-                    minHeight: _reactionTrayMaxHeight,
-                    maxHeight: _reactionTrayMaxHeight,
-                    child: child,
+          return Opacity(
+            opacity: appearance,
+            child: Transform.scale(
+              alignment: scaleAlignment,
+              scale: lerpDouble(0.95, 1, appearance)!,
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: SizedBox(
+                  width: width,
+                  height: _reactionTrayMaxHeight,
+                  child: Material(
+                    key: trayKey,
+                    color: context.colors.surface,
+                    surfaceTintColor: Colors.transparent,
+                    elevation: 8,
+                    shadowColor: Colors.black.withValues(alpha: 0.2),
+                    shape: const StadiumBorder(),
+                    clipBehavior: Clip.antiAlias,
+                    child: OverflowBox(
+                      alignment: Alignment.centerLeft,
+                      minWidth: trayWidth,
+                      maxWidth: trayWidth,
+                      minHeight: _reactionTrayMaxHeight,
+                      maxHeight: _reactionTrayMaxHeight,
+                      child: child,
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 }

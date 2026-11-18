@@ -217,7 +217,8 @@ IosNavigationAction _huddleNavigationAction(
 
   return IosNavigationAction(
     symbol: 'headphones',
-    onPressed: disabledByOtherHuddle
+    onPressed:
+        disabledByOtherHuddle || ref.watch(offlineConnectionRequiredProvider)
         ? null
         : () async {
             if (isCurrentParent) {
