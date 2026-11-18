@@ -341,3 +341,24 @@ test("attached composer measurements wait for restoration release without retiri
     await h.close();
   }
 });
+
+test("retired padding flush cannot settle an unfocused view to bottom", async () => {
+  const h = await fixture({ measuredComposer: true });
+  try {
+    await h.measureComposer(60);
+    h.viewport.current.scrollTop = 1900;
+    await h.focus(false);
+    assert.equal(h.viewport.current.style.paddingBottom, "60px");
+    assert.equal(
+      h.writes(),
+      0,
+      "layout release must consume fallback without a background scroll",
+    );
+    await h.focus(true);
+    await h.flush();
+    assert.equal(h.viewport.current.scrollTop, 1900);
+    assert.equal(h.writes(), 0);
+  } finally {
+    await h.close();
+  }
+});
