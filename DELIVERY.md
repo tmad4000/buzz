@@ -1,9 +1,9 @@
 # Forward to agent — separate .9 source delivery
 
 Draft PR: https://github.com/tmad4000/buzz/pull/85
-Feature commit: `78e71a621` (stacked on unchanged PR81).
+Feature commit: `78e71a621` (stacked on PR81; current base refresh below).
 
-Owner: Sol session5e7bc9da. Worktree `/home/dev/agent-worktrees/forward-to-agent-20261118`; branch `sol/forward-to-agent-20261118`. Stacked on Direct Agents PR81 at `02eb5541275f27464c1ffe8375c6ac1ce98a82c9`, which remains unchanged. That base descends from the requested .8 tag69eda1ff (peeled source16fa57df).
+Owner: Sol session5e7bc9da. Worktree `/home/dev/agent-worktrees/forward-to-agent-20261118`; branch `sol/forward-to-agent-20261118`. Stacked on Direct Agents PR81, currently `daf6e9dbbb4d8874a38bf41bb0e018f7c765dacf`. That base descends from the requested .8 tag69eda1ff (peeled source16fa57df).
 
 Original ask: Jacob, Buzz P2 2026-11-18 05:50Z, one-click forwarding to another orchestrator alongside Send to thread. Root's approved nonrecursive contract: Paseo DM→P2(later), P2→Paseo DM(now), plus existing Direct agents picker; quote/backlink sent by Jacob's own client; original Forwarded-to-target marker; no new relay kind; default OFF; separate .9 draft and independent Sol review via root.
 
@@ -27,8 +27,8 @@ Known cross-device limitation: **other devices do not show “Forwarded ↗”**
 Stack refresh: merged the latest PR81head83d1462c1 into this owned branch, retaining its owner-approved Star/runtime slot reservation. The only merge conflict was DELIVERY.md; this file retains the forwarding report and the three semantic safeguards above. Final refreshed-stack typecheck PASS;30/30 focused tests PASS for the forward changes. PR81 itself was not changed.
 
 
-PR81 P1 base fix: merged eeaa2c2d62d31025b7b2c9651c456ec3ffef5d53. Zero-version DEFAULT_DEV is explicitly a placeholder, so delayed authored legacy names (including same-name Paseo and local-cache1 A) replace the upgraded baseline; genuine authored strings/null/false remain protected. The independent NO-GO requires exact-head re-review; this branch no longer retains the known bad base source. PR81's37-case focused suite and typecheck pass; refreshed forwarding-stack typecheck and30/30 focused tests PASS. Only DELIVERY.md conflicted in the base merge, resolved by keeping this forwarding report.
+Historical intermediate base eeaa2c2d6 used a placeholder successor fix. That unshipped candidate is superseded by the view-only base refresh below.
 
 ## PR81 display-only P1 base refresh
 
-Includes PR81daf6e9dbbb4d8874a38bf41bb0e018f7c765dacf: Direct agents is now a pure view-only label for the exact untouched seed node. No stored name or stamp upgrade; generic sidebar merge source/tests restored to .8. Delayed legacy authored renames, including rename-back, beat the baseline. Owner36ce confirmed exact diff; independent19ed01b1 re-review requested. Prior unshipped successor candidates are superseded. Forward behavior and device-local receipt limitation remain unchanged. Stack typecheck and30 focused forward tests are rerun with bounded process-group cleanup before push.
+Includes PR81daf6e9dbbb4d8874a38bf41bb0e018f7c765dacf: Direct agents is now a pure view-only label for the exact untouched seed node. No stored name or stamp upgrade; generic sidebar merge source/tests restored to .8. Delayed legacy authored renames, including rename-back, beat the baseline. Owner36ce confirmed exact diff; independent19ed01b1 re-review requested. Prior unshipped successor candidates are superseded. Forward behavior and device-local receipt limitation remain unchanged. Refreshed-stack typecheck and30 focused forward tests PASS with bounded process-group cleanup.
