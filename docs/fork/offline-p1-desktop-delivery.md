@@ -1,8 +1,8 @@
-# Offline P1 desktop/web delivery checkpoint
+# Offline P1 desktop delivery checkpoint
 
 Owner: Paseo a027d58a-dc45-48ec-9629-2aa2fd6a08a3. Worktree `/home/dev/agent-worktrees/buzz-offline-p1-20261118`, branch `sol/buzz-offline-p1-desktop`. Draft PR86: https://github.com/tmad4000/buzz/pull/86, target `sol/buzz8-release` (.9 bucket). Starts at .8 peeled commit `16fa57dfc97f115d00382fcb75128295b5fb3def` (annotated tag object `69eda1ff`). Other agents' worktrees were read only.
 
-Jacob's original ask (Buzz DM 2026-11-18 00:57Z, quoted in Fable's full offline DESIGN.md) was partial mobile/web offline reading and queued replies with authored time/context and supersession checks. This implements P1; P2 and mobile outbox PR44 integration are excluded. Mobile sibling is PR90.
+Jacob's original ask (Buzz DM 2026-11-18 00:57Z, quoted in Fable's full offline DESIGN.md) was partial mobile/web offline reading and queued replies with authored time/context and supersession checks. Root narrowed this P1 task to desktop (Tauri) and mobile. A production web chat client and browser transport/signer bridge are excluded; P2 and mobile outbox PR44 integration are also excluded. Mobile sibling is PR90.
 
 ## Behavior and boundaries
 
@@ -14,7 +14,7 @@ Jacob's original ask (Buzz DM 2026-11-18 00:57Z, quoted in Fable's full offline 
 
 ## Validation
 
-`offline-typecheck.log`: TypeScript `tsc --noEmit` PASS. `offline-cache-tests.log`:49 focused models PASS, including actual NIP-44 Unicode/chunk integrity, expected-signer switch, lock/relay isolation, pending/dispatched write vs clear/logout, late-write ordering, production IndexedDB adapter with deterministic transaction model, bounded head/aux parser round-trip, sidebar/profile hydration and reply placeholders. `offline-admission-tests.log`:2 mounted production admission regressions PASS, including queued callbacks across transport reconnect and physical offline/online before a fresh head.
+`offline-typecheck.log`: TypeScript `tsc --noEmit` PASS. `offline-cache-tests.log`:51 focused models PASS, including actual NIP-44 Unicode/chunk integrity, expected-signer switch, lock/relay isolation, pending/dispatched write vs clear/logout, late-write ordering, production IndexedDB adapter with deterministic transaction model, bounded head/aux parser round-trip, sidebar/profile hydration and reply placeholders. `offline-admission-tests.log`:2 mounted production admission regressions PASS, including queued callbacks across transport reconnect and physical offline/online before a fresh head.
 
 All checks use `scripts/run_offline_check.py`: separate process session (setsid), timeout, whole process-group TERM/KILL cleanup. No heavy browser/native/Tauri/cargo builds, services or M5 actions. Hermit tooling and an existing dependency installation read only; no dependency/lockfile changes. Hooks requiring prohibited lanes were skipped only for commit/push; focused validation ran explicitly.
 
@@ -22,6 +22,8 @@ All checks use `scripts/run_offline_check.py`: separate process session (setsid)
 
 Independent exact-head Sol review requested through root; no reviewer result/source GO asserted. Native SQLite compilation/migration and real IndexedDB browser lifecycle are unverified under the dispatch's light-only gate. Apple/Android/keychain/file-protection acceptance cannot be claimed on Linux.
 
-The .8 production chat transport is Tauri-only; `web/` is a repository browser. IndexedDB is implemented, but a shipping browser chat needs an authorized chat transport and injected expected-account-bound NIP-44 signer. Generic active-key NIP-07 cannot atomically pin the sender, so the default browser cipher fails closed. Root has the blocker/owner request.
+The fork has no production web chat client: the .8 production chat transport is Tauri-only and `web/` is a repository browser. Root explicitly excluded a browser client/transport/signer bridge from P1. The IndexedDB adapter and opt-in `createBrowserOfflineCipher` window.nostr.nip44 seam remain unit-tested and unwired. This seam is ready if a browser host is built, provided that host supplies an account-pinning lease. Generic active-key NIP-07 cannot atomically pin the sender; the default browser cipher fails closed. Unit tests cover NIP-44 roundtrip, owner mismatch/switch and missing signer, blocked-upgrade retry and version-change connection release. No browser bridge is implemented here.
+
+Future minimum browser-chat estimate: **80–120 agent-hours**, an engineering estimate from the .8 transport/UI seams rather than a commitment. This includes an authenticated chat shell/session/identity routes (~12–20h), relay query/subscription/mutation/upload and outbox transports (~32–48h), signer account-lifetime integration plus cache wiring (~12–20h), and offline/restart/multi-tab/accessibility/security acceptance (~16–24h). The component ranges total72–112h; the headline adds integration contingency. Full native agent/terminal/Huddle feature parity, deployment, service-worker policy decisions and external signer capability changes are excluded. Existing cache/seam work avoids rebuilding storage but does not supply authentication or a browser chat transport. This excluded gap does not block desktop/mobile P1 review.
 
 PR51 host-presence banner is absent at .8; stacking/collapse must be verified when the independently owned source is composed into .9. Preserve owners445b5cb9/2d576c28 read gates and36ce8949 sidebar source/order; additive coordination was sent to them and integration ownerfd0be4cf. No merge/deployment/Buzz posting performed. This remains a draft checkpoint, not full P1 completion.

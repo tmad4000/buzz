@@ -140,6 +140,9 @@ class ModelDatabase {
     this.version = 1;
     this.queue = [];
   }
+  close() {
+    this.closed = true;
+  }
   createObjectStore(name, options) {
     const schema = {
       keyPath: options.keyPath,

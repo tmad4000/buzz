@@ -10,6 +10,7 @@ import {
   offlineCacheEnabled,
   setOfflineCipher,
   createOfflineCipher,
+  createBrowserOfflineCipher,
   clearOfflineForLogout,
 } from "./offlineCache.ts";
 const dom = new JSDOM("", { url: "http://offline.test" });
@@ -216,6 +217,78 @@ test("native clear waits for an already-dispatched write so late completion cann
   assert.equal(rows.size, 0);
 });
 
+test("unwired window.nostr NIP44 seam requires a host account lease and rejects wrong/switched owners", async () => {
+  let leaseCount = 0;
+  let owner = pubkey;
+  let switchOwner = false;
+  let calls = 0;
+  globalThis.isTauri = false;
+  window.nostr = {
+    getPublicKey: async () => owner,
+    nip44: {
+      encrypt: async (recipient, value) => {
+        calls++;
+        assert.equal(recipient, pubkey);
+        const result = await realCipher.encrypt(value);
+        if (switchOwner) owner = "b".repeat(64);
+        return result;
+      },
+      decrypt: async (recipient, value) => {
+        calls++;
+        assert.equal(recipient, pubkey);
+        return realCipher.decrypt(value);
+      },
+    },
+  };
+  const optIn = createBrowserOfflineCipher(async (expected, operation) => {
+    leaseCount++;
+    assert.equal(expected, pubkey);
+    return operation();
+  });
+  try {
+    const encrypted = await optIn.encrypt("cached payload", pubkey);
+    assert.equal(await optIn.decrypt(encrypted, pubkey), "cached payload");
+    assert.equal(leaseCount, 2);
+    assert.equal(calls, 2);
+    owner = "b".repeat(64);
+    await assert.rejects(optIn.encrypt("private", pubkey), /signer changed/);
+    assert.equal(calls, 2, "wrong owner cannot reach encryption");
+    owner = pubkey;
+    switchOwner = true;
+    await assert.rejects(optIn.encrypt("private", pubkey), /signer changed/);
+    delete window.nostr.nip44;
+    await assert.rejects(
+      optIn.decrypt(encrypted, pubkey),
+      /NIP-44 browser signer/,
+    );
+  } finally {
+    globalThis.isTauri = true;
+    delete window.nostr;
+  }
+});
+
+test("blocked IndexedDB upgrades fail promptly, close late results and allow retry", async () => {
+  const { indexedDbOfflineAdapter } = await import("./offlineCache.ts");
+  let request;
+  let closed = false;
+  globalThis.indexedDB = {
+    open() {
+      request = {};
+      queueMicrotask(() => request.onblocked());
+      return request;
+    },
+  };
+  await assert.rejects(indexedDbOfflineAdapter.epoch(), /upgrade blocked/);
+  request.result = {
+    close() {
+      closed = true;
+    },
+  };
+  request.onsuccess();
+  assert.equal(closed, true);
+  // The next production-adapter test opens a fresh DB, verifying failed-open retry.
+});
+
 test("production IndexedDB adapter upgrades indexes and fences encryption across another tab's clear", async () => {
   const { OfflineIndexedDbModel } = await import("./offlineIndexedDbModel.mjs");
   const { indexedDbOfflineAdapter } = await import("./offlineCache.ts");
@@ -288,6 +361,19 @@ test("production IndexedDB adapter upgrades indexes and fences encryption across
       "a tab cannot hydrate a snapshot cleared during decryption",
     );
     assert.equal(globalThis.indexedDB.database.version, 3);
+    const oldDatabase = globalThis.indexedDB.database;
+    oldDatabase.onversionchange();
+    assert.equal(
+      oldDatabase.closed,
+      true,
+      "an upgrade in another tab is not blocked by this cache",
+    );
+    globalThis.indexedDB = new OfflineIndexedDbModel();
+    assert.equal(
+      await indexedDbOfflineAdapter.epoch(),
+      0,
+      "a closed connection is reopened on demand",
+    );
   } finally {
     globalThis.isTauri = true;
     delete window.nostr;

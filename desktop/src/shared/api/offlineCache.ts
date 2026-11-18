@@ -64,6 +64,42 @@ function browserSigner(): BrowserSigner {
     throw new Error("A NIP-44 browser signer is required for offline cache");
   return signer;
 }
+/** A future browser host must pin the sender account for the whole callback.
+ * NIP-07 exposes only an active signer, so before/after identity checks alone
+ * cannot implement this lease. No lease or browser transport is installed here.
+ */
+export type BrowserAccountLease = <T>(
+  expectedPubkey: string,
+  operation: () => Promise<T>,
+) => Promise<T>;
+/** Opt-in window.nostr.nip44 seam, deliberately unwired in the desktop/mobile product. */
+export function createBrowserOfflineCipher(
+  withAccount: BrowserAccountLease,
+): OfflineCipher {
+  const run = (
+    expectedPubkey: string,
+    direction: "encrypt" | "decrypt",
+    value: string,
+  ) =>
+    withAccount(expectedPubkey, async () => {
+      const signer = browserSigner();
+      const owner = await signer.getPublicKey();
+      if (owner.toLowerCase() !== expectedPubkey.toLowerCase())
+        throw new Error("Offline cache signer changed");
+      const result = await signer.nip44![direction](expectedPubkey, value);
+      if (
+        browserSigner() !== signer ||
+        (await signer.getPublicKey()).toLowerCase() !==
+          expectedPubkey.toLowerCase()
+      )
+        throw new Error("Offline cache signer changed");
+      return result;
+    });
+  return {
+    encrypt: (value, owner) => run(owner, "encrypt", value),
+    decrypt: (value, owner) => run(owner, "decrypt", value),
+  };
+}
 /** Default identity-fenced bridge cipher; exposed for adapter-level regression tests. */
 export function createOfflineCipher(): OfflineCipher {
   return {
@@ -151,6 +187,16 @@ let database: Promise<IDBDatabase> | undefined;
 function db(): Promise<IDBDatabase> {
   return (database ??= new Promise((resolve, reject) => {
     const request = indexedDB.open("buzz-offline-cache-v1", 3);
+    let abandoned = false;
+    request.onblocked = () => {
+      abandoned = true;
+      database = undefined;
+      reject(
+        new Error(
+          "Offline cache upgrade blocked by another tab; close it and retry",
+        ),
+      );
+    };
     request.onupgradeneeded = () => {
       const transaction = request.transaction;
       if (!transaction)
@@ -165,8 +211,19 @@ function db(): Promise<IDBDatabase> {
       if (!records.indexNames.contains("scope"))
         records.createIndex("scope", "scope");
     };
-    request.onsuccess = () => resolve(request.result);
+    request.onsuccess = () => {
+      if (abandoned) {
+        request.result.close();
+        return;
+      }
+      request.result.onversionchange = () => {
+        request.result.close();
+        database = undefined;
+      };
+      resolve(request.result);
+    };
     request.onerror = () => {
+      if (abandoned) return;
       database = undefined;
       reject(request.error);
     };
