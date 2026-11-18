@@ -67,12 +67,23 @@ export async function clearCapturedAutoSendTrigger({
   projectionId: string;
 }): Promise<boolean> {
   const captured = readLocation();
+  const sameChannel = (href: string) => {
+    try {
+      return (
+        new URL(href, "https://buzz.invalid").pathname.replace(/\/$/, "") ===
+        `/channels/${encodeURIComponent(target.channelId)}`
+      );
+    } catch {
+      return false;
+    }
+  };
   const stillCaptured = () => {
     if (!admitted()) return false;
     const route = readLocation(),
       history = readHistory();
     return (
       JSON.stringify([route.state.__TSR_key, route.href]) === entryKey &&
+      sameChannel(route.href) &&
       history.state.__TSR_key === route.state.__TSR_key &&
       history.href === route.href
     );
@@ -139,6 +150,7 @@ export async function clearCapturedAutoSendTrigger({
         actual.state.__TSR_key === boundEntry &&
         history.state.__TSR_key === boundEntry &&
         history.href === actual.href &&
+        sameChannel(actual.href) &&
         conversationProjectionId(actual.state) === projectionId &&
         actual.search.autoSend === undefined &&
         actual.hash === captured.hash &&

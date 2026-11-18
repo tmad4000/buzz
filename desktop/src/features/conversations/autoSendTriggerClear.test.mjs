@@ -126,13 +126,24 @@ test("changed entry during subscription cannot be overwritten by a stale clear",
 });
 
 test("navigation failure or unconfirmed/foreign settlement denies submission and clears listeners/echo", async () => {
-  for (const mode of ["throw", "no-event", "foreign", "lost-admission"]) {
+  for (const mode of [
+    "throw",
+    "no-event",
+    "foreign",
+    "foreign-channel",
+    "lost-admission",
+  ]) {
     const h = fixture();
     const navigate = h.options.navigate;
     h.options.navigate = async (projection) => {
       if (mode === "throw") throw new Error("router failed");
       if (mode === "no-event") return;
       await navigate(projection);
+      if (mode === "foreign-channel")
+        h.set({
+          ...h.read(),
+          href: "/channels/other?thread=root&other=keep#anchor",
+        });
       if (mode === "foreign")
         h.set({ ...h.read(), search: { ...h.read().search, thread: "other" } });
       if (mode === "lost-admission") h.active(false);
