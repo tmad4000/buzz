@@ -1,3 +1,5 @@
+import { BusyThreadSuggestions } from "./BusyThreadSuggestions";
+import type { ChannelWindowThreadSummary } from "@/features/messages/lib/channelWindowStore";
 import { useOpenThreadPins } from "../lib/openThreadPinStore";
 import * as React from "react";
 import type { MainTimelineEntry } from "@/features/messages/lib/threadPanel";
@@ -10,6 +12,7 @@ import {
 
 type Props = {
   storageKey: string;
+  threadSummaries?: ReadonlyMap<string, ChannelWindowThreadSummary>;
   entries: readonly MainTimelineEntry[];
   currentThread: TimelineMessage | null;
   onOpen: (message: TimelineMessage) => void;
@@ -17,6 +20,7 @@ type Props = {
 /** Manual first slice; automatic membership awaits a trusted work adapter. */
 export function OpenThreadsBar({
   storageKey,
+  threadSummaries,
   entries,
   currentThread,
   onOpen,
@@ -92,6 +96,11 @@ export function OpenThreadsBar({
               Changes are session-only; storage is unavailable.
             </p>
           ) : null}
+          <BusyThreadSuggestions
+            storageKey={storageKey}
+            entries={entries}
+            threadSummaries={threadSummaries}
+          />
           <div className="flex gap-2">
             <input
               aria-label="Search open threads"

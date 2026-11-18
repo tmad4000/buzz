@@ -315,3 +315,159 @@ test("legacy pins are a read-only seed; tombstones survive remount and failed wr
       win.Storage.prototype.setItem = original;
     }
   }));
+
+test("busy suggestions require opt-in and explicit pin; tuning and dismissal survive remount without auto-pinning", async () =>
+  fixture(async (root, win) => {
+    const entries = [
+      {
+        message: { id: "A", body: "Busy A", depth: 0, createdAt: 1 },
+        summary: { replyCount: 20 },
+      },
+      {
+        message: { id: "B", body: "Busy B", depth: 0, createdAt: 2 },
+        summary: { replyCount: 10 },
+      },
+    ];
+    const render = (scope = "busy", rows = entries) =>
+      act(() =>
+        root.render(
+          React.createElement(OpenThreadsBar, {
+            key: scope,
+            storageKey: scope,
+            entries: rows,
+            currentThread: null,
+            onOpen: () => {
+              throw new Error("Suggestion must not navigate");
+            },
+          }),
+        ),
+      );
+    await render();
+    await click(button("Open threads"), win);
+    assert.equal(button("Pin this busy thread?"), undefined);
+    const checkbox = document.querySelector('input[type="checkbox"]');
+    assert.equal(checkbox.checked, false);
+    await click(checkbox, win);
+    assert.ok(document.body.textContent.includes("0 pinned"));
+    assert.equal(localStorage.getItem("busy:pin.v2:A"), null);
+    assert.equal(
+      [...document.querySelectorAll("button")].filter(
+        (x) => x.textContent === "Pin this busy thread?",
+      ).length,
+      1,
+    );
+    await click(button("Pin this busy thread?"), win);
+    assert.ok(document.body.textContent.includes("1 pinned"));
+    assert.equal(button("Pin this busy thread?"), undefined);
+    await act(() => {
+      const select = document.querySelector(
+        '[aria-label="Busy thread reply threshold"]',
+      );
+      select.value = "10";
+      select.dispatchEvent(new win.Event("change", { bubbles: true }));
+    });
+    await click(
+      document.querySelector(
+        '[aria-label="Dismiss busy-thread suggestion: Busy B"]',
+      ),
+      win,
+    );
+    assert.equal(button("Pin this busy thread?"), undefined);
+    assert.equal(localStorage.getItem("busy:busyDismissed.v1:B"), "true");
+    await act(() => root.render(null));
+    await render(
+      "busy",
+      entries.map((entry) => ({ ...entry, summary: { replyCount: 100 } })),
+    );
+    assert.equal(
+      document.querySelector('[aria-label="Busy thread reply threshold"]')
+        .value,
+      "10",
+    );
+    assert.equal(button("Pin this busy thread?"), undefined);
+    assert.ok(document.body.textContent.includes("1 pinned"));
+    await act(() => {
+      const select = document.querySelector('[aria-label="Thread to pin"]');
+      select.value = "B";
+      select.dispatchEvent(new win.Event("change", { bubbles: true }));
+    });
+    await click(button("Pin here"), win);
+    await click(
+      document.querySelector('[aria-label="Remove Busy B from bar"]'),
+      win,
+    );
+    assert.equal(button("Pin this busy thread?"), undefined);
+    await render("other");
+    await click(button("Open threads"), win);
+    assert.equal(
+      document.querySelector('input[type="checkbox"]').checked,
+      false,
+    );
+    assert.ok(document.body.textContent.includes("0 pinned"));
+  }));
+
+test("busy suggestion can use existing relay summary in Timeline and shared dismissal updates sibling bars", async () =>
+  fixture(async (root, win) => {
+    const props = {
+      storageKey: "busy-siblings",
+      entries: [
+        {
+          message: { id: "root", body: "Relay busy", depth: 0, createdAt: 1 },
+          summary: null,
+        },
+      ],
+      threadSummaries: new Map([["root", { descendantCount: 25 }]]),
+      currentThread: null,
+      onOpen: () => {},
+    };
+    localStorage.setItem("busy-siblings:expanded", "true");
+    localStorage.setItem(
+      "busy-siblings:busySuggestions.v1",
+      JSON.stringify({ enabled: true, threshold: 20 }),
+    );
+    await act(() =>
+      root.render(
+        React.createElement(
+          React.Fragment,
+          null,
+          React.createElement(OpenThreadsBar, props),
+          React.createElement(OpenThreadsBar, props),
+        ),
+      ),
+    );
+    assert.equal(
+      [...document.querySelectorAll("button")].filter(
+        (x) => x.textContent === "Pin this busy thread?",
+      ).length,
+      2,
+    );
+    await click(
+      document.querySelector(
+        '[aria-label="Dismiss busy-thread suggestion: Relay busy"]',
+      ),
+      win,
+    );
+    assert.equal(button("Pin this busy thread?"), undefined);
+    assert.equal(localStorage.getItem("busy-siblings:pin.v2:root"), null);
+    // Concurrent tab pin membership is independent from suggestion dismissal.
+    await act(() => {
+      localStorage.setItem(
+        "busy-siblings:pin.v2:root",
+        JSON.stringify({ pin: { id: "root", title: "Relay busy" }, rank: 0 }),
+      );
+      win.dispatchEvent(
+        new win.StorageEvent("storage", { key: "busy-siblings:pin.v2:root" }),
+      );
+    });
+    assert.equal(
+      localStorage.getItem("busy-siblings:busyDismissed.v1:root"),
+      "true",
+    );
+    assert.equal(
+      [
+        ...document.querySelectorAll('section[aria-label="Open threads"]'),
+      ].every((section) => section.textContent.includes("1 pinned")),
+      true,
+    );
+    assert.equal(button("Pin this busy thread?"), undefined);
+  }));
