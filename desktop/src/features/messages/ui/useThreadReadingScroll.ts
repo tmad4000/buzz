@@ -176,10 +176,25 @@ export function useThreadReadingScroll(
     restore,
   });
   const settlePadding = React.useCallback(() => {
+    if (
+      reading.saved &&
+      (!canHandle() ||
+        latest.current.view?.rootRef?.current?.dataset.focusedConversation !==
+          "true" ||
+        options.scrollContainerRef.current?.closest(
+          '[hidden], [inert], [aria-hidden="true"]',
+        ))
+    )
+      return true;
     const handled = scroll.settleAtBottomAfterLayout();
     // A saved-slot owner consumes legacy direct-scroll fallback as well.
     return reading.saved !== undefined || handled;
-  }, [reading.saved, scroll.settleAtBottomAfterLayout]);
+  }, [
+    canHandle,
+    options.scrollContainerRef,
+    reading.saved,
+    scroll.settleAtBottomAfterLayout,
+  ]);
   useComposerHeightPadding(
     options.scrollContainerRef,
     composerRef,
