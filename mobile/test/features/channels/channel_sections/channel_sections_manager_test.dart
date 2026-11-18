@@ -60,6 +60,122 @@ void main() {
     );
   }
 
+  test(
+    'reader never mutates or publishes even with legacy editing calls',
+    () async {
+      await setUpEnv();
+      final relay = _RateLimitedRelaySession(failuresBeforeSuccess: 0);
+      final signer = _RecordingSigner();
+      final manager = ChannelSectionsManager(
+        pubkey: keychain.public,
+        prefs: prefs,
+        crypto: crypto,
+        relaySession: relay,
+        signedEventRelay: signer,
+        remoteEnabled: true,
+        onChanged: () {},
+      );
+      await manager.initialize();
+      manager.createSection('Never publish');
+      manager.renameSection('s', 'Name');
+      manager.deleteSection('s');
+      manager.moveSectionUp('s');
+      manager.moveSectionDown('s');
+      manager.assignChannel('dm', 's');
+      manager.unassignChannel('dm');
+      manager.markDirty();
+      manager.dispose();
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(manager.store.sections, isEmpty);
+      expect(manager.store.assignments, isEmpty);
+      expect(signer.calls, 0);
+    },
+  );
+
+  test(
+    'unknown newer head flattens and fences older replay; valid head restores',
+    () async {
+      await setUpEnv();
+      final relay = _RateLimitedRelaySession(failuresBeforeSuccess: 0);
+      final manager = buildManager(relaySession: relay);
+      await manager.initialize();
+      final known = sectionsEvent(
+        sections: [
+          {'id': 's', 'name': 'Ops', 'order': 0},
+        ],
+        createdAt: 10,
+      );
+      relay.emit(known);
+      expect(manager.store.sections.single.name, 'Ops');
+      relay.emit(
+        NostrEvent(
+          id: 'new',
+          pubkey: keychain.public,
+          createdAt: 11,
+          kind: EventKind.readState,
+          tags: const [
+            ['d', 'channel-sections'],
+          ],
+          content: crypto.encrypt(
+            jsonEncode({
+              'version': 1,
+              'meta': {'v': 3},
+            }),
+          ),
+          sig: 'sig',
+        ),
+      );
+      relay.emit(known);
+      expect(manager.store.sections, isEmpty);
+      relay.emit(
+        sectionsEvent(
+          sections: [
+            {'id': 's', 'name': 'Restored', 'order': 0},
+          ],
+          createdAt: 12,
+        ),
+      );
+      expect(manager.store.sections.single.name, 'Restored');
+      manager.dispose();
+    },
+  );
+
+  test('cached layouts are isolated by relay for the same identity', () async {
+    await setUpEnv();
+    final relay = _RateLimitedRelaySession(
+      failuresBeforeSuccess: 0,
+      historyEvents: [
+        sectionsEvent(
+          sections: [
+            {'id': 's', 'name': 'Private', 'order': 0},
+          ],
+          createdAt: 10,
+        ),
+      ],
+    );
+    ChannelSectionsManager scoped(String url, bool remote) =>
+        ChannelSectionsManager(
+          pubkey: keychain.public,
+          relayUrl: url,
+          prefs: prefs,
+          crypto: crypto,
+          relaySession: relay,
+          signedEventRelay: null,
+          remoteEnabled: remote,
+          onChanged: () {},
+        );
+    final first = scoped('wss://one.example', true);
+    await first.initialize();
+    expect(first.store.sections.single.name, 'Private');
+    first.dispose();
+    final same = scoped('wss://one.example', false);
+    final other = scoped('wss://two.example', false);
+    expect(same.store.sections.single.name, 'Private');
+    expect(other.store.sections, isEmpty);
+    same.dispose();
+    other.dispose();
+  });
+
   test('startup fetch rejected by relay rate limit retries until the remote '
       'blob is adopted (cold-start regression)', () async {
     await setUpEnv();
@@ -454,4 +570,22 @@ class _RateLimitedRelaySession extends RelaySessionNotifier {
       }
     };
   }
+}
+
+class _RecordingSigner implements SignedEventRelay {
+  int calls = 0;
+  @override
+  Future<NostrEvent> submit({
+    required int kind,
+    required String content,
+    required List<List<String>> tags,
+    int? createdAt,
+    void Function(NostrEvent)? onSigned,
+  }) async {
+    calls++;
+    throw StateError('Read-only lane must never publish');
+  }
+
+  @override
+  String? get pubkey => null;
 }

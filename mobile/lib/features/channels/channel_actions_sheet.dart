@@ -28,6 +28,7 @@ import 'channel_identity_names_provider.dart';
 import 'channel_management_provider.dart';
 import 'channel_mutes/channel_mutes_provider.dart';
 import 'channel_sections/channel_sections_provider.dart';
+import 'channel_sections/channel_sections_storage.dart';
 import 'channel_stars/channel_stars_provider.dart';
 import 'channels_provider.dart';
 import 'manage_channel_sheet.dart';
@@ -185,20 +186,22 @@ class ChannelActionsSheet extends HookConsumerWidget {
                   if (!channel.isDm)
                     ListTile(
                       leading: const Icon(BuzzIcons.folderInput),
-                      title: const Text('Move to section…'),
-                      onTap: () async {
-                        final pageContext = Navigator.of(
-                          context,
-                          rootNavigator: true,
-                        ).context;
-                        close();
-                        await _showMoveSectionSheet(
-                          pageContext,
-                          ref,
-                          channel: channel,
-                          sectionId: sectionId,
-                        );
-                      },
+                      title: const Text('Sections are managed on desktop'),
+                      onTap: !channelSectionsEditable
+                          ? null
+                          : () async {
+                              final pageContext = Navigator.of(
+                                context,
+                                rootNavigator: true,
+                              ).context;
+                              close();
+                              await _showMoveSectionSheet(
+                                pageContext,
+                                ref,
+                                channel: channel,
+                                sectionId: sectionId,
+                              );
+                            },
                     ),
                   ListTile(
                     leading: Icon(isMuted ? BuzzIcons.bell : BuzzIcons.bellOff),

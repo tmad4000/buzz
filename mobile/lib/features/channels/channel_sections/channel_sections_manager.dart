@@ -5,14 +5,10 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:nostr/nostr.dart' as nostr;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:uuid/uuid.dart';
 
 import '../../../shared/crypto/nip44.dart';
 import '../../../shared/relay/relay.dart';
-import '../../../shared/read_state/read_state_time.dart';
 import 'channel_sections_storage.dart';
-
-const _uuid = Uuid();
 
 class ChannelSectionsCrypto {
   final Uint8List _conversationKey;
@@ -33,16 +29,14 @@ class ChannelSectionsCrypto {
 
 class ChannelSectionsManager {
   final String pubkey;
+  final String _cacheScope;
   final ChannelSectionsStorage _storage;
   final ChannelSectionsCrypto _crypto;
   final RelaySessionNotifier? _relaySession;
-  final SignedEventRelay? _signedEventRelay;
   final bool _remoteEnabled;
   final VoidCallback _onChanged;
 
   ChannelSectionStore _store;
-  ChannelSectionStore? _lastPublishedStore;
-  Timer? _publishDebounce;
   int _lastRemoteCreatedAt = 0;
   String? _lastRemoteEventId;
   void Function()? _unsubscribe;
@@ -56,11 +50,10 @@ class ChannelSectionsManager {
   Future<void>? _syncInFlight;
   bool _syncAgain = false;
   int _subscriptionGeneration = 0;
-  int _localRevision = 0;
-  bool _publishPending = false;
 
   ChannelSectionsManager({
     required this.pubkey,
+    String? relayUrl,
     required SharedPreferences prefs,
     required ChannelSectionsCrypto crypto,
     required RelaySessionNotifier? relaySession,
@@ -69,14 +62,18 @@ class ChannelSectionsManager {
     required VoidCallback onChanged,
     @visibleForTesting
     Duration startupRetryBaseDelay = const Duration(seconds: 2),
-  }) : _storage = ChannelSectionsStorage(prefs),
+  }) : _cacheScope = relayUrl == null
+           ? pubkey
+           : '${Uri.encodeComponent(relayUrl)}:$pubkey',
+       _storage = ChannelSectionsStorage(prefs),
        _crypto = crypto,
        _relaySession = relaySession,
-       _signedEventRelay = signedEventRelay,
        _remoteEnabled = remoteEnabled,
        _onChanged = onChanged,
        _startupRetryBaseDelay = startupRetryBaseDelay,
-       _store = ChannelSectionsStorage(prefs).read(pubkey);
+       _store = ChannelSectionsStorage(prefs).read(
+         relayUrl == null ? pubkey : '${Uri.encodeComponent(relayUrl)}:$pubkey',
+       );
 
   ChannelSectionStore get store => _store;
 
@@ -93,16 +90,10 @@ class ChannelSectionsManager {
   }
 
   /// Re-reads the retained head once, e.g. on app foreground resume, to catch
-  /// an EVENT a healthy socket never delivered. Skipped while a local edit is
-  /// pending and discarded if one lands before the read returns.
+  /// an EVENT a healthy socket never delivered. This lane never has local edits.
   void refreshFromRelay() {
-    if (_disposed || !_remoteEnabled || _publishPending) return;
-    final revision = _localRevision;
-    unawaited(
-      _fetchAndMerge(
-        isCurrent: () => revision == _localRevision && !_publishPending,
-      ),
-    );
+    if (_disposed || !_remoteEnabled) return;
+    unawaited(_fetchAndMerge());
   }
 
   /// One startup-sync attempt: fetch the remote blob, then start the live
@@ -191,129 +182,20 @@ class ChannelSectionsManager {
     _startupRetryTimer?.cancel();
     _startupRetryTimer = null;
 
-    final hadPending = _publishDebounce != null;
-    _publishDebounce?.cancel();
-    _publishDebounce = null;
-
-    if (flushPending && hadPending && _remoteEnabled) {
-      unawaited(_publish(allowDisposed: true));
-    }
-
     _unsubscribe?.call();
     _unsubscribe = null;
   }
 
-  void createSection(String name) {
-    if (_disposed) return;
-    final maxOrder = _store.sections.fold<int>(
-      -1,
-      (max, s) => s.order > max ? s.order : max,
-    );
-    final section = ChannelSection(
-      id: _uuid.v4(),
-      name: name.trim(),
-      order: maxOrder + 1,
-    );
-    _store = ChannelSectionStore(
-      sections: [..._store.sections, section],
-      assignments: _store.assignments,
-    );
-    _persist();
-    markDirty();
-  }
-
-  void renameSection(String sectionId, String newName) {
-    if (_disposed) return;
-    _store = ChannelSectionStore(
-      sections: [
-        for (final s in _store.sections)
-          if (s.id == sectionId)
-            ChannelSection(
-              id: s.id,
-              name: newName.trim(),
-              icon: s.icon,
-              order: s.order,
-            )
-          else
-            s,
-      ],
-      assignments: _store.assignments,
-    );
-    _persist();
-    markDirty();
-  }
-
-  void deleteSection(String sectionId) {
-    if (_disposed) return;
-    final updatedAssignments = Map<String, String>.from(_store.assignments)
-      ..removeWhere((_, sid) => sid == sectionId);
-    _store = ChannelSectionStore(
-      sections: [
-        for (final s in _store.sections)
-          if (s.id != sectionId) s,
-      ],
-      assignments: updatedAssignments,
-    );
-    _persist();
-    markDirty();
-  }
-
-  void moveSectionUp(String sectionId) {
-    if (_disposed) return;
-    final sorted = _sortedSections();
-    final idx = sorted.indexWhere((s) => s.id == sectionId);
-    if (idx <= 0) return;
-    _swapOrders(sorted, idx, idx - 1);
-    markDirty();
-  }
-
-  void moveSectionDown(String sectionId) {
-    if (_disposed) return;
-    final sorted = _sortedSections();
-    final idx = sorted.indexWhere((s) => s.id == sectionId);
-    if (idx < 0 || idx >= sorted.length - 1) return;
-    _swapOrders(sorted, idx, idx + 1);
-    markDirty();
-  }
-
-  void assignChannel(String channelId, String sectionId) {
-    if (_disposed) return;
-    final updated = Map<String, String>.from(_store.assignments)
-      ..[channelId] = sectionId;
-    _store = ChannelSectionStore(
-      sections: _store.sections,
-      assignments: updated,
-    );
-    _persist();
-    markDirty();
-  }
-
-  void unassignChannel(String channelId) {
-    if (_disposed) return;
-    final updated = Map<String, String>.from(_store.assignments)
-      ..remove(channelId);
-    _store = ChannelSectionStore(
-      sections: _store.sections,
-      assignments: updated,
-    );
-    _persist();
-    markDirty();
-  }
-
-  void markDirty() {
-    if (!_remoteEnabled || _disposed) return;
-    _localRevision++;
-    _publishPending = true;
-    _publishDebounce?.cancel();
-    _publishDebounce = Timer(const Duration(seconds: 5), () {
-      _publishDebounce = null;
-      unawaited(
-        _publish().whenComplete(
-          () => _publishPending = _publishDebounce != null,
-        ),
-      );
-    });
-  }
+  // Intentionally inert: legacy mobile snapshots must never fence desktop
+  // metadata v2 writers or clobber their registers and conversion journals.
+  void createSection(String name) {}
+  void renameSection(String sectionId, String newName) {}
+  void deleteSection(String sectionId) {}
+  void moveSectionUp(String sectionId) {}
+  void moveSectionDown(String sectionId) {}
+  void assignChannel(String channelId, String sectionId) {}
+  void unassignChannel(String channelId) {}
+  void markDirty() {}
 
   /// Returns whether the fetch reached the relay (regardless of whether a
   /// remote blob exists).
@@ -402,22 +284,24 @@ class ChannelSectionsManager {
   void _mergeEvent(NostrEvent event) {
     // Only process channel-sections d-tag events.
     final dTag = event.getTagValue('d');
-    if (dTag != 'channel-sections') return;
+    if (dTag != 'channel-sections' ||
+        event.pubkey != pubkey ||
+        event.kind != EventKind.readState) {
+      return;
+    }
 
     try {
       final plaintext = _crypto.decrypt(event.content);
       final parsed = jsonDecode(plaintext);
       if (parsed is! Map<String, dynamic>) return;
 
-      final incoming = ChannelSectionStore.fromJson(parsed);
+      final incoming = readDesktopSections(parsed);
 
       if (_isAfterCursor(event.createdAt, event.id)) {
         _lastRemoteCreatedAt = event.createdAt;
         _lastRemoteEventId = event.id;
         _store = incoming;
         _persist();
-        // A pending debounce stays armed: its republish re-converges an OK
-        // that later wins the cursor after this head replaced the store.
       }
     } catch (_) {
       // Decryption failure or parse error — keep existing state.
@@ -437,112 +321,9 @@ class ChannelSectionsManager {
     if (!_disposed) _onChanged();
   }
 
-  bool _isIdenticalToLastPublished() {
-    final last = _lastPublishedStore;
-    if (last == null) return false;
-    if (last.sections.length != _store.sections.length) return false;
-    if (last.assignments.length != _store.assignments.length) return false;
-    for (var i = 0; i < _store.sections.length; i++) {
-      final a = last.sections[i];
-      final b = _store.sections[i];
-      if (a.id != b.id ||
-          a.name != b.name ||
-          a.icon != b.icon ||
-          a.order != b.order) {
-        return false;
-      }
-    }
-    for (final key in _store.assignments.keys) {
-      if (last.assignments[key] != _store.assignments[key]) return false;
-    }
-    return true;
-  }
-
-  Future<void> _publish({bool allowDisposed = false}) async {
-    if ((!allowDisposed && _disposed) ||
-        !_remoteEnabled ||
-        _signedEventRelay == null) {
-      return;
-    }
-
-    // Read-before-write: merge remote state before publishing
-    await _fetchAndMerge(allowDisposed: allowDisposed);
-
-    // No-op suppression: skip if nothing changed
-    if (_isIdenticalToLastPublished()) return;
-
-    final submitted = _store;
-    final revision = _localRevision;
-    try {
-      final payload = jsonEncode(submitted.toJson());
-      final ciphertext = _crypto.encrypt(payload);
-      final createdAt = max(currentUnixSeconds(), _lastRemoteCreatedAt + 1);
-
-      String? signedId;
-      await _signedEventRelay.submit(
-        kind: EventKind.readState,
-        content: ciphertext,
-        tags: [
-          ['d', 'channel-sections'],
-          ['t', 'channel-sections'],
-        ],
-        createdAt: createdAt,
-        onSigned: (event) => signedId = event.id,
-      );
-
-      // Keep the cursor a coherent (created_at, id) pair so an OK that beats
-      // its own echo cannot make later same-second heads compare against a
-      // stale ID. A newer head learned during the await stays.
-      if (signedId != null && _isAfterCursor(createdAt, signedId!)) {
-        _lastRemoteCreatedAt = createdAt;
-        _lastRemoteEventId = signedId;
-        // A same-second loser merged during the await must not strand the
-        // device on content the relay did not keep.
-        if (revision == _localRevision && !identical(_store, submitted)) {
-          _store = submitted;
-          _persist();
-          if (!_disposed) _onChanged();
-        }
-      }
-      _lastPublishedStore = ChannelSectionStore(
-        sections: List.of(submitted.sections),
-        assignments: Map.of(submitted.assignments),
-      );
-    } catch (error) {
-      debugPrint('[ChannelSectionsManager] publish failed: $error');
-    }
-  }
-
   /// A retired manager never writes the prefs key its successor now owns.
   void _persist() {
     if (_disposed) return;
-    _storage.write(pubkey, _store);
-  }
-
-  List<ChannelSection> _sortedSections() {
-    final sorted = _store.sections.toList()
-      ..sort((a, b) => a.order.compareTo(b.order));
-    return sorted;
-  }
-
-  void _swapOrders(List<ChannelSection> sorted, int indexA, int indexB) {
-    final orderA = sorted[indexA].order;
-    final orderB = sorted[indexB].order;
-    final idA = sorted[indexA].id;
-    final idB = sorted[indexB].id;
-
-    _store = ChannelSectionStore(
-      sections: [
-        for (final s in _store.sections)
-          if (s.id == idA)
-            ChannelSection(id: s.id, name: s.name, icon: s.icon, order: orderB)
-          else if (s.id == idB)
-            ChannelSection(id: s.id, name: s.name, icon: s.icon, order: orderA)
-          else
-            s,
-      ],
-      assignments: _store.assignments,
-    );
-    _persist();
+    _storage.write(_cacheScope, _store);
   }
 }

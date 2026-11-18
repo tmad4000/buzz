@@ -190,42 +190,46 @@ class _CustomSectionHeader extends ConsumerWidget {
                     alignment: AnchoredPopoverAlignment.end,
                     surfaceKey: ValueKey('section-popover-${section.id}'),
                     items: [
-                      const PopupMenuItem(
-                        value: 'rename',
-                        padding: _sectionMenuItemPadding,
-                        child: _SectionMenuItemContent(
-                          icon: BuzzIcons.pencil,
-                          label: 'Rename section',
+                      if (channelSectionsEditable)
+                        const PopupMenuItem(
+                          value: 'rename',
+                          padding: _sectionMenuItemPadding,
+                          child: _SectionMenuItemContent(
+                            icon: BuzzIcons.pencil,
+                            label: 'Rename section',
+                          ),
                         ),
-                      ),
-                      PopupMenuItem(
-                        value: 'move_up',
-                        enabled: !isFirst,
-                        padding: _sectionMenuItemPadding,
-                        child: const _SectionMenuItemContent(
-                          icon: BuzzIcons.arrowUp,
-                          label: 'Move up',
+                      if (channelSectionsEditable)
+                        PopupMenuItem(
+                          value: 'move_up',
+                          enabled: !isFirst,
+                          padding: _sectionMenuItemPadding,
+                          child: const _SectionMenuItemContent(
+                            icon: BuzzIcons.arrowUp,
+                            label: 'Move up',
+                          ),
                         ),
-                      ),
-                      PopupMenuItem(
-                        value: 'move_down',
-                        enabled: !isLast,
-                        padding: _sectionMenuItemPadding,
-                        child: const _SectionMenuItemContent(
-                          icon: BuzzIcons.arrowDown,
-                          label: 'Move down',
+                      if (channelSectionsEditable)
+                        PopupMenuItem(
+                          value: 'move_down',
+                          enabled: !isLast,
+                          padding: _sectionMenuItemPadding,
+                          child: const _SectionMenuItemContent(
+                            icon: BuzzIcons.arrowDown,
+                            label: 'Move down',
+                          ),
                         ),
-                      ),
                       ..._sortMenuItems(sortMode),
-                      PopupMenuItem(
-                        value: 'delete',
-                        padding: _sectionMenuItemPadding,
-                        child: _SectionMenuItemContent(
-                          icon: BuzzIcons.trash2,
-                          label: 'Delete section',
-                          color: context.colors.error,
+                      if (channelSectionsEditable)
+                        PopupMenuItem(
+                          value: 'delete',
+                          padding: _sectionMenuItemPadding,
+                          child: _SectionMenuItemContent(
+                            icon: BuzzIcons.trash2,
+                            label: 'Delete section',
+                            color: context.colors.error,
+                          ),
                         ),
-                      ),
                     ],
                   );
                   switch (value) {

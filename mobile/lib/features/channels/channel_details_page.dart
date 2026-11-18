@@ -479,16 +479,18 @@ class ChannelDetailsPage extends HookConsumerWidget {
             children: [
               AppListRow(
                 icon: BuzzIcons.folderInput,
-                title: 'Move to section…',
+                title: 'Sections are managed on desktop',
                 trailing: const _ChannelDetailsChevron(),
-                onTap: () async {
-                  await _showMoveSectionSheet(
-                    context,
-                    ref,
-                    channel: resolvedChannel,
-                    sectionId: currentSectionId,
-                  );
-                },
+                onTap: !channelSectionsEditable
+                    ? null
+                    : () async {
+                        await _showMoveSectionSheet(
+                          context,
+                          ref,
+                          channel: resolvedChannel,
+                          sectionId: currentSectionId,
+                        );
+                      },
               ),
               AppListRow(
                 icon: BuzzIcons.copy,
