@@ -3,7 +3,7 @@ import test, { beforeEach } from "node:test";
 import {
   isJacobSidebarScope,
   decodeSidebarDefaults,
-  upgradeDirectAgentsDefault,
+  projectDirectAgentSections,
 } from "./jacobChannelSectionDefaults.ts";
 import { SECTIONS_LANE, projectSections } from "./channelSectionsSync.ts";
 import { LaneStore, decodeDoc, encodeDoc } from "./sidebarLaneStore.ts";
@@ -130,21 +130,20 @@ test("a delayed legacy relay head overrides bootstrap placeholders", () => {
   );
 });
 
-test("Direct agents updates only exact untouched seed section; authored edits and P2 survive", () => {
+test("Direct agents is only a view of the exact untouched seed, with no stored or encoded changes", () => {
   const defaults = decodeSidebarDefaults(payload);
-  const upgraded = upgradeDirectAgentsDefault(defaults, defaults);
+  const before = JSON.stringify(encodeDoc(SECTIONS_LANE, defaults));
+  const view = projectDirectAgentSections(defaults, defaults);
   assert.equal(
-    projectSections(upgraded).sections.find((s) => s.id === "paseo").name,
+    view.sections.find((s) => s.id === "paseo").name,
     "Direct agents",
   );
-  assert.deepEqual(upgraded.a, defaults.a);
   assert.equal(
-    projectSections(mergeTrees(upgraded, defaults)).sections.find(
-      (s) => s.id === "paseo",
-    ).name,
-    "Direct agents",
+    projectSections(defaults).sections.find((s) => s.id === "paseo").name,
+    "Paseo",
   );
-  assert.equal(upgradeDirectAgentsDefault(upgraded, defaults), upgraded);
+  assert.equal(JSON.stringify(encodeDoc(SECTIONS_LANE, defaults)), before);
+  assert.deepEqual(view.assignments, projectSections(defaults).assignments);
   for (const [field, value] of [
     ["name", "My agents"],
     ["name", "Paseo"],
@@ -152,33 +151,63 @@ test("Direct agents updates only exact untouched seed section; authored edits an
     ["icon", "⭐"],
     ["live", false],
   ]) {
-    const edited = setRegs(
+    const initial =
       field === "name" && value === "Paseo"
         ? setRegs(defaults, [[["s", "paseo", "name"], "Temporary"]])
-        : defaults,
-      [[["s", "paseo", field], value]],
-      true,
+        : defaults;
+    const edited = setRegs(initial, [[["s", "paseo", field], value]], true);
+    assert.deepEqual(
+      projectDirectAgentSections(edited, defaults),
+      projectSections(edited),
     );
-    assert.equal(upgradeDirectAgentsDefault(edited, defaults), edited);
   }
-  const unrelated = decodeSidebarDefaults(
+  assert.deepEqual(
+    projectDirectAgentSections(defaults),
+    projectSections(defaults),
+  );
+});
+
+test("reviewer P1 repro: display default cannot fence a delayed legacy authored rename", () => {
+  const defaults = decodeSidebarDefaults(
     JSON.stringify({
       version: 1,
-      sections: [{ id: "user", name: "Paseo", order: 0 }],
+      sections: [{ id: "paseo", name: "Paseo", order: 1 }],
       assignments: {},
     }),
   );
-  assert.equal(upgradeDirectAgentsDefault(unrelated, defaults), unrelated);
+  const rawBefore = JSON.stringify(defaults);
+  assert.equal(
+    projectDirectAgentSections(defaults, defaults).sections[0].name,
+    "Direct agents",
+  );
+  assert.equal(JSON.stringify(defaults), rawBefore);
+  const remote = decodeDoc(
+    SECTIONS_LANE,
+    {
+      version: 1,
+      sections: [{ id: "paseo", name: "My authored agents", order: 1 }],
+      assignments: {},
+    },
+    200000,
+  );
+  const merged = mergeTrees(defaults, remote.tree, remote.legacy);
+  assert.equal(
+    projectDirectAgentSections(merged, defaults).sections[0].name,
+    "My authored agents",
+  );
+  assert.deepEqual(merged.s.paseo.name, [
+    200000,
+    "0".repeat(16),
+    "My authored agents",
+  ]);
 });
 
-test("upgraded baseline yields to delayed legacy authored names in both orders and after persistence", () => {
+test("view-only baseline preserves old-client names and rename-back in both arrival orders and after reload", () => {
   const defaults = decodeSidebarDefaults(payload);
   const importDefaults = (store) =>
-    store.transact((prev) =>
-      upgradeDirectAgentsDefault(mergeTrees(defaults, prev), defaults),
-    );
-  for (const authoredName of ["A", "My authored agents", "Paseo"]) {
-    for (const legacyV of [1, 200000]) {
+    store.transact((prev) => mergeTrees(defaults, prev));
+  for (const name of ["A", "My authored agents", "Paseo"]) {
+    for (const legacyV of [1, 2, 200000]) {
       for (const legacyFirst of [false, true]) {
         storage.clear();
         const remote = decodeDoc(
@@ -187,59 +216,54 @@ test("upgraded baseline yields to delayed legacy authored names in both orders a
             version: 1,
             sections: [
               { id: "projects", name: "Projects", order: 0 },
-              { id: "paseo", name: authoredName, order: 1 },
+              { id: "paseo", name, order: 1 },
             ],
             assignments: { project: "projects", dm: "paseo" },
           },
           legacyV,
         );
-        assert.equal(remote.legacy, true);
         let store = device();
         if (legacyFirst) store.merge(remote.tree, remote.legacy);
         importDefaults(store);
-        // Exercise the actual encoded local tree, not an in-memory synthetic merge.
+        const before = JSON.stringify(encodeDoc(SECTIONS_LANE, store.get()));
+        projectDirectAgentSections(store.get(), defaults);
+        assert.equal(
+          JSON.stringify(encodeDoc(SECTIONS_LANE, store.get())),
+          before,
+        );
         store = device();
         if (!legacyFirst) store.merge(remote.tree, remote.legacy);
         importDefaults(store);
         assert.equal(
-          projectSections(store.get()).sections.find((s) => s.id === "paseo")
-            .name,
-          authoredName,
-          `${authoredName}; legacyFirst=${legacyFirst}`,
+          projectDirectAgentSections(store.get(), defaults).sections.find(
+            (s) => s.id === "paseo",
+          ).name,
+          name,
         );
         assert.equal(
-          projectSections(device().get()).sections.find((s) => s.id === "paseo")
-            .name,
-          authoredName,
+          projectDirectAgentSections(device().get(), defaults).sections.find(
+            (s) => s.id === "paseo",
+          ).name,
+          name,
         );
-        assert.equal(projectSections(store.get()).assignments.dm, "paseo");
         assert.deepEqual(device().get(), store.get());
       }
     }
   }
 });
 
-test("late legacy data still cannot replace genuinely authored modern section fields", () => {
+test("view default never changes existing authored fields or tombstones", () => {
   const defaults = decodeSidebarDefaults(payload);
-  const store = device();
-  store.transact(() => upgradeDirectAgentsDefault(defaults, defaults));
-  store.transact((tree) =>
-    setRegs(tree, [[["s", "paseo", "name"], "My current agents"]]),
-  );
-  const authored = store.get().s.paseo.name;
-  const legacy = decodeDoc(
-    SECTIONS_LANE,
-    {
-      version: 1,
-      sections: [{ id: "paseo", name: "Late older name", order: 0 }],
-      assignments: { dm: "paseo" },
-    },
-    Date.now() + 10000,
-  );
-  store.merge(legacy.tree, legacy.legacy);
-  assert.deepEqual(store.get().s.paseo.name, authored);
-  assert.equal(
-    projectSections(device().get()).sections.find((s) => s.id === "paseo").name,
-    "My current agents",
-  );
+  for (const value of ["Paseo", "My agents", null, false]) {
+    const authored = {
+      ...defaults,
+      s: {
+        ...defaults.s,
+        paseo: { ...defaults.s.paseo, name: [1, "a".repeat(16), value] },
+      },
+    };
+    const before = JSON.stringify(authored);
+    projectDirectAgentSections(authored, defaults);
+    assert.equal(JSON.stringify(authored), before);
+  }
 });

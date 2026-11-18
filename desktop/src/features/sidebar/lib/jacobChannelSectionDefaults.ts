@@ -1,7 +1,11 @@
 import { normalizeRelayUrl } from "@/shared/lib/normalizeRelayUrl";
-import { SECTIONS_LANE } from "./channelSectionsSync";
+import {
+  SECTIONS_LANE,
+  projectSections,
+  type SectionsView,
+} from "./channelSectionsSync";
 import { decodeDoc } from "./sidebarLaneStore";
-import { isReg, LEGACY_DEV, DEFAULT_DEV, type Tree } from "./sidebarLwwMap";
+import { isReg, canonical, type Tree } from "./sidebarLwwMap";
 
 const JACOB =
   "3eb6491e9fecd5e2c0221f76b79685a1478b591bf90ea155f5352ebe12672e1f";
@@ -26,30 +30,32 @@ export function decodeSidebarDefaults(plaintext: string): Tree {
   return doc.tree;
 }
 
-/** Rename only the seed's untouched baseline, never an authored/legacy section. */
-export function upgradeDirectAgentsDefault(tree: Tree, defaults: Tree): Tree {
-  const sections = tree.s;
-  const baseline = defaults.s;
-  if (!sections || isReg(sections) || !baseline || isReg(baseline)) return tree;
-  let next = sections;
-  for (const [id, seed] of Object.entries(baseline)) {
-    if (!seed || isReg(seed) || !isReg(seed.name) || seed.name[2] !== "Paseo")
-      continue;
-    const node = sections[id];
-    if (!node || isReg(node) || !isReg(node.name) || node.name[2] !== "Paseo")
-      continue;
-    if (
-      !Object.values(node).every(
-        (r) => isReg(r) && r[0] === 0 && r[1] === LEGACY_DEV,
+/** View-only label for the exact untouched seed; never changes a stored register. */
+export function projectDirectAgentSections(
+  tree: Tree,
+  defaults?: Tree,
+): SectionsView {
+  const view = projectSections(tree);
+  const stored = tree.s;
+  const baseline = defaults?.s;
+  if (!stored || isReg(stored) || !baseline || isReg(baseline)) return view;
+  return {
+    ...view,
+    sections: view.sections.map((section) => {
+      const seed = baseline[section.id];
+      const node = stored[section.id];
+      if (
+        section.name !== "Paseo" ||
+        !seed ||
+        isReg(seed) ||
+        !isReg(seed.name) ||
+        seed.name[2] !== "Paseo" ||
+        !node ||
+        isReg(node) ||
+        canonical(node) !== canonical(seed)
       )
-    )
-      continue;
-    next = {
-      ...next,
-      // Reserved stamp-zero defaults beat the old seed without outranking
-      // even a stamp-one legacy cache; the merge layer keeps them placeholders.
-      [id]: { ...node, name: [0, DEFAULT_DEV, "Direct agents"] },
-    };
-  }
-  return next === sections ? tree : { ...tree, s: next };
+        return section;
+      return { ...section, name: "Direct agents" };
+    }),
+  };
 }

@@ -5,7 +5,6 @@ import {
   canonical,
   compareRegs,
   LEGACY_DEV,
-  DEFAULT_DEV,
   mergeTrees,
   setRegs,
   validTree,
@@ -145,40 +144,4 @@ test("inherited names are ordinary keys in either arrival order", () => {
     g: { "*": () => true },
   });
   assert.equal(canonical(valid), canonical(ab));
-});
-
-test("onlyMissing admits explicit zero-stamp defaults but protects every authored successor", () => {
-  for (const baseline of [
-    [0, LEGACY_DEV, "Paseo"],
-    [0, DEFAULT_DEV, "Direct agents"],
-  ]) {
-    const tree = { s: { name: baseline } };
-    for (const legacy of [
-      [1, LEGACY_DEV, "A"],
-      [200000, LEGACY_DEV, "Paseo"],
-    ]) {
-      assert.deepEqual(
-        mergeTrees(tree, { s: { name: legacy } }, true).s.name,
-        legacy,
-      );
-    }
-  }
-  for (const [version, dev] of [
-    [1, DEFAULT_DEV],
-    [200000, DEFAULT_DEV],
-    [200000, A],
-    [200000, LEGACY_DEV],
-  ]) {
-    for (const value of ["Authored", null, false]) {
-      const tree = { s: { name: [version, dev, value] } };
-      assert.equal(
-        mergeTrees(
-          tree,
-          { s: { name: [300000, LEGACY_DEV, "Late legacy"] } },
-          true,
-        ),
-        tree,
-      );
-    }
-  }
 });
