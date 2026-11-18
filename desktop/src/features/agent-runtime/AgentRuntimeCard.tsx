@@ -1,7 +1,7 @@
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { toast } from "sonner";
 import { copyTextToClipboard } from "@/shared/lib/clipboard";
-import { useNow } from "@/shared/lib/useNow";
+import { RuntimeRouteAge } from "./RuntimeRouteAge";
 import { runtimeSessionLink, type RuntimeSession } from "./model";
 import { setRuntimeCardsEnabled, useRuntimeCardsEnabled } from "./preference";
 import { useAgentRuntime } from "./useAgentRuntime";
@@ -27,9 +27,7 @@ export function OpenRuntimeSession({ session }: { session: RuntimeSession }) {
 export function AgentRuntimeCard({ pubkey }: { pubkey: string }) {
   const enabled = useRuntimeCardsEnabled();
   const query = useAgentRuntime(pubkey);
-  const now = useNow(60_000);
   const data = query.data;
-  const stale = data && now / 1000 - data.attestedAt > 86_400;
   return (
     <section
       className="my-3 rounded-lg border p-3 text-sm"
@@ -65,7 +63,7 @@ export function AgentRuntimeCard({ pubkey }: { pubkey: string }) {
         </p>
       ) : null}
       {data ? (
-        <div className={stale ? "mt-3 text-muted-foreground" : "mt-3"}>
+        <div className="mt-3">
           <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-2">
             <dt>Host</dt>
             <dd>{data.card.host.toUpperCase()}</dd>
@@ -127,9 +125,11 @@ export function AgentRuntimeCard({ pubkey }: { pubkey: string }) {
             </div>
           ))}
           <p className="mt-3 text-xs text-muted-foreground">
+            <RuntimeRouteAge attestedAt={data.attestedAt} />
+            <br />
             Self-signed · self-reported{" "}
             {new Date(data.attestedAt * 1000).toLocaleString()}
-            {stale ? " · Stale (over 24 h)" : ""}
+
             {query.isError ? " · Refresh failed" : ""}
           </p>
         </div>
