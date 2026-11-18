@@ -33,7 +33,11 @@ export function useConversationAutoSendTriggerClear({
     return () => echoes.cancelOwner(echoOwner);
   }, [session, echoOwner]);
   return React.useCallback(
-    async (entryKey: string, target: ConversationAutoSubmitTarget) => {
+    async (
+      entryKey: string,
+      target: ConversationAutoSubmitTarget,
+      onProjection?: (id: string) => void,
+    ) => {
       if (!session) return false;
       const controller = session.controller;
       const view = controller.getSnapshot().layout.views[target.viewId];
@@ -62,6 +66,8 @@ export function useConversationAutoSendTriggerClear({
         );
       };
       if (!admitted()) return false;
+      const projectionId = crypto.randomUUID();
+      onProjection?.(projectionId);
       return clearCapturedAutoSendTrigger({
         entryKey,
         target,
@@ -78,7 +84,7 @@ export function useConversationAutoSendTriggerClear({
         },
         echoes: projectionEchoesFor(controller),
         echoOwner,
-        projectionId: crypto.randomUUID(),
+        projectionId,
       });
     },
     [router, session, echoOwner],
