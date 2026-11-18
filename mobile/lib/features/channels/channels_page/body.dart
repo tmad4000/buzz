@@ -108,6 +108,7 @@ class _SliverChannelsList extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final readState = ref.watch(readStateProvider);
     final sectionsState = ref.watch(channelSectionsProvider);
+    final syncDesktopLayout = ref.watch(desktopSectionsEnabledProvider);
     final mutesState = ref.watch(channelMutesProvider);
     final mutedChannelIds = {
       for (final entry in mutesState.store.channels.entries)
@@ -205,10 +206,11 @@ class _SliverChannelsList extends HookConsumerWidget {
       for (final entry in sectionAssignments.entries)
         if (validSectionIds.contains(entry.value)) entry.key,
     };
-    // Starred is exclusive: a starred channel lives only in the Starred section,
-    // not in its custom section or the default Channels list.
+    // Desktop Starred is a shortcut; original placement is retained when enabled.
     final starredStreamChannels = sortChannelsForList(
-      streamChannels.where((c) => starredChannelIds.contains(c.id)).toList(),
+      (syncDesktopLayout ? visibleChannels : streamChannels)
+          .where((c) => starredChannelIds.contains(c.id))
+          .toList(),
       sortState.sortModeFor('starred'),
     );
     final ungroupedStreamChannels = sortChannelsForList(
@@ -216,17 +218,24 @@ class _SliverChannelsList extends HookConsumerWidget {
           .where(
             (c) =>
                 !assignedChannelIds.contains(c.id) &&
-                !starredChannelIds.contains(c.id),
+                (syncDesktopLayout || !starredChannelIds.contains(c.id)),
           )
           .toList(),
       sortState.sortModeFor('channels'),
     );
     // DMs default to the display-label alphabetical order (labels can differ
     // from channel names); Recent mode reorders by last message time.
+    final ungroupedDms = syncDesktopLayout
+        ? channelsInSidebarSection(
+            dmChannels,
+            sectionsState.store,
+            'builtin:dms',
+          )
+        : dmChannels;
     final sortedDmChannels =
         sortState.sortModeFor('dms') == ChannelSortMode.recent
-        ? sortChannelsForList(dmChannels, ChannelSortMode.recent)
-        : dmChannels;
+        ? sortChannelsForList(ungroupedDms, ChannelSortMode.recent)
+        : ungroupedDms;
 
     final liveSectionIds = [for (final s in userSections) s.id];
     void setSortMode(String groupKey, ChannelSortMode mode) {
@@ -247,162 +256,193 @@ class _SliverChannelsList extends HookConsumerWidget {
       };
     }
 
-    return SliverPadding(
-      padding: EdgeInsets.only(
-        top: Grid.xxs,
-        bottom: MediaQuery.paddingOf(context).bottom,
-      ),
-      sliver: SliverList.list(
-        children: [
-          if (visibleChannels.isEmpty)
-            const _EmptyState()
-          else ...[
-            // Starred channels (exclusive — pinned above all sections).
-            if (starredStreamChannels.isNotEmpty)
-              _ChannelSection(
-                title: 'Starred',
-                icon: BuzzIcons.star,
-                showTopDivider: false,
-                expanded: starredExpanded.value,
-                onToggle: () => starredExpanded.value = !starredExpanded.value,
-                channels: starredStreamChannels,
-                unreadChannelIds: unreadChannelIds,
-                mutedChannelIds: mutedChannelIds,
-                currentPubkey: currentPubkey,
-                emptyLabel: '',
-                sortMode: sortState.sortModeFor('starred'),
-                onSortModeChange: (mode) => setSortMode('starred', mode),
-                onSelectChannel: onSelectChannel,
-              ),
-            // User-defined sections for stream channels, in user-defined order.
-            for (final section in userSections)
-              _CustomChannelSection(
-                section: section,
-                channels: sortChannelsForList(
-                  streamChannels
+    final groups = <String, Widget>{
+      // Starred shortcuts follow desktop order when the opt-in is enabled.
+      if (starredStreamChannels.isNotEmpty)
+        'builtin:starred': _ChannelSection(
+          title: 'Starred',
+          icon: BuzzIcons.star,
+          showTopDivider: false,
+          expanded: starredExpanded.value,
+          onToggle: () => starredExpanded.value = !starredExpanded.value,
+          channels: starredStreamChannels,
+          unreadChannelIds: unreadChannelIds,
+          mutedChannelIds: mutedChannelIds,
+          currentPubkey: currentPubkey,
+          emptyLabel: '',
+          sortMode: sortState.sortModeFor('starred'),
+          onSortModeChange: (mode) => setSortMode('starred', mode),
+          onSelectChannel: onSelectChannel,
+        ),
+      // User-defined sections for stream channels, in user-defined order.
+      for (final section in userSections)
+        section.id: _CustomChannelSection(
+          section: section,
+          channels: sortChannelsForList(
+            syncDesktopLayout
+                ? channelsInSidebarSection(
+                    visibleChannels,
+                    sectionsState.store,
+                    section.id,
+                  )
+                : streamChannels
                       .where(
                         (c) =>
                             sectionAssignments[c.id] == section.id &&
                             !starredChannelIds.contains(c.id),
                       )
                       .toList(),
-                  sortState.sortModeFor(sectionSortGroupKey(section.id)),
-                ),
-                unreadChannelIds: unreadChannelIds,
-                mutedChannelIds: mutedChannelIds,
-                currentPubkey: currentPubkey,
-                expanded: sectionExpanded(section.id),
-                isFirst: userSections.first.id == section.id,
-                isLast: userSections.last.id == section.id,
-                showTopDivider:
-                    starredStreamChannels.isNotEmpty ||
-                    userSections.first.id != section.id,
-                onToggle: () => toggleSection(section.id),
-                onRename: () async {
-                  final name = await showBuzzDialog<String>(
-                    context: context,
-                    builder: (_) => _SectionNameDialog(
-                      title: 'Rename Section',
-                      confirmLabel: 'Rename',
-                      initialValue: section.name,
-                    ),
-                  );
-                  if (name != null && name.isNotEmpty) {
-                    ref
-                        .read(channelSectionsProvider.notifier)
-                        .renameSection(section.id, name);
-                  }
-                },
-                onDelete: () async {
-                  final confirmed = await showBuzzDialog<bool>(
-                    context: context,
-                    builder: (_) => AlertDialog(
-                      title: Text('Delete "${section.name}"?'),
-                      content: const Text(
-                        'Channels in this section will move back to the main list.',
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context, false),
-                          child: const Text('Cancel'),
-                        ),
-                        TextButton(
-                          onPressed: () => Navigator.pop(context, true),
-                          child: Text(
-                            'Delete',
-                            style: TextStyle(color: context.colors.error),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                  if (confirmed == true) {
-                    ref
-                        .read(channelSectionsProvider.notifier)
-                        .deleteSection(section.id);
-                  }
-                },
-                onMoveUp: () => ref
-                    .read(channelSectionsProvider.notifier)
-                    .moveSectionUp(section.id),
-                onMoveDown: () => ref
-                    .read(channelSectionsProvider.notifier)
-                    .moveSectionDown(section.id),
-                sortMode: sortState.sortModeFor(
-                  sectionSortGroupKey(section.id),
-                ),
-                onSortModeChange: (mode) =>
-                    setSortMode(sectionSortGroupKey(section.id), mode),
-                onSelectChannel: onSelectChannel,
-                onMarkChannelRead: (channel) {
-                  final ts = dateTimeToUnixSeconds(channel.lastMessageAt);
-                  if (ts != null) {
-                    ref
-                        .read(readStateProvider.notifier)
-                        .markContextRead(
-                          channel.id,
-                          ts,
-                          clearForcedMessages: true,
-                        );
-                    ref
-                        .read(channelsProvider.notifier)
-                        .clearObservedUnreadCoveredByRead(channel.id, ts);
-                  }
-                },
+            sortState.sortModeFor(sectionSortGroupKey(section.id)),
+          ),
+          unreadChannelIds: unreadChannelIds,
+          mutedChannelIds: mutedChannelIds,
+          currentPubkey: currentPubkey,
+          expanded: sectionExpanded(section.id),
+          isFirst: userSections.first.id == section.id,
+          isLast: userSections.last.id == section.id,
+          showTopDivider:
+              starredStreamChannels.isNotEmpty ||
+              userSections.first.id != section.id,
+          onToggle: () => toggleSection(section.id),
+          onRename: () async {
+            final name = await showBuzzDialog<String>(
+              context: context,
+              builder: (_) => _SectionNameDialog(
+                title: 'Rename Section',
+                confirmLabel: 'Rename',
+                initialValue: section.name,
               ),
-            _ChannelSection(
-              title: 'Channels',
-              icon: BuzzIcons.hash,
-              showTopDivider:
-                  starredStreamChannels.isNotEmpty || userSections.isNotEmpty,
-              expanded: channelsExpanded.value,
-              onToggle: () => channelsExpanded.value = !channelsExpanded.value,
-              channels: ungroupedStreamChannels,
-              unreadChannelIds: unreadChannelIds,
-              mutedChannelIds: mutedChannelIds,
-              currentPubkey: currentPubkey,
-              emptyLabel: 'No stream channels yet',
-              sortMode: sortState.sortModeFor('channels'),
-              onSortModeChange: (mode) => setSortMode('channels', mode),
-              onSelectChannel: onSelectChannel,
-            ),
-            _ChannelSection(
-              title: 'DMs',
-              icon: BuzzIcons.messagesSquare,
-              showTopDivider: true,
-              expanded: dmsExpanded.value,
-              onToggle: () => dmsExpanded.value = !dmsExpanded.value,
-              channels: sortedDmChannels,
-              unreadChannelIds: unreadChannelIds,
-              mutedChannelIds: mutedChannelIds,
-              currentPubkey: currentPubkey,
-              emptyLabel: 'No direct messages yet',
-              sortMode: sortState.sortModeFor('dms'),
-              onSortModeChange: (mode) => setSortMode('dms', mode),
-              onSelectChannel: onSelectChannel,
-            ),
-          ],
-        ],
+            );
+            if (name != null && name.isNotEmpty) {
+              ref
+                  .read(channelSectionsProvider.notifier)
+                  .renameSection(section.id, name);
+            }
+          },
+          onDelete: () async {
+            final confirmed = await showBuzzDialog<bool>(
+              context: context,
+              builder: (_) => AlertDialog(
+                title: Text('Delete "${section.name}"?'),
+                content: const Text(
+                  'Channels in this section will move back to the main list.',
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: const Text('Cancel'),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    child: Text(
+                      'Delete',
+                      style: TextStyle(color: context.colors.error),
+                    ),
+                  ),
+                ],
+              ),
+            );
+            if (confirmed == true) {
+              ref
+                  .read(channelSectionsProvider.notifier)
+                  .deleteSection(section.id);
+            }
+          },
+          onMoveUp: () => ref
+              .read(channelSectionsProvider.notifier)
+              .moveSectionUp(section.id),
+          onMoveDown: () => ref
+              .read(channelSectionsProvider.notifier)
+              .moveSectionDown(section.id),
+          sortMode: sortState.sortModeFor(sectionSortGroupKey(section.id)),
+          onSortModeChange: (mode) =>
+              setSortMode(sectionSortGroupKey(section.id), mode),
+          onSelectChannel: onSelectChannel,
+          onMarkChannelRead: (channel) {
+            final ts = dateTimeToUnixSeconds(channel.lastMessageAt);
+            if (ts != null) {
+              ref
+                  .read(readStateProvider.notifier)
+                  .markContextRead(channel.id, ts, clearForcedMessages: true);
+              ref
+                  .read(channelsProvider.notifier)
+                  .clearObservedUnreadCoveredByRead(channel.id, ts);
+            }
+          },
+        ),
+      'builtin:channels': _ChannelSection(
+        title: 'Channels',
+        icon: BuzzIcons.hash,
+        showTopDivider:
+            starredStreamChannels.isNotEmpty || userSections.isNotEmpty,
+        expanded: channelsExpanded.value,
+        onToggle: () => channelsExpanded.value = !channelsExpanded.value,
+        channels: ungroupedStreamChannels,
+        unreadChannelIds: unreadChannelIds,
+        mutedChannelIds: mutedChannelIds,
+        currentPubkey: currentPubkey,
+        emptyLabel: 'No stream channels yet',
+        sortMode: sortState.sortModeFor('channels'),
+        onSortModeChange: (mode) => setSortMode('channels', mode),
+        onSelectChannel: onSelectChannel,
+      ),
+      if (syncDesktopLayout)
+        'builtin:forums': _ChannelSection(
+          title: 'Forums',
+          icon: BuzzIcons.hash,
+          showTopDivider: true,
+          expanded: sectionExpanded('builtin:forums'),
+          onToggle: () => toggleSection('builtin:forums'),
+          channels: channelsInSidebarSection(
+            visibleChannels,
+            sectionsState.store,
+            'builtin:forums',
+          ),
+          unreadChannelIds: unreadChannelIds,
+          mutedChannelIds: mutedChannelIds,
+          currentPubkey: currentPubkey,
+          emptyLabel: 'No forums yet',
+          sortMode: sortState.sortModeFor('forums'),
+          onSortModeChange: (mode) => setSortMode('forums', mode),
+          onSelectChannel: onSelectChannel,
+        ),
+      'builtin:dms': _ChannelSection(
+        title: 'DMs',
+        icon: BuzzIcons.messagesSquare,
+        showTopDivider: true,
+        expanded: dmsExpanded.value,
+        onToggle: () => dmsExpanded.value = !dmsExpanded.value,
+        channels: sortedDmChannels,
+        unreadChannelIds: unreadChannelIds,
+        mutedChannelIds: mutedChannelIds,
+        currentPubkey: currentPubkey,
+        emptyLabel: 'No direct messages yet',
+        sortMode: sortState.sortModeFor('dms'),
+        onSortModeChange: (mode) => setSortMode('dms', mode),
+        onSelectChannel: onSelectChannel,
+      ),
+    };
+    final order = syncDesktopLayout
+        ? normalizeSectionOrder(sectionsState.store.layoutOrder, userSections)
+        : [
+            'builtin:starred',
+            ...userSections.map((s) => s.id),
+            'builtin:channels',
+            'builtin:dms',
+          ];
+    return SliverPadding(
+      padding: EdgeInsets.only(
+        top: Grid.xxs,
+        bottom: MediaQuery.paddingOf(context).bottom,
+      ),
+      sliver: SliverList.list(
+        children: visibleChannels.isEmpty
+            ? [const _EmptyState()]
+            : [
+                for (final id in order)
+                  if (groups[id] case final Widget group)
+                    KeyedSubtree(key: ValueKey(id), child: group),
+              ],
       ),
     );
   }

@@ -35,7 +35,7 @@ class ChannelSectionsNotifier extends Notifier<ChannelSectionsState> {
     final relayConfig = ref.watch(relayConfigProvider);
     final sessionState = ref.watch(relaySessionProvider);
     // Rebuild when the active community changes (pubkey may differ).
-    ref.watch(activeCommunityProvider);
+    final community = ref.watch(activeCommunityProvider).unwrapPrevious().value;
 
     final nsec = relayConfig.nsec?.trim();
     if (nsec == null || nsec.isEmpty) {
@@ -63,6 +63,7 @@ class ChannelSectionsNotifier extends Notifier<ChannelSectionsState> {
     late final ChannelSectionsManager manager;
     manager = ChannelSectionsManager(
       pubkey: pubkey,
+      relayUrl: community?.relayUrl,
       prefs: prefs,
       crypto: crypto,
       relaySession: ref.read(relaySessionProvider.notifier),
@@ -140,3 +141,7 @@ String? _safePubkeyFromNsec(String nsec) {
     return null;
   }
 }
+
+final desktopSectionsEnabledProvider = Provider<bool>(
+  (ref) => desktopSectionsEnabled,
+);

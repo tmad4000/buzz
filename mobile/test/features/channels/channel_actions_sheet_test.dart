@@ -124,7 +124,7 @@ void main() {
     for (final label in [
       'Star',
       'Mark Unread',
-      'Move to section…',
+      'Sections are managed on desktop',
       'Mute channel',
       'Manage channel',
       'Copy channel name',
@@ -136,7 +136,9 @@ void main() {
       expect(find.text(label), findsOneWidget, reason: label);
     }
 
-    final moveTop = tester.getTopLeft(find.text('Move to section…')).dy;
+    final moveTop = tester
+        .getTopLeft(find.text('Sections are managed on desktop'))
+        .dy;
     final muteTop = tester.getTopLeft(find.text('Mute channel')).dy;
     final manageTop = tester.getTopLeft(find.text('Manage channel')).dy;
     final copyNameTop = tester.getTopLeft(find.text('Copy channel name')).dy;
@@ -310,7 +312,7 @@ void main() {
 
     expect(find.text('Archive channel'), findsNothing);
     expect(find.text('Delete channel'), findsNothing);
-    expect(find.text('Move to section…'), findsOneWidget);
+    expect(find.text('Sections are managed on desktop'), findsOneWidget);
     expect(find.text('Leave channel'), findsOneWidget);
   });
 
@@ -773,45 +775,54 @@ void main() {
     expect(tester.widget<FilledButton>(editCanvas).onPressed, isNull);
   });
 
-  testWidgets('regular members can move channels but cannot edit metadata', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      _modalApp(
-        channel: _channel(),
-        loadMembers: () async => [
-          ChannelMember(
-            pubkey: _currentPubkey,
-            role: 'member',
-            joinedAt: DateTime(2025),
-          ),
-        ],
-        createChannelActions: (ref) => _FakeChannelActions(ref),
-      ),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Open actions'));
-    await tester.pumpAndSettle();
+  testWidgets(
+    'regular members see read-only sections and cannot edit metadata',
+    (tester) async {
+      await tester.pumpWidget(
+        _modalApp(
+          channel: _channel(),
+          loadMembers: () async => [
+            ChannelMember(
+              pubkey: _currentPubkey,
+              role: 'member',
+              joinedAt: DateTime(2025),
+            ),
+          ],
+          createChannelActions: (ref) => _FakeChannelActions(ref),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Open actions'));
+      await tester.pumpAndSettle();
 
-    expect(find.text('Move to section…'), findsOneWidget);
-    await tester.tap(find.text('Manage channel'));
-    await tester.pumpAndSettle();
+      expect(find.text('Sections are managed on desktop'), findsOneWidget);
+      expect(
+        tester
+            .widget<ListTile>(
+              find.widgetWithText(ListTile, 'Sections are managed on desktop'),
+            )
+            .onTap,
+        isNull,
+      );
+      await tester.tap(find.text('Manage channel'));
+      await tester.pumpAndSettle();
 
-    final nameField = find.byKey(const ValueKey('manage-channel-name'));
-    final descriptionField = find.byKey(
-      const ValueKey('manage-channel-description'),
-    );
-    expect(tester.widget<TextField>(nameField).enabled, isFalse);
-    expect(tester.widget<TextField>(descriptionField).enabled, isFalse);
-    expect(
-      tester
-          .widget<FilledButton>(
-            find.byKey(const ValueKey('manage-channel-canvas')),
-          )
-          .onPressed,
-      isNotNull,
-    );
-  });
+      final nameField = find.byKey(const ValueKey('manage-channel-name'));
+      final descriptionField = find.byKey(
+        const ValueKey('manage-channel-description'),
+      );
+      expect(tester.widget<TextField>(nameField).enabled, isFalse);
+      expect(tester.widget<TextField>(descriptionField).enabled, isFalse);
+      expect(
+        tester
+            .widget<FilledButton>(
+              find.byKey(const ValueKey('manage-channel-canvas')),
+            )
+            .onPressed,
+        isNotNull,
+      );
+    },
+  );
 
   testWidgets('DM omits quick actions, then shows mute and copy rows', (
     tester,
@@ -836,7 +847,7 @@ void main() {
       'Unstar',
       'Mark Unread',
       'Mark Read',
-      'Move to section…',
+      'Sections are managed on desktop',
       'Manage channel',
       'Leave channel',
       'Archive channel',
