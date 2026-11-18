@@ -1,0 +1,37 @@
+{
+  "at": "2026-11-18T07:32:34.025406+00:00",
+  "parent": "3a1e41ec74e6de8b261fbb7b4e6667333b8c0e8a",
+  "productSourceHead": "4c50166c8",
+  "droppedCommits": [
+    "0e842999456e04fd2256599ec4af532998f46744",
+    "e021fa3677a1042f0a6e434d6e0227252f98ce68"
+  ],
+  "removedMerge": "31a7bed72fb4d5e949ef4a36d8ef7dd17392a892",
+  "productTreeIdenticalToPreRebase4f29": true,
+  "retainedProductDelta": [
+    "threadParentQuote.ts",
+    "threadParentQuote.test.mjs",
+    "ThreadParentJump.test.mjs",
+    "ThreadParentQuoteChip.jsdom-test.mjs",
+    "useUnreadSidebarThread.jsdom-test.mjs"
+  ],
+  "modelTests": {
+    "pass": 18,
+    "fail": 0,
+    "timeoutSeconds": 60
+  },
+  "domTests": {
+    "pass": 15,
+    "fail": 0,
+    "timeoutSeconds": 60
+  },
+  "typecheck": {
+    "exitCode": 0,
+    "diagnostics": 0,
+    "timeoutSeconds": 90
+  },
+  "isolation": "setsid plus process-group kill cleanup",
+  "requestedLease": "e021fa3677a1042f0a6e434d6e0227252f98ce68",
+  "observedRemote": "4f29b77b06760b539f9b21c6607fcbe421f88968",
+  "realBuzzActions": false
+}

@@ -1,0 +1,18 @@
+✔ owning pane rejects quote navigation before changing any state when Page or thread edit guard refuses (82.126329ms)
+✔ same-thread parent jump exposes an exact target without retargeting the newer composer draft (8.42267ms)
+✔ opening a different thread sets only its root as the default composer target, not the navigation parent (5.31886ms)
+✔ allowed owning-pane jump closes the covering Page before opening the parent target (13.17692ms)
+✔ repeated exact-parent reveals keep open, closed and collapsed destinations open without toggle/composer actions (26.76182ms)
+✔ native nested reply quotes only the parent's current first line, independent of presentation depth (3.31537ms)
+✔ root replies, self references and messages without native reply tags have no quote (0.53585ms)
+✔ unloaded and nontext parents keep exact native jump identity without inventing a quote (0.42822ms)
+✔ cross-channel or ambiguous channel tags never expose a parent chip (0.27588ms)
+✔ conflicting or duplicate ancestry never asserts a jump; out-of-scope loaded parents become neutral stubs (0.65376ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1253.506795

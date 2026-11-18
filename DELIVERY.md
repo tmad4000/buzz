@@ -1,63 +1,57 @@
-> Current P1 follow-up: root requested exact3857 reproduction and current-effective-body provenance recheck. Prior source reviews below are historical; same-reviewer recheck of the new head is pending.
+# Parent quote reveal / scope follow-up (.9)
 
-# Agent reply UX — .9 source candidate
+Jacob's original ask: agent replies should visibly attach to the exact message they answer. Root's latest explicit assignment: apply075's compatibility advisory, use the dedicated exact-parent reveal seam, repeated-click regressions, separate draft PR stacked on frozen PR67 rather than modifying PR84.
 
-Owner: d809bb50-03b8-41d2-ba83-e2a18cb86a89. Workspace: `/home/dev/agent-worktrees/buzz-agent-reply-ux-20261118`.
-Base: `buzz-ideaflow-v0.5.28-ideaflow.8`, annotated tag object `69eda1ff`, peeled commit `16fa57dfc97f115d00382fcb75128295b5fb3def`.
+Own worktree /home/dev/agent-worktrees/buzz-parent-reveal-20261118; branch agent-parent-reveal-20261118; final authoritative base3a1e41ec74e6de8b261fbb7b4e6667333b8c0e8a. PR67, PR84 and PR87 unchanged.
 
-Jacob's original asks, recovered by the root dispatch and `buzz-request-audit-20261117/REPORT.md`:
-- 2026-11-16 23:48 / 2026-11-17 08:19 DM: show which agent is working, with a link and less noise.
-- 2026-11-17 15:43 DM: agent answers should visibly attach to the exact answered message even in expanded inline threads.
+## Source finding and change
 
-Draft PR: https://github.com/tmad4000/buzz/pull/67 (base `sol/buzz8-release`, .9 bucket).
+The advisory describes an onOpenThread(parent) pitfall. Exact183 already routes MessageThreadRow quotes through ThreadParentQuoteChip, then onJumpToThreadMessage(nativeRoot, exactParent), falling back to goChannel(channel,{messageId,threadRootId,force:true}). There is no onOpenThread(parent) call to replace at this base. Inline summary and sidebar branch toggles remain independent of the quote action. We preserve this existing seam and add repeated-click regression evidence rather than claim an absent callback was fixed.
 
-## Source delivery
+Concrete scope gaps fixed in threadParentQuote:
+- Reject duplicate/conflicting root/reply ancestry, missing native reply, and edit-event targets. Presentation root/parent/depth never supplies identity.
+- Require exactly one matching channel marker on the child.
+- A loaded parent's ID and its own single channel marker must match before displaying an excerpt or enabling navigation. Missing, removed/deleted (absent from index), mismatched or ambiguous parents use the neutral noninteractive earlier-message stub. No fetch, hidden read, composer action or cross-scope lookup.
 
-Settings → Experiments → **Agent reply context** opts into compact reported-status cards and native-parent quotes. Default OFF. Expanding the compact summary opts into details and the agent link. The shared MessageRow renders recognized bridge cards compactly across channel/thread surfaces, with executor and opt-in Open agent, report provenance/model, full original card text and copyable IDs. Unknown formats and substantive answer content retain the normal renderer. No runtime subscription, worker wakeup, inferred completion or seen-state write is added.
+The map is supplied by the current pane's scoped thread index. The helper cannot independently prove community/identity from a message body. No global cache lookup is introduced. Previews are explicitly **nested-only**: direct-root parent quotes remain deliberately omitted, since the root is already shown. This is not a claim that every reply has a preview.
 
-Parent display reuses reviewed PR54's native NIP-10 parent≠root quote plus guarded owning-pane jump; it never uses capped paint depth or retargets an existing draft. Root replies remain visually attached to their root without a redundant quote. Missing parents show a noninteractive “reply to earlier message” stub; no parent fetch or navigation is attempted.
+## Preserved boundaries
 
-## Reused source / integration order
+Same default-OFF agentReplyUx. No bridge parser, signer/effective-edit signer, metadata/control qualifier, original card message ID/count/read target, watchdog prose or body fallback changes. No new protocol or runtime claims. PR84 controls and PR87 contract parser corrections remain separate. Originating-request footer, card-role/count-neutral and lifecycle projection are explicitly DEFERRED: there is no structured on-wire binding. No hidden parent read or composer mutation occurs during rendering; a user's navigation uses existing guarded navigation and ordinary visible-message admission. Existing different-thread opening defaults are unchanged.
 
-Apply each prerequisite once; this branch contains additive signed-off cherry-picks:
-- PR54 `533f8d23c`, `1d284379b`, `89bb4f3b` → local `236e128a6`, `74afcc34d`, `b6cf5bc55`.
-- PR58 `7472d44a5`, `b04b419e` → local `ea3230b15`, `314103027`.
-- Then this branch's compact-card/experiment commit. If integrating PR54/58 separately, omit the duplicated prerequisite cherry-picks. The opt-in wrapper is intentional and needs retaining around ThreadParentQuoteChip.
+Advisory SHA256 verified a80d53776e37077af1d108499e62e20866821a3d407b14de5ed96eb90dd5b592 at /home/dev/code/buzz-agent-reply-ux-contract-20261118/COMPATIBILITY-ADVISORY.md. Current CONTRACT.md/fixture/source hashes recorded by separate PR87. Synthetic fixtures are not signature proof.
 
-PR58's established main-window GCP/M4/M5 host + exact UUID opener capability is reused unchanged. No new hosts, relay kinds, dependencies, lockfiles, listeners or service changes.
+## Validation and review
 
-## Contract coordination and remaining work
+PASS:10 focused model tests,14 DOM tests, whole-desktop tsc --noEmit (exit0, no diagnostics). Logs validation/parent-reveal-model.log, parent-reveal-dom.log, parent-reveal-typecheck.log. Each run uses setsid + timeout + process-group SIGKILL cleanup via validation/run-bounded.py.
 
-Read-only source contract: `/home/dev/code/paseo-buzz-bridge-20261114/listener/status_agent_metadata.py` (`render`, `link`, `normalize_status`), `status_cards.py`, `status_card_transport.py`. Existing ordinary kind9 reply + kind edit transport, established raw bridge signer, exact four-line envelope plus optional stale-metadata line. Full-body envelope recognition is bounded to 2048 characters. Delegated display authors do not establish signer trust.
+Production component tests repeat both owner callback and force-route clicks and preserve body identity and neutral stubs/default OFF. Actual owning-pane callback tests verify repeated exact-root/parent selection and guard behavior. Actual useUnreadSidebarThread hook tests reveal open, closed and collapsed ancestry twice, preserving per-view/saved disclosure semantics. No heavy browser/native/Tauri/cargo builds, live reads/posts/control triggers or Mac actions.
 
-Root approved compatibility and proposed machine binding. Sent the additive tags/snapshot proposal in STATUS-CARD-TAGS.md to bridge owner075fe13; listener remains untouched. Client prefers valid machine tags; old untagged cards use the body fallback. Production edit formatting replaces machine snapshots only for bridge-signed edits and records the edit signer so other-author edits cannot masquerade as bridge reports. Activation/contract response remains pending075. 445b5cb9 confirmed PR54 reuse and guarded callback requirement; implemented it. fd0 integration owner received prerequisite/pick-order notices.
+Owners445 and2d notified. Separate independent Sol source review requested through root. Keep draft/frozen for review; no deployment or native/human acceptance claim.
 
-**Compatibility limitation, still open:** the transport contains ordinary status reply messages, not a structured count-neutral message-level work projection. This slice compacts the existing card in its existing position; it does not move it into the originating-request footer, keep it visible with collapsed replies, remove legacy reply counts/notifications, or verify active task-bound execution. Labels explicitly say Reported working/done and details say live activity unverified. Full quiet footer semantics from DESIGN.md §280 remain an adapter/transport integration item with 075fe13/root, and must not be reported as completed by this PR.
+## Final authoritative rebase
 
-## Validation
+Rebased onto original approved3a1e41ec74e6de8b261fbb7b4e6667333b8c0e8a. Dropped duplicate provenance commit0e8429994 and combined provenance receipt e021fa367; merge31a is removed by linear rebase. Retained quote hardening plus quote validation receipts. LocalEditedContent, exact3857 regression, formatter/cache/parser/type provenance remain supplied ONLY by original3a ancestry.
 
-Only bounded light checks; each test/typecheck uses `setsid` with a parent timeout and process-group SIGKILL cleanup. Reused the existing installed desktop dependency tree by symlink; no dependency installation/update.
-- 45 focused model/unit tests PASS: bridge envelope/signature identity, tag precedence/duplicate-malformed rejection, production edit snapshot/immutable-ancestry behavior, report edits/watchdog/stale metadata, exact native parent tags, parent quote scope, Page/thread guarded navigation, Markdown transform/opener callback, native permission scope.
-- 6 focused DOM tests PASS: compact card original text/link/edit identity, shared thread-row native quote/navigation/body identity, default-off quote gate and no-fetch unloaded-parent stub; production sidebar-panel default-off legacy context and on-state deduplication.
-- Whole-desktop TypeScript `tsc --noEmit`: PASS, exit 0; `validation/typecheck.log` is empty (no diagnostics).
-- Biome on added/changed components and models PASS; whitespace check PASS.
+Product content not already in3a and retained:
+- threadParentQuote.ts: strict native ancestry/channel scope checks, neutral absent/out-of-scope loaded-parent fallback, nested-only documentation.
+- ThreadParentJump.test.mjs: repeated owning-pane exact-parent reveal guards.
+- threadParentQuote.test.mjs: conflicting ancestry and parent scope cases.
+- ThreadParentQuoteChip.jsdom-test.mjs: repeated dedicated owner/force-route clicks and scoped fixtures.
+- useUnreadSidebarThread.jsdom-test.mjs: actual hook repeated reveal for open/closed/collapsed destinations.
 
-Evidence: `validation/model-tests.log`, `validation/dom-tests.log`, `validation/typecheck.log`. The bounded runner is reproduced in `validation/run-bounded.py`.
+DELIVERY.md and quote validation logs/receipts are also retained. No other product content differs from3a. Pre-rebase backup4f29 product/test source matches the rebased result exactly. Earlier parent-restack receipts are historical; fresh rebase checks follow in the final receipt. PR67 stays3a, PR84 and PR87 untouched.
 
-No browser/native/Tauri/cargo builds, M5 actions, release, install or Buzz posts. Native OS-handler behavior and human acceptance remain unverified. Draft/source review only; no buzz-review-completed attestation.
+## Final rebased candidate validation
 
-## Review / manual acceptance for the release owner
+Fresh PASS:18 focused model tests,15 DOM tests,whole-desktop tsc --noEmit exit0/no diagnostics. Logs validation/final-rebase-model.log,final-rebase-dom.log,final-rebase-typecheck.log; structured final-rebase-receipt.json. Runs use setsid/60s test/90s typecheck deadlines/process-group kill cleanup. Product/test tree matches backup4f29 exactly; original3a ancestry supplies all provenance changes. The retained5-file quote-only product delta is listed above.
 
-Independent Sol review by87017e7a at fde7c66fe found one P2: default-off deep-sidebar context was removed by prerequisite PR54. Restored the original context while disabled, with a mounted production-panel off/on regression; optional reported-label wording also applied. First review: https://github.com/tmad4000/buzz/pull/67#pullrequestreview-5951545364. Focused recheck completed at exact source `7d5893bd07395d2ec22676eef94ad2e4940ffd43`: no blockers, scores9/9/9; https://github.com/tmad4000/buzz/pull/67#pullrequestreview-5951577042. Reviewer independently reran5DOM tests. Final author tsc completed exit0; see validation/typecheck-receipt.json. Subsequent delivery-receipt-only commits do not change reviewed application code. Keep draft pending release captain authorization for heavier validation and native/human acceptance.
+PR67 remote readback3a and body explicitly record restore/freeze and independent GO comments6971137524 and6971162662. Requested PR67 expected183 lease push was no-op Everything up-to-date because remote already held3a. PR84 and PR87 are left untouched at their observed current heads,76e8ddaee andde2bf4765.
 
-After an authorized build, enable Agent reply context. Expand a native reply-to-reply: verify its quote names the exact parent's first line and opens/highlights that parent through the guarded owning pane; preserve any newer draft. Collapse/reopen and verify exact-observed/read authority is unchanged. Show a bridge status card: verify compact reported executor + Open agent, raw original text in details, and an edit updates the same report. Confirm a non-bridge lookalike and a substantive answer stay ordinary content. Disable the experiment to restore ordinary status-body rendering and hide parent quotes.
+PR88 requested force-with-lease expectede021fa3677a1042f0a6e434d6e0227252f98ce68 differs from observed remote4f29b77b06760b539f9b21c6607fcbe421f88968 (our earlier normal-merge validation receipt). Candidate is prepared; push must preserve the requested lease guard. No silent replacement with a different expected SHA. Exact push outcome/needed decision will be recorded in Stream and root handoff. No live/native/release claim.
 
-Root follow-up: count-neutral means this renderer adds no events/counter/read/notification mutations; exclusion of legacy card replies from relay counts remains unverified and is not claimed. See STATUS-CARD-TAGS.md for exact proposed fields and activation boundary.
+## Lease decision resolved and final publication
 
-## P1 effective-body provenance follow-up
+Root's latest Proceed now instruction authorizes the rebased PR88 publication with force-with-lease, superseding the earlier stale literal expectedSHA. Fresh remote readback is4f29b77b06760b539f9b21c6607fcbe421f88968; use THAT exact lease to preserve concurrent-write protection. The earlier expectede021 rejection remains historical and unchanged. PR67 is final3a; no parent-GO wait remains.
 
-Reviewer3857fd1d's NO-GO at oldd6d53c6d7 is retained: https://github.com/tmad4000/buzz/pull/67#issuecomment-6970480074. The canonical formatter already records the latest applied edit signer, and the compact parser requires original bridge author plus current effective edit signer=bridge. This follow-up adds the exact untagged ordinary-original→owner-signed Done-envelope reproduction with a conditional bridge owner mapping, verifies ordinary owner edits remain authorized content but never compact reports, and covers newer owner/bridge edit ordering plus unrelated edits.
-
-Also closes the concrete local-cache gap: the on-success edit patch mutates raw cached content before signed edit projection. It now marks localEditedContent; formatter treats this as unknown effective signer until an actual signed applied edit is available. Unknown edited TimelineMessage provenance also fails closed. This preserves owner edit permission and normal text; no signing identity, hook configuration or relay protocol changes.
-
-Final author checks for this follow-up:45model/unit+6DOM PASS; whole-desktop tsc exit0/no diagnostics; all bounded setsid+timeout+process-group cleanup. Exact source hashes recorded in validation/typecheck-receipt.json. Same3857 reviewer requested on the new source head. Quiet footer/count-neutral projection remainsOPEN; PR84 child remains frozen6ed4e6951 until parent disposition/restack.
+Post-push fresh checks and exact-head publication receipt are recorded at /home/dev/code/buzz-pr88-final-rebase-publish-20261118/RECEIPT.json (plus model.log,dom.log,typecheck.log). Product/test source remains identical to the tested quote-only rebase; this publication update is documentation only. Keep final pushed head frozen for reviewer6754eb26 via root. PR84 andPR87 stay at their existing correction heads for reviewersbe986aea andf087a4d0, respectively. No other source/head changes.

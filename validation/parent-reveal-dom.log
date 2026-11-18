@@ -1,0 +1,22 @@
+✔ thread row keeps native quote jump, accessible first line and body identity across pending/ack and quote removal (128.431089ms)
+✔ quote presentation remains off when experiment is disabled (30.790749ms)
+✔ explicit expansion survives navigation and a fresh hook instance; collapse wins over new unread (128.395039ms)
+✔ thread, channel, community and identity choices are isolated; seen read branches stay closed (38.499559ms)
+✔ unknown unread state isn't saved as read; deep link waits for messages and permits later toggles (29.16856ms)
+✔ partial ancestry waits for the full path; pending read state doesn't initialize defaults (24.996949ms)
+✔ a suspended scope render cannot redirect the committed thread's toggle (37.187649ms)
+✔ own defaults do not mistake historical hydration for a send; pending reveal survives ack/read and later collapse wins (29.3997ms)
+✔ explicit navigation reveals only this view and preserves saved collapsed ancestry (32.36329ms)
+✔ durable intent exposes only its originating view, once through pending/ACK/refetch and later manual collapse (20.06245ms)
+✔ fast durable ACK before first paint still reveals; identical text has distinct intent identities (13.06283ms)
+✔ manual collapse after capture wins even before durable admission; unknown ancestry waits and unrelated toggles don't cancel (12.89964ms)
+✔ unrelated view/history cannot acquire an intent and retired captured origin cannot reveal a new scope (7.19794ms)
+✔ repeated exact-parent targets reveal open, closed and collapsed destinations without toggling them shut (46.70764ms)
+ℹ tests 14
+ℹ suites 0
+ℹ pass 14
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2270.475182

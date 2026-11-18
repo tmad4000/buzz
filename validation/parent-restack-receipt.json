@@ -1,0 +1,30 @@
+{
+  "at": "2026-11-18T07:15:13.126721+00:00",
+  "parent": "3a1e41ec74e6de8b261fbb7b4e6667333b8c0e8a",
+  "sourceHead": "31a7bed72fb4d5e949ef4a36d8ef7dd17392a892",
+  "normalMergeParents": [
+    "e021fa3677a1042f0a6e434d6e0227252f98ce68",
+    "3a1e41ec74e6de8b261fbb7b4e6667333b8c0e8a"
+  ],
+  "mergeBase": "3a1e41ec74e6de8b261fbb7b4e6667333b8c0e8a",
+  "modelTests": {
+    "pass": 18,
+    "fail": 0,
+    "timeoutSeconds": 60
+  },
+  "domTests": {
+    "pass": 15,
+    "fail": 0,
+    "timeoutSeconds": 60
+  },
+  "typecheck": {
+    "exitCode": 0,
+    "diagnostics": 0,
+    "timeoutSeconds": 90
+  },
+  "isolation": "setsid plus process-group SIGKILL cleanup",
+  "sourceDeltaChanged": false,
+  "forcePush": false,
+  "realBuzzActions": false,
+  "review": "pending root-dispatched independent source review"
+}

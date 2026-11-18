@@ -1,0 +1,26 @@
+✔ owning pane rejects quote navigation before changing any state when Page or thread edit guard refuses (94.565058ms)
+✔ same-thread parent jump exposes an exact target without retargeting the newer composer draft (8.10101ms)
+✔ opening a different thread sets only its root as the default composer target, not the navigation parent (4.79957ms)
+✔ allowed owning-pane jump closes the covering Page before opening the parent target (10.89601ms)
+✔ repeated exact-parent reveals keep open, closed and collapsed destinations open without toggle/composer actions (20.03726ms)
+✔ report preserves exact executor and host without claiming live work (6.18604ms)
+✔ unknown, impersonated and substantive content retain original body (1.0005ms)
+✔ edits, watchdog source and stale metadata stay explicit (2.82224ms)
+✔ root+reply tags retain exact answered event (1.33182ms)
+✔ structured bridge tags outrank body and bind exact originating request (9.3317ms)
+✔ malformed machine envelopes cannot downgrade into legacy body trust (4.06178ms)
+✔ production formatter applies only bridge-signed status snapshots and preserves immutable ancestry (316.005296ms)
+✔ reviewer P1 reproduction: latest owner-signed Done body never inherits the original bridge signer (14.32796ms)
+✔ native nested reply quotes only the parent's current first line, independent of presentation depth (7.82084ms)
+✔ root replies, self references and messages without native reply tags have no quote (0.4068ms)
+✔ unloaded and nontext parents keep exact native jump identity without inventing a quote (2.18521ms)
+✔ cross-channel or ambiguous channel tags never expose a parent chip (0.317629ms)
+✔ conflicting or duplicate ancestry never asserts a jump; out-of-scope loaded parents become neutral stubs (0.43794ms)
+ℹ tests 18
+ℹ suites 0
+ℹ pass 18
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1506.355511
