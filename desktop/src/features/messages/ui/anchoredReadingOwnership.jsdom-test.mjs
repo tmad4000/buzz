@@ -157,3 +157,115 @@ test("external reading owns automatic writes until release, while explicit comma
     globalThis.ResizeObserver = previousObserver;
   }
 });
+
+test("virtualized mid-history release does not revive bottom settlement on resize", async () => {
+  const previousObserver = globalThis.ResizeObserver;
+  const observers = [];
+  globalThis.ResizeObserver = class {
+    constructor(callback) {
+      this.callback = callback;
+      observers.push(this);
+    }
+    observe() {}
+    disconnect() {}
+  };
+  const scroller = document.createElement("div");
+  const row = document.createElement("div");
+  row.dataset.messageId = "m1";
+  scroller.append(row);
+  document.body.append(scroller);
+  Object.defineProperties(scroller, {
+    scrollHeight: { value: 1000 },
+    clientHeight: { value: 100 },
+  });
+  scroller.getBoundingClientRect = () => ({ top: 0, bottom: 100 });
+  row.getBoundingClientRect = () => ({
+    top: 300 - scroller.scrollTop,
+    bottom: 350 - scroller.scrollTop,
+  });
+  let writes = 0;
+  let settlements = 0;
+  const toBottom = () => {
+    writes++;
+    scroller.scrollTop = 900;
+  };
+  const settle = () => {
+    settlements++;
+  };
+  const cancelBottom = () => {};
+  const container = { current: scroller };
+  const messages = [{ id: "m1" }];
+  const mount = document.createElement("div");
+  document.body.append(mount);
+  const root = createRoot(mount);
+  let view;
+  function Harness() {
+    view = useAnchoredScroll({
+      scrollContainerRef: container,
+      contentRef: container,
+      channelId: "virtual",
+      isLoading: false,
+      messages,
+      virtualizerOwnsPrependAnchoring: true,
+      virtualScrollToBottom: toBottom,
+      virtualSettleAtBottom: settle,
+      virtualCancelBottomIntent: cancelBottom,
+    });
+    return null;
+  }
+  try {
+    await act(() => root.render(React.createElement(Harness)));
+    let lease;
+    await act(() => {
+      lease = view.beginReadingRestore();
+    });
+    const writeCount = writes;
+    const settleCount = settlements;
+    await act(() => {
+      scroller.scrollTop = 300;
+      view.onVirtualizerAtBottomStateChange(false);
+      lease.release();
+    });
+    await act(() => {
+      for (const observer of observers) observer.callback([]);
+    });
+    assert.equal(writes, writeCount);
+    assert.equal(
+      settlements,
+      settleCount,
+      "viewport resize must not follow the stale pre-restore bottom flag",
+    );
+    assert.equal(scroller.scrollTop, 300);
+    assert.equal(view.isAtBottom, false);
+    // Physical release also repairs a missing virtualizer notification.
+    await act(() => {
+      view.onVirtualizerAtBottomStateChange(true);
+      lease = view.beginReadingRestore();
+      scroller.scrollTop = 300;
+      lease.release();
+    });
+    const beforeResize = settlements;
+    await act(() => {
+      for (const observer of observers) observer.callback([]);
+    });
+    assert.equal(settlements, beforeResize);
+    assert.equal(view.isAtBottom, false);
+    // A restore that actually ends at bottom resumes normal resize following.
+    await act(() => {
+      lease = view.beginReadingRestore();
+      scroller.scrollTop = 900;
+      lease.release();
+    });
+    const atBottom = settlements;
+    await act(() => {
+      for (const observer of observers) observer.callback([]);
+    });
+    assert.ok(settlements > atBottom);
+    assert.equal(view.isAtBottom, true);
+  } finally {
+    await act(() => root.unmount());
+    scroller.remove();
+    mount.remove();
+    globalThis.ResizeObserver = previousObserver;
+  }
+});

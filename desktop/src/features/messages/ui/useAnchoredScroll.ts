@@ -1031,6 +1031,7 @@ export function useAnchoredScroll({
         // Adopt the final physical position without another scroll write.
         anchorRef.current = computeAnchor(container);
         const bottom = anchorRef.current.kind === "at-bottom";
+        virtualizerAtBottomRef.current = bottom;
         setIsAtBottom(bottom);
         if (bottom) setNewMessageCount(0);
       },
@@ -1039,8 +1040,9 @@ export function useAnchoredScroll({
 
   const onVirtualizerAtBottomStateChange = React.useCallback(
     (atBottom: boolean) => {
-      if (!virtualizerOwnsPrependAnchoring || readingOwner.blocked()) return;
+      if (!virtualizerOwnsPrependAnchoring) return;
       virtualizerAtBottomRef.current = atBottom;
+      if (readingOwner.blocked()) return;
       if (atBottom) {
         anchorRef.current = { kind: "at-bottom" };
         setNewMessageCount(0);
