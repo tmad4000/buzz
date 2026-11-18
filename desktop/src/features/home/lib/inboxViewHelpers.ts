@@ -13,6 +13,7 @@ import {
 import type { TimelineMessage } from "@/features/messages/types";
 import type {
   FeedItem,
+  HomeFeed,
   RelayEvent,
   UserProfileSummary,
 } from "@/shared/api/types";
@@ -99,6 +100,69 @@ export function matchesInboxAllView(
         ownedAgentPubkeys.has(normalizePubkey(representative.pubkey)),
     )
   );
+}
+
+const INBOX_FEED_FILTER_BUCKETS = {
+  all: null,
+  project: null,
+  mention: "mentions",
+  thread: null,
+  needs_action: "needsAction",
+  agent_activity: null,
+} as const satisfies Record<
+  Exclude<InboxFilter, "reminders" | "drafts">,
+  keyof HomeFeed | null
+>;
+
+/** Loaded conversation counts, with "+" when the source may have more rows. */
+export type InboxFilterCounts = Partial<Record<InboxFilter, string>>;
+
+/** Use the same rows for the menu counts and for opening each filter. */
+export function buildInboxFilterResults({
+  items,
+  feed,
+  limit,
+  ownedAgentPubkeys,
+  unreadOnly,
+  effectiveDoneSet,
+  selectedConversationId,
+}: {
+  items: readonly InboxItem[];
+  feed: HomeFeed | undefined;
+  limit: number;
+  ownedAgentPubkeys: ReadonlySet<string>;
+  unreadOnly: boolean;
+  effectiveDoneSet: ReadonlySet<string>;
+  selectedConversationId: string | null;
+}) {
+  const visibleItems = unreadOnly
+    ? items.filter(
+        (item) =>
+          !effectiveDoneSet.has(item.id) ||
+          item.conversationId === selectedConversationId,
+      )
+    : items;
+  const anyBucketFull = Object.values(feed ?? {}).some(
+    (bucket) => bucket.length >= limit,
+  );
+  const rowsByFilter: Partial<Record<InboxFilter, InboxItem[]>> = {};
+  const countsByFilter: InboxFilterCounts = {};
+
+  for (const filter of Object.keys(INBOX_FEED_FILTER_BUCKETS) as Array<
+    keyof typeof INBOX_FEED_FILTER_BUCKETS
+  >) {
+    const rows = visibleItems.filter((item) =>
+      matchesInboxFilter(item, filter, ownedAgentPubkeys),
+    );
+    const bucket = INBOX_FEED_FILTER_BUCKETS[filter];
+    const bucketFull = bucket
+      ? (feed?.[bucket].length ?? 0) >= limit
+      : anyBucketFull;
+    rowsByFilter[filter] = rows;
+    countsByFilter[filter] = `${rows.length}${bucketFull ? "+" : ""}`;
+  }
+
+  return { rowsByFilter, countsByFilter };
 }
 
 export function getContextMessageDepth(

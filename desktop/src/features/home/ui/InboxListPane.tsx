@@ -16,6 +16,7 @@ import {
   type InboxTypeLabel,
 } from "@/features/home/lib/inbox";
 import { buildInboxListRows } from "@/features/home/lib/inboxListRows";
+import type { InboxFilterCounts } from "@/features/home/lib/inboxViewHelpers";
 import { hasRenderedVideoAttachment } from "@/features/messages/lib/videoReviewContext";
 import { getThreadReference } from "@/features/messages/lib/threading";
 import { InboxFilterMenu } from "@/features/home/ui/InboxFilterMenu";
@@ -214,6 +215,7 @@ type InboxListPaneProps = {
   activeReminderEventIds?: ReadonlySet<string>;
   agentPubkeys?: ReadonlySet<string>;
   activeDraftCount: number;
+  countsByFilter: InboxFilterCounts;
   draftItems: DraftViewItem[];
   doneSet: ReadonlySet<string>;
   filter: InboxFilter;
@@ -244,6 +246,7 @@ export function InboxListPane({
   activeReminderEventIds,
   agentPubkeys,
   activeDraftCount,
+  countsByFilter,
   draftItems,
   doneSet,
   filter,
@@ -663,6 +666,7 @@ export function InboxListPane({
             <div className="order-1 flex shrink-0 items-center justify-start">
               <InboxFilterMenu
                 activeDraftCount={activeDraftCount}
+                countsByFilter={countsByFilter}
                 dueReminderCount={dueReminderCount}
                 filter={filter}
                 onFilterChange={onFilterChange}

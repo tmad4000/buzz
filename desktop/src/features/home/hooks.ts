@@ -4,6 +4,8 @@ import { getHomeFeed } from "@/shared/api/tauri";
 import { useRelayConnection } from "@/shared/api/useRelayConnection";
 import { useFocusedRefetchInterval } from "@/shared/lib/useDocumentVisible";
 
+/** Maximum number of events requested from each Home feed bucket. */
+export const HOME_FEED_LIMIT = 50;
 /** Keeps focused polling at the established 30-second cadence. */
 export const HOME_FEED_REFETCH_INTERVAL_MS = 30_000;
 /** Suppresses the expensive focus refetch until the home feed is old. */
@@ -26,7 +28,7 @@ export function useHomeFeedQuery() {
     queryKey: ["home-feed"],
     queryFn: () =>
       getHomeFeed({
-        limit: 50,
+        limit: HOME_FEED_LIMIT,
         types: "mentions,needs_action,activity,agent_activity",
       }),
     gcTime: 5 * 60 * 1_000,
