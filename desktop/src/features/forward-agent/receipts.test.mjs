@@ -164,3 +164,77 @@ test("edited text has a distinct receipt; retries of that revision still do not 
     "2".repeat(64),
   );
 });
+
+test("ACK dedupe retains A-B-A revisions across persisted reload-style lookups", async () => {
+  let calls = 0;
+  const send = async () => ack(String(++calls).repeat(64));
+  for (const revision of ["A", "B", "A", "B"])
+    await forwardOnce(
+      "edit-back",
+      "source",
+      "event",
+      "target",
+      "Agent",
+      send,
+      "self",
+      revision,
+    );
+  assert.equal(calls, 2);
+  const rows = JSON.parse(
+    storage.get("buzz.forward-agent-receipts.v1:edit-back"),
+  );
+  assert.deepEqual(rows.map((r) => r.revision).sort(), ["A", "B"]);
+  assert.equal(forwardReceipts("edit-back", "event").length, 1);
+});
+
+test("reverse-order concurrent ACKs preserve both revision dedupe keys", async () => {
+  let a,
+    b,
+    calls = 0;
+  const first = forwardOnce(
+    "reverse-ack",
+    "source",
+    "event",
+    "target",
+    "Agent",
+    () => {
+      calls++;
+      return new Promise((r) => (a = r));
+    },
+    "self",
+    "A",
+  );
+  const second = forwardOnce(
+    "reverse-ack",
+    "source",
+    "event",
+    "target",
+    "Agent",
+    () => {
+      calls++;
+      return new Promise((r) => (b = r));
+    },
+    "self",
+    "B",
+  );
+  await Promise.resolve();
+  b(ack("2".repeat(64)));
+  await second;
+  a(ack("1".repeat(64)));
+  await first;
+  for (const revision of ["B", "A"])
+    await forwardOnce(
+      "reverse-ack",
+      "source",
+      "event",
+      "target",
+      "Agent",
+      async () => {
+        calls++;
+        return ack();
+      },
+      "self",
+      revision,
+    );
+  assert.equal(calls, 2);
+});

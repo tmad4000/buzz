@@ -1,4 +1,5 @@
 import * as React from "react";
+import { forwardFailureMessage } from "./delivery";
 import { toast } from "sonner";
 import type { Channel } from "@/shared/api/types";
 import type { TimelineMessage } from "@/features/messages/types";
@@ -41,12 +42,12 @@ export function useForwardAgentSend(input: Input) {
     signer,
     relayUrl,
     scope,
-    channels,
-    known,
     sectionIds,
     send,
     closeMenu,
   } = input;
+  const latest = React.useRef(input);
+  latest.current = input;
   const [busy, setBusy] = React.useState(false);
   const [note, setNote] = React.useState("");
   const [pending, setPending] = React.useState<Pending | null>(null);
@@ -75,27 +76,42 @@ export function useForwardAgentSend(input: Input) {
     lock.current = true;
     setBusy(true);
     closeMenu();
+    let publicationStarted = false;
     try {
-      const current = directAgentLanes(
-        channels,
-        readForwardSections(signer, relayUrl),
-        sectionIds,
-        signer,
-        known,
-      );
-      const lane = current.find(
-        (l) => l.channel.id === intent.targetId && l.channel.id !== channelId,
-      );
-      if (!lane || lane.agentPubkeys.length !== 1)
-        throw new Error(
-          "Destination changed or has no single agent. Reopen the picker.",
+      const validateDestination = () => {
+        const now = latest.current;
+        if (
+          !ownsUi() ||
+          now.scope !== scope ||
+          now.signer !== signer ||
+          now.relayUrl !== relayUrl ||
+          now.channelId !== channelId ||
+          !now.sectionIds
+        )
+          throw new Error("Forward scope changed. Reopen the picker.");
+        const current = directAgentLanes(
+          now.channels,
+          readForwardSections(signer, relayUrl),
+          now.sectionIds,
+          signer,
+          now.known,
         );
-      if (
-        intent.isDefault &&
-        defaultAgentLane(channelId, current)?.lane.channel.id !==
-          intent.targetId
-      )
-        throw new Error("Default destination changed. Reopen the picker.");
+        const lane = current.find(
+          (l) => l.channel.id === intent.targetId && l.channel.id !== channelId,
+        );
+        if (!lane || lane.agentPubkeys.length !== 1)
+          throw new Error(
+            "Destination changed or has no single agent. Reopen the picker.",
+          );
+        if (
+          intent.isDefault &&
+          defaultAgentLane(channelId, current)?.lane.channel.id !==
+            intent.targetId
+        )
+          throw new Error("Default destination changed. Reopen the picker.");
+        return lane;
+      };
+      const lane = validateDestination();
       const content = linkedForward(channelId, intent.message, {
         senderNote: intent.note,
         senderPubkey: signer,
@@ -144,8 +160,12 @@ export function useForwardAgentSend(input: Input) {
             ? "P2"
             : "Paseo DM"
           : intent.label,
-        () =>
-          send({
+        () => {
+          const liveLane = validateDestination();
+          if (liveLane.agentPubkeys[0] !== lane.agentPubkeys[0])
+            throw new Error("Destination agent changed. Reopen the picker.");
+          publicationStarted = true;
+          return send({
             targetChannel: audiences.target.channel,
             channelId: intent.targetId,
             content,
@@ -153,20 +173,15 @@ export function useForwardAgentSend(input: Input) {
             parentEventId: null,
             transport: "http",
             expectedScope: { relayUrl, signerPubkey: signer },
-          }),
+          });
+        },
         signer,
         revision,
       );
       if (ownsUi()) toast.success(`Forwarded to ${receipt.label}`);
     } catch (error) {
       if (ownsUi()) {
-        const detail =
-          error instanceof Error ? error.message : "Could not confirm forward.";
-        toast.error(
-          /timed out|timeout|network|connection|uncertain/i.test(detail)
-            ? `${detail} Check the target before retrying.`
-            : detail,
-        );
+        toast.error(forwardFailureMessage(error, publicationStarted));
       }
     } finally {
       if (ownsUi()) {

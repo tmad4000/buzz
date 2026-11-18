@@ -24,7 +24,7 @@ import {
 import {
   forwardScope,
   loadAgentSectionIds,
-  readForwardSections,
+  useForwardSections,
 } from "./targets";
 import { useForwardAgentSend } from "./useForwardAgentSend";
 import { ForwardAudienceConfirm } from "./ForwardAudienceConfirm";
@@ -74,6 +74,7 @@ function EnabledForwardAction({
   const signer = identity?.pubkey;
   const relayUrl = activeCommunity?.relayUrl;
   const scope = signer && relayUrl ? forwardScope(signer, relayUrl) : "";
+  const liveSections = useForwardSections(signer, relayUrl);
   const [open, setOpen] = React.useState(false);
   const noteInputId = React.useId();
   const query = useQuery({
@@ -84,19 +85,12 @@ function EnabledForwardAction({
       if (!signer || !relayUrl) throw new Error("No forwarding identity.");
       return {
         ids: await loadAgentSectionIds(signer, relayUrl),
-        sections: readForwardSections(signer, relayUrl),
       };
     },
   });
   const lanes =
-    query.data && signer
-      ? directAgentLanes(
-          channels,
-          query.data.sections,
-          query.data.ids,
-          signer,
-          known,
-        )
+    query.data && signer && liveSections
+      ? directAgentLanes(channels, liveSections, query.data.ids, signer, known)
       : [];
   const targetDefault = channelId ? defaultAgentLane(channelId, lanes) : null;
   const { busy, note, setNote, pending, forward, confirm, cancel } =

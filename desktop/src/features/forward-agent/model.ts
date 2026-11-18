@@ -61,9 +61,10 @@ export function directAgentLanes(
       return {
         channel,
         label: resolveChannelDisplayLabel(channel, signer, undefined),
-        agentPubkeys: agents.length ? agents : peers.length === 1 ? peers : [],
+        agentPubkeys: agents,
       };
-    });
+    })
+    .filter((lane) => lane.agentPubkeys.length === 1);
 }
 /** No recursive tiers: only an unambiguous, same-participant Paseo DM ↔ P2 pair. */
 export function defaultAgentLane(
@@ -71,7 +72,7 @@ export function defaultAgentLane(
   lanes: AgentLane[],
 ): { lane: AgentLane; label: string } | null {
   const source = lanes.find((l) => l.channel.id === sourceId);
-  if (!source) return null;
+  if (!source || source.agentPubkeys.length !== 1) return null;
   const sourceIsDm =
     source.channel.channelType === "dm" && source.label === "Paseo";
   const sourceIsP2 =
@@ -86,6 +87,8 @@ export function defaultAgentLane(
     return null;
   const matches = lanes.filter(
     (l) =>
+      l.agentPubkeys.length === 1 &&
+      l.agentPubkeys[0] === source.agentPubkeys[0] &&
       l.channel.id !== sourceId &&
       l.channel.visibility === "private" &&
       members(l.channel).length === 2 &&

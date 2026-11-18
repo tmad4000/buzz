@@ -1,4 +1,8 @@
 import * as React from "react";
+import {
+  registerSidebarLaneReadView,
+  notifySidebarLaneReadViews,
+} from "./sidebarLaneReadView";
 
 import { relayClient } from "@/shared/api/relayClient";
 import { PublishCanceledError } from "@/shared/api/relayEventPublisher";
@@ -60,12 +64,20 @@ export class LaneReconciler {
   private timer: ReturnType<typeof setTimeout> | null = null;
   private destroyed = false;
 
+  private readonly onReadViewChange: () => void;
   private readonly lane: Lane;
   private readonly store: LaneStore;
   private readonly pubkey: string;
   private readonly relayUrl: string;
 
-  constructor(lane: Lane, store: LaneStore, pubkey: string, relayUrl: string) {
+  constructor(
+    lane: Lane,
+    store: LaneStore,
+    pubkey: string,
+    relayUrl: string,
+    onReadViewChange: () => void = () => {},
+  ) {
+    this.onReadViewChange = onReadViewChange;
     this.lane = lane;
     this.store = store;
     this.pubkey = pubkey;
@@ -99,6 +111,7 @@ export class LaneReconciler {
       status: "decoding",
       digest: null,
     };
+    this.onReadViewChange();
   }
 
   /** Decodes and merges `event`; its status lands only while it is still the head. */
@@ -121,6 +134,7 @@ export class LaneReconciler {
       this.head = doc
         ? { ...this.head, status: "decoded", digest: canonical(json) }
         : { ...this.head, status: "unreadable", digest: null };
+      this.onReadViewChange();
     }
     this.reconcile();
   }
@@ -138,6 +152,7 @@ export class LaneReconciler {
       this.observations++;
       const status = this.lastHead === 0 ? "empty" : "unknown";
       this.head = { ...this.head, status, digest: null };
+      this.onReadViewChange();
     }
     this.reconcile();
   }
@@ -324,10 +339,23 @@ export function useLaneSync(
 
   React.useEffect(() => {
     if (!store || !pubkey || !relayUrl) return;
-    const rec = new LaneReconciler(lane, store, pubkey, relayUrl);
+    const rec = new LaneReconciler(
+      lane,
+      store,
+      pubkey,
+      relayUrl,
+      notifySidebarLaneReadViews,
+    );
     setReconciler(rec);
     let disposed = false;
     let unsubLive: (() => Promise<void>) | null = null;
+    const detachReadView = registerSidebarLaneReadView(
+      lane,
+      pubkey,
+      relayUrl,
+      store,
+      () => rec.head.status === "decoded" || rec.head.status === "empty",
+    );
     const detachTabs = store.attachCrossTab();
     const unsubReconnect = relayClient.subscribeToReconnects(() => rec.wake());
     void relayClient
@@ -342,6 +370,7 @@ export function useLaneSync(
     return () => {
       disposed = true;
       rec.destroy();
+      detachReadView();
       detachTabs();
       unsubReconnect();
       if (unsubLive) void unsubLive();

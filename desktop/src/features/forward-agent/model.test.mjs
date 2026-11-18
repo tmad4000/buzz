@@ -192,3 +192,27 @@ test("third-party source cannot escape its data block or become the sender's not
     false,
   );
 });
+
+test("unknown humans and unavailable agent roster never supply picker targets or namesake defaults", () => {
+  const human = directAgentLanes(
+    channels,
+    sections,
+    ["stable"],
+    "self",
+    new Set(),
+  );
+  assert.deepEqual(human, []);
+  assert.equal(defaultAgentLane("dm", human), null);
+  const unknown = lanes().map((l) => ({ ...l, agentPubkeys: [] }));
+  assert.equal(defaultAgentLane("dm", unknown), null);
+  assert.deepEqual(
+    directAgentLanes(
+      channels,
+      sections,
+      ["stable"],
+      "self",
+      new Set(["unrelated"]),
+    ),
+    [],
+  );
+});

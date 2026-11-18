@@ -5,6 +5,7 @@ import test from "node:test";
 import vm from "node:vm";
 import ts from "typescript";
 import * as model from "./model.ts";
+import * as delivery from "./delivery.ts";
 import { audienceKey, needsAudienceConfirmation } from "./audience.ts";
 const require = createRequire(import.meta.url);
 function load(relative, mocks) {
@@ -133,10 +134,12 @@ function actionHarness(enabled = true) {
       ].map((n) => [n, n]),
     ),
     "./model": model,
+    "./delivery": delivery,
     "./targets": {
       forwardScope: () => "scope",
       loadAgentSectionIds: async () => ["agents"],
       readForwardSections: () => current,
+      useForwardSections: () => current,
     },
     "./receipts": {
       forwardRevision: async () => "revision",
@@ -324,4 +327,89 @@ test("source marker opens the acknowledged target event, never the source thread
     JSON.stringify(opened),
     JSON.stringify([["p2", { messageId: "b".repeat(64) }]]),
   );
+});
+
+test("Home Inbox row mounts receipt line with the same source identity as its forwarding action", () => {
+  const jsx = {
+    jsx: (type, props) => ({ type, props }),
+    jsxs: (type, props) => ({ type, props }),
+  };
+  const fallback = new Proxy(
+    {},
+    {
+      get: (_t, name) =>
+        name === "cn"
+          ? (...s) => s.filter(Boolean).join(" ")
+          : name === "normalizePubkey"
+            ? (s) => s
+            : name === "useKnownAgentPubkeys"
+              ? () => new Set()
+              : name === "useReactionHandler"
+                ? () => ({ reactions: [], canToggle: true })
+                : name === "useMessageEmoji"
+                  ? () => ({ customEmoji: [], emojiOnly: false })
+                  : name === "toTimelineMessage"
+                    ? (m) => ({ ...message, id: m.id })
+                    : name === "formatTimeWithoutDayPeriod" ||
+                        name === "formatItemTimestamp"
+                      ? () => "time"
+                      : name === "getConfigNudgeAuthorPubkey" ||
+                          name === "parseImetaTags"
+                        ? () => undefined
+                        : name === "hasLinkPreviewSuppression"
+                          ? () => false
+                          : name,
+    },
+  );
+  const source = fs.readFileSync(
+      new URL("../home/ui/InboxMessageRow.tsx", import.meta.url),
+      "utf8",
+    ),
+    js = ts.transpileModule(source, {
+      compilerOptions: {
+        module: ts.ModuleKind.CommonJS,
+        jsx: ts.JsxEmit.ReactJSX,
+      },
+    }).outputText,
+    module = { exports: {} };
+  vm.runInNewContext(js, {
+    module,
+    exports: module.exports,
+    require: (s) =>
+      s === "react/jsx-runtime"
+        ? jsx
+        : s === "react"
+          ? {
+              useMemo: (f) => f(),
+              useCallback: (f) => f,
+              useState: (v) => [v, () => {}],
+            }
+          : fallback,
+  });
+  const tree = module.exports.InboxMessageRow({
+    channelId: "dm",
+    message: {
+      id: message.id,
+      content: "body",
+      authorPubkey: "human",
+      authorLabel: "Member",
+      tags: [],
+      depth: 0,
+    },
+    canReply: true,
+    onSelectReplyTarget: () => {},
+  });
+  const line = nodes(tree).find((n) => n.type === "ForwardedToAgentLine"),
+    action = nodes(tree).find((n) => n.type === "MessageActionBar");
+  assert.ok(line);
+  assert.ok(action);
+  const body = nodes(tree).find(
+    (n) => n.props?.["data-testid"] === "message-body",
+  );
+  assert.equal(
+    nodes(body).some((n) => n.type === "ForwardedToAgentLine"),
+    false,
+  );
+  assert.equal(line.props.channelId, action.props.channelId);
+  assert.equal(line.props.messageId, action.props.message.id);
 });

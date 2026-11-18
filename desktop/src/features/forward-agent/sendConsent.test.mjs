@@ -5,6 +5,7 @@ import test from "node:test";
 import vm from "node:vm";
 import ts from "typescript";
 import * as model from "./model.ts";
+import * as delivery from "./delivery.ts";
 import { audienceKey, needsAudienceConfirmation } from "./audience.ts";
 const require = createRequire(import.meta.url);
 const channel = (id, count = 2, visibility = "private") => ({
@@ -36,6 +37,12 @@ function harness(initial) {
     effects = [];
   let cursor = 0,
     current = initial;
+  let currentSections = {
+    version: 1,
+    sections: [{ id: "agents", name: "Direct agents", order: 0 }],
+    assignments: { dm: "agents", p2: "agents" },
+  };
+  let onRead = () => {};
   const sends = [],
     messages = [],
     errors = [];
@@ -66,10 +73,14 @@ function harness(initial) {
     react,
     sonner: { toast: { success: () => {}, error: (e) => errors.push(e) } },
     "./model": model,
+    "./delivery": delivery,
     "./audience": {
       audienceKey,
       needsAudienceConfirmation,
-      readForwardAudiences: async () => current,
+      readForwardAudiences: async () => {
+        await onRead();
+        return current;
+      },
     },
     "./receipts": {
       forwardRevision: async () => "hash",
@@ -79,11 +90,7 @@ function harness(initial) {
       },
     },
     "./targets": {
-      readForwardSections: () => ({
-        version: 1,
-        sections: [{ id: "agents", name: "Direct agents", order: 0 }],
-        assignments: { dm: "agents", p2: "agents" },
-      }),
+      readForwardSections: () => currentSections,
     },
   };
   const js = ts.transpileModule(
@@ -128,6 +135,13 @@ function harness(initial) {
       return module.exports.useForwardAgentSend(input);
     },
     setAudience: (a) => (current = a),
+    input,
+    setSections: (s) => {
+      currentSections = s;
+    },
+    afterAudienceRead: (fn) => {
+      onRead = fn;
+    },
     sends,
     messages,
     errors,
@@ -240,4 +254,61 @@ test("audience dialog names members and exposes only an explicit confirm action"
     )
     .props.onClick();
   assert.equal(sends, 1);
+});
+
+test("live unassignment during async audience checks blocks dispatch, as does agent roster or scope loss", async () => {
+  for (const change of [
+    (h) =>
+      h.setSections({
+        version: 1,
+        sections: [{ id: "agents", name: "Direct agents", order: 0 }],
+        assignments: { dm: "agents" },
+      }),
+    (h) => {
+      h.input.known = new Set();
+      h.render();
+    },
+    (h) => {
+      h.input.scope = "new identity";
+      h.render();
+    },
+  ]) {
+    const h = harness(audience(["self", "agent"]));
+    h.afterAudienceRead(() => change(h));
+    await h.render().forward("p2", "P2 (later)", true);
+    assert.equal(h.sends.length, 0);
+  }
+});
+
+test("post-mutation malformed ACK guidance differs from preflight, definite rejection and marker-only recovery", async () => {
+  for (const detail of [
+    "relay returned malformed response: not valid JSON",
+    "Forward acknowledgement did not match the captured signer.",
+    "unexpected native error",
+  ]) {
+    const h = harness(audience(["self", "agent"]));
+    h.input.send = async () => {
+      throw Error(detail);
+    };
+    await h.render().forward("p2", "P2 (later)", true);
+    assert.match(h.errors[0], /Check the target before retrying\./);
+  }
+  for (const error of [
+    new Error("relay rejected event: permission denied"),
+    new delivery.ForwardMarkerError(
+      "Forward sent, but its marker could not be saved. Choose the same target to retry only the marker.",
+    ),
+  ]) {
+    const h = harness(audience(["self", "agent"]));
+    h.input.send = async () => {
+      throw error;
+    };
+    await h.render().forward("p2", "P2 (later)", true);
+    assert.equal(h.errors[0], error.message);
+  }
+  const h = harness(audience(["self", "agent"]));
+  h.setSections({ version: 1, sections: [], assignments: {} });
+  await h.render().forward("p2", "P2 (later)", true);
+  assert.equal(h.sends.length, 0);
+  assert.doesNotMatch(h.errors[0], /Check the target/);
 });

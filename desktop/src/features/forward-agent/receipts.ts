@@ -1,3 +1,4 @@
+import { ForwardMarkerError } from "./delivery";
 import { useSyncExternalStore } from "react";
 export type ForwardReceipt = {
   sourceChannelId: string;
@@ -36,14 +37,21 @@ export function forwardReceipts(scope: string, sourceId: string) {
       .filter(([k]) => k.startsWith(`${scope}:`))
       .map(([, r]) => r),
   ];
-  return rows
-    .filter((r) => r.sourceId === sourceId)
-    .filter((r, i, a) => a.findIndex((x) => x.targetId === r.targetId) === i);
+  const visible = new Map<string, ForwardReceipt>();
+  for (const receipt of rows) {
+    if (receipt.sourceId === sourceId)
+      visible.set(receipt.targetChannelId, receipt);
+  }
+  return [...visible.values()];
 }
 function save(scope: string, r: ForwardReceipt) {
   const rows = stored(scope).filter(
     (x) =>
-      !(x.sourceId === r.sourceId && x.targetChannelId === r.targetChannelId),
+      !(
+        x.sourceId === r.sourceId &&
+        x.targetChannelId === r.targetChannelId &&
+        (x.revision ?? "") === (r.revision ?? "")
+      ),
   );
   globalThis.localStorage.setItem(
     key(scope),
@@ -75,7 +83,13 @@ export async function forwardOnce(
         (r.revision ?? "") === revision,
     );
   if (existing) {
-    save(scope, existing);
+    try {
+      save(scope, existing);
+    } catch {
+      throw new ForwardMarkerError(
+        "Forward sent, but its marker could not be saved. Choose the same target to retry only the marker.",
+      );
+    }
     return existing;
   }
   const inflight = pending.get(k);
@@ -105,7 +119,7 @@ export async function forwardOnce(
     try {
       save(scope, receipt);
     } catch {
-      throw new Error(
+      throw new ForwardMarkerError(
         "Forward sent, but its marker could not be saved. Choose the same target to retry only the marker.",
       );
     }

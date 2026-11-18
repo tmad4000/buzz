@@ -1,24 +1,40 @@
+import * as React from "react";
+import {
+  SECTIONS_LANE,
+  projectSections,
+} from "@/features/sidebar/lib/channelSectionsSync";
+import {
+  readSidebarLaneView,
+  subscribeSidebarLaneView,
+} from "@/features/sidebar/lib/sidebarLaneReadView";
 import { loadSidebarSectionDefaults } from "@/shared/api/tauri";
 import { isJacobSidebarScope } from "@/features/sidebar/lib/jacobChannelSectionDefaults";
-import {
-  parseChannelSectionPayload,
-  storageKey,
-} from "@/features/sidebar/lib/channelSectionsStorage";
+import { parseChannelSectionPayload } from "@/features/sidebar/lib/channelSectionsStorage";
 import { normalizeRelayUrl } from "@/shared/lib/normalizeRelayUrl";
 
 export function forwardScope(signer: string, relayUrl: string) {
   return `${signer}:${encodeURIComponent(normalizeRelayUrl(relayUrl))}`;
 }
-/** Read-only projection of the sidebar's current persisted view; no second sync writer. */
+/** Read the actual mounted sidebar tree, including edits whose disk write failed. */
 export function readForwardSections(signer: string, relayUrl: string) {
-  const raw = globalThis.localStorage.getItem(storageKey(signer, relayUrl));
-  if (!raw) return { version: 1 as const, sections: [], assignments: {} };
-  const view = parseChannelSectionPayload(JSON.parse(raw));
-  if (!view)
+  const tree = readSidebarLaneView(SECTIONS_LANE, signer, relayUrl);
+  if (!tree)
     throw new Error(
-      "Sidebar section data is unavailable. Reopen the sidebar and try again.",
+      "Live sidebar sections are unavailable. Reopen the sidebar and try again.",
     );
-  return view;
+  return { version: 1 as const, ...projectSections(tree) };
+}
+export function useForwardSections(signer?: string, relayUrl?: string) {
+  const tree = React.useSyncExternalStore(subscribeSidebarLaneView, () =>
+    signer && relayUrl
+      ? readSidebarLaneView(SECTIONS_LANE, signer, relayUrl)
+      : undefined,
+  );
+  return React.useMemo(
+    () =>
+      tree ? { version: 1 as const, ...projectSections(tree) } : undefined,
+    [tree],
+  );
 }
 /** Recipient-encrypted bootstrap supplies identity only, never overrides edited membership. */
 export async function loadAgentSectionIds(signer: string, relayUrl: string) {
