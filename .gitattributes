@@ -7,3 +7,5 @@
 # copy on every platform; the stored blobs are already LF.
 * text=auto eol=lf
 .git-archive-info export-subst
+# Unified-diff context encodes a leading space before upstream tabs/blank lines.
+patches/@tanstack__router-core@1.171.5.patch whitespace=-blank-at-eol,-space-before-tab
