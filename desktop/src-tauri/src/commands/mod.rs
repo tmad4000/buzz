@@ -1,3 +1,5 @@
+mod agent_queue;
+pub use agent_queue::decrypt_agent_queue_event;
 pub mod admin;
 mod agent_access;
 mod agent_auth;

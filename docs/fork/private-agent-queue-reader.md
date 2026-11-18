@@ -1,0 +1,29 @@
+# Private queue reader — separate opt-in, outside .9
+
+Jacob's P2 request (19:27Z, 2026-11-18) asks for a private, read-only mirror of Root's host queue near its runtime row/profile. Root assigned the UI/native-receiver source to5e7bc9da;075 owns the separate producer/listener/install lane. This is a new draft PR, not an unfreeze or extension of PR81/100 and not part of .9.
+
+The controlling wire specification is [private-agent-queue-v1.md](private-agent-queue-v1.md), copied byte-for-byte from the shared frozen design SHA`cb0b8f09a5e53fb087c0165663311b3a638b8740f38035c4fb10126dc6ce953c`. Both producer and reader ACK that contract. Do not change that copy to document a new contract; agree a successor explicitly.
+
+A separate device-local boolean opt-in defaults OFF. Only the fixed Jacob keystore identity on the fixed community, viewing the fixed Paseo bridge participant, can subscribe or see the control. Other accounts/communities/profiles fail closed. The global plaintext runtime advertisement and its settings/query stay unchanged; queue enablement works independently of the public runtime-card switch.
+
+`useAgentQueue` owns one shared RAM-only reader for the single approved relay/recipient/bridge coordinate. The ordinary signed `subscribeLive` filter requests kind30078, exact bridge author, d=agent-queue-v1, p=Jacob, limit1. It supplies bounded history and ongoing events through the existing relay client; there is no broad fetch, own-author snapshot query, polling loop or new socket/service. Last unsubscribe/disable/identity or relay retirement aborts and clears plaintext. Scope generations reject retired callbacks and late A→B→A decrypts.
+
+Before crypto, the TS reader bounds the untrusted verification frame (32KiB ciphertext-string budget,16 tags,8 strings/tag,256 code units/string, exact signature/ID encodings). Inputs outside that authentication budget never acquire authority. Inside it, exact ID/signature/bridge authentication precedes newest selection (timestamp descending, lowest ID tie). Only then does the strict queue envelope enforce the narrower24,576-character ciphertext bound, exact ordered d/p tags, v2 and clock policy. A newest authenticated malformed candidate clears the visible projection and holds its watermark across readiness failures; foreign/unsigned input cannot erase it. One native decrypt plus one latest pending candidate is the hard concurrency bound. A5s UI deadline reports a stalled operation but never spawns replacement native work while it remains in flight; late/timed-out results do not revive a projection.
+
+The new native IPC command has no peer-selection option: current active signing keys must equal fixed Jacob; expected relay/recipient and actual workspace/keys are checked before and after the bounded blocking decrypt. It verifies signed event ID/author/exact ordered tags and decrypts NIP44v2 with the fixed bridge counterparty. Plaintext is schema-validated before returning a typed JSON projection. No secret crosses IPC; errors are fixed messages, not raw plaintext/ciphertext diagnostics. Native schema validation and the second TS validation enforce required/unknown fields, fixed strings/enums, byte/row bounds, unique/disjoint IDs, placement, count arithmetic, unavailable shape and clock constraints. No generic decrypt oracle, publication, send/stop/edit/remove operation or auto-retry is added.
+
+UI state is reported, not inferred: running/idle/unknown from the snapshot; stale after120s since last successful`verifiedAt`; absolute successful and attempted observation clocks; canonical unavailable never renews last success or preserves old counts. Stale/error views hide current counts/rows. Recent delivered receipts are labelled provider submissions and first-observed times, never answered/done. Queue disappearance has no client-side state transition. Preview strings are fixed metadata only. The display excludes not-yet-synced device outboxes and makes no presence or update-SLA claim.
+
+## Validation and remaining qualifications
+
+The focused Node tests exercise strict TS contract failures, actual reader races/coalescing/deadlines/watermarks, opt-in/scope gating, DOM row/profile states with the real shared timer under fake clocks, preference lifecycle, and existing runtime model/UI behavior. Store tests use an injected authenticator and synthetic signed-event-shaped records for race control; they do not claim real bridge signing or native decryption. Separate checks reject actual foreign signed events/forgery. The cryptographic verification helper is the existing nostr-tools primitive. No production bridge private key or Jacob private key is accessed by these tests.
+
+Five Rust tests are SOURCE ONLY until a separately authorized native slot:
+
+- `commands::agent_queue::tests::strict_queue_snapshot_accepts_success_and_retained_unavailable_clock`
+- `commands::agent_queue::tests::strict_queue_snapshot_rejects_private_text_fields_placement_and_inferred_states`
+- `commands::agent_queue::tests::strict_queue_snapshot_rejects_bad_arithmetic_clocks_and_noncanonical_unavailable`
+- `commands::agent_queue::tests::narrow_receiver_rejects_other_keystore_identity_before_decrypt`
+- `commands::agent_queue::tests::private_payload_helper_cross_author_v2_authenticates_and_rejects_wrong_counterparty`
+
+They cover the parser and a private cross-author helper with synthetic keys; they do not establish a valid production bridge→Jacob keystore IPC. Future explicit qualification must compile the exact included native source, run actual nonempty Rust tests, then verify authenticated Jacob UI/decryption, wrong-account rejection and identity/relay retirement on an authorized host. This source change grants no native/Cargo/Mac job or installer/service activation. Independent review goes througha036. No release inclusion, merge, deploy or enablement is implied.

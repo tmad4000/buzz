@@ -18,7 +18,14 @@ function load(name, mocks) {
   vm.runInNewContext(js, {
     module,
     exports: module.exports,
-    require: (s) => (s in mocks ? mocks[s] : s === "./RuntimeRouteAge" ? { RuntimeRouteAge: () => null } : require(s)),
+    require: (s) =>
+      s in mocks
+        ? mocks[s]
+        : s === "@/features/agent-queue/AgentQueueView"
+          ? { AgentQueuePanel: () => null, AgentQueueRow: () => null }
+          : s === "./RuntimeRouteAge"
+            ? { RuntimeRouteAge: () => null }
+            : require(s),
     Date,
   });
   return module.exports;
@@ -116,7 +123,11 @@ test("row with no signed card renders no invented host/action; session action is
       "./useAgentRuntime": { useAgentRuntime: () => ({ data }) },
       "./AgentRuntimeCard": { OpenRuntimeSession: () => null },
     });
-    assert.equal(mod.AgentRuntimeHost({ pubkey: "agent" }) === null, !data);
+    const hostTree = nodes(mod.AgentRuntimeHost({ pubkey: "agent" }));
+    assert.equal(
+      hostTree.some((n) => n.props?.title === "Self-reported runtime host"),
+      Boolean(data),
+    );
     assert.equal(
       mod.AgentRuntimeRowAction({ pubkey: "agent" }) === null,
       !data?.card.session,
@@ -210,24 +221,32 @@ test("production hook gates network/data on opt-in and scope; fetch uses exact a
   }
 });
 
-
 test("row and profile both mount shared Last advertised route clock for the signed timestamp", () => {
-  function RuntimeRouteAge() { return null; }
-  const data = {card:{host:"gcp",session},attestedAt:123};
+  function RuntimeRouteAge() {
+    return null;
+  }
+  const data = { card: { host: "gcp", session }, attestedAt: 123 };
   const common = {
-    "./RuntimeRouteAge":{RuntimeRouteAge},
-    "./useAgentRuntime":{useAgentRuntime:()=>({data})},
-    "./model":{runtimeSessionLink},
-    "./preference":{useRuntimeCardsEnabled:()=>true,setRuntimeCardsEnabled:assert.fail},
-    "@tauri-apps/plugin-opener":{openUrl:assert.fail},
-    sonner:{toast:{error:assert.fail}},
-    "@/shared/lib/clipboard":{copyTextToClipboard:assert.fail},
-    "@/shared/context/ProfilePanelContext":{useProfilePanel:()=>({})},
-    "./AgentRuntimeCard":{OpenRuntimeSession:()=>null},
+    "./RuntimeRouteAge": { RuntimeRouteAge },
+    "./useAgentRuntime": { useAgentRuntime: () => ({ data }) },
+    "./model": { runtimeSessionLink },
+    "./preference": {
+      useRuntimeCardsEnabled: () => true,
+      setRuntimeCardsEnabled: assert.fail,
+    },
+    "@tauri-apps/plugin-opener": { openUrl: assert.fail },
+    sonner: { toast: { error: assert.fail } },
+    "@/shared/lib/clipboard": { copyTextToClipboard: assert.fail },
+    "@/shared/context/ProfilePanelContext": { useProfilePanel: () => ({}) },
+    "./AgentRuntimeCard": { OpenRuntimeSession: () => null },
   };
-  for (const [file,component] of [["./AgentRuntimeRow.tsx","AgentRuntimeHost"],["./AgentRuntimeCard.tsx","AgentRuntimeCard"]]) {
-    const tree=nodes(load(file,common)[component]({pubkey:"agent"}));
-    const clock=tree.find(n=>n.type===RuntimeRouteAge);
-    assert.ok(clock);assert.equal(clock.props.attestedAt,123);
+  for (const [file, component] of [
+    ["./AgentRuntimeRow.tsx", "AgentRuntimeHost"],
+    ["./AgentRuntimeCard.tsx", "AgentRuntimeCard"],
+  ]) {
+    const tree = nodes(load(file, common)[component]({ pubkey: "agent" }));
+    const clock = tree.find((n) => n.type === RuntimeRouteAge);
+    assert.ok(clock);
+    assert.equal(clock.props.attestedAt, 123);
   }
 });
