@@ -881,3 +881,67 @@ test("discarding_a_draft_drops_its_retained_local_files", () => {
 
   assert.deepEqual(takeQueuedAttachmentsForDraft("chan-deleted"), []);
 });
+
+test("restoration_readiness_is_visit_local_and_retires_before_persistence", async () => {
+  setupStore("pubkey-restoration-readiness");
+  persistDraftEntry("ready-a", "restored A", "ready-a", [IMG_A], []);
+  let draftKey = "ready-a";
+  let currentReady = () => false;
+  const spoileredRef = { current: new Set() };
+  const restoring = [];
+  const persisting = [];
+  function HarnessComposer() {
+    let visitReady = () => false;
+    const lifecycle = useDraftPersistLifecycle({
+      effectiveDraftKey: draftKey,
+      channelId: draftKey,
+      loadDraft: loadDraftEntry,
+      persistDraft: (key) => persisting.push([key, visitReady()]),
+      getMentionRefs: () => [],
+      restoreMentionRefs: () => {},
+      livePendingImeta: [],
+      setPendingImeta: () => {},
+      setContent: () => restoring.push(currentReady()),
+      clearContent: () => restoring.push(currentReady()),
+      setSpoileredAttachmentUrls: () => {},
+      spoileredAttachmentUrlsRef: spoileredRef,
+      syncComposerContentFromEditor: () => "",
+    });
+    visitReady = lifecycle.isDraftRestored;
+    currentReady = lifecycle.isDraftRestored;
+    return null;
+  }
+  const handle = await mountStrictMode(HarnessComposer);
+  try {
+    const firstA = currentReady;
+    assert.equal(firstA(), true);
+    draftKey = "ready-b";
+    await handle.rerender();
+    const firstB = currentReady;
+    assert.equal(firstA(), false);
+    assert.equal(firstB(), true);
+    draftKey = "ready-a";
+    await handle.rerender();
+    assert.equal(firstA(), false, "returning to A cannot revive its old visit");
+    assert.equal(firstB(), false);
+    assert.equal(currentReady(), true);
+    draftKey = null;
+    await handle.rerender();
+    assert.equal(
+      currentReady(),
+      false,
+      "a keyless editor cannot offer a draft",
+    );
+    draftKey = "ready-c";
+    await handle.rerender();
+    assert.equal(currentReady(), true);
+    assert.ok(restoring.length >= 4);
+    assert.ok(restoring.every((ready) => ready === false));
+    assert.ok(persisting.length >= 3);
+    assert.ok(persisting.every(([, ready]) => ready === false));
+  } finally {
+    await handle.unmount();
+  }
+  assert.equal(currentReady(), false);
+  assert.ok(persisting.every(([, ready]) => ready === false));
+});
