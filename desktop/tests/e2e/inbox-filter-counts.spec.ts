@@ -76,18 +76,25 @@ test("Inbox dropdown counts the rows for each filter and respects unread only", 
   const menu = page.getByRole("menu");
   const option = (label: string) =>
     menu.getByRole("menuitemradio", { name: label, exact: true });
+  const selectOption = async (label: string) => {
+    await option(label).click();
+    await expect(page.getByRole("menu", { includeHidden: true })).toHaveCount(
+      0,
+    );
+    await expect(trigger).toBeFocused();
+  };
   await expect(option("All 3+")).toBeVisible();
   await expect(option("Projects 1+")).toBeVisible();
   await expect(option("Mentions 1+")).toBeVisible();
   await expect(option("Threads 1+")).toBeVisible();
   await expect(option("Needs action 1")).toBeVisible();
-  await option("Mentions 1+").click();
+  await selectOption("Mentions 1+");
   await expect(thread).toBeVisible();
   await expect(project).toHaveCount(0);
   await expect(action).toHaveCount(0);
 
   await trigger.click();
-  await option("Needs action 1").click();
+  await selectOption("Needs action 1");
   await expect(action).toBeVisible();
   await action.click({ button: "right" });
   await page
@@ -96,9 +103,7 @@ test("Inbox dropdown counts the rows for each filter and respects unread only", 
 
   // Switch to a different selection so the read action row is no longer pinned.
   await trigger.click();
-  await option("Mentions 1+").click();
-  await expect(page.getByRole("menu", { includeHidden: true })).toHaveCount(0);
-  await expect(trigger).toBeFocused();
+  await selectOption("Mentions 1+");
   await page.getByTestId("inbox-options-trigger").click();
   const unreadOnly = page.getByRole("switch", { name: "Show unread only" });
   await unreadOnly.click();
@@ -107,7 +112,7 @@ test("Inbox dropdown counts the rows for each filter and respects unread only", 
 
   await trigger.click();
   await expect(option("Needs action")).toBeVisible();
-  await option("Needs action").click();
+  await selectOption("Needs action");
   await expect(action).toHaveCount(0);
   await trigger.click();
   await expect(option("Needs action 0")).toHaveAttribute(
