@@ -9,6 +9,7 @@ import {
 } from "./ConversationReadingPositions.tsx";
 import { ConversationViewContext } from "./ConversationViewContext.tsx";
 import { readingPositionKey } from "./layout/readingPositions.ts";
+import { mainReadingIntent } from "./mainReadingIntent.ts";
 
 async function fixture({
   covered = false,
@@ -37,7 +38,8 @@ async function fixture({
     value: "visible",
   });
   let key = readingPositionKey("main", "threads");
-  let explicitTarget = explicit;
+  let targetMessageId = explicit ? "explicit-route" : null;
+  let searchActiveMessageId = null;
   const initial = ["threads", "timeline"].map((mode) => ({
     key: readingPositionKey("main", mode),
     position: { id: `saved-${mode}`, offset: -2, pixel: 500, neighbors: [] },
@@ -53,6 +55,7 @@ async function fixture({
     calls = [];
   let stops = 0;
   function Harness() {
+    const intent = mainReadingIntent(targetMessageId, searchActiveMessageId);
     useCaptureConversationReadingPosition({
       key,
       container,
@@ -63,7 +66,7 @@ async function fixture({
       key,
       container,
       ready: true,
-      explicitTarget,
+      explicitTarget: intent.explicit,
       restore: (position, onStop) => {
         calls.push({ position, onStop });
         return () => {
@@ -108,7 +111,11 @@ async function fixture({
       await render();
     },
     explicit: async (next) => {
-      explicitTarget = next;
+      targetMessageId = next ? "explicit-route" : null;
+      await render();
+    },
+    search: async (id) => {
+      searchActiveMessageId = id;
       await render();
     },
     focus: async () => {
@@ -210,6 +217,58 @@ test("a reading gesture before first focus consumes the old restore opportunity"
       0,
       "focus must not overwrite a reader's newer position",
     );
+    assert.ok(h.readers.get(h.key())());
+  } finally {
+    await h.close();
+  }
+});
+
+test("route or search takeover during a restore stops it and releases capture without replay", async () => {
+  for (const kind of ["route", "search"]) {
+    const h = await fixture();
+    try {
+      assert.equal(h.calls.length, 1);
+      const stale = h.calls[0].onStop;
+      if (kind === "route") await h.explicit(true);
+      else await h.search("active-search-hit");
+      assert.equal(
+        h.stops(),
+        1,
+        "explicit navigation must cancel the running saved restore",
+      );
+      assert.ok(
+        h.readers.get(h.key())(),
+        "explicit destination must be eligible for capture",
+      );
+      stale("retired");
+      stale("complete");
+      assert.ok(h.readers.get(h.key())());
+      if (kind === "route") await h.explicit(false);
+      else await h.search(null);
+      assert.equal(
+        h.calls.length,
+        1,
+        "clearing an explicit target cannot replay the saved restore",
+      );
+      assert.ok(h.readers.get(h.key())());
+    } finally {
+      await h.close();
+    }
+  }
+});
+
+test("an initial active search suppresses the saved slot even without a routed target", async () => {
+  const h = await fixture({ covered: true });
+  try {
+    await h.search("active-search-hit");
+    await act(async () => {
+      h.host.removeAttribute("inert");
+      await Promise.resolve();
+    });
+    await flush();
+    assert.equal(h.calls.length, 0);
+    await h.search(null);
+    assert.equal(h.calls.length, 0);
     assert.ok(h.readers.get(h.key())());
   } finally {
     await h.close();

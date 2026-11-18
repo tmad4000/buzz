@@ -12,6 +12,7 @@ import {
   useConversationControlScope,
 } from "@/features/conversations/ConversationViewContext";
 import { timelineScrollIdentity } from "@/features/conversations/timelineScrollIdentity";
+import { mainReadingIntent } from "@/features/conversations/mainReadingIntent";
 import {
   useCaptureConversationReadingPosition,
   useRestoreConversationReadingPosition,
@@ -245,17 +246,19 @@ const MessageTimelineBase = React.forwardRef<
 ) {
   const conversationView = React.useContext(ConversationViewContext);
   const { mode } = useTimelineView();
+  const { explicit: hasReadingTarget, key: readingTargetKey } =
+    mainReadingIntent(targetMessageId, searchActiveMessageId);
   const { canHandle } = useConversationControlScope();
   const restorationOwner = React.useRef({
     channelId,
     mode,
-    targetMessageId,
+    targetKey: readingTargetKey,
     viewId: conversationView?.viewInstanceId,
   });
   restorationOwner.current = {
     channelId,
     mode,
-    targetMessageId,
+    targetKey: readingTargetKey,
     viewId: conversationView?.viewInstanceId,
   };
   const internalScrollRef = React.useRef<HTMLDivElement>(null);
@@ -288,7 +291,7 @@ const MessageTimelineBase = React.forwardRef<
         conversationView.interactive,
         channelId,
         mode,
-        targetMessageId,
+        readingTargetKey,
       ])
     : null;
   React.useLayoutEffect(() => {
@@ -596,7 +599,7 @@ const MessageTimelineBase = React.forwardRef<
                 current.viewId === conversationView.viewInstanceId &&
                 current.channelId === channelId &&
                 current.mode === mode &&
-                current.targetMessageId === targetMessageId &&
+                current.targetKey === readingTargetKey &&
                 container?.closest(
                   '[hidden], [inert], [aria-hidden="true"]',
                 ) === null
@@ -613,14 +616,14 @@ const MessageTimelineBase = React.forwardRef<
       timelineVirtualizerApi,
       channelId,
       mode,
-      targetMessageId,
+      readingTargetKey,
     ],
   );
   useRestoreConversationReadingPosition({
     key: readingPositionKey("main", mode),
     container: activeScrollContainerRef,
     ready: showMessageList && !isLoading && timelineVirtualizerApi !== null,
-    explicitTarget: targetMessageId !== null,
+    explicitTarget: hasReadingTarget,
     restore: restoreSavedReadingPosition,
   });
 

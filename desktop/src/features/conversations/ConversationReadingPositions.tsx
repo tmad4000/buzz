@@ -215,8 +215,13 @@ export function useRestoreConversationReadingPosition({
     if (attempted.current?.key !== key || attempted.current.element !== element)
       attempted.current = { key, element, started: false };
     const attempt = attempted.current;
+    if (explicitTarget) {
+      attempt.started = true;
+      scope.completeRestore(key);
+      return;
+    }
     if (attempt.started) return;
-    if (explicitTarget || scope.interacted(key)) {
+    if (scope.interacted(key)) {
       attempt.started = true;
       scope.completeRestore(key);
       return;
