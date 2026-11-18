@@ -67,3 +67,7 @@ Exact native/API/frontend diff was sent before push to send/API owneraf293993, c
 Scope-growth note sent to root as requested: the P0/P1 fixes touch native detail/member read contracts. They remain additive optional parameters on existing commands and stay within the same feature; splitting broader audiences would not remove the private shortcut's need for these native count/participant, writer metadata and scope fences. No broader product work was added.
 
 Note/recovery interaction: confirmed marker-save failure no longer tells users to choose the same target, because a cleared note would change the envelope revision. It explicitly says the forward was sent and not to send again. The captured original revision still deduplicates/permits marker-only persistence retry; no send is retried automatically.
+
+## Final PR81 restack
+
+Merged PR81 exact7998e81a88134a03f578175c29eed20daecef5e0 (expanded production regression/validation/M5 documentation only; display-only product code unchanged). Independent19ed01b1 SOURCE GO/P1 resolved at that exact base: https://github.com/tmad4000/buzz/pull/81#issuecomment-6972530035 . It independently confirmed historical RED → stamp1 RED → display-only GREEN. Only DELIVERY.md conflicted; this forwarding report was preserved. Updated forward stack reruns the three new label-convergence regressions alongside its91 focused checks. The PR81 source gate is resolved; PR85 still needs14632ddb exact-head source disposition and separate captain native/release acceptance.
