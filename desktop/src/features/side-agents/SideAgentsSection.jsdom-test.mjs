@@ -298,7 +298,12 @@ test("feature defaults off, then shows cached rows, guarded route and opener act
       [
         "channel",
         stream.id,
-        { thread: root, threadRootId: root, messageId: eventId(10) },
+        {
+          thread: root,
+          threadRootId: root,
+          messageId: eventId(10),
+          revealThread: true,
+        },
       ],
     ]);
     fireEvent.click(

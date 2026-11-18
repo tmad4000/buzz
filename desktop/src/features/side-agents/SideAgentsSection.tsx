@@ -167,11 +167,13 @@ export function SideAgentsSidebar({
           agent.channelType === "forum"
             ? goForumPost(agent.channelId, agent.rootId, {
                 replyId: agent.cardId,
+                revealThread: true,
               })
             : goChannel(agent.channelId, {
                 thread: agent.rootId,
                 threadRootId: agent.rootId,
                 messageId: agent.cardId,
+                revealThread: true,
               });
         void task.catch(() => toast.error("Failed to open the thread"));
       }}

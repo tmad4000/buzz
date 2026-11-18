@@ -100,7 +100,7 @@ export function ChannelScreen({
   onAddFiles, onCloseIdleAuxiliaryPanel,
   onCloseForumPost, onSelectForumPost,
   selectedForumPostId, targetForumReplyId,
-  targetMessageEvents, targetMessageId,
+  targetMessageEvents, targetMessageId, threadRevealId,
   ...searchTarget
 }: ChannelScreenProps) {
   const queryClient = useQueryClient();
@@ -150,7 +150,7 @@ export function ChannelScreen({
     useElementWidth<HTMLElement>();
   const isNarrowPanelViewport = channelContentWidthPx > 0 && channelContentWidthPx < AUXILIARY_PANEL_SINGLE_COLUMN_BREAKPOINT_PX;
   const { pageOpen, pageExpanded, onPageKeyDown, closePage, pageHeaderActions, pagePanel, requirePageEditResolution } =
-    useChannelPageSurface(activeChannel, headerEndActions, registerPageLeaveGuard, !isNarrowPanelViewport, targetMessageId ?? targetForumReplyId ?? selectedForumPostId);
+    useChannelPageSurface(activeChannel, headerEndActions, registerPageLeaveGuard, !isNarrowPanelViewport, threadRevealId);
   const {
     canReset: canResetThreadPanelWidth,
     onResetWidth: handleThreadPanelWidthReset,
