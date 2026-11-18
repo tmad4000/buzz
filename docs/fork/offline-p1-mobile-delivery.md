@@ -42,3 +42,14 @@ python3 ../scripts/run_offline_check.py 240 dart --packages=.dart_tool/package_c
 ```
 
 The runner resolves units and reports all diagnostics, with nonzero exit for diagnostics or unresolved files. It supplements the blocked standard server command. All test/analyzer subprocesses remain process-group bounded. Native/device acceptance and independent exact-head re-review remain open; no merge, deployment, enablement or source GO asserted.
+
+
+### Follow-up coverage requested by the coordinator
+
+Original builder a027's six-ID ACK describes historical OPEN status, not these fixes. On the takeover branch, producer regressions now exercise both real head/thread debounce → clear → drain → no snapshot, then a genuinely new live event → a saved snapshot. The blocked profile queue case retains its new post-clear profile assertion.
+
+Temp cleanup now sweeps kind-directory and index temps even when the metadata cache is warm; the prior warm-cache early return skipped the sweep. New warm/cold tests cover all four kind directories plus `index.json.tmp`, while preserving committed payloads. Separate record/index tests inject an exception after a partial temp write through production `File.writeAsString`, in addition to actual rename-failure tests. Atomic `finally` leaves no sibling temp in either case. Sweeping still runs within the per-scope serialization lane.
+
+The auth regression exercises actual `signOut()` with a real signing identity, an explicitly OFF flag and a directory seam that throws on any access; transition teardown and credential removal succeed. Community removal has its corresponding OFF fault test. Scope and observation flag guards remain as mapped above; no privacy rationale overrides OFF parity.
+
+Bounded evidence: `pr90-followup-verified-tests.log` (17 cache/timer/fault tests PASS), `pr90-followup-auth-verified.log` (36 auth/community tests PASS), `pr90-followup-combined-verified.log` (**162 tests PASS**, final combined run), and `pr90-followup-final-analyze.log` (**4 changed files resolved, 0 diagnostics**, exit 0). Prior 149-test, mounted screen and 13-file analyzer evidence remains at ancestor `90edb65fb69c554d92ebf13eaee1285c9b001b8e`; it is not relabeled as a fresh run. Standard server analysis still has the separately recorded quota limitation; direct analysis uses the installed pinned analyzer API without watchers. No Apple/Android acceptance or duplicate reviewer launch.

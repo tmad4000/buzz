@@ -302,7 +302,6 @@ class OfflineCacheStore {
   Future<List<({File file, String kind, int visited, int bytes})>>
   _records() async {
     final existing = _recordCaches[_key];
-    if (existing != null) return [...existing];
     final result = <({File file, String kind, int visited, int bytes})>[];
     if (!await _dir.exists()) return result;
     final indexTemp = File('$_key/index.json.tmp');
@@ -315,7 +314,10 @@ class OfflineCacheStore {
           await entity.delete();
           continue;
         }
-        if (entity is! File || !entity.path.endsWith('.json')) continue;
+        if (existing != null ||
+            entity is! File ||
+            !entity.path.endsWith('.json'))
+          continue;
         final bytes = await entity.length();
         if (bytes > offlineCaps[kind]!.$2 * 3 + 1024) {
           await entity.delete();
@@ -337,6 +339,7 @@ class OfflineCacheStore {
         }
       }
     }
+    if (existing != null) return [...existing];
     _recordCaches[_key] = [...result];
     for (final row in result) {
       if (row.visited > (_visitClocks[_key] ?? 0)) {

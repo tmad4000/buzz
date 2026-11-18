@@ -1,0 +1,22 @@
+00:00 +0: loading /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart
+00:00 +0: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: disk label survives failed history but reconnect replaces it through production preload
+00:00 +1: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: profile queue captured before clear cannot resurrect a later queued row
+00:00 +1: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: disk label survives failed history but reconnect replaces it through production preload
+Offline author label write failed: PathNotFoundException: Cannot retrieve length of file, path = '/tmp/pr90-recovery-DPRELD/5f161c9149882e0e10124bc5dd5c11f0fbe8ec452edd52bcec76b01e9252cb33/profile/2bd806c97f0e00af1a1fc3328fa763a9269723c8db8fac4f93af71db186d6e90.json' (OS Error: No such file or directory, errno = 2)
+00:01 +2: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_thread_commit_p1_test.dart: live thread authority follows AsyncData commit and never waits for optional cache initialization
+00:01 +3: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+[ChannelMessagesNotifier] channel window unavailable for general, falling back to WS history: Exception: Channel window response must contain exactly one bounds event.
+00:03 +4: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:03 +5: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_recovery_regressions_test.dart: production head debounce scheduled before clear stays cleared on timer and cancel
+00:06 +6: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_cache_p1_test.dart: file model caps heads/threads and rejects oversized complete units
+00:06 +7: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_cache_p1_test.dart: file model caps heads/threads and rejects oversized complete units
+00:06 +8: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_cache_p1_test.dart: file model caps heads/threads and rejects oversized complete units
+00:06 +9: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_cache_p1_test.dart: file model caps heads/threads and rejects oversized complete units
+00:06 +10: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_cache_p1_test.dart: file model caps heads/threads and rejects oversized complete units
+00:06 +11: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_cache_p1_test.dart: file model caps heads/threads and rejects oversized complete units
+00:06 +12: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_cache_p1_test.dart: file model caps heads/threads and rejects oversized complete units
+00:08 +13: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_cache_p1_test.dart: file model caps heads/threads and rejects oversized complete units
+00:16 +14: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_cache_p1_test.dart: production LRU enforces byte budget and retired scopes cannot refill
+00:16 +15: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_cache_p1_test.dart: clear fences encryption in flight and leaves no committed payload
+00:16 +16: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/offline_cache_p1_test.dart: late encryption cannot replace a newer committed unit
+00:16 +17: All tests passed!

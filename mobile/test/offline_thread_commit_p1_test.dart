@@ -144,6 +144,28 @@ void main() {
           await store.clear();
           await Future<void>.delayed(const Duration(milliseconds: 2200));
           expect(await store.load('thread', 'general:root'), isNull);
+          channel.arrive(
+            const NostrEvent(
+              id: 'genuinely-new',
+              pubkey: 'alice',
+              createdAt: 1003,
+              kind: 9,
+              tags: [
+                ['h', 'general'],
+                ['e', 'root', '', 'reply'],
+              ],
+              content: 'new after clear',
+              sig: '',
+            ),
+          );
+          await Future<void>.delayed(const Duration(milliseconds: 2300));
+          final fresh = await store.load('thread', 'general:root');
+          expect(
+            (fresh?.payload as Map)['events'].any(
+              (dynamic e) => e['id'] == 'genuinely-new',
+            ),
+            isTrue,
+          );
           return;
         }
         OfflineSnapshot? snapshot;

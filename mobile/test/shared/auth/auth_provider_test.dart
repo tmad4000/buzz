@@ -66,38 +66,48 @@ void main() {
     );
   });
 
-  test('waits for transition teardown before removing credentials', () async {
-    final storage = CommunityStorage(secure: FakeSecureStorage());
-    final community = Community.create(
-      name: 'Active',
-      relayUrl: 'https://relay.example',
-      nsec: nostr.Keys.generate().nsec,
-    );
-    await storage.save(community);
-    await storage.saveActiveId(community.id);
-    final container = ProviderContainer(
-      overrides: [
-        offlineDirectoryProvider.overrideWithValue(() async => offlineRoot),
-        communityStorageProvider.overrideWithValue(storage),
-      ],
-    );
-    addTearDown(container.dispose);
-    await container.read(authProvider.future);
-    final teardown = Completer<void>();
-    container.read(communityTransitionProvider).register(() => teardown.future);
+  test(
+    'flag OFF sign-out skips failing filesystem and waits for credential teardown',
+    () async {
+      final storage = CommunityStorage(secure: FakeSecureStorage());
+      final community = Community.create(
+        name: 'Active',
+        relayUrl: 'https://relay.example',
+        nsec: nostr.Keys.generate().nsec,
+      );
+      await storage.save(community);
+      await storage.saveActiveId(community.id);
+      final container = ProviderContainer(
+        overrides: [
+          offlineEnabledProvider.overrideWithValue(false),
+          offlineDirectoryProvider.overrideWithValue(() async {
+            throw FileSystemException(
+              'OFF sign-out must never resolve filesystem',
+            );
+          }),
+          communityStorageProvider.overrideWithValue(storage),
+        ],
+      );
+      addTearDown(container.dispose);
+      await container.read(authProvider.future);
+      final teardown = Completer<void>();
+      container
+          .read(communityTransitionProvider)
+          .register(() => teardown.future);
 
-    final signingOut = container.read(authProvider.notifier).signOut();
-    await Future<void>.delayed(Duration.zero);
+      final signingOut = container.read(authProvider.notifier).signOut();
+      await Future<void>.delayed(Duration.zero);
 
-    expect(await storage.loadActiveId(), community.id);
-    final saved = await storage.loadAll();
-    expect(saved, hasLength(1));
-    expect(saved.single.id, community.id);
-    teardown.complete();
-    await signingOut;
-    expect(await storage.loadActiveId(), isNull);
-    expect(await storage.loadAll(), isEmpty);
-  });
+      expect(await storage.loadActiveId(), community.id);
+      final saved = await storage.loadAll();
+      expect(saved, hasLength(1));
+      expect(saved.single.id, community.id);
+      teardown.complete();
+      await signingOut;
+      expect(await storage.loadActiveId(), isNull);
+      expect(await storage.loadAll(), isEmpty);
+    },
+  );
 
   test('serializes overlapping switch and sign-out mutations', () async {
     final storage = CommunityStorage(secure: FakeSecureStorage());

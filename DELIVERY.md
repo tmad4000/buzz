@@ -11,3 +11,5 @@ Independent Sol reviews are requested through root. These draft checkpoints are 
 
 
 PR90 mobile takeover: Paseo `01d56bc1` owns b–f fixes and review coordination, from exact `cb34b3927`, in `/home/dev/agent-worktrees/buzz-pr90-takeover-01d56`; `a027d58a` retains desktop PR86 and its worktrees. See the mobile delivery's takeover section and `pr90-verified-tests.log` / `pr90-direct-analyze-verified.log`. Re-review routes to coordinator `a036208f-259f-46f1-9689-dba3d08e3805`, same reviewer `43467fd2-5d89-4891-a100-9811f770e915`. No root dispatch unless blocked.
+
+PR90 follow-up strengthens fresh post-clear head/thread event, OFF sign-out filesystem-fault, warm/cold all-kind/index temp, and partial-write/rename evidence. See the follow-up section and `pr90-followup-combined-verified.log` / `pr90-followup-final-analyze.log`; original a027 ACK remains historical.

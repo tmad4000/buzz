@@ -1,0 +1,105 @@
+00:00 +0: loading /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/auth/auth_provider_test.dart
+00:00 +0: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/auth/auth_provider_test.dart: waits for transition teardown before replacing credentials
+00:00 +1: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/auth/auth_provider_test.dart: flag OFF sign-out skips failing filesystem and waits for credential teardown
+00:00 +2: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/auth/auth_provider_test.dart: serializes overlapping switch and sign-out mutations
+00:00 +3: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/auth/auth_provider_test.dart: removes an invalid saved community instead of authenticating
+00:01 +4: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/auth/auth_provider_test.dart: authenticate exports the complete stored community snapshot
+00:01 +5: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/auth/auth_provider_test.dart: sign out removes the active community from the shared snapshot
+00:01 +6: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/community/community_provider_test.dart: P1 logout removes cached bytes and retires old writers before credentials disappear
+00:01 +6: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/auth/auth_provider_test.dart: snapshot export failure does not gate startup authentication
+Push community snapshot export failed: PlatformException(save_failed, Keychain unavailable, null, null)
+#0      main.<anonymous closure>.<anonymous closure> (file:///home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/auth/auth_provider_test.dart:302:13)
+#1      _CommunitySnapshotSync._write (package:buzz/shared/community/community_provider.dart:220:18)
+#2      _CommunitySnapshotSync.write.<anonymous closure> (package:buzz/shared/community/community_provider.dart:200:32)
+#3      _CommunitySnapshotSync._serializeMutation.<anonymous closure> (package:buzz/shared/community/community_provider.dart:191:55)
+<asynchronous suspension>
+#9      syncCommunitySnapshot (package:buzz/shared/community/community_provider.dart:227:5)
+<asynchronous suspension>
+#10     AuthNotifier.build (package:buzz/shared/auth/auth_provider.dart:40:9)
+<asynchronous suspension>
+#11     ElementWithFuture.handleFuture.<anonymous closure>.<anonymous closure> (package:riverpod/src/core/element.dart:220:17)
+<asynchronous suspension>
+#12     ElementWithFuture.handleFuture.<anonymous closure>.<anonymous closure> (package:riverpod/src/core/element.dart:225:29)
+<asynchronous suspension>
+(elided 5 frames from dart:async and package:stack_trace)
+00:01 +7: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/community/community_provider_test.dart: P1 logout removes cached bytes and retires old writers before credentials disappear
+00:01 +7: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/auth/auth_provider_test.dart: snapshot export failure does not gate direct authentication
+Push community snapshot export failed: PlatformException(save_failed, Keychain unavailable, null, null)
+#0      main.<anonymous closure>.<anonymous closure> (file:///home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/auth/auth_provider_test.dart:331:11)
+#1      _CommunitySnapshotSync._write (package:buzz/shared/community/community_provider.dart:220:18)
+#2      _CommunitySnapshotSync.write.<anonymous closure> (package:buzz/shared/community/community_provider.dart:200:32)
+#3      _CommunitySnapshotSync._serializeMutation.<anonymous closure> (package:buzz/shared/community/community_provider.dart:191:55)
+<asynchronous suspension>
+#9      syncCommunitySnapshot (package:buzz/shared/community/community_provider.dart:227:5)
+<asynchronous suspension>
+#10     AuthNotifier.build (package:buzz/shared/auth/auth_provider.dart:27:7)
+<asynchronous suspension>
+#11     ElementWithFuture.handleFuture.<anonymous closure>.<anonymous closure> (package:riverpod/src/core/element.dart:220:17)
+<asynchronous suspension>
+#12     ElementWithFuture.handleFuture.<anonymous closure>.<anonymous closure> (package:riverpod/src/core/element.dart:225:29)
+<asynchronous suspension>
+(elided 5 frames from dart:async and package:stack_trace)
+Push community snapshot export failed: PlatformException(save_failed, Keychain unavailable, null, null)
+#0      main.<anonymous closure>.<anonymous closure> (file:///home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/auth/auth_provider_test.dart:331:11)
+#1      _CommunitySnapshotSync._write (package:buzz/shared/community/community_provider.dart:220:18)
+#2      _CommunitySnapshotSync.write.<anonymous closure> (package:buzz/shared/community/community_provider.dart:200:32)
+#3      _CommunitySnapshotSync._serializeMutation.<anonymous closure> (package:buzz/shared/community/community_provider.dart:191:55)
+<asynchronous suspension>
+#9      syncCommunitySnapshot (package:buzz/shared/community/community_provider.dart:227:5)
+<asynchronous suspension>
+#10     syncStoredCommunitySnapshot (package:buzz/shared/community/community_provider.dart:236:3)
+<asynchronous suspension>
+#11     AuthNotifier.authenticateWithCommunity.<anonymous closure> (package:buzz/shared/auth/auth_provider.dart:65:7)
+<asynchronous suspension>
+#12     main.<anonymous closure> (file:///home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/auth/auth_provider_test.dart:340:5)
+<asynchronous suspension>
+#13     Declarer.test.<anonymous closure>.<anonymous closure> (package:test_api/src/backend/declarer.dart:253:15)
+<asynchronous suspension>
+#14     Declarer.test.<anonymous closure> (package:test_api/src/backend/declarer.dart:250:11)
+<asynchronous suspension>
+#15     Invoker._waitForOutstandingCallbacks.<anonymous closure> (package:test_api/src/backend/invoker.dart:318:9)
+<asynchronous suspension>
+(elided 5 frames from dart:async and package:stack_trace)
+00:01 +8: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/community/community_provider_test.dart: P1 logout removes cached bytes and retires old writers before credentials disappear
+00:01 +9: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/community/community_provider_test.dart: P1 logout removes cached bytes and retires old writers before credentials disappear
+00:02 +10: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/community/community_provider_test.dart: flag OFF removal never resolves offline filesystem even with a signing identity
+00:02 +11: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/community/community_provider_test.dart: CommunityListNotifier loads empty list initially
+00:02 +12: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/community/community_provider_test.dart: CommunityListNotifier exports migrated communities on startup
+00:02 +13: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/community/community_provider_test.dart: CommunityListNotifier skips an unchanged snapshot after provider invalidation
+00:02 +14: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/community/community_provider_test.dart: CommunityListNotifier addCommunity adds to list
+00:02 +15: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/community/community_provider_test.dart: CommunityListNotifier push notifications default off and opt-in survives restart
+00:02 +16: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/community/community_provider_test.dart: CommunityListNotifier lease retry reserves beyond a locally unaccepted generation
+00:02 +17: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/community/community_provider_test.dart: CommunityListNotifier older lease success cannot regress accepted generation
+00:02 +18: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/community/community_provider_test.dart: CommunityListNotifier lease success cannot accept stale desired subscriptions
+00:02 +19: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/community/community_provider_test.dart: CommunityListNotifier opt-out tombstones an in-flight first publication
+00:02 +20: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/community/community_provider_test.dart: CommunityListNotifier opt-out persists first and publishes a higher tombstone
+00:02 +21: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/community/community_provider_test.dart: CommunityListNotifier failed opt-out tombstone retries after restart at a newer generation
+Push lease cleanup failed: Bad state: injected tombstone failure
+#0      main.<anonymous closure>.<anonymous closure>.<anonymous closure> (file:///home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/community/community_provider_test.dart:424:13)
+#1      CommunityListNotifier._retryPendingPushLeaseTombstone (package:buzz/shared/community/community_provider.dart:580:60)
+<asynchronous suspension>
+#2      CommunityListNotifier.setPushNotificationsEnabled (package:buzz/shared/community/community_provider.dart:510:9)
+<asynchronous suspension>
+#3      main.<anonymous closure>.<anonymous closure> (file:///home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/community/community_provider_test.dart:447:9)
+<asynchronous suspension>
+#4      Declarer.test.<anonymous closure>.<anonymous closure> (package:test_api/src/backend/declarer.dart:253:15)
+<asynchronous suspension>
+#5      Declarer.test.<anonymous closure> (package:test_api/src/backend/declarer.dart:250:11)
+<asynchronous suspension>
+#6      Invoker._waitForOutstandingCallbacks.<anonymous closure> (package:test_api/src/backend/invoker.dart:318:9)
+<asynchronous suspension>
+00:02 +22: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/community/community_provider_test.dart: CommunityListNotifier removeCommunity removes from list
+00:02 +23: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/community/community_provider_test.dart: CommunityListNotifier remote tombstone attempt cannot block local removal
+00:02 +24: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/community/community_provider_test.dart: CommunityListNotifier journal persistence failure keeps community credentials
+00:02 +25: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/community/community_provider_test.dart: CommunityListNotifier waits for transition teardown before removing active community
+00:02 +26: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/community/community_provider_test.dart: CommunityListNotifier renameCommunity updates name
+00:02 +27: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/community/community_provider_test.dart: CommunityListNotifier waits for transition teardown before updating active ID
+00:02 +28: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/community/community_provider_test.dart: CommunityListNotifier overlapping transitions share one callback run
+00:02 +29: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/community/community_provider_test.dart: CommunityListNotifier a later transition starts a new callback run
+00:02 +30: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/community/community_provider_test.dart: CommunityListNotifier transition callback failure does not block the active ID update
+00:02 +31: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/community/community_provider_test.dart: CommunityListNotifier switchCommunity updates active ID
+00:02 +32: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/community/community_provider_test.dart: activeCommunityProvider returns null when no communities
+00:02 +33: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/community/community_provider_test.dart: activeCommunityProvider returns community matching active ID
+00:02 +34: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/community/community_provider_test.dart: activeCommunityProvider falls back without persisting when active ID is missing
+00:02 +35: /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/shared/community/community_provider_test.dart: activeCommunityProvider falls back to first community if active ID is invalid
+00:02 +36: All tests passed!
