@@ -28,3 +28,9 @@ Reader cases: metadata v1/v2, stale projections, deleted/orphan assignments, unk
 Format review: 36ce8949 confirmed envelope and register-authoritative reading, requested stable rank ties + dense section numbering; both fixed with a regression. Format approval confirmed after both fixes (36ce8949 message read back via `paseo logs`). Source-format approval only; owner ran no checks. Independent Sol review requested through root with the draft PR.
 
 Not a TestFlight delivery. Captain 9888b74e must grant START for any native/mobile build, then enable the flag and exercise desktop rearrange → phone initial fetch/live update/reconnect/foreground resume, channel/DM placement, Starred shortcuts, account/community isolation, navigation, local collapse and unknown-version fallback. Linux Flutter tests do not verify iOS behavior. Human testing and review attestation remain open; PR stays draft.
+
+## Independent review follow-up
+
+Sol review [6970426493](https://github.com/tmad4000/buzz/pull/68#issuecomment-6970426493) returned NO-GO at `378f4d5c3`: Forums displayed/persisted its sort choice but did not apply it to rows. Lane safety, metadata, DM privacy and opt-in passed. The correction wraps placed Forums rows in the shared `sortChannelsForList` with the persisted `forums` mode. A production-sidebar widget regression starts with saved Recent mode, selects A–Z then Recent through the actual Forums menu, and verifies row order after each selection. Re-review of this finding and introduced defects requested from the same reviewer `3e9a8208`. Captain START/TestFlight remains gated on GO.
+
+Follow-up validation: `flutter analyze --no-pub` clean; `flutter test --no-pub test/features/channels/channels_page_test.dart --plain-name section` **6/6 pass**. Log `/tmp/mobile-sections-forums-fix.log`; same 180s process-group timeout supervisor, no timeout.

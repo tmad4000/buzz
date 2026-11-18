@@ -393,10 +393,13 @@ class _SliverChannelsList extends HookConsumerWidget {
           showTopDivider: true,
           expanded: sectionExpanded('builtin:forums'),
           onToggle: () => toggleSection('builtin:forums'),
-          channels: channelsInSidebarSection(
-            visibleChannels,
-            sectionsState.store,
-            'builtin:forums',
+          channels: sortChannelsForList(
+            channelsInSidebarSection(
+              visibleChannels,
+              sectionsState.store,
+              'builtin:forums',
+            ),
+            sortState.sortModeFor('forums'),
           ),
           unreadChannelIds: unreadChannelIds,
           mutedChannelIds: mutedChannelIds,

@@ -20,6 +20,7 @@ import 'package:hooks_riverpod/misc.dart';
 import 'package:buzz/features/channels/channel_stars/channel_stars_provider.dart';
 import 'package:buzz/features/channels/channel_mutes/channel_mutes_provider.dart';
 import 'package:buzz/features/channels/channel_sort/channel_sort_provider.dart';
+import 'package:buzz/features/channels/channel_sort/channel_sort_storage.dart';
 import 'package:buzz/shared/theme/buzz_icons.dart';
 import 'package:buzz/features/channels/channel.dart';
 import 'package:buzz/features/channels/channel_management_provider.dart';
@@ -773,6 +774,67 @@ void main() {
         findsNothing,
       );
     }
+  });
+
+  testWidgets('desktop sections Forums honors saved sort and both menu modes', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(600, 1800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    Channel forum(String id, String name, int day) => Channel(
+      id: id,
+      name: name,
+      channelType: 'forum',
+      visibility: 'open',
+      description: '',
+      createdBy: 'abc',
+      createdAt: DateTime(2025),
+      memberCount: 2,
+      isMember: true,
+      lastMessageAt: DateTime(2025, 1, day),
+    );
+    await tester.pumpWidget(
+      buildTestable(
+        overrides: [
+          desktopSectionsEnabledProvider.overrideWithValue(true),
+          channelSortProvider.overrideWith(_ForumsSortNotifier.new),
+          channelsProvider.overrideWith(
+            () => _FakeNotifier([
+              forum('alpha', 'Alpha forum', 1),
+              forum('zulu', 'Zulu forum', 2),
+            ]),
+          ),
+          channelSectionsProvider.overrideWith(
+            () => _FakeChannelSectionsNotifier(
+              const ChannelSectionStore(layoutOrder: ['builtin:forums']),
+            ),
+          ),
+        ],
+      ),
+    );
+    await tester.pumpAndSettle();
+    void expectAbove(String first, String second) => expect(
+      tester.getTopLeft(find.text(first)).dy,
+      lessThan(tester.getTopLeft(find.text(second)).dy),
+    );
+    // Existing saved Recent preference must apply on initial render.
+    expectAbove('Zulu forum', 'Alpha forum');
+    Future<void> selectSort(String label) async {
+      await tester.tap(find.byKey(const ValueKey('sort-menu-Forums')));
+      await tester.pumpAndSettle();
+      final popover = find.byKey(const ValueKey('sort-popover-Forums'));
+      await tester.tap(
+        find.descendant(of: popover, matching: find.text(label)),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    await selectSort('Sort: A–Z');
+    expectAbove('Alpha forum', 'Zulu forum');
+    await selectSort('Sort: Recent');
+    expectAbove('Zulu forum', 'Alpha forum');
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('desktop sections apply layout order and DM assignments', (
@@ -3998,4 +4060,25 @@ class _SwitchingUserCache extends UserCacheNotifier {
 class _CompletedPairingNotifier extends PairingNotifier {
   @override
   PairingState build() => const PairingState(status: PairingStatus.success);
+}
+
+class _ForumsSortNotifier extends ChannelSortNotifier {
+  @override
+  ChannelSortState build() => const ChannelSortState(
+    isReady: true,
+    store: ChannelSortStore(groups: {'forums': ChannelSortMode.recent}),
+  );
+
+  @override
+  void setSortModeFor(
+    String groupKey,
+    ChannelSortMode mode, {
+    Iterable<String>? liveSectionIds,
+  }) {
+    state = ChannelSortState(
+      isReady: true,
+      version: state.version + 1,
+      store: ChannelSortStore(groups: {...state.store.groups, groupKey: mode}),
+    );
+  }
 }
