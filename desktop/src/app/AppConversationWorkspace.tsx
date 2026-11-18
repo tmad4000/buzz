@@ -15,6 +15,7 @@ import type { SearchHighlightNavigation } from "./navigation/searchHighlightNavi
 import { admittedRouteSearchHighlight } from "@/features/conversations/routeSearchHighlight";
 import { useConversationHistoryOrigin } from "@/features/conversations/useConversationHistoryOrigin";
 import { hasSidebarConversationIntent } from "@/features/conversations/conversationNavigationIntent";
+import { createWorkspaceFocusCycle } from "@/features/conversations/workspaceFocusCycle";
 
 const ChannelRouteScreen = React.lazy(async () => {
   const module = await import("./routes/ChannelRouteScreen");
@@ -24,6 +25,7 @@ const ChannelRouteScreen = React.lazy(async () => {
 export type AppConversationNavigation = {
   /** True means handled, including a target guard veto; never fall through after a veto. */
   selectChannel: (channelId: string) => boolean;
+  cycleFocus: (direction: 1 | -1, target: EventTarget | null) => boolean;
 };
 
 function windowSlot() {
@@ -271,9 +273,63 @@ export function AppConversationWorkspace({
       );
     },
   });
+  const focusCycle = React.useRef<ReturnType<
+    typeof createWorkspaceFocusCycle
+  > | null>(null);
+  const focusCycleState = React.useRef({ session, active, project });
+  focusCycleState.current = { session, active, project };
+  React.useLayoutEffect(() => {
+    const workspace = root.current;
+    const scope = workspace?.closest<HTMLElement>(
+      "[data-conversation-focus-scope]",
+    );
+    if (!workspace || !scope || !session) return;
+    const cycle = createWorkspaceFocusCycle({
+      scope,
+      workspace,
+      enabled: () =>
+        focusCycleState.current.session === session &&
+        focusCycleState.current.active,
+      panes: () =>
+        listPanes(session.controller.getSnapshot().layout.root).map((pane) => ({
+          paneId: pane.id,
+          viewId: pane.viewInstanceId,
+        })),
+      focusedViewId: () => {
+        const layout = session.controller.getSnapshot().layout;
+        return (
+          listPanes(layout.root).find(
+            (pane) => pane.id === layout.focusedPaneId,
+          )?.viewInstanceId ?? null
+        );
+      },
+      focusView: (viewId) => {
+        const pane = listPanes(
+          session.controller.getSnapshot().layout.root,
+        ).find((candidate) => candidate.viewInstanceId === viewId);
+        if (!pane) return false;
+        session.controller.focus(pane.id);
+        const layout = session.controller.getSnapshot().layout;
+        if (layout.focusedPaneId !== pane.id) return false;
+        setMessage(null);
+        setRetryAction(null);
+        focusCycleState.current.project(layout.views[viewId], {
+          replace: true,
+        });
+        return true;
+      },
+    });
+    focusCycle.current = cycle;
+    return () => {
+      cycle.dispose();
+      if (focusCycle.current === cycle) focusCycle.current = null;
+    };
+  }, [session]);
   React.useLayoutEffect(() => {
     let alive = true;
     const port: AppConversationNavigation = {
+      cycleFocus: (direction, target) =>
+        alive ? (focusCycle.current?.cycle(direction, target) ?? false) : false,
       selectChannel: (channelId) => {
         if (!alive || !active || !session || !canOpen(channelId)) return false;
         const viewId = session.controller.navigateRoute({

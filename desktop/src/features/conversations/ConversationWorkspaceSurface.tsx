@@ -145,6 +145,7 @@ export function ConversationWorkspaceSurface({
       <ConversationViewGuardsContext.Provider value={session.guards}>
         <ConversationDraftEditorsProvider key={session.scopeKey}>
           <ConversationLayoutSurface
+            keyboardTraversal="shell"
             layout={snapshot.layout}
             canRestore={snapshot.canRestore}
             focusRequest={
