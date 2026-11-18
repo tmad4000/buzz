@@ -80,7 +80,10 @@ const channel =
     ? { ...general, channelType: pageHost }
     : general;
 if (pageHost) {
-  const html = "<h1>Shared page</h1><button>Page control</button>";
+  const intro = "<h1>Shared page</h1><button>Page control</button>";
+  const html = new URLSearchParams(location.search).has("shortPage")
+    ? intro
+    : `${intro}<div style="height:100vh"></div><h2 id="middle">Middle</h2><div style="height:100vh"></div><h3>End of page</h3><div style="height:100vh"></div>`;
   const publication = "00000000-0000-4000-8000-000000000001";
   const chunk = {
     id: "a".repeat(64),

@@ -65,7 +65,7 @@ test("size cap counts UTF-8 bytes, accepts boundary and rejects oversized incomi
   );
 });
 test("policy precedes hostile markup and link requests allow only external HTTP(S)", () => {
-  const document = pageDocument(
+  const { srcDoc: document } = pageDocument(
     '<meta http-equiv="Content-Security-Policy" content="default-src *"><script>fetch("https://bad.test")</script>',
   );
   assert.ok(document.includes("default-src 'none'"));
@@ -86,8 +86,28 @@ test("policy precedes hostile markup and link requests allow only external HTTP(
   );
 });
 
+test("contents comes from sanitized headings with stable unique anchors and bounded labels", () => {
+  const html =
+    '<div id="hello-1"></div><h1> Hello <em>world</em> </h1>' +
+    '<h2 id="author-id"> Hello <script>hidden</script></h2><h3 id="author-id">Hello</h3>' +
+    "<h4>Excluded</h4><h3> </h3><template><h1>Inert</h1></template>" +
+    `<h2>${"x".repeat(200)}</h2>` +
+    "<h2>Repeated</h2>".repeat(210);
+  const { headings, srcDoc } = pageDocument(html);
+  assert.equal(headings.length, 200);
+  assert.equal(new Set(headings.map(({ id }) => id)).size, 200);
+  assert.deepEqual(headings.slice(0, 3), [
+    { id: "hello-world-1", level: 1, text: "Hello world" },
+    { id: "author-id", level: 2, text: "Hello" },
+    { id: "hello-2", level: 3, text: "Hello" },
+  ]);
+  assert.equal(headings[3].text.length, 120);
+  assert.match(srcDoc, /<h3 id="hello-2">Hello<\/h3>/);
+  assert.deepEqual(pageDocument(html), { srcDoc, headings });
+});
+
 test("link bridge hash stays synchronized with child and native parent CSP", () => {
-  const html = pageDocument("<p>Page</p>");
+  const { srcDoc: html } = pageDocument("<p>Page</p>");
   const script = html.match(/<script>([\s\S]*?)<\/script>/)[1];
   const hash = `sha256-${createHash("sha256").update(script).digest("base64")}`;
   assert.ok(html.includes(hash));
