@@ -287,13 +287,16 @@ export function reconcileFetchedChannelWindow(
     emptyChannelWindowStore();
   const next = replaceNewestChannelWindow(current, page);
   queryClient.setQueryData(windowKey, next);
-  queryClient.setQueryData(["offline-snapshot", channelId], null);
-  queryClient.setQueryData(["offline-live", channelId], offlineEpoch);
+  if (offlineCacheEnabled()) {
+    queryClient.setQueryData(["offline-snapshot", channelId], null);
+    queryClient.setQueryData(["offline-live", channelId], offlineEpoch);
+  }
   const scope = channelHeadCacheScope(queryClient);
   if (scope) {
     const capturedAt = Date.now();
     void storeChannelHeadCache(scope, channelId, events)
       .then(() => {
+        if (!offlineCacheEnabled()) return;
         queryClient.setQueryData(["offline-cached-at", channelId], {
           savedAt: capturedAt,
         });

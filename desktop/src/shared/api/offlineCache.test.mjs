@@ -12,6 +12,7 @@ import {
   createOfflineCipher,
   createBrowserOfflineCipher,
   clearOfflineForLogout,
+  prepareOfflineCache,
 } from "./offlineCache.ts";
 const dom = new JSDOM("", { url: "http://offline.test" });
 const pubkey = "f".repeat(64);
@@ -22,6 +23,8 @@ const key = nip44.v2.utils.getConversationKey(
   "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
 );
 let locked = false;
+let migrations = 0;
+let migrationSawLocked = false;
 let activePubkey = pubkey;
 let switchDuringEncryption = false;
 let bridgeEncryptions = 0;
@@ -36,6 +39,12 @@ before(() => {
   globalThis.isTauri = true;
   window.__TAURI_INTERNALS__ = {
     invoke: async (command, args) => {
+      if (command === "offline_cache_epoch") return 0;
+      if (command === "offline_cache_migrate") {
+        migrations++;
+        migrationSawLocked = locked;
+        return;
+      }
       if (command === "get_identity") return { pubkey: activePubkey, locked };
       if (command === "offline_cache_encrypt") {
         if (args.expectedPubkey !== activePubkey)
@@ -71,6 +80,40 @@ before(() => {
   setOfflineCipher(realCipher);
 });
 after(() => dom.window.close());
+test("R4 full-scope opt-in migration runs while locked and preserves unrelated storage; OFF is inert", async () => {
+  const legacy = [
+    "buzz-channels.v1:wss://one:alice",
+    "buzz-channels.v1:wss://two:bob",
+    "buzz-user-labels.v1:wss://one",
+    "buzz-user-labels.v1:wss://two",
+  ];
+  for (const key of legacy)
+    window.localStorage.setItem(key, "plaintext fixture");
+  window.localStorage.setItem("unrelated-draft", "keep");
+  await prepareOfflineCache();
+  assert.equal(migrations, 0);
+  for (const key of legacy)
+    assert.notEqual(window.localStorage.getItem(key), null);
+  locked = true;
+  window.localStorage.setItem("buzz-offline-cache-v1", "on");
+  try {
+    await prepareOfflineCache();
+    assert.equal(migrations, 1);
+    assert.equal(
+      migrationSawLocked,
+      true,
+      "native all-scope disposal does not depend on unlocked identity",
+    );
+    for (const key of legacy)
+      assert.equal(window.localStorage.getItem(key), null);
+    assert.equal(window.localStorage.getItem("unrelated-draft"), "keep");
+    await assert.rejects(loadOffline(scope, "head"), /unavailable/);
+  } finally {
+    locked = false;
+    window.localStorage.removeItem("buzz-offline-cache-v1");
+  }
+});
+
 test("off by default; all payloads encrypted with actual NIP44, Unicode chunks and scope binding", async () => {
   assert.equal(offlineCacheEnabled(), false);
   await saveOffline(scope, "head", "a", ["secret"]);
@@ -451,6 +494,65 @@ test("late encryption cannot overwrite a newer successful snapshot of the same u
   assert.deepEqual((await loadOffline(scope, "sidebar"))[0].payload, [
     "new-payload",
   ]);
+});
+
+test("R1 hydration touch queued before clear cannot recreate a cleared native row", async () => {
+  rows.clear();
+  setOfflineCipher(realCipher);
+  await saveOffline(scope, "head", "touch", ["private"]);
+  let release;
+  nativeWriteStarted = false;
+  nativeWriteGate = new Promise((resolve) => {
+    release = resolve;
+  });
+  try {
+    const reading = loadOffline(scope, "head", "touch");
+    while (!nativeWriteStarted)
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    const clearing = clearOffline(scope);
+    release();
+    assert.deepEqual(await reading, []);
+    await clearing;
+    assert.equal(rows.size, 0);
+  } finally {
+    release();
+    nativeWriteGate = null;
+  }
+});
+
+test("R3 actual NIP44 rejects cross-record cross-relay splice, reorder, duplicate and omitted chunks", async () => {
+  rows.clear();
+  setOfflineCipher(realCipher);
+  const second = { ...scope, relayUrl: "wss://other.test/" };
+  await saveOffline(scope, "head", "bundle", { text: "A".repeat(10000) });
+  await saveOffline(second, "head", "bundle", { text: "B".repeat(10000) });
+  const id = JSON.stringify([offlineScopeKey(scope), "head", "bundle"]);
+  const original = rows.get(id);
+  const other = [...rows.values()].find(
+    (row) => row.scope === offlineScopeKey(second),
+  );
+  const a = JSON.parse(original.ciphertext),
+    b = JSON.parse(other.ciphertext);
+  const attacks = [
+    [a[0], a[1], b[2]],
+    [a[0], a[2], a[1]],
+    [a[0], a[1], a[1]],
+    [a[0], a[1]],
+  ];
+  for (const chunks of attacks) {
+    const ciphertext = JSON.stringify(chunks);
+    rows.set(id, {
+      ...original,
+      ciphertext,
+      bytes: new TextEncoder().encode(ciphertext).length,
+    });
+    assert.deepEqual(await loadOffline(scope, "head", "bundle"), []);
+  }
+  rows.set(id, original);
+  assert.equal(
+    (await loadOffline(scope, "head", "bundle"))[0].payload.text,
+    "A".repeat(10000),
+  );
 });
 
 test("logout drains dispatched native writes and prevents later writers before restart", async () => {

@@ -1,3 +1,4 @@
+import { addHuddleAgentAfterStart } from "./huddleAddConnection";
 import { invokeTauri as invoke } from "@/shared/api/tauri";
 import { useDeviceOffline } from "@/shared/api/offlineConnection";
 import { LoaderCircle } from "lucide-react";
@@ -87,11 +88,15 @@ export function AddAgentDialog({
       const needsStart = isLocal
         ? agent.status !== "running"
         : agent.status !== "deployed";
-      if (needsStart && isLocal) {
-        await invoke("start_managed_agent", { pubkey: agent.pubkey });
-        startedForAdd = true;
-      }
-      const result = await onAdd(agent.pubkey);
+      const result = await addHuddleAgentAfterStart(
+        async () => {
+          if (needsStart && isLocal) {
+            await invoke("start_managed_agent", { pubkey: agent.pubkey });
+            startedForAdd = true;
+          }
+        },
+        () => onAdd(agent.pubkey),
+      );
       if (needsStart && !isLocal) {
         try {
           await invoke("start_managed_agent", { pubkey: agent.pubkey });

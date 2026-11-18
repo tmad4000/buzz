@@ -754,6 +754,8 @@ pub fn run() {
             unread_catch_up::unread_catch_up,
             observed_unread::observed_unread_open_scope,
             observed_unread::observed_unread_ingest,
+            offline_cache::offline_cache_migrate,
+            offline_cache::offline_cache_epoch,
             offline_cache::offline_cache_encrypt,
             offline_cache::offline_cache_decrypt,
             offline_cache::offline_cache_list,

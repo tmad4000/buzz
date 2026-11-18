@@ -1,10 +1,14 @@
+import { offlineThreadIsAuthoritative } from "@/features/messages/lib/offlineThreadAuthority";
 import { toast } from "sonner";
 import { offlineConnectionEpoch } from "@/shared/api/offlineConnection";
 import * as React from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { offlineCacheEnabled } from "@/shared/api/offlineCache";
 import { relayClient } from "@/shared/api/relayClient";
-import { useRelayConnection } from "@/shared/api/useRelayConnection";
+import {
+  isRelayConnectionDegraded,
+  useRelayConnection,
+} from "@/shared/api/useRelayConnection";
 import { ConversationLiveContext } from "./ConversationViewContext";
 
 /** Scoped to one pane: a live sibling must never admit a cached conversation. */
@@ -39,6 +43,7 @@ export function OfflineConversation({
     queryFn: () => null,
     enabled: false,
   });
+  const [threadRevision, setThreadRevision] = React.useState(0);
   const [cachedThread, setCachedThread] = React.useState<{
     savedAt: number;
     truncated?: boolean;
@@ -72,7 +77,18 @@ export function OfflineConversation({
       );
     };
     update();
-    return client.getQueryCache().subscribe(update);
+    return client.getQueryCache().subscribe((event) => {
+      if (
+        event.query.queryKey[0] === "thread-replies" &&
+        (event.type === "observerAdded" ||
+          event.type === "observerRemoved" ||
+          event.type === "removed" ||
+          (event.type === "updated" &&
+            (event.action.type === "success" || event.action.type === "error")))
+      )
+        setThreadRevision((value) => value + 1);
+      update();
+    });
   }, [client, channelId]);
   const enabled = offlineCacheEnabled();
   const liveFetch = useQuery<string>({
@@ -95,7 +111,7 @@ export function OfflineConversation({
           .some(
             (query) =>
               query.getObserversCount() > 0 &&
-              !!client.getQueryData(["offline-source", ...query.queryKey]),
+              !offlineThreadIsAuthoritative(client, query),
           )),
     [
       enabled,
@@ -104,6 +120,7 @@ export function OfflineConversation({
       snapshot.data,
       liveFetch.data,
       cachedThread,
+      threadRevision,
       online,
       relay,
     ],
@@ -118,7 +135,8 @@ export function OfflineConversation({
   const offline =
     enabled &&
     (!online ||
-      ((relay === "disconnected" || relay === "stalled") && !!visibleSnapshot));
+      ((relay === "connecting" || isRelayConnectionDegraded(relay)) &&
+        !!visibleSnapshot));
   const refresh =
     enabled && online && relay === "connected" && !liveNow && !!visibleSnapshot;
   const wasOffline = React.useRef(false);

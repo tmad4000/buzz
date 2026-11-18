@@ -1,3 +1,4 @@
+import { beginOfflineThreadRead } from "./lib/offlineThreadAuthority";
 import { offlineNeedsConnection } from "@/shared/api/offlineConnection";
 import { OfflineReadUnavailableError } from "@/shared/api/offlineRead";
 import { hydrateOpenedThread } from "./lib/offlineQueryCache";
@@ -56,6 +57,11 @@ export async function loadThreadReplies(
   signal?: AbortSignal,
 ): Promise<RelayEvent[]> {
   const queryKey = threadRepliesKey(channelId, rootId);
+  const completeOfflineRead = beginOfflineThreadRead(
+    queryClient,
+    queryKey,
+    signal,
+  );
   const scope = channelHeadCacheScope(queryClient);
   if (scope)
     await hydrateOpenedThread(queryClient, scope, channelId, rootId).catch(
@@ -103,10 +109,7 @@ export async function loadThreadReplies(
       ) {
         throw new ThreadExpectedEventMissingError(expectedEventId);
       }
-      queryClient.removeQueries({
-        queryKey: ["offline-source", ...queryKey],
-        exact: true,
-      });
+      completeOfflineRead(result);
       return result;
     }
     cursor = response.nextCursor;

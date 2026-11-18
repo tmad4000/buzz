@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { useCommunities } from "@/features/communities/useCommunities";
 import { getIdentity } from "@/shared/api/tauriIdentity";
 import {
+  prepareOfflineCache,
   clearOffline,
   offlineAdapter,
   offlineCacheEnabled,
@@ -27,6 +28,10 @@ export function OfflineStorageSettings() {
     };
   };
   React.useEffect(() => {
+    if (!enabled) {
+      setBytes(null);
+      return;
+    }
     let current = true;
     void scope()
       .then(async (value) => {
@@ -44,17 +49,21 @@ export function OfflineStorageSettings() {
     return () => {
       current = false;
     };
-  }, [activeCommunity]);
-  const toggle = (value: boolean) => {
+  }, [activeCommunity, enabled]);
+  const toggle = async (value: boolean) => {
+    setBusy(true);
     try {
       window.localStorage.setItem(
         "buzz-offline-cache-v1",
         value ? "on" : "off",
       );
+      if (value) await prepareOfflineCache();
       setEnabled(value);
       toast.success("Offline cache setting saved. Restart Buzz to apply.");
     } catch {
-      toast.error("Could not save offline cache setting");
+      toast.error("Could not prepare offline cache. Restart to retry.");
+    } finally {
+      setBusy(false);
     }
   };
   const clear = async () => {
@@ -75,8 +84,9 @@ export function OfflineStorageSettings() {
       <label className="flex items-center gap-2 text-sm">
         <input
           type="checkbox"
+          disabled={busy}
           checked={enabled}
-          onChange={(event) => toggle(event.target.checked)}
+          onChange={(event) => void toggle(event.target.checked)}
         />
         Keep encrypted messages for offline reading
       </label>
@@ -86,7 +96,7 @@ export function OfflineStorageSettings() {
       </p>
       <button
         type="button"
-        disabled={busy || !activeCommunity}
+        disabled={busy || !enabled || !activeCommunity}
         onClick={() => void clear()}
         className="text-sm underline"
       >

@@ -12,6 +12,7 @@ export type OfflineRecord = {
   lastVisitedAt: number;
   bytes: number;
   cacheEpoch?: number;
+  touch?: boolean;
 };
 export interface OfflineCacheAdapter {
   epoch(): Promise<number>;
@@ -165,7 +166,8 @@ function nativeCacheOperation<T>(operation: () => Promise<T>): Promise<T> {
   return result;
 }
 const nativeAdapter: OfflineCacheAdapter = {
-  epoch: async () => globalGeneration,
+  epoch: () =>
+    nativeCacheOperation(() => invokeTauri<number>("offline_cache_epoch")),
   list: (scope, kind) =>
     nativeCacheOperation(() =>
       invokeTauri<OfflineRecord[]>("offline_cache_list", { scope, kind }),
@@ -179,6 +181,30 @@ const nativeAdapter: OfflineCacheAdapter = {
       invokeTauri<void>("offline_cache_clear", { scope }),
     ),
 };
+let migration: Promise<void> | undefined;
+/** Complete opt-in disposal, independent of account/signer availability. OFF is read-only. */
+export function prepareOfflineCache(): Promise<void> {
+  if (!offlineCacheEnabled()) return Promise.resolve();
+  return (migration ??= (async () => {
+    const storage = window.localStorage;
+    const keys = Array.from({ length: storage.length }, (_, index) =>
+      storage.key(index),
+    );
+    for (const key of keys)
+      if (
+        key?.startsWith("buzz-channels.v1:") ||
+        key?.startsWith("buzz-user-labels.v1:")
+      )
+        storage.removeItem(key);
+    if (isTauri())
+      await nativeCacheOperation(() =>
+        invokeTauri<void>("offline_cache_migrate"),
+      );
+  })().catch((error) => {
+    migration = undefined;
+    throw error;
+  }));
+}
 const generations = new Map<string, number>();
 const pendingWrites = new Map<string, symbol>();
 let globalGeneration = 0;
@@ -286,6 +312,17 @@ async function mutate(
           )
         )
           return;
+        if (
+          record.touch &&
+          !rows.some(
+            (row) =>
+              row.kind === record.kind &&
+              row.id === record.id &&
+              row.savedAt === record.savedAt &&
+              row.ciphertext === record.ciphertext,
+          )
+        )
+          return;
         rows = rows.filter(
           (row) => row.kind !== record.kind || row.id !== record.id,
         );
@@ -352,6 +389,7 @@ export async function saveOffline(
   try {
     const generation = generations.get(key) ?? 0;
     const globalAtStart = globalGeneration;
+    await prepareOfflineCache();
     const [, storeEpoch] = await Promise.all([
       assertOwner(scope),
       offlineAdapter().epoch(),
@@ -421,6 +459,7 @@ export async function loadOffline<T>(
   const key = offlineScopeKey(scope);
   const readGeneration = generations.get(key) ?? 0;
   const readGlobal = globalGeneration;
+  await prepareOfflineCache();
   const [, storeEpoch] = await Promise.all([
     assertOwner(scope),
     offlineAdapter().epoch(),
@@ -477,6 +516,7 @@ export async function loadOffline<T>(
         await offlineAdapter().put({
           ...row,
           cacheEpoch: storeEpoch,
+          touch: true,
           lastVisitedAt: Date.now(),
         });
       }

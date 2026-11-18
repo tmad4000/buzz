@@ -18,7 +18,10 @@ const hydratedChannels = new WeakMap<QueryClient, Set<string>>();
 const persistedHydratedChannels = new WeakMap<QueryClient, Set<string>>();
 const cacheScopes = new WeakMap<QueryClient, ChannelHeadScope>();
 export function isChannelHeadCacheEnabled(): boolean {
-  return offlineCacheEnabled();
+  if (offlineCacheEnabled()) return true;
+  if (typeof window === "undefined") return false;
+  if (import.meta.env?.VITE_BUZZ_CHANNEL_HEAD_CACHE === "off") return false;
+  return window.localStorage.getItem("buzz-channel-head-cache") !== "off";
 }
 export function channelHeadCacheScope(
   queryClient: QueryClient,
@@ -99,13 +102,15 @@ async function seedChannelHeads(
         undefined
       )
         continue;
-      queryClient.setQueryData(["offline-snapshot", entry.channelId], {
-        savedAt: entry.savedAt,
-        source: "cache",
-      });
-      queryClient.setQueryData(["offline-cached-at", entry.channelId], {
-        savedAt: entry.savedAt,
-      });
+      if (offlineCacheEnabled()) {
+        queryClient.setQueryData(["offline-snapshot", entry.channelId], {
+          savedAt: entry.savedAt,
+          source: "cache",
+        });
+        queryClient.setQueryData(["offline-cached-at", entry.channelId], {
+          savedAt: entry.savedAt,
+        });
+      }
       const messagesKey = channelMessagesKey(entry.channelId);
       // Merge, don't replace: the app mounts while this load is in flight, so
       // the live subscription may already have overlaid events on this store.

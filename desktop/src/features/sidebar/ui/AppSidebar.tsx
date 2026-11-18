@@ -1,3 +1,4 @@
+import { offlineNeedsConnection } from "@/shared/api/offlineConnection";
 import { OfflineSidebarStatus } from "./OfflineSidebarStatus";
 // biome-ignore format: keep compact to stay within file size limit
 import * as React from "react";
@@ -343,6 +344,7 @@ export function AppSidebar({
 
   const handleCreateSectionForChannel = React.useCallback(
     (channelId: string) => {
+      if (offlineNeedsConnection()) return;
       setCreateSectionState({ open: true, pendingChannelId: channelId });
     },
     [],
@@ -350,6 +352,7 @@ export function AppSidebar({
 
   const handleCreateSectionConfirm = React.useCallback(
     (value: SectionDialogValue) => {
+      if (offlineNeedsConnection()) return;
       const section = createSection(value.name, value.icon);
       if (!section) {
         return;

@@ -96,6 +96,7 @@ function install(entries, { loadDelayMs = 0 } = {}) {
   window.__TAURI_INTERNALS__ = {};
   window.__TAURI_INTERNALS__ = {
     invoke: async (command, args) => {
+      if (command === "offline_cache_epoch") return 0;
       if (command === "get_identity") return { pubkey: "f".repeat(64) };
       if (command === "offline_cache_decrypt") return args.ciphertext;
       if (command === "offline_cache_encrypt") return args.plaintext;

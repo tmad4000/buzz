@@ -285,6 +285,7 @@ const OFFLINE_CONNECTION_ACTIONS = new Set([
   "search_messages_page",
   "start_huddle",
   "join_huddle",
+  "add_agent_to_huddle",
   "create_managed_agent",
   "start_managed_agent",
   "start_managed_agent_runtime",

@@ -1,3 +1,5 @@
+import { invokeTauri } from "@/shared/api/tauri";
+import { offlineNeedsConnection } from "@/shared/api/offlineConnection";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -640,10 +642,11 @@ export function HuddleBar({
           currentAgentPubkeys={barState.agent_pubkeys}
           onClose={() => setShowAddAgent(false)}
           onAdd={async (pubkey: string): Promise<AgentAddResult> => {
+            if (offlineNeedsConnection()) throw new Error("Needs a connection");
             setAgentAddError(null);
             const record = beginChannelMembershipWrite();
             try {
-              const result = await invoke<AgentAddResult>(
+              const result = await invokeTauri<AgentAddResult>(
                 "add_agent_to_huddle",
                 { agentPubkey: pubkey },
               );

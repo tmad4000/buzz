@@ -29,6 +29,7 @@ import type { ChannelSection } from "@/features/sidebar/lib/useChannelSections";
 import {
   ContextMenuIconSlot,
   deferMenuAction,
+  deferConnectedMenuAction,
 } from "@/features/sidebar/ui/sidebarMenuHelpers";
 import { StatusEmoji } from "@/features/user-status/ui/StatusEmoji";
 import type { Channel } from "@/shared/api/types";
@@ -74,7 +75,9 @@ function MoveToSectionSubmenu({
           <ContextMenuItem
             key={section.id}
             onSelect={() =>
-              deferMenuAction(() => onAssignChannel(channelId, section.id))
+              deferConnectedMenuAction(() =>
+                onAssignChannel(channelId, section.id),
+              )
             }
           >
             <ContextMenuIconSlot>
@@ -90,7 +93,7 @@ function MoveToSectionSubmenu({
         {sections.length > 0 ? <ContextMenuSeparator /> : null}
         <ContextMenuItem
           onSelect={() =>
-            deferMenuAction(() => onCreateSectionForChannel(channelId))
+            deferConnectedMenuAction(() => onCreateSectionForChannel(channelId))
           }
         >
           <ContextMenuIconSlot>
@@ -100,7 +103,9 @@ function MoveToSectionSubmenu({
         </ContextMenuItem>
         {currentSectionId ? (
           <ContextMenuItem
-            onSelect={() => deferMenuAction(() => onUnassignChannel(channelId))}
+            onSelect={() =>
+              deferConnectedMenuAction(() => onUnassignChannel(channelId))
+            }
           >
             <ContextMenuIconSlot />
             <span>Remove from section</span>
