@@ -1,5 +1,12 @@
 use super::*;
 
+pub(super) fn log_event_rejection(event: &nostr::Event, status: u16, error: &str) {
+    eprintln!(
+        "{}",
+        crate::link_preview_tags::rejection_diagnostic(event, status, error)
+    );
+}
+
 /// Response from `POST /events`.
 #[derive(Debug, Deserialize, serde::Serialize)]
 pub struct SubmitEventResponse {
@@ -42,7 +49,12 @@ pub async fn submit_signed_event_at_with_keys(
     .map_err(|e| classify_request_error(&e))?;
 
     if !response.status().is_success() {
-        return Err(relay_error_message(response).await);
+        let status = response.status();
+        let error = relay_error_message(response).await;
+        if status.is_client_error() {
+            log_event_rejection(event, status.as_u16(), &error);
+        }
+        return Err(error);
     }
 
     let result: SubmitEventResponse = parse_json_response(response).await?;

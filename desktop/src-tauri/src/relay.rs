@@ -723,7 +723,12 @@ pub async fn submit_signed_event_with_keys(
         .map_err(|e| classify_request_error(&e))?;
 
     if !response.status().is_success() {
-        return Err(relay_error_message(response).await);
+        let status = response.status();
+        let error = relay_error_message(response).await;
+        if status.is_client_error() {
+            submit::log_event_rejection(event, status.as_u16(), &error);
+        }
+        return Err(error);
     }
 
     let result: SubmitEventResponse = parse_json_response(response).await?;

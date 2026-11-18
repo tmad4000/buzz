@@ -50,6 +50,7 @@ fn valid_media_pair(url: &str, hash: &str, relay_base: &url::Url) -> bool {
 pub fn append(
     preview_tags: &[Vec<String>],
     relay_base: &str,
+    content: &str,
     tags: &mut Vec<Tag>,
 ) -> Result<(), String> {
     if preview_tags.len() > MAX_SNAPSHOTS {
@@ -59,7 +60,7 @@ pub fn append(
     }
     let base = url::Url::parse(relay_base).map_err(|_| "invalid relay base URL")?;
     let mut seen = HashSet::new();
-    for preview_tag in preview_tags {
+    for (index, preview_tag) in preview_tags.iter().enumerate() {
         if preview_tag.as_slice() == ["link-preview", "none"] {
             if preview_tags.len() != 1 {
                 return Err("link-preview suppression cannot include snapshots".into());
@@ -70,17 +71,43 @@ pub fn append(
             );
             continue;
         }
-        let valid = preview_tag.len() == 11
+        // Preview metadata is optional. URL serialization can add a slash or
+        // change case/encoding, while the relay requires a literal body match.
+        if preview_tag.len() == 11
             && preview_tag[0] == "link-preview"
             && preview_tag[1] == "snapshot"
             && preview_tag[2] == "1"
-            && url::Url::parse(&preview_tag[3]).is_ok_and(|url| {
+        {
+            let canonical = &preview_tag[3];
+            let reason = if !url::Url::parse(canonical).is_ok_and(|url| {
                 url.scheme() == "https"
                     && url.username().is_empty()
                     && url.password().is_none()
                     && url.fragment().is_none()
-            })
-            && seen.insert(preview_tag[3].clone())
+            }) {
+                Some("invalid_canonical_url")
+            } else if !content.contains(canonical) {
+                Some("canonical_not_in_content")
+            } else if !seen.insert(canonical.clone()) {
+                Some("duplicate_canonical_url")
+            } else {
+                None
+            };
+            if let Some(reason) = reason {
+                eprintln!(
+                    "{}",
+                    serde_json::json!({
+                        "event": "link_preview_omitted", "tag_index": index,
+                        "reason": reason, "tag": diagnostic(preview_tag),
+                    })
+                );
+                continue;
+            }
+        }
+        let valid = preview_tag.len() == 11
+            && preview_tag[0] == "link-preview"
+            && preview_tag[1] == "snapshot"
+            && preview_tag[2] == "1"
             && valid_text(&preview_tag[4], MAX_TITLE, false)
             && valid_text(&preview_tag[5], MAX_SITE, false)
             && valid_text(&preview_tag[6], MAX_DESCRIPTION, true)
@@ -93,6 +120,52 @@ pub fn append(
         tags.push(Tag::parse(parts).map_err(|e| format!("invalid link-preview tag: {e}"))?);
     }
     Ok(())
+}
+
+const MAX_LOG_PREVIEWS: usize = 8;
+const MAX_LOG_FIELDS: usize = 11;
+const MAX_REJECTION_LOG_BYTES: usize = 4096;
+
+/// Bounded tag shape; URL and text values are never copied into diagnostics.
+pub fn diagnostic(tag: &[String]) -> serde_json::Value {
+    serde_json::json!({
+        "field_bytes": tag.iter().take(MAX_LOG_FIELDS).map(String::len).collect::<Vec<_>>(),
+        "omitted_fields": tag.len().saturating_sub(MAX_LOG_FIELDS),
+    })
+}
+
+/// Structured HTTP rejection context with a hard serialized record budget.
+pub fn rejection_diagnostic(event: &nostr::Event, status: u16, error: &str) -> serde_json::Value {
+    let is_preview =
+        |tag: &nostr::Tag| tag.as_slice().first().map(String::as_str) == Some("link-preview");
+    let total = event.tags.iter().filter(|tag| is_preview(tag)).count();
+    let previews: Vec<_> = event
+        .tags
+        .iter()
+        .enumerate()
+        .filter(|(_, tag)| is_preview(tag))
+        .take(MAX_LOG_PREVIEWS)
+        .map(|(index, tag)| {
+            serde_json::json!({
+                "tag_index": index, "tag": diagnostic(tag.as_slice()),
+            })
+        })
+        .collect();
+    let mut record = serde_json::json!({
+        "event": "relay_event_rejected", "event_id": event.id.to_hex(),
+        "status": status, "link_preview_tags": previews,
+        "omitted_previews": total.saturating_sub(MAX_LOG_PREVIEWS),
+        "reason": if error.contains("invalid link-preview canonical URL") {
+            "invalid_link_preview_canonical_url"
+        } else { "relay_client_error" },
+    });
+    // Reserve one byte for the newline emitted by the stderr writer. Even if
+    // fields are added later, the diagnostic never exceeds this fixed budget.
+    if record.to_string().len() >= MAX_REJECTION_LOG_BYTES {
+        record["link_preview_tags"] = serde_json::json!([]);
+        record["omitted_previews"] = serde_json::json!(total);
+    }
+    record
 }
 
 #[cfg(test)]
@@ -121,11 +194,125 @@ mod tests {
     }
 
     #[test]
+    fn canonical_mismatch_drops_only_preview_and_preserves_message_tags() {
+        let content = "<https://humanityinfrastructure.com> <https://x.com/kevinrose/status/2122394902168473975>";
+        let mut humanity = tag("", "");
+        humanity[3] = "https://humanityinfrastructure.com/".into();
+        let mut x = tag("", "");
+        x[3] = "https://x.com/kevinrose/status/2122394902168473975".into();
+        let existing = Tag::parse(["h", "channel"]).unwrap();
+        let mut tags = vec![existing.clone()];
+        append(&[humanity, x.clone()], BASE, content, &mut tags).unwrap();
+        assert_eq!(tags.len(), 2);
+        assert_eq!(tags[0], existing);
+        assert_eq!(tags[1].as_slice(), x.as_slice());
+    }
+
+    #[test]
+    fn canonical_rules_omit_invalid_or_absent_urls_without_failing_send() {
+        for canonical in [
+            "http://example.com/",
+            "https://user:password@example.com/",
+            "https://example.com/#fragment",
+            "[example](https://example.com/)",
+            "not a URL",
+            "https://example.com/redirected",
+        ] {
+            let mut preview = tag("", "");
+            preview[3] = canonical.into();
+            let mut tags = Vec::new();
+            append(&[preview], BASE, "https://example.com/", &mut tags).unwrap();
+            assert!(tags.is_empty(), "{canonical}");
+        }
+    }
+
+    #[test]
+    fn markdown_and_angle_wrappers_allow_exact_canonical_and_duplicates_are_omitted() {
+        let preview = tag("", "");
+        let canonical = &preview[3];
+        for content in [format!("[label]({canonical})"), format!("<{canonical}>")] {
+            let mut tags = Vec::new();
+            append(
+                &[preview.clone(), preview.clone()],
+                BASE,
+                &content,
+                &mut tags,
+            )
+            .unwrap();
+            assert_eq!(tags.len(), 1);
+        }
+    }
+
+    #[test]
+    fn diagnostics_redact_url_credentials_query_fragment_and_text() {
+        let mut preview = tag("", "");
+        preview[3] = "https://user:password@example.com/private?token=secret#secret".into();
+        let diagnostic = diagnostic(&preview);
+        assert!(diagnostic.get("canonical_origin").is_none());
+        let serialized = diagnostic.to_string();
+        for secret in ["password", "secret", "private", "Example", "Description"] {
+            assert!(!serialized.contains(secret));
+        }
+    }
+
+    #[test]
+    fn rejection_record_has_signed_id_status_tag_index_and_safe_reason() {
+        let keys = nostr::Keys::parse(&"1".repeat(64)).unwrap();
+        let preview = Tag::parse(tag("", "")).unwrap();
+        let event = nostr::EventBuilder::text_note("private message body")
+            .tags([Tag::parse(["h", "channel"]).unwrap(), preview])
+            .sign_with_keys(&keys)
+            .unwrap();
+        let record = rejection_diagnostic(&event, 400, "invalid link-preview canonical URL");
+        assert_eq!(record["event_id"], event.id.to_hex());
+        assert_eq!(record["status"], 400);
+        assert_eq!(record["link_preview_tags"][0]["tag_index"], 1);
+        assert_eq!(record["reason"], "invalid_link_preview_canonical_url");
+        assert!(!record.to_string().contains("private message body"));
+        assert!(!record.to_string().contains(&event.sig.to_string()));
+        assert_eq!(
+            rejection_diagnostic(&event, 403, "untrusted secret response")["reason"],
+            "relay_client_error"
+        );
+    }
+
+    #[test]
+    fn oversized_rejection_diagnostics_have_count_field_and_byte_caps() {
+        let keys = nostr::Keys::parse(&"1".repeat(64)).unwrap();
+        let mut fields = vec!["link-preview".to_string(); 10_000];
+        fields[3] = format!("https://{}.example/", "a".repeat(10_000));
+        let preview = Tag::parse(fields).unwrap();
+        let event = nostr::EventBuilder::text_note("private")
+            .tags(vec![preview; 100])
+            .sign_with_keys(&keys)
+            .unwrap();
+        let record = rejection_diagnostic(&event, 400, "invalid link-preview canonical URL");
+        let summaries = record["link_preview_tags"].as_array().unwrap();
+        assert_eq!(summaries.len(), MAX_LOG_PREVIEWS);
+        assert_eq!(record["omitted_previews"], 92);
+        for summary in summaries {
+            assert_eq!(
+                summary["tag"]["field_bytes"].as_array().unwrap().len(),
+                MAX_LOG_FIELDS
+            );
+            assert_eq!(summary["tag"]["omitted_fields"], 9989);
+        }
+        assert!(record.to_string().len() + 1 <= MAX_REJECTION_LOG_BYTES);
+        assert!(
+            diagnostic(event.tags.iter().next().unwrap().as_slice())
+                .to_string()
+                .len()
+                < 256
+        );
+    }
+
+    #[test]
     fn append_accepts_complete_local_snapshot() {
         let mut tags = Vec::new();
         append(
             &[tag(&format!("{BASE}/media/{HASH}.png"), HASH)],
             BASE,
+            "https://linear.app/acme/issue/ABC-123/example",
             &mut tags,
         )
         .unwrap();
@@ -138,6 +325,7 @@ mod tests {
         append(
             &[vec!["link-preview".into(), "none".into()]],
             BASE,
+            "https://linear.app/acme/issue/ABC-123/example",
             &mut tags,
         )
         .unwrap();
@@ -145,6 +333,7 @@ mod tests {
         assert!(append(
             &[vec!["link-preview".into(), "none".into()], tag("", ""),],
             BASE,
+            "https://linear.app/acme/issue/ABC-123/example",
             &mut Vec::new(),
         )
         .is_err());
@@ -154,14 +343,26 @@ mod tests {
     fn append_accepts_description_newlines() {
         let mut preview_tag = tag("", "");
         preview_tag[6] = "First paragraph\n\nSecond paragraph".into();
-        assert!(append(&[preview_tag], BASE, &mut Vec::new()).is_ok());
+        assert!(append(
+            &[preview_tag],
+            BASE,
+            "https://linear.app/acme/issue/ABC-123/example",
+            &mut Vec::new()
+        )
+        .is_ok());
     }
 
     #[test]
     fn append_rejects_other_control_characters() {
         let mut preview_tag = tag("", "");
         preview_tag[6] = "Unsafe\tdescription".into();
-        assert!(append(&[preview_tag], BASE, &mut Vec::new()).is_err());
+        assert!(append(
+            &[preview_tag],
+            BASE,
+            "https://linear.app/acme/issue/ABC-123/example",
+            &mut Vec::new()
+        )
+        .is_err());
     }
 
     #[test]
@@ -175,13 +376,20 @@ mod tests {
             format!("{BASE}/media/{HASH}.png/extra"),
         ] {
             assert!(
-                append(&[tag(&url, HASH)], BASE, &mut Vec::new()).is_err(),
+                append(
+                    &[tag(&url, HASH)],
+                    BASE,
+                    "https://linear.app/acme/issue/ABC-123/example",
+                    &mut Vec::new()
+                )
+                .is_err(),
                 "{url}"
             );
         }
         assert!(append(
             &[tag(&format!("{BASE}/media/{HASH}.png"), &"b".repeat(64))],
             BASE,
+            "https://linear.app/acme/issue/ABC-123/example",
             &mut Vec::new(),
         )
         .is_err());
