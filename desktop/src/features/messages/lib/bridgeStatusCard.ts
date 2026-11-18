@@ -24,6 +24,7 @@ export function parseBridgeStatusCard(message: TimelineMessage) {
   if (
     message.kind !== 9 ||
     message.signerPubkey !== BRIDGE_STATUS_SIGNER ||
+    (message.edited && message.editSignerPubkey === undefined) ||
     (message.editSignerPubkey !== undefined &&
       message.editSignerPubkey !== BRIDGE_STATUS_SIGNER)
   )

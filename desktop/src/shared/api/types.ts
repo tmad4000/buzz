@@ -187,6 +187,8 @@ export type RelayEvent = {
   id: string;
   /** Local-only render identity for optimistic events that are later acknowledged. */
   localKey?: string;
+  /** Locally patched edit body: original signature does not authenticate this content. */
+  localEditedContent?: boolean;
   localSendIntent?: LocalSendIntent;
   pubkey: string;
   created_at: number;
