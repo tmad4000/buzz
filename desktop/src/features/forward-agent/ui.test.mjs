@@ -5,6 +5,7 @@ import test from "node:test";
 import vm from "node:vm";
 import ts from "typescript";
 import * as model from "./model.ts";
+import { audienceKey, needsAudienceConfirmation } from "./audience.ts";
 const require = createRequire(import.meta.url);
 function load(relative, mocks) {
   const js = ts.transpileModule(
@@ -42,6 +43,7 @@ const channel = (id, type, name) => ({
   visibility: "private",
   isMember: true,
   archivedAt: null,
+  memberCount: 2,
   participantPubkeys: ["self", "agent"],
   memberPubkeys: ["self", "agent"],
   participants: ["Jacob", "Paseo"],
@@ -60,6 +62,7 @@ const message = {
   kind: 9,
   body: "Please investigate",
   author: "Jacob",
+  pubkey: "f".repeat(64),
 };
 function actionHarness(enabled = true) {
   const sends = [],
@@ -71,8 +74,9 @@ function actionHarness(enabled = true) {
   let deferred = false;
   let finish;
   let queryOptions;
-  const mod = load("./ForwardToAgentAction.tsx", {
+  const mocks = {
     react: {
+      useId: () => "forward-note-id",
       useState: (v) => [v, () => {}],
       useRef: (v) => ({ current: v }),
       useEffect: (fn) => {
@@ -143,7 +147,31 @@ function actionHarness(enabled = true) {
       },
     },
     "./preference": { useForwardAgentEnabled: () => enabled },
+  };
+  const controller = load("./useForwardAgentSend.ts", {
+    ...mocks,
+    "./audience": {
+      audienceKey,
+      needsAudienceConfirmation,
+      readForwardAudiences: async () => ({
+        source: {
+          channel: channels[0],
+          members: [{ pubkey: "self" }, { pubkey: "agent" }],
+        },
+        target: {
+          channel: channels[1],
+          members: [{ pubkey: "self" }, { pubkey: "agent" }],
+        },
+      }),
+    },
   });
+  const mod = load("./ForwardToAgentAction.tsx", {
+    ...mocks,
+    "./useForwardAgentSend": controller,
+    "./ForwardAudienceConfirm": { ForwardAudienceConfirm: () => null },
+    "@/shared/ui/input": { Input: "input" },
+  });
+
   const wrapper = mod.ForwardToAgentAction({ channelId: "dm", message });
   return {
     tree: wrapper?.type(wrapper.props),
