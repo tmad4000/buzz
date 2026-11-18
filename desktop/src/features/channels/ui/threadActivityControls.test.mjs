@@ -471,3 +471,35 @@ test("busy suggestion can use existing relay summary in Timeline and shared dism
     );
     assert.equal(button("Pin this busy thread?"), undefined);
   }));
+
+test("dismissal history shares the bounded preference budget; additional pin stays visibly session-only", async () =>
+  fixture(async (root, win) => {
+    for (let i = 0; i < 1000; i++)
+      localStorage.setItem(`capacity:busyDismissed.v1:history-${i}`, "true");
+    const message = {
+      id: "new-root",
+      body: "New root",
+      depth: 0,
+      createdAt: 1,
+    };
+    await act(() =>
+      root.render(
+        React.createElement(OpenThreadsBar, {
+          storageKey: "capacity",
+          entries: [{ message, summary: null }],
+          currentThread: null,
+          onOpen: () => {},
+        }),
+      ),
+    );
+    await click(button("Open threads"), win);
+    await act(() => {
+      const select = document.querySelector('[aria-label="Thread to pin"]');
+      select.value = "new-root";
+      select.dispatchEvent(new win.Event("change", { bubbles: true }));
+    });
+    await click(button("Pin here"), win);
+    assert.ok(document.body.textContent.includes("1 pinned"));
+    assert.ok(document.body.textContent.includes("session-only"));
+    assert.equal(localStorage.getItem("capacity:pin.v2:new-root"), null);
+  }));

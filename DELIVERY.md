@@ -6,6 +6,8 @@ Jacob's 2026-11-18 08:43Z ask, relayed by root: suggest pinning threads with man
 
 Stacked on PR70 https://github.com/tmad4000/buzz/pull/70 at exact base `c25dd45c7aa4f1294f0207765f893f96936e7e7e`, branch `feat/thread-activity-20261118`. That preserves .8 ancestry (annotated69eda1ff →16fa57dfc) and freezes PR70's pending delta review. Parent PR70 source review/acceptance remains its own gate; this follow-on is not an independent replacement for PR70.
 
+Draft PR: https://github.com/tmad4000/buzz/pull/95
+
 ## Behavior
 
 Expand **Open threads**, then opt into **Suggest busy threads** (off initially). The reply threshold defaults to20 and can be set to5/10/20/50/100. Eligible loaded canonical roots show a quiet **Pin this busy thread?** action with actual subject/reply count. One click invokes the existing private pin owner. No pin is created on render, threshold change, count change, search, or dismissal.
@@ -20,8 +22,8 @@ The bar remains manual: suggestions confer no work lifecycle/Needs you authority
 
 Focused checks only, every test/typecheck launched through the existing process-group timeout runner `/home/dev/code/buzz-thread-activity-20261118/run-bounded.py` (setsid; TERM/KILL timeout and group cleanup). No browser/native/Tauri/cargo/M5/production jobs. Repository-wide hooks/CI remain outside the dispatch validation scope.
 
-- 14 focused unit/model/component tests: busy threshold/evidence/dedupe/eligibility/limits; prior pin/Order regressions; opt-in/manual-only pin, threshold and dismissal persistence, sibling views, relay-only Timeline summary and independent dismissal/membership keys.
-- TypeScript no-emit check PASS on final source, with180s group bound.
+- 15 focused unit/model/component tests: busy threshold/evidence/dedupe/eligibility/limits; prior pin/Order regressions; opt-in/manual-only pin, threshold and dismissal persistence, sibling views, relay-only Timeline summary and independent dismissal/membership keys; bounded combined preference capacity with visible session-only fallback.
+- TypeScript no-emit check: initial source PASS with180s group bound; final capacity-fix recheck rerun with180s after a60s attempt timed out without diagnostics. Final exact-source recheck PASS with180s bound.
 - Focused Biome and diff whitespace checks.
 
 Logs and receipts: `/home/dev/code/buzz-busy-thread-suggestions-20261118/`. New draft PR will target parent branch `feat/thread-activity-20261118`; exact-head source review requested only through coordinator, no reviewer launched by builder. Runtime/native/human/composed release gates remain open.

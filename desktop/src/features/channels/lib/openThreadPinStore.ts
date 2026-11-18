@@ -149,7 +149,10 @@ class PinStore {
   };
   private write(id: string, record: Register) {
     try {
-      if (!this.registers.has(id) && this.registers.size >= MAX_REGISTERS)
+      if (
+        !this.registers.has(id) &&
+        this.registers.size + this.storedDismissals.size >= MAX_REGISTERS
+      )
         throw new Error("Pin history is full");
       localStorage.setItem(
         `${this.prefix}${encodeURIComponent(id)}`,
