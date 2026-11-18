@@ -503,6 +503,9 @@ export function formatTimelineMessages(
       // A local cache patch has not carried a signed edit through this projection yet.
       editSignerPubkey:
         edit?.signerPubkey ?? (event.localEditedContent ? "" : undefined),
+      ...(edit && event.pubkey === BRIDGE_STATUS_SIGNER
+        ? { editRevision: { id: edit.eventId, createdAt: edit.createdAt } }
+        : {}),
       author,
       isAgent,
       ownerPubkey,

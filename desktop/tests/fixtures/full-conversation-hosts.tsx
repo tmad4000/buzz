@@ -7,9 +7,17 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   createMemoryHistory,
   createRootRoute,
+  createRoute,
+  Outlet,
+  useLocation,
   createRouter,
   RouterProvider,
 } from "@tanstack/react-router";
+import {
+  useAppNavigation,
+  useThreadRevealId,
+} from "@/app/navigation/useAppNavigation";
+import { KIND_FORUM_COMMENT, KIND_FORUM_POST } from "@/shared/constants/kinds";
 import { PAGE_ANCHOR, PAGE_KIND } from "@/features/channel-page/model";
 import { relayClient } from "@/shared/api/relayClient";
 import { AppShellProvider, useAppShell } from "@/app/AppShellContext";
@@ -74,7 +82,11 @@ window.__BUZZ_E2E__ = {
         }
       : undefined,
 };
-const pageHost = new URLSearchParams(location.search).get("pageHost");
+const flags = new URLSearchParams(location.search);
+const pageHost = flags.get("pageHost");
+const repeatForum = pageHost === "forum" && flags.has("repeat");
+const forumRoot = "7".repeat(64);
+const forumReport = "8".repeat(64);
 const { maybeInstallE2eTauriMocks } = await import("@/testing/e2eBridge");
 maybeInstallE2eTauriMocks();
 installOutboxFixture();
@@ -89,7 +101,7 @@ const channel =
     : general;
 if (pageHost) {
   const intro = "<h1>Shared page</h1><button>Page control</button>";
-  const html = new URLSearchParams(location.search).has("shortPage")
+  const html = flags.has("shortPage")
     ? intro
     : `${intro}<div style="height:100vh"></div><h2 id="middle">Middle</h2><div style="height:100vh"></div><h3>End of page</h3><div style="height:100vh"></div>`;
   const publication = "00000000-0000-4000-8000-000000000001";
@@ -140,6 +152,13 @@ if (pageHost) {
     filter.kinds?.includes(PAGE_KIND)
       ? Promise.resolve(noop)
       : subscribeLive(filter, ...args);
+  if (repeatForum) {
+    const publishEvent = relayClient.publishEvent.bind(relayClient);
+    relayClient.publishEvent = (event, ...args) =>
+      event.kind === PAGE_KIND
+        ? new Promise((resolve) => window.setTimeout(resolve, 15_000))
+        : publishEvent(event, ...args);
+  }
 }
 initDraftStore(identity.pubkey, community.relayUrl);
 persistDraftEntry(
@@ -165,6 +184,21 @@ for (const [id, content, parentEventId] of [
     channelName: "general",
     pubkey: "c".repeat(64),
     createdAt: Math.floor(Date.now() / 1000),
+  });
+}
+if (repeatForum) {
+  window.__BUZZ_E2E_EMIT_MOCK_MESSAGE__?.({
+    id: forumRoot,
+    kind: KIND_FORUM_POST,
+    channelName: "general",
+    content: "Forum thread for the Side agents selection",
+  });
+  window.__BUZZ_E2E_EMIT_MOCK_MESSAGE__?.({
+    id: forumReport,
+    kind: KIND_FORUM_COMMENT,
+    channelName: "general",
+    parentEventId: forumRoot,
+    content: "Bound agent report",
   });
 }
 const fakeRelay = {
@@ -207,6 +241,11 @@ function PerViewShell({
   return <AppShellProvider value={value}>{children}</AppShellProvider>;
 }
 function Screen() {
+  const { goForumPost } = useAppNavigation();
+  const threadRevealId = useThreadRevealId();
+  const committedReplyId = useLocation({
+    select: ({ search }) => (search as { replyId?: string }).replyId,
+  });
   const fallback = useAppShell();
   const read = useReadState(identity.pubkey, fakeRelay);
   harnessWindow.hostEffective = (id: string) =>
@@ -245,6 +284,19 @@ function Screen() {
         <main className="flex h-screen flex-col bg-background text-foreground">
           <div className="flex gap-3 border-b border-border p-2">
             <span>Buzz Ideaflow · production host regression</span>
+            {repeatForum ? (
+              <button
+                type="button"
+                onClick={() =>
+                  void goForumPost(channel.id, forumRoot, {
+                    replyId: forumReport,
+                    revealThread: true,
+                  })
+                }
+              >
+                Open bound forum report
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={() => {
@@ -280,8 +332,11 @@ function Screen() {
                     autoSendDraftKey: channel?.id ?? null,
                     onCloseForumPost: noop,
                     onSelectForumPost: noop,
-                    selectedForumPostId: null,
-                    targetForumReplyId: null,
+                    selectedForumPostId: repeatForum ? forumRoot : null,
+                    targetForumReplyId: repeatForum
+                      ? (committedReplyId ?? null)
+                      : null,
+                    threadRevealId,
                     targetMessageEvents: emptyEvents,
                     targetMessageId: null,
                   }}
@@ -297,9 +352,24 @@ function Screen() {
 const client = new QueryClient({
   defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } },
 });
+const rootRoute = createRootRoute({ component: repeatForum ? Outlet : Screen });
+const forumRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/channels/$channelId/posts/$postId",
+  component: Screen,
+  validateSearch: (search) => ({
+    replyId: typeof search.replyId === "string" ? search.replyId : undefined,
+  }),
+});
 const router = createRouter({
-  routeTree: createRootRoute({ component: Screen }),
-  history: createMemoryHistory({ initialEntries: ["/"] }),
+  routeTree: repeatForum ? rootRoute.addChildren([forumRoute]) : rootRoute,
+  history: createMemoryHistory({
+    initialEntries: [
+      repeatForum
+        ? `/channels/${channel.id}/posts/${forumRoot}?replyId=${forumReport}`
+        : "/",
+    ],
+  }),
 });
 const root = document.getElementById("root");
 if (root)

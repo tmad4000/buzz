@@ -26,6 +26,13 @@
       "platforms": ["desktop"]
     },
     {
+      "id": "sideAgents",
+      "name": "Side agents",
+      "description": "Show agents reported in loaded Buzz threads and open their bound conversations",
+      "defaultEnabled": false,
+      "platforms": ["desktop"]
+    },
+    {
       "id": "agentManagedProfiles",
       "name": "Agent-managed profiles",
       "description": "Let agents manage their own relay name and avatar instead of restoring the desktop copy",

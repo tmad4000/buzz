@@ -33,6 +33,7 @@ export type ChannelScreenProps = {
   onSelectForumPost: (postId: string) => void;
   selectedForumPostId: string | null;
   targetForumReplyId: string | null;
+  threadRevealId?: string;
   targetMessageEvents: RelayEvent[];
   targetMessageId: string | null;
   /** Exact clicked result id, retained after route target cleanup. */

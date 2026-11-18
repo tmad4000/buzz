@@ -19,7 +19,16 @@ type NavigationBehavior = {
   force?: boolean;
   replace?: boolean;
   resetScroll?: boolean;
+  revealThread?: boolean;
 };
+
+/** New identity for each guarded thread-selection activation, even at the same URL. */
+export function useThreadRevealId() {
+  return useLocation({
+    select: ({ state }) =>
+      (state as { threadRevealId?: string }).threadRevealId,
+  });
+}
 
 export function useAppNavigation() {
   const router = useRouter();
@@ -43,7 +52,7 @@ export function useAppNavigation() {
       guardedTarget?: GuardedNavigation,
     ) => {
       const nextLocation = router.buildLocation(next as never);
-      const hasStateUpdate = next.state !== undefined;
+      const hasStateUpdate = next.state !== undefined || behavior.revealThread;
 
       if (
         location.href === nextLocation.href &&
@@ -61,8 +70,18 @@ export function useAppNavigation() {
         return false;
       }
 
+      const revealId = behavior.revealThread ? crypto.randomUUID() : undefined;
+      const requestedState = next.state;
       await navigate({
         ...next,
+        state: revealId
+          ? (previous: Record<string, unknown>) => ({
+              ...(typeof requestedState === "function"
+                ? requestedState(previous)
+                : (requestedState ?? previous)),
+              threadRevealId: revealId,
+            })
+          : requestedState,
         replace: behavior.replace,
         resetScroll: behavior.resetScroll,
       } as never);
@@ -281,6 +300,8 @@ export function useAppNavigation() {
         preserveSearchHighlight?: boolean;
         searchHighlight?: SearchHighlightNavigation;
         replace?: boolean;
+        /** Reveal the destination above a clean Page, including repeat selections. */
+        revealThread?: boolean;
         /** Open this thread panel directly without waiting for a timeline row. */
         thread?: string;
         threadRootId?: string | null;
@@ -315,6 +336,7 @@ export function useAppNavigation() {
         {
           force: options?.force,
           replace: options?.replace,
+          revealThread: options?.revealThread,
           resetScroll: options?.messageId ? true : undefined,
         },
         options?.messageId
@@ -349,6 +371,8 @@ export function useAppNavigation() {
         /** Navigate even when the destination matches the current href. */
         force?: boolean;
         replace?: boolean;
+        /** Reveal the destination above a clean Page, including repeat selections. */
+        revealThread?: boolean;
         replyId?: string;
         /** Preserve an active search highlight; ordinary navigation clears it. */
         preserveSearchHighlight?: boolean;
@@ -375,6 +399,7 @@ export function useAppNavigation() {
         {
           force: options?.force,
           replace: options?.replace,
+          revealThread: options?.revealThread,
           resetScroll: false,
         },
         {

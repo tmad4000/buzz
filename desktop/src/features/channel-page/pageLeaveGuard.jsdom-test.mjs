@@ -61,12 +61,13 @@ test("background Page veto targets only its own view, protects saves, and unregi
   };
   const registrations = { a: register("a"), b: register("b") };
   const channel = { id: "same-channel", isMember: true };
-  function View({ id }) {
+  function View({ id, routeTarget }) {
     const surface = useChannelPageSurface(
       channel,
       React.createElement("span", null, `Pane controls ${id}`),
       registrations[id],
       true,
+      routeTarget,
     );
     surfaces.set(id, surface);
     return React.createElement(
@@ -81,14 +82,14 @@ test("background Page veto targets only its own view, protects saves, and unregi
     );
   }
   const root = createRoot(document.getElementById("root"));
-  const render = async (showA = true) =>
+  const render = async (showA = true, routeTarget) =>
     act(async () => {
       root.render(
         React.createElement(
           React.Fragment,
           null,
           showA ? React.createElement(View, { id: "a", key: "a" }) : null,
-          React.createElement(View, { id: "b", key: "b" }),
+          React.createElement(View, { id: "b", key: "b", routeTarget }),
         ),
       );
     });
@@ -189,6 +190,24 @@ test("background Page veto targets only its own view, protects saves, and unregi
   await render(false);
   assert.equal(guards.has("a"), false);
   assert.equal(guards.get("b")(), true, "A cleanup preserves B registration");
+  assert.equal(surfaces.get("b").pageExpanded, true);
+  await act(async () =>
+    fireEvent.change(focusedEditor, { target: { value: "<h1>Draft B</h1>" } }),
+  );
+  await render(false, "message-from-sidebar");
+  assert.equal(
+    surfaces.get("b").pageOpen,
+    true,
+    "an unsaved Page remains guarded",
+  );
+  assert.equal(focusedEditor.value, "<h1>Draft B</h1>");
+  await click("b", "Cancel");
+  await render(false, "another-message-from-sidebar");
+  assert.equal(
+    surfaces.get("b").pageOpen,
+    false,
+    "message navigation reveals the thread",
+  );
   await act(async () => root.unmount());
   assert.equal(guards.size, 0);
   dom.window.close();

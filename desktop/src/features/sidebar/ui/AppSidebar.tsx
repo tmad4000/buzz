@@ -1,6 +1,7 @@
 // biome-ignore format: keep compact to stay within file size limit
 import * as React from "react";
 import { FeatureGate } from "@/shared/features";
+import { SideAgentsSidebar } from "@/features/side-agents/SideAgentsSection";
 import { SidebarSections } from "./SidebarSections";
 import { groupSidebarChannels } from "../lib/groupSidebarChannels";
 import { SidebarDndContext } from "@/features/sidebar/ui/SidebarDnd";
@@ -246,6 +247,7 @@ export function AppSidebar({
     channels: false,
     forums: false,
     directMessages: false,
+    sideAgents: false,
   });
 
   const toggleCollapsedGroup = React.useCallback(
@@ -332,6 +334,15 @@ export function AppSidebar({
     ],
   );
 
+  const directAgentsSectionId = sectionBuckets.groups.find(
+    ({ section }) => section.name === "Direct agents",
+  )?.section.id;
+  const sideAgents = (
+    <FeatureGate key="side-agents" feature="sideAgents">
+      <SideAgentsSidebar channels={channels} collapsed={collapsedGroups.sideAgents}
+        onToggleCollapsed={() => toggleCollapsedGroup("sideAgents")} />
+    </FeatureGate>
+  );
   const starredChannels = React.useMemo(() => {
     if (!starredChannelIds || starredChannelIds.size === 0) return [];
     return sortChannelsForSidebar(
@@ -615,7 +626,7 @@ export function AppSidebar({
                   >
                     <SidebarSections
                       groups={sectionBuckets.groups}
-                      renderSection={(section, idx) => (
+                      renderSection={(section, idx) => [
                         <CustomChannelSection
                           key={section.id}
                           section={section}
@@ -686,8 +697,9 @@ export function AppSidebar({
                           onUnstarChannel={onUnstarChannel}
                           onDeleteChannel={requestDeleteChannel}
                           onLeaveChannel={requestLeaveChannel}
-                        />
-                      )}
+                        />,
+                        section.id === directAgentsSectionId ? sideAgents : null,
+                      ]}
                     >
                       <ChannelGroupSection
                         draggable
@@ -762,6 +774,7 @@ export function AppSidebar({
                       onDeleteChannel={requestDeleteChannel}
                     />
                   </FeatureGate>
+                  {directAgentsSectionId ? null : sideAgents}
                   <SidebarSection
                     action={
                       <div className="absolute right-1 top-1/2 z-10 flex -translate-y-1/2 items-center gap-0.5">

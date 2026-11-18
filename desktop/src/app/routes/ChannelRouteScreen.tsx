@@ -3,7 +3,10 @@ import { useQueryClient } from "@tanstack/react-query";
 
 import type { SearchHighlightNavigation } from "@/app/navigation/searchHighlightNavigation";
 import { getCachedSearchHitEvent } from "@/app/navigation/searchHitEventCache";
-import { useAppNavigation } from "@/app/navigation/useAppNavigation";
+import {
+  useAppNavigation,
+  useThreadRevealId,
+} from "@/app/navigation/useAppNavigation";
 import { useChannelsQuery } from "@/features/channels/hooks";
 import { useOpenChannelDirectoryQuery } from "@/features/channels/openChannelDirectory";
 import { ChannelScreen } from "@/features/channels/ui/ChannelScreen";
@@ -123,6 +126,7 @@ export function ChannelRouteScreen({
   const isHuddleTranscript = huddleWindowChannelId() !== null;
   const queryClient = useQueryClient();
   const { closeForumPost, goForumPost } = useAppNavigation();
+  const threadRevealId = useThreadRevealId();
   const channelsQuery = useChannelsQuery();
   const projectsQuery = useProjectsQuery();
   const identityQuery = useIdentityQuery();
@@ -322,6 +326,7 @@ export function ChannelRouteScreen({
       }}
       selectedForumPostId={selectedPostId}
       targetForumReplyId={targetReplyId}
+      threadRevealId={threadRevealId}
       targetMessageEvents={targetMessageEvents}
       targetMessageId={targetMessageId}
       targetSearchMessageId={activeSearchHighlight?.messageId}
