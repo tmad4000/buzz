@@ -2,6 +2,7 @@ import {
   captureReadingPosition,
   restoreReadingPosition,
   type TimelineReadingPosition,
+  type ReadingRestoreStop,
 } from "./timelineReadingPosition";
 import { createReadingRestoreAdmission } from "./readingRestoreAdmission";
 import type { ThreadSummaryRenderer } from "./TimelineMessageRow";
@@ -11,7 +12,11 @@ import {
   useConversationControlScope,
 } from "@/features/conversations/ConversationViewContext";
 import { timelineScrollIdentity } from "@/features/conversations/timelineScrollIdentity";
-import { useCaptureConversationReadingPosition } from "@/features/conversations/ConversationReadingPositions";
+import { mainReadingIntent } from "@/features/conversations/mainReadingIntent";
+import {
+  useCaptureConversationReadingPosition,
+  useRestoreConversationReadingPosition,
+} from "@/features/conversations/ConversationReadingPositions";
 import { readingPositionKey } from "@/features/conversations/layout/readingPositions";
 import { useTimelineView } from "@/features/channels/ui/TimelineViewContext";
 
@@ -241,17 +246,19 @@ const MessageTimelineBase = React.forwardRef<
 ) {
   const conversationView = React.useContext(ConversationViewContext);
   const { mode } = useTimelineView();
+  const { explicit: hasReadingTarget, key: readingTargetKey } =
+    mainReadingIntent(targetMessageId, searchActiveMessageId);
   const { canHandle } = useConversationControlScope();
   const restorationOwner = React.useRef({
     channelId,
     mode,
-    targetMessageId,
+    targetKey: readingTargetKey,
     viewId: conversationView?.viewInstanceId,
   });
   restorationOwner.current = {
     channelId,
     mode,
-    targetMessageId,
+    targetKey: readingTargetKey,
     viewId: conversationView?.viewInstanceId,
   };
   const internalScrollRef = React.useRef<HTMLDivElement>(null);
@@ -284,7 +291,7 @@ const MessageTimelineBase = React.forwardRef<
         conversationView.interactive,
         channelId,
         mode,
-        targetMessageId,
+        readingTargetKey,
       ])
     : null;
   React.useLayoutEffect(() => {
@@ -552,7 +559,7 @@ const MessageTimelineBase = React.forwardRef<
     key: readingPositionKey("main", mode),
     container: activeScrollContainerRef,
     ids: messages.map((message) => message.id),
-    ready: showMessageList && !isLoading,
+    ready: showMessageList && !isLoading && timelineVirtualizerApi !== null,
   });
   const showChannelIntroOnly = activeChannelIntro !== null && !showMessageList;
   const showPinnedIntroOnly = activePinnedIntro !== null && !showMessageList;
@@ -566,6 +573,60 @@ const MessageTimelineBase = React.forwardRef<
     scrollToBottomOnNextUpdate();
   }, [scrollToBottomOnNextUpdate]);
 
+  const restoreSavedReadingPosition = React.useCallback(
+    (
+      snapshot: TimelineReadingPosition,
+      onStop?: (reason: ReadingRestoreStop) => void,
+    ) => {
+      const element = activeScrollContainerRef.current;
+      if (!element) return;
+      const lease = conversationView
+        ? restoreAdmission.current?.capture()
+        : undefined;
+      if (conversationView && !lease) return;
+      if (conversationView) timelineVirtualizerApi?.cancelBottomIntent();
+      return restoreReadingPosition(
+        element,
+        snapshot,
+        messages.map((m) => m.id),
+        (id) => timelineVirtualizerApi?.scrollToMessage(id) ?? false,
+        conversationView
+          ? () => {
+              const current = restorationOwner.current;
+              const container = activeScrollContainerRef.current;
+              return (
+                lease?.() === true &&
+                current.viewId === conversationView.viewInstanceId &&
+                current.channelId === channelId &&
+                current.mode === mode &&
+                current.targetKey === readingTargetKey &&
+                container?.closest(
+                  '[hidden], [inert], [aria-hidden="true"]',
+                ) === null
+              );
+            }
+          : undefined,
+        onStop,
+      );
+    },
+    [
+      activeScrollContainerRef,
+      conversationView,
+      messages,
+      timelineVirtualizerApi,
+      channelId,
+      mode,
+      readingTargetKey,
+    ],
+  );
+  useRestoreConversationReadingPosition({
+    key: readingPositionKey("main", mode),
+    container: activeScrollContainerRef,
+    ready: showMessageList && !isLoading && timelineVirtualizerApi !== null,
+    explicitTarget: hasReadingTarget,
+    restore: restoreSavedReadingPosition,
+  });
+
   React.useImperativeHandle(
     ref,
     () => ({
@@ -576,36 +637,7 @@ const MessageTimelineBase = React.forwardRef<
               messages.map((m) => m.id),
             )
           : null,
-      restoreReadingPosition: (snapshot) => {
-        const element = activeScrollContainerRef.current;
-        if (!element) return;
-        const lease = conversationView
-          ? restoreAdmission.current?.capture()
-          : undefined;
-        if (conversationView && !lease) return;
-        return restoreReadingPosition(
-          element,
-          snapshot,
-          messages.map((m) => m.id),
-          (id) => timelineVirtualizerApi?.scrollToMessage(id) ?? false,
-          conversationView
-            ? () => {
-                const current = restorationOwner.current;
-                const container = activeScrollContainerRef.current;
-                return (
-                  lease?.() === true &&
-                  current.viewId === conversationView.viewInstanceId &&
-                  current.channelId === channelId &&
-                  current.mode === mode &&
-                  current.targetMessageId === targetMessageId &&
-                  container?.closest(
-                    '[hidden], [inert], [aria-hidden="true"]',
-                  ) === null
-                );
-              }
-            : undefined,
-        );
-      },
+      restoreReadingPosition: restoreSavedReadingPosition,
       scrollToBottomOnNextUpdate: prepareForOwnMessage,
       settleAtBottom: () => {
         if (!timelineVirtualizerApi) return false;
@@ -619,10 +651,7 @@ const MessageTimelineBase = React.forwardRef<
       timelineVirtualizerApi,
       activeScrollContainerRef,
       messages,
-      conversationView,
-      channelId,
-      mode,
-      targetMessageId,
+      restoreSavedReadingPosition,
     ],
   );
 
