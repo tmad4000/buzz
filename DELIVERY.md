@@ -28,3 +28,16 @@ PASS:10 focused model tests,14 DOM tests, whole-desktop tsc --noEmit (exit0, no 
 Production component tests repeat both owner callback and force-route clicks and preserve body identity and neutral stubs/default OFF. Actual owning-pane callback tests verify repeated exact-root/parent selection and guard behavior. Actual useUnreadSidebarThread hook tests reveal open, closed and collapsed ancestry twice, preserving per-view/saved disclosure semantics. No heavy browser/native/Tauri/cargo builds, live reads/posts/control triggers or Mac actions.
 
 Owners445 and2d notified. Separate independent Sol source review requested through root. Keep draft/frozen for review; no deployment or native/human acceptance claim.
+
+## Final authoritative rebase
+
+Rebased onto original approved3a1e41ec74e6de8b261fbb7b4e6667333b8c0e8a. Dropped duplicate provenance commit0e8429994 and combined provenance receipt e021fa367; merge31a is removed by linear rebase. Retained quote hardening plus quote validation receipts. LocalEditedContent, exact3857 regression, formatter/cache/parser/type provenance remain supplied ONLY by original3a ancestry.
+
+Product content not already in3a and retained:
+- threadParentQuote.ts: strict native ancestry/channel scope checks, neutral absent/out-of-scope loaded-parent fallback, nested-only documentation.
+- ThreadParentJump.test.mjs: repeated owning-pane exact-parent reveal guards.
+- threadParentQuote.test.mjs: conflicting ancestry and parent scope cases.
+- ThreadParentQuoteChip.jsdom-test.mjs: repeated dedicated owner/force-route clicks and scoped fixtures.
+- useUnreadSidebarThread.jsdom-test.mjs: actual hook repeated reveal for open/closed/collapsed destinations.
+
+DELIVERY.md and quote validation logs/receipts are also retained. No other product content differs from3a. Pre-rebase backup4f29 product/test source matches the rebased result exactly. Earlier parent-restack receipts are historical; fresh rebase checks follow in the final receipt. PR67 stays3a, PR84 and PR87 untouched.
