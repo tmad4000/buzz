@@ -64,13 +64,14 @@ test("root+reply tags retain exact answered event", () =>
     { rootId: "root", parentId: "exact-parent" },
   ));
 
-const requestId = "a".repeat(64);
+const originEventId = "a".repeat(64);
 const machineTags = (state = "progress") => [
   ["buzz-status", state],
+  ["buzz-status-source", "root"],
   ["agent", agent, server, "Astra"],
   ["paseo-link", href],
   ["e", "b".repeat(64), "", "root"],
-  ["e", requestId, "", "reply"],
+  ["e", originEventId, "", "reply"],
 ];
 test("structured bridge tags outrank body and bind exact originating request", () => {
   const card = parseBridgeStatusCard({
@@ -79,7 +80,7 @@ test("structured bridge tags outrank body and bind exact originating request", (
     body: "An old working body",
   });
   assert.equal(card.label, "✅ Reported done");
-  assert.equal(card.requestId, requestId);
+  assert.equal(card.originEventId, originEventId);
   assert.equal(card.href, href);
   assert.equal(card.title, "Astra");
   assert.equal(
@@ -156,8 +157,8 @@ test("production formatter applies only bridge-signed status snapshots and prese
     );
   const updated = format(edit);
   assert.equal(parseBridgeStatusCard(updated).label, "✅ Reported done");
-  assert.equal(parseBridgeStatusCard(updated).requestId, requestId);
-  assert.equal(updated.parentId, requestId);
+  assert.equal(parseBridgeStatusCard(updated).originEventId, originEventId);
+  assert.equal(updated.parentId, originEventId);
   const legacy = format({
     ...edit,
     content: body("✅ Done"),
@@ -318,4 +319,32 @@ test("current producer unsigned fixture projects exact body and lowest-ID equal-
     original.content.replace("example-provider","x".repeat(41)),
     original.content.replace("Example agent","bad\tlabel"),
   ]) assert.equal(parseBridgeStatusCard({...originalMessage,body}),null);
+});
+
+test("pure producer label fixtures accept decoded code-point bounds, escapes and Unicode sanitation", async () => {
+  const {readFileSync}=await import("node:fs");
+  const fixtures=JSON.parse(readFileSync(new URL("./bridgeStatusCard.label-fixtures.json",import.meta.url)));
+  assert.equal(fixtures.fixtureType,"SYNTHETIC_UNSIGNED_PURE_RENDERER_OUTPUT");
+  for(const fixture of fixtures.cases) {
+    const card=parseBridgeStatusCard({...message,body:fixture.content});
+    assert.ok(card,fixture.name);
+    for(const key of ["title","model","provider"]) assert.equal(card[key],fixture.expectedLabels[key],fixture.name+" "+key);
+  }
+  const excluded = [0x85,0x200b,0xe000,0x378,0x1fae9,0xd800]
+    .map(codepoint => "A"+String.fromCodePoint(codepoint)+"B");
+  for(const title of [...excluded,"bad*escape",String.fromCharCode(92)+"q", "dangling"+String.fromCharCode(92)]) {
+    assert.equal(parseBridgeStatusCard({...message,body:body().replace("Astra",title)}),null,JSON.stringify(title));
+  }
+});
+test("prospective classification keeps originating Nostr event distinct and Root-only state constraints", () => {
+  for(const state of ["waiting","done","ack"]) {
+    for(const source of ["listener","watchdog",undefined]) {
+      const tags=machineTags(state).filter(t=>t[0]!=="buzz-status-source");
+      if(source) tags.push(["buzz-status-source",source]);
+      assert.equal(parseBridgeStatusCard({...message,tags}),null);
+    }
+    const card=parseBridgeStatusCard({...message,tags:machineTags(state)});
+    assert.equal(card.originEventId,originEventId);
+    assert.equal("requestId" in card,false);
+  }
 });
