@@ -149,13 +149,21 @@ class MessageOutbox extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> _checkpoint(OutboxItem previous, OutboxItem next) =>
-      _mutate(() async {
-        if (_rows[previous.id]?.revision != previous.revision) {
-          throw const OutboxChanged();
-        }
-        await _write(next);
-      });
+  void _requireCaptureOwner() {
+    if (_closed || _lock == null) throw const OutboxChanged();
+  }
+
+  Future<void> _checkpoint(
+    OutboxItem previous,
+    OutboxItem next, {
+    bool requireCaptureOwner = false,
+  }) => _mutate(() async {
+    if (requireCaptureOwner) _requireCaptureOwner();
+    if (_rows[previous.id]?.revision != previous.revision) {
+      throw const OutboxChanged();
+    }
+    await _write(next);
+  });
 
   /// Copy every selected byte, then commit metadata; only then may the UI clear.
   Future<OutboxItem> enqueue(
@@ -165,6 +173,7 @@ class MessageOutbox extends ChangeNotifier {
   }) async {
     await open();
     final row = await _mutate(() async {
+      _requireCaptureOwner();
       final id = const Uuid().v4();
       final folder = await Directory('${directory.path}/$id').create();
       final attachments = await _copyFiles(folder, files);
@@ -214,7 +223,7 @@ class MessageOutbox extends ChangeNotifier {
         'state': 'waiting',
         'error': null,
       });
-      await _checkpoint(row, next);
+      await _checkpoint(row, next, requireCaptureOwner: true);
       return next;
     } catch (_) {
       // Initial checkpoint is paused and recoverable even if preparation fails,
@@ -294,22 +303,32 @@ class MessageOutbox extends ChangeNotifier {
     List<OutboxAttachment> files, {
     OutboxPreparation? prepare,
   }) async {
-    final attachments = await _copyFiles(
-      Directory('${directory.path}/${expected.id}'),
-      files,
-    );
-    final next = expected.patch({
-      ...payload,
-      'attachments': attachments,
-      'state': prepare == null ? 'waiting' : 'editing',
-      'needsReview': prepare != null,
-      'error': null,
-      'retryAt': 0,
-      'signed': null,
-      'signedIds': <String>[],
-      'uncertain': false,
+    await open();
+    final next = await _mutate(() async {
+      _requireCaptureOwner();
+      if (_rows[expected.id]?.revision != expected.revision) {
+        throw const OutboxChanged();
+      }
+      // Copy and its initial checkpoint share the owned serial tail. close()
+      // waits this admitted work before releasing worker.lock.
+      final attachments = await _copyFiles(
+        Directory('${directory.path}/${expected.id}'),
+        files,
+      );
+      final next = expected.patch({
+        ...payload,
+        'attachments': attachments,
+        'state': prepare == null ? 'waiting' : 'editing',
+        'needsReview': prepare != null,
+        'error': null,
+        'retryAt': 0,
+        'signed': null,
+        'signedIds': <String>[],
+        'uncertain': false,
+      });
+      await _write(next);
+      return next;
     });
-    await _checkpoint(expected, next);
     await _prepareCapture(next, prepare);
     wake();
   }

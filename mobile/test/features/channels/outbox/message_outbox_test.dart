@@ -206,6 +206,34 @@ void main() {
   );
 
   test(
+    'closed writer cannot enqueue or edit after another owner reopens',
+    () async {
+      final oldOwner = await store();
+      final row = await oldOwner.enqueue(message('original capture'), []);
+      final paused = await oldOwner.pause(row.id);
+      await oldOwner.close();
+      final currentOwner = await store();
+      final file = File('${directory.path}/${row.id}/message.json');
+      final before = await file.readAsBytes();
+      await expectLater(
+        oldOwner.enqueue(message('late capture'), []),
+        throwsA(isA<OutboxChanged>()),
+      );
+      await expectLater(
+        oldOwner.edit(paused, {'text': 'late edit'}, []),
+        throwsA(isA<OutboxChanged>()),
+      );
+      expect(await file.readAsBytes(), before);
+      expect(currentOwner.items.single.text, 'original capture');
+      final rows = await directory
+          .list()
+          .where((entry) => entry is Directory)
+          .length;
+      expect(rows, 1);
+    },
+  );
+
+  test(
     'raw bytes and text survive closing and reopening independently of source file',
     () async {
       final original = File('${directory.path}/source.png');
