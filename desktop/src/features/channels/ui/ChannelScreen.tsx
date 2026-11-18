@@ -150,7 +150,7 @@ export function ChannelScreen({
     useElementWidth<HTMLElement>();
   const isNarrowPanelViewport = channelContentWidthPx > 0 && channelContentWidthPx < AUXILIARY_PANEL_SINGLE_COLUMN_BREAKPOINT_PX;
   const { pageOpen, pageExpanded, onPageKeyDown, closePage, pageHeaderActions, pagePanel, requirePageEditResolution } =
-    useChannelPageSurface(activeChannel, headerEndActions, registerPageLeaveGuard, !isNarrowPanelViewport);
+    useChannelPageSurface(activeChannel, headerEndActions, registerPageLeaveGuard, !isNarrowPanelViewport, targetMessageId ?? targetForumReplyId ?? selectedForumPostId);
   const {
     canReset: canResetThreadPanelWidth,
     onResetWidth: handleThreadPanelWidthReset,

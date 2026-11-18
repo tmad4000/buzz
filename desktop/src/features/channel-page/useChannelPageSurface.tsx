@@ -10,6 +10,7 @@ export function useChannelPageSurface(
   endActions: React.ReactNode,
   registerTargetLeaveGuard?: PageLeaveGuardRegistrar,
   canExpand = false,
+  routeTarget?: string | null,
 ) {
   const [pageChannel, setPageChannel] = React.useState<string | null>(null);
   const pageOpen = Boolean(channel && pageChannel === channel.id);
@@ -39,6 +40,13 @@ export function useChannelPageSurface(
       setExpanded(false);
     }
   }, [requirePageEditResolution]);
+  const previousRouteTarget = React.useRef(routeTarget);
+  React.useLayoutEffect(() => {
+    const changed = previousRouteTarget.current !== routeTarget;
+    previousRouteTarget.current = routeTarget;
+    // A newly committed message destination should be revealed in this view.
+    if (changed && routeTarget && pageOpen) closePage();
+  }, [routeTarget, pageOpen, closePage]);
   const pageHeaderActions = React.useMemo(
     () => (
       <>
