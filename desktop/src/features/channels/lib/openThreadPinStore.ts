@@ -24,6 +24,8 @@ class PinStore {
   private readonly prefix: string;
   private readonly dismissPrefix: string;
   private storedDismissals = new Set<string>();
+  private durableKeys = new Set<string>();
+  private durableReady = false;
   private readonly volatileDismissals = new Set<string>();
   private readonly key: string;
   private readonly listeners = new Set<() => void>();
@@ -72,15 +74,18 @@ class PinStore {
     parseOpenThreadPins(localStorage.getItem(this.key)).forEach((pin, rank) => {
       if (!pin.id.startsWith("optimistic-")) result.set(pin.id, { pin, rank });
     });
-    if (localStorage.length > MAX_STORAGE_KEYS)
+    const keyCount = localStorage.length;
+    if (keyCount > MAX_STORAGE_KEYS)
       throw new Error("Preference storage is too large");
-    let records = 0;
+    const durableKeys = new Set<string>();
     const dismissed = new Set<string>();
-    for (let index = 0; index < localStorage.length; index++) {
+    // Allocation is capped at1000; bounded reads still preserve all existing
+    // records if older clients or concurrent tabs have exceeded that budget.
+    for (let index = 0; index < keyCount; index++) {
       const name = localStorage.key(index);
       if (!name) continue;
       if (name.startsWith(this.dismissPrefix)) {
-        if (++records > MAX_REGISTERS) throw new Error("Pin history is full");
+        durableKeys.add(name);
         const id = decodeURIComponent(name.slice(this.dismissPrefix.length));
         if (
           id &&
@@ -92,7 +97,7 @@ class PinStore {
         continue;
       }
       if (!name.startsWith(this.prefix)) continue;
-      if (++records > MAX_REGISTERS) throw new Error("Pin history is full");
+      durableKeys.add(name);
       const id = decodeURIComponent(name.slice(this.prefix.length));
       try {
         const value = JSON.parse(localStorage.getItem(name) ?? "null");
@@ -112,6 +117,7 @@ class PinStore {
         /* Invalid preference records do not become references. */
       }
     }
+    this.durableKeys = durableKeys;
     this.storedDismissals = dismissed;
     return result;
   }
@@ -122,7 +128,9 @@ class PinStore {
       this.capacityFailure;
     try {
       this.registers = this.read();
+      this.durableReady = true;
     } catch {
+      this.durableReady = false;
       sessionOnly = true;
     }
     for (const [id, record] of this.volatile) this.registers.set(id, record);
@@ -149,15 +157,14 @@ class PinStore {
   };
   private write(id: string, record: Register) {
     try {
+      const key = `${this.prefix}${encodeURIComponent(id)}`;
       if (
-        !this.registers.has(id) &&
-        this.registers.size + this.storedDismissals.size >= MAX_REGISTERS
+        !this.durableReady ||
+        (!this.durableKeys.has(key) && this.durableKeys.size >= MAX_REGISTERS)
       )
-        throw new Error("Pin history is full");
-      localStorage.setItem(
-        `${this.prefix}${encodeURIComponent(id)}`,
-        JSON.stringify(record),
-      );
+        throw new Error("Pin history is full or unavailable");
+      // Volatile and v1-seeded identities are not allocated durable slots.
+      localStorage.setItem(key, JSON.stringify(record));
       this.volatile.delete(id);
     } catch {
       if (this.volatile.has(id) || this.volatile.size < MAX_REGISTERS) {
@@ -206,17 +213,15 @@ class PinStore {
     if (!id || id.length > 128 || id.startsWith("optimistic-")) return;
     this.refresh();
     try {
+      const key = `${this.dismissPrefix}${encodeURIComponent(id)}`;
       if (
-        !this.storedDismissals.has(id) &&
-        this.registers.size + this.storedDismissals.size >= MAX_REGISTERS
+        !this.durableReady ||
+        (!this.durableKeys.has(key) && this.durableKeys.size >= MAX_REGISTERS)
       )
-        throw new Error("Pin preferences are full");
+        throw new Error("Pin preferences are full or unavailable");
       // Separate from pin membership so a concurrent tab's pin cannot be undone
       // by dismissal (and a pin/remove write cannot forget a dismissal).
-      localStorage.setItem(
-        `${this.dismissPrefix}${encodeURIComponent(id)}`,
-        "true",
-      );
+      localStorage.setItem(key, "true");
       this.volatileDismissals.delete(id);
     } catch {
       if (this.volatileDismissals.size < MAX_REGISTERS)
