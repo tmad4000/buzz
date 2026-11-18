@@ -320,9 +320,10 @@ export function useChannelMessagesQuery(channel: Channel | null) {
       // opened during boot takes the hydrated path instead of racing it with
       // a cold relay fetch.
       await channelHeadHydration(queryClient);
-      await hydrateChannelHeadForNavigation(queryClient, channel.id).catch(
-        (error) => console.warn("Offline head hydration failed", error),
-      );
+      if (offlineCacheEnabled())
+        await hydrateChannelHeadForNavigation(queryClient, channel.id).catch(
+          (error) => console.warn("Offline head hydration failed", error),
+        );
       if (consumeHydratedChannel(queryClient, channel.id)) {
         return queryClient.getQueryData<RelayEvent[]>(queryKey) ?? [];
       }

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import React, { act } from "react";
 import { createRoot } from "react-dom/client";
-import { QueryClient } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { OfflineStorageSettings } from "./OfflineStorageSettings.tsx";
 import { CommunitiesProvider } from "@/features/communities/useCommunities";
 import {
@@ -112,6 +112,46 @@ test("R5 flag OFF preserves legacy load/store/hydration and opening Storage has 
       "legacy sidebar",
     );
   } finally {
+    await act(() => root.unmount());
+    client.clear();
+    window.localStorage.clear();
+  }
+});
+
+
+test("R5 OFF cold navigation dispatches relay without a second legacy cache read", async () => {
+  const { useChannelMessagesQuery } = await import("@/features/messages/hooks");
+  window.localStorage.clear();
+  globalThis.localStorage = window.localStorage;
+  globalThis.isTauri = true;
+  const calls = [];
+  let releaseUnexpectedLoad;
+  window.__TAURI_INTERNALS__ = {
+    invoke: async (command, args) => {
+      calls.push([command, args]);
+      if (command === "get_relay_http_url") return "https://relay.test";
+      if (command === "get_media_proxy_port") return 7777;
+      if (command === "channel_head_cache_load") {
+        if (args.limit === 12) return [];
+        return new Promise((resolve) => { releaseUnexpectedLoad = resolve; });
+      }
+      if (command === "get_channel_window") return [];
+    },
+  };
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  await hydrateChannelHeads(client, { pubkey: "alice", relayUrl: "wss://one" });
+  const channel = { id: "cold", channelType: "stream" };
+  function Probe() { useChannelMessagesQuery(channel); return null; }
+  const root = createRoot(document.createElement("div"));
+  try {
+    await act(async () => {
+      root.render(React.createElement(QueryClientProvider, { client }, React.createElement(Probe)));
+      await new Promise((resolve) => setTimeout(resolve, 30));
+    });
+    assert.deepEqual(calls.filter(([cmd]) => cmd === "channel_head_cache_load").map(([, args]) => args.limit), [12]);
+    assert.equal(calls.filter(([cmd]) => cmd === "get_channel_window").length, 1, "relay fetch must not wait on lazy disk IPC while OFF");
+  } finally {
+    releaseUnexpectedLoad?.([]);
     await act(() => root.unmount());
     client.clear();
     window.localStorage.clear();
