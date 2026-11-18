@@ -67,6 +67,8 @@ type UseDraftPersistLifecycleParams = {
 };
 
 type UseDraftPersistLifecycleResult = {
+  /** True only after this visit's restoration completed; retired accessors stay false. */
+  isDraftRestored: () => boolean;
   /** Shared key intent; later visits can revoke a captured continuation. */
   getComposerRevision: () => number;
   /** Optimistic send/recovery is not an authored edit or authoritative deletion. */
@@ -87,7 +89,7 @@ type UseDraftPersistLifecycleResult = {
  *   persisting `pendingImeta` to the draft store.
  * - Updates that ref on every render (render-time passive path) so normal
  *   add/remove-image operations are always captured.
- * - Runs a `useEffect` keyed on `effectiveDraftKey` that restores a saved
+ * - Runs a `useLayoutEffect` keyed on `effectiveDraftKey` that restores a saved
  *   draft into the composer (content + imeta + spoilered urls) or clears it,
  *   and whose cleanup persists the outgoing draft before the key changes.
  *
@@ -125,6 +127,14 @@ export function useDraftPersistLifecycle({
   syncComposerContentFromEditor,
   getImplicitAgentMentionPrefix,
 }: UseDraftPersistLifecycleParams): UseDraftPersistLifecycleResult {
+  const restoration = React.useMemo(
+    () => ({ draftKey: effectiveDraftKey, ready: false }),
+    [effectiveDraftKey],
+  );
+  const isDraftRestored = React.useCallback(
+    () => restoration.ready,
+    [restoration],
+  );
   const persistedContent = React.useCallback(
     (content: string) =>
       stripImplicitAgentMentionPrefix(
@@ -182,6 +192,7 @@ export function useDraftPersistLifecycle({
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: effectiveDraftKey is the sole trigger
   React.useLayoutEffect(() => {
+    restoration.ready = false;
     // The outgoing draft is persisted by the cleanup below, which runs before
     // this body on key changes and has the correct outgoing channelId in its
     // closure. Do NOT re-persist prevKey here: channelId in this render
@@ -225,8 +236,11 @@ export function useDraftPersistLifecycle({
       setSpoileredAttachmentUrls(new Set());
     }
     isRestoringContentRef.current = false;
+    restoration.ready = Boolean(restoration.draftKey);
 
     return () => {
+      // Retire before persistence callbacks can observe or re-enter this visit.
+      restoration.ready = false;
       // Another composer or explicit inbox deletion may supersede this visit
       // without changing its editor. A send claim alone does not block saving
       // the outgoing editor: optimistic clear must still persist normally.
@@ -282,5 +296,10 @@ export function useDraftPersistLifecycle({
     ],
   );
 
-  return { trackAuthoredContent, getComposerRevision, runComposerUpdate };
+  return {
+    trackAuthoredContent,
+    getComposerRevision,
+    runComposerUpdate,
+    isDraftRestored,
+  };
 }
