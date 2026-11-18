@@ -1,5 +1,8 @@
 # Direct agents — .9 source delivery
 
+Draft PR: https://github.com/tmad4000/buzz/pull/81
+Base branch: `sol/direct-agents-base-ideaflow8-20261118` (frozen .8 tag source).
+
 Owner: Sol session5e7bc9da, worktree `/home/dev/agent-worktrees/direct-agents-20261118`, branch `sol/direct-agents-20261118`.
 
 Base: `buzz-ideaflow-v0.5.28-ideaflow.8`, annotated tag object `69eda1ffddf61c70c52420904deef8e79861c6f2`, peeled source `16fa57dfc97f115d00382fcb75128295b5fb3def`. No other worktrees edited. The reviewed opener prerequisites are cherry-picked separately (original7472d44a/b04b419e → local4a8799b80/7fce5d719).
@@ -8,7 +11,7 @@ Jacob's original ask: rename the Paseo section to a vendor-neutral name, put dir
 
 Implemented: opt-in runtime reader and host/session/Resume profile/row/menu affordances; exact key/signature/coordinate validation; strict paired-server Paseo links through the reviewed native opener; bounded copy-only commands/delegates; self-reported stale timestamps; author/community query scope with focused minute polling and reconnect invalidation; stamp-zero default label successor that loses to authored/legacy edits. No channel membership/order/Starred/read-state/composer changes.
 
-Validation: TypeScript `tsc --noEmit`; focused actual model/UI/hook/defaults/opener/invalidation unit tests. Commands run through Python `Popen(start_new_session=True)` (setsid), deadlines120s/60s, with `killpg` TERM/KILL on timeout and process-group cleanup on all exits. Biome changed-file check and diff whitespace check. Final results: typecheck PASS; focused tests24/24 PASS; changed-file Biome PASS; whitespace PASS. Full CI/browser/native/Tauri/cargo/M5/human tests intentionally not run under dispatch restrictions. No new dependencies/lock/version changes. No preview services.
+Validation: TypeScript `tsc --noEmit`; focused actual model/UI/hook/defaults/opener/invalidation unit tests. Commands run through Python `Popen(start_new_session=True)` (setsid), deadlines120s/60s, with `killpg` TERM/KILL on timeout and process-group cleanup on all exits. Biome changed-file check and diff whitespace check. Final results: typecheck PASS; focused tests24/24 plus8 existing sidebar/profile tests PASS; changed-file Biome PASS; whitespace PASS. Full CI/browser/native/Tauri/cargo/M5/human tests intentionally not run under dispatch restrictions. No new dependencies/lock/version changes. No preview services.
 
 `PINNED-DRAFTS.md` contains the Paseo/Hermes messages for root to post/pin/read back. Draft text was handed to root; no Buzz writes from this task. Hermes paths and daemon behavior remain reported by the existing M4 owner, requiring M4 verification before pinning/publishing.
 
