@@ -1,5 +1,6 @@
 import * as React from "react";
 import type { MainTimelineEntry } from "../lib/threadPanel";
+import { loadedThreadWindowAnchor } from "./loadedThreadWindowAnchor";
 const SIZE = 40;
 /** Bound focused-thread DOM while keeping complete ancestry metadata elsewhere. */
 export function useThreadRowWindow(
@@ -43,17 +44,48 @@ export function useThreadRowWindow(
       saved.start !== anchor ||
       saved.target !== target
     )
-      setSaved({
-        scope,
-        start: anchor,
-        target,
-      });
+      // A committed preparation may run before this passive bookkeeping.
+      setSaved((current) =>
+        current === saved ? { scope, start: anchor, target } : current,
+      );
   }, [enabled, pending, scope, anchor, saved, explicit, targetId]);
   const visible = React.useMemo(
     () => (enabled ? entries.slice(start, start + SIZE) : entries),
     [enabled, entries, start],
   );
+  const visit = React.useMemo(() => ({ scope }), [scope]);
+  const committed = React.useRef<{
+    visit: typeof visit;
+    ensure: (ids: readonly string[]) => boolean;
+  } | null>(null);
+  React.useLayoutEffect(() => {
+    const owner = {
+      visit,
+      ensure: (ids: readonly string[]) => {
+        if (!enabled || pending || targetId !== null) return false;
+        const found = loadedThreadWindowAnchor(indexById, entries.length, ids);
+        if (!found) return false;
+        if (found.index >= start && found.index < start + SIZE) return true;
+        setSaved({
+          scope,
+          target: targetId,
+          start: entries[found.start].message.id,
+        });
+        return true;
+      },
+    };
+    committed.current = owner;
+    return () => {
+      if (committed.current === owner) committed.current = null;
+    };
+  }, [visit, scope, enabled, pending, targetId, indexById, entries, start]);
   return {
+    // Only moves this window over already projected/loaded rows. The caller
+    // must wait for the committed rows before measuring or restoring scroll.
+    ensureVisible: (ids: readonly string[]) => {
+      const owner = committed.current;
+      return owner?.visit === visit ? owner.ensure(ids) : false;
+    },
     entries: visible,
     earlier: enabled ? start : 0,
     later: enabled ? Math.max(0, entries.length - start - SIZE) : 0,
