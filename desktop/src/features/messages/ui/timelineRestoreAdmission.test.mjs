@@ -9,6 +9,7 @@ function harness(run) {
     cancel: globalThis.cancelAnimationFrame,
   };
   const frames = new Map();
+  const handlers = new Map();
   let next = 0,
     writes = 0,
     pixel = 0;
@@ -27,8 +28,10 @@ function harness(run) {
       writes++;
     },
     querySelectorAll: () => [],
-    addEventListener: () => {},
-    removeEventListener: () => {},
+    addEventListener: (type, handler) => handlers.set(type, handler),
+    removeEventListener: (type, handler) => {
+      if (handlers.get(type) === handler) handlers.delete(type);
+    },
   };
   const tick = () => {
     const pending = [...frames.values()];
@@ -36,7 +39,7 @@ function harness(run) {
     for (const frame of pending) frame();
   };
   try {
-    run({ element, tick, frames, writes: () => writes });
+    run({ element, tick, frames, handlers, writes: () => writes });
   } finally {
     globalThis.requestAnimationFrame = original.request;
     globalThis.cancelAnimationFrame = original.cancel;
@@ -184,4 +187,60 @@ test("legacy callers without an admission predicate retain bounded fallback sett
     assert.equal(element.scrollTop, 42);
     assert.equal(writes(), 4);
     assert.equal(frames.size, 0);
+  }));
+
+test("completion is reported once and pointer interaction retires even a retained frame callback", () =>
+  harness(({ element, tick, frames, handlers, writes }) => {
+    const reasons = [];
+    const stop = restoreReadingPosition(
+      element,
+      snapshot,
+      [],
+      () => false,
+      () => true,
+      (reason) => reasons.push(reason),
+    );
+    for (let i = 0; i < 4; i++) tick();
+    stop();
+    assert.deepEqual(reasons, ["complete"]);
+    assert.equal(handlers.size, 0);
+    const before = writes(),
+      nextReasons = [];
+    restoreReadingPosition(
+      element,
+      snapshot,
+      [],
+      () => false,
+      () => true,
+      (reason) => nextReasons.push(reason),
+    );
+    const retained = [...frames.values()][0];
+    handlers.get("pointerdown")();
+    retained();
+    assert.equal(writes(), before);
+    assert.equal(frames.size, 0);
+    assert.equal(handlers.size, 0);
+    assert.deepEqual(nextReasons, ["gesture"]);
+  }));
+
+test("reentrant admission retirement cannot write or reschedule the stopped restore", () =>
+  harness(({ element, tick, frames, handlers, writes }) => {
+    let stop;
+    const reasons = [];
+    stop = restoreReadingPosition(
+      element,
+      snapshot,
+      [],
+      () => false,
+      () => {
+        stop();
+        return true;
+      },
+      (reason) => reasons.push(reason),
+    );
+    tick();
+    assert.equal(writes(), 0);
+    assert.equal(frames.size, 0);
+    assert.equal(handlers.size, 0);
+    assert.deepEqual(reasons, ["retired"]);
   }));

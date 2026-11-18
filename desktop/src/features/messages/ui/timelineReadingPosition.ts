@@ -5,6 +5,7 @@ export type TimelineReadingPosition = {
   pixel: number;
   neighbors: string[];
 };
+export type ReadingRestoreStop = "complete" | "gesture" | "retired";
 
 /** Capture a message anchor inside the actual virtualizer scroller. */
 export function captureReadingPosition(
@@ -40,6 +41,7 @@ export function restoreReadingPosition(
   ids: string[],
   realize: (id: string) => boolean,
   canRestore: () => boolean = () => true,
+  onStop?: (reason: ReadingRestoreStop) => void,
 ) {
   const id = [snapshot.id, ...snapshot.neighbors].find(
     (candidate) => candidate && ids.includes(candidate),
@@ -47,20 +49,32 @@ export function restoreReadingPosition(
   let frame = 0;
   let tries = 0;
   let stable = 0;
-  const stop = () => {
+  let stopped = false;
+  const stop = (reason: ReadingRestoreStop = "retired") => {
+    if (stopped) return;
+    stopped = true;
     cancelAnimationFrame(frame);
-    container.removeEventListener("wheel", stop);
-    container.removeEventListener("touchstart", stop);
-    container.removeEventListener("keydown", stop);
+    container.removeEventListener("wheel", gesture);
+    container.removeEventListener("touchstart", gesture);
+    container.removeEventListener("keydown", gesture);
+    container.removeEventListener("pointerdown", gesture);
+    onStop?.(reason);
   };
+  const gesture = () => stop("gesture");
   const restore = () => {
-    if (!container.isConnected || !canRestore()) {
+    if (stopped) return;
+    if (
+      !container.isConnected ||
+      !canRestore() ||
+      stopped ||
+      !container.isConnected
+    ) {
       stop();
       return;
     }
     if (++tries > 30) {
       container.scrollTop = snapshot.pixel;
-      stop();
+      stop("complete");
       return;
     }
     const row = id
@@ -74,6 +88,7 @@ export function restoreReadingPosition(
         container.getBoundingClientRect().top -
         snapshot.offset;
       container.scrollTop += delta;
+      if (stopped) return;
       stable = Math.abs(delta) < 1 ? stable + 1 : 0;
       container.dispatchEvent(new Event("scroll"));
     } else if (id) {
@@ -83,15 +98,17 @@ export function restoreReadingPosition(
       container.scrollTop = snapshot.pixel;
       stable++;
     }
+    if (stopped) return;
     if (stable >= 4) {
-      stop();
+      stop("complete");
       return;
     }
     frame = requestAnimationFrame(restore);
   };
-  container.addEventListener("wheel", stop, { passive: true });
-  container.addEventListener("touchstart", stop, { passive: true });
-  container.addEventListener("keydown", stop);
+  container.addEventListener("wheel", gesture, { passive: true });
+  container.addEventListener("touchstart", gesture, { passive: true });
+  container.addEventListener("keydown", gesture);
+  container.addEventListener("pointerdown", gesture);
   frame = requestAnimationFrame(restore);
-  return stop;
+  return () => stop();
 }
