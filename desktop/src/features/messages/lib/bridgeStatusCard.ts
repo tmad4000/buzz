@@ -1,3 +1,4 @@
+import producerUnicode from "./bridgeProducerUnicodeC.json" with { type: "json" };
 import { isPaseoAgentLink } from "@/shared/ui/markdown/paseoAgentLink";
 import type { TimelineMessage } from "@/features/messages/types";
 
@@ -18,6 +19,43 @@ const LABELS: Readonly<Record<string, string>> = {
   "👍 Noted · no action": "👍 Reported noted",
   "⚠️ Agent response overdue": "⚠️ Reported overdue",
 };
+
+// Producer label(): replace Unicode category C with spaces, trim, truncate by
+// code points, then escape exactly this Markdown set. Validate its wire form;
+// escaped bytes and UTF-16 code units are not the producer's length measure.
+const PRODUCER_ESCAPES = new Set("\\`*_{}[]()<>#!|");
+// JS/browser Unicode versions differ from the producer's Python database.
+// Pin the producer's excluded categories rather than trusting host regex tables.
+function producerExcludes(char: string): boolean {
+  const codepoint = char.codePointAt(0)!;
+  let low = 0, high = producerUnicode.ranges.length - 1;
+  while (low <= high) {
+    const middle = (low + high) >>> 1;
+    const [start, end] = producerUnicode.ranges[middle];
+    if (codepoint < start) high = middle - 1;
+    else if (codepoint > end) low = middle + 1;
+    else return true;
+  }
+  return false;
+}
+function decodeProducerLabel(encoded: string, maximum: number): string | null {
+  const chars = Array.from(encoded);
+  let decoded = "";
+  for (let i = 0; i < chars.length; i++) {
+    let char = chars[i];
+    if (char === "\\") {
+      char = chars[++i];
+      if (!PRODUCER_ESCAPES.has(char)) return null;
+    } else if (PRODUCER_ESCAPES.has(char)) return null;
+    if (producerExcludes(char)) return null;
+    decoded += char;
+  }
+  const length = Array.from(decoded).length;
+  // Truncating an already-trimmed long label may leave trailing whitespace.
+  if (length > maximum || decoded.trimStart() !== decoded ||
+      (length < maximum && decoded.trimEnd() !== decoded)) return null;
+  return decoded;
+}
 
 /** Prefer signed machine tags; body parsing is only for untagged old cards. */
 export function parseBridgeStatusCard(message: TimelineMessage) {
@@ -44,8 +82,12 @@ export function parseBridgeStatusCard(message: TimelineMessage) {
     lines[3],
   )?.[1];
   if (!source) return null;
-  const header = /^(.*?) — (.+) · (.+) \((.+)\)$/.exec(lines[0]);
+  const header = /^([\s\S]*?) — ([\s\S]*) · ([\s\S]*) \(([\s\S]*)\)$/.exec(lines[0]);
   if (!header || !Object.hasOwn(LABELS, header[1])) return null;
+  const decoded = [160, 80, 40].map((limit, index) =>
+    decodeProducerLabel(header[index + 2], limit),
+  );
+  if (decoded.some(label => label === null)) return null;
   if (
     (header[1] === "❓ Needs Jacob" ||
       header[1] === "✅ Done" ||
@@ -56,15 +98,15 @@ export function parseBridgeStatusCard(message: TimelineMessage) {
   if (header[1] === "⚠️ Agent response overdue" && source !== "watchdog")
     return null;
   if (
-    lines[4] &&
+    lines.length === 5 &&
     !/^Metadata unavailable; last verified at Unix \d+$/.test(lines[4])
   )
     return null;
   return {
     label: LABELS[header[1]],
-    title: header[2],
-    model: header[3],
-    provider: header[4],
+    title: decoded[0]!,
+    model: decoded[1]!,
+    provider: decoded[2]!,
     agentId,
     serverId,
     href,
@@ -119,13 +161,13 @@ function parseTaggedCard(tags: string[][]) {
       !["root", "listener", "watchdog"].includes(sourceTag[1]))
   )
     return null;
+  // Prospective classification only: obligations/completion reports require Root.
+  if (["waiting", "done", "ack"].includes(status[1]) && sourceTag?.[1] !== "root")
+    return null;
   const title = agent[3] ?? `Agent ${agent[1].slice(0, 8)}`;
   if (
     !title.trim() ||
-    title.length > 160 ||
-    Array.from(title).some(
-      (char) => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127,
-    )
+    Array.from(title).length > 160 || Array.from(title).some(producerExcludes)
   )
     return null;
   return {
@@ -138,7 +180,7 @@ function parseTaggedCard(tags: string[][]) {
     model: "Model unavailable",
     provider: "Provider unavailable",
     metadataUnavailable: null,
-    requestId: replies[0][1],
+    originEventId: replies[0][1],
   };
 }
 

@@ -1,0 +1,28 @@
+{
+  "at": "2026-11-18T07:27:36.745932+00:00",
+  "parent": "3a1e41ec74e6de8b261fbb7b4e6667333b8c0e8a",
+  "priorReviewedHead": "16dd2c440d670e47a91b2387ca3cf28cf4672921",
+  "modelTests": {
+    "pass": 11,
+    "fail": 0,
+    "timeoutSeconds": 60
+  },
+  "domTests": {
+    "pass": 1,
+    "fail": 0,
+    "timeoutSeconds": 60
+  },
+  "wholeDesktopTypecheck": {
+    "exitCode": 0,
+    "diagnostics": 0,
+    "timeoutSeconds": 90
+  },
+  "producerFixtureSha256": "7a8c7ebcd8ca068fc419b3209323f3925912125898b9ce7e27bd7d85c1460f3f",
+  "producerUnicodeVersion": "15.0.0",
+  "unicodeRangeSha256": "7d7db2a24acee4a337eaba9e407bbd63f69975bf8f5812a596efdfbe325f2852",
+  "unicodeRanges": 712,
+  "isolation": "setsid plus process-group SIGKILL cleanup",
+  "fixtureCryptographicVerification": false,
+  "liveProducerChange": false,
+  "independentSourceRecheck": "pending same PR87 reviewer via root"
+}
