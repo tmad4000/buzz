@@ -2,19 +2,19 @@ TAP version 13
 # Subtest: compact card exposes exact agent link, signed original text, and in-place report edits
 ok 1 - compact card exposes exact agent link, signed original text, and in-place report edits
   ---
-  duration_ms: 47.76534
+  duration_ms: 58.069849
   type: 'test'
   ...
 # Subtest: thread row keeps native quote jump, accessible first line and body identity across pending/ack and quote removal
 ok 2 - thread row keeps native quote jump, accessible first line and body identity across pending/ack and quote removal
   ---
-  duration_ms: 90.327509
+  duration_ms: 90.606738
   type: 'test'
   ...
 # Subtest: quote presentation remains off when experiment is disabled
 ok 3 - quote presentation remains off when experiment is disabled
   ---
-  duration_ms: 24.63007
+  duration_ms: 13.73259
   type: 'test'
   ...
 1..3
@@ -25,4 +25,4 @@ ok 3 - quote presentation remains off when experiment is disabled
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 2135.587553
+# duration_ms 2161.64332

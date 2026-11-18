@@ -54,9 +54,16 @@ test("compact card exposes exact agent link, signed original text, and in-place 
     );
     assert.equal(container.querySelector("details").open, false);
     assert.equal(container.querySelector("pre").textContent, originalBody);
-    await act(() =>
-      container.querySelector('[aria-label="Open agent Astra"]').click(),
+    const details = container.querySelector("details");
+    const link = container.querySelector('[aria-label="Open agent Astra"]');
+    assert.ok(
+      details.contains(link),
+      "link is opt-in with the collapsed details",
     );
+    await act(() => {
+      details.open = true;
+    });
+    await act(() => link.click());
     assert.deepEqual(globalThis.__openedAgent, [href]);
     const summary = container.querySelector("summary");
     await render(originalBody.replace("⏳ Working", "✅ Done"));

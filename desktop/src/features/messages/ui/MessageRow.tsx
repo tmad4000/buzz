@@ -954,6 +954,7 @@ export const MessageRow = React.memo(
     prev.message.id === next.message.id &&
     prev.message.pubkey === next.message.pubkey &&
     prev.message.body === next.message.body &&
+    prev.message.editSignerPubkey === next.message.editSignerPubkey &&
     prev.message.author === next.message.author &&
     prev.message.isAgent === next.message.isAgent &&
     prev.message.ownerPubkey === next.message.ownerPubkey &&

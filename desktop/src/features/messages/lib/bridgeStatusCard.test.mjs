@@ -27,9 +27,9 @@ test("unknown, impersonated and substantive content retain original body", () =>
     { signerPubkey: undefined },
     { kind: 1 },
     { parentId: null },
-    { body: body() + "\nAnswer follows" },
+    { body: `${body()}\nAnswer follows` },
     { body: body().replace(href, "https://example.com") },
-    { body: body().replace(href, href + "/extra") },
+    { body: body().replace(href, `${href}/extra`) },
     { body: body("✅ Done", "listener") },
     { body: body("❓ Needs Jacob", "watchdog") },
     { body: body("Unknown") },
@@ -63,3 +63,131 @@ test("root+reply tags retain exact answered event", () =>
     ]),
     { rootId: "root", parentId: "exact-parent" },
   ));
+
+const requestId = "a".repeat(64);
+const machineTags = (state = "progress") => [
+  ["buzz-status", state],
+  ["agent", agent, server, "Astra"],
+  ["paseo-link", href],
+  ["e", "b".repeat(64), "", "root"],
+  ["e", requestId, "", "reply"],
+];
+test("structured bridge tags outrank body and bind exact originating request", () => {
+  const card = parseBridgeStatusCard({
+    ...message,
+    tags: machineTags("done"),
+    body: "An old working body",
+  });
+  assert.equal(card.label, "✅ Reported done");
+  assert.equal(card.requestId, requestId);
+  assert.equal(card.href, href);
+  assert.equal(card.title, "Astra");
+  assert.equal(
+    parseBridgeStatusCard({ ...message, tags: machineTags("waiting") }).label,
+    "❓ Reported waiting",
+  );
+});
+test("malformed machine envelopes cannot downgrade into legacy body trust", () => {
+  for (const tags of [
+    machineTags("toString"),
+    machineTags("unknown"),
+    [...machineTags(), ["buzz-status", "done"]],
+    machineTags().filter((t) => t[0] !== "agent"),
+    [...machineTags(), ["agent", agent, server]],
+    machineTags().map((t) =>
+      t[0] === "paseo-link" ? ["paseo-link", `${href}/extra`] : t,
+    ),
+    machineTags().map((t) =>
+      t[0] === "agent" ? ["agent", "short", server] : t,
+    ),
+    machineTags().filter((t) => t[3] !== "reply"),
+    [...machineTags(), ["e", "c".repeat(64), "", "reply"]],
+    [...machineTags(), ["buzz-status-source", "untrusted"]],
+  ])
+    assert.equal(
+      parseBridgeStatusCard({ ...message, tags }),
+      null,
+      JSON.stringify(tags),
+    );
+  for (const signerPubkey of ["other", undefined])
+    assert.equal(
+      parseBridgeStatusCard({ ...message, signerPubkey, tags: machineTags() }),
+      null,
+    );
+  assert.equal(
+    parseBridgeStatusCard({
+      ...message,
+      editSignerPubkey: "other",
+      tags: machineTags(),
+    }),
+    null,
+  );
+});
+
+test("production formatter applies only bridge-signed status snapshots and preserves immutable ancestry", async () => {
+  const { formatTimelineMessages } = await import(
+    "./formatTimelineMessages.ts"
+  );
+  const channelId = "36411e44-0e2d-4cfe-bd6e-567eb169db9f";
+  const original = {
+    id: "c".repeat(64),
+    kind: 9,
+    pubkey: message.signerPubkey,
+    created_at: 1_700_000_000,
+    content: body(),
+    tags: [["h", channelId], ...machineTags()],
+    sig: "synthetic",
+  };
+  const edit = {
+    id: "d".repeat(64),
+    kind: 40003,
+    pubkey: message.signerPubkey,
+    created_at: 1_700_000_001,
+    content: "Structured report",
+    tags: [
+      ["e", original.id],
+      ...machineTags("done").filter((tag) => tag[0] !== "e"),
+    ],
+    sig: "synthetic",
+  };
+  const format = (e, profiles) =>
+    formatTimelineMessages([original, e], null, undefined, null, profiles).find(
+      (m) => m.id === original.id,
+    );
+  const updated = format(edit);
+  assert.equal(parseBridgeStatusCard(updated).label, "✅ Reported done");
+  assert.equal(parseBridgeStatusCard(updated).requestId, requestId);
+  assert.equal(updated.parentId, requestId);
+  const legacy = format({
+    ...edit,
+    content: body("✅ Done"),
+    tags: [["e", original.id]],
+  });
+  assert.equal(parseBridgeStatusCard(legacy).label, "✅ Reported done");
+  assert.equal(
+    legacy.tags.some((t) => t[0] === "buzz-status"),
+    false,
+    "legacy edit drops stale machine progress",
+  );
+  const rejected = format({ ...edit, pubkey: "e".repeat(64) });
+  assert.equal(
+    parseBridgeStatusCard(rejected).label,
+    "⏳ Reported working",
+    "unauthorized edit does not apply",
+  );
+  const ownerSigner = "e".repeat(64);
+  const ownerEdit = format(
+    { ...edit, pubkey: ownerSigner },
+    { [message.signerPubkey]: { ownerPubkey: ownerSigner } },
+  );
+  assert.equal(
+    ownerEdit.body,
+    "Structured report",
+    "owner-authorized edit is ordinary valid content",
+  );
+  assert.equal(
+    parseBridgeStatusCard(ownerEdit),
+    null,
+    "owner edit is not a bridge-signed report",
+  );
+});

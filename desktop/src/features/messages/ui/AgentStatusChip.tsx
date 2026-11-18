@@ -27,6 +27,20 @@ export function AgentStatusChip({
             Reported status · source: {card.source}. Live activity unverified.
           </p>
           {card.metadataUnavailable ? <p>{card.metadataUnavailable}</p> : null}
+          <button
+            type="button"
+            className="min-h-11 shrink-0 rounded px-1 underline focus-visible:outline-2 focus-visible:outline-primary"
+            aria-label={`Open agent ${card.title}`}
+            onClick={() =>
+              void openUrl(card.href).catch(() =>
+                toast.error(
+                  "Could not open Paseo. Copy the agent and server IDs from details.",
+                ),
+              )
+            }
+          >
+            Open agent ↗
+          </button>
           <pre className="whitespace-pre-wrap break-words">{originalBody}</pre>
           <p className="break-all">
             Agent {card.agentId} · server {card.serverId}
@@ -45,20 +59,6 @@ export function AgentStatusChip({
           </button>
         </div>
       </details>
-      <button
-        type="button"
-        className="min-h-11 shrink-0 rounded px-1 underline focus-visible:outline-2 focus-visible:outline-primary"
-        aria-label={`Open agent ${card.title}`}
-        onClick={() =>
-          void openUrl(card.href).catch(() =>
-            toast.error(
-              "Could not open Paseo. Copy the agent and server IDs from details.",
-            ),
-          )
-        }
-      >
-        Open agent ↗
-      </button>
     </div>
   );
 }

@@ -21,6 +21,7 @@ test("native nested reply quotes only the parent's current first line, independe
   assert.deepEqual(threadParentQuote(reply, messages, "channel"), {
     parentId: "parent",
     rootId: "root",
+    parentLoaded: true,
     excerpt: "Latest edited first line",
   });
 });
@@ -35,7 +36,7 @@ test("root replies, self references and messages without native reply tags have 
 test("unloaded and nontext parents keep exact native jump identity without inventing a quote", () => {
   assert.equal(
     threadParentQuote(reply, new Map(), "channel").excerpt,
-    "Parent message unavailable",
+    "reply to earlier message",
   );
   assert.equal(
     threadParentQuote(

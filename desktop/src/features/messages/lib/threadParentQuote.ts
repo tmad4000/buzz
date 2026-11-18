@@ -25,8 +25,9 @@ export function threadParentQuote(
   return {
     parentId,
     rootId,
+    parentLoaded: parent !== undefined,
     excerpt:
       firstLine ||
-      (parent ? "Message without text" : "Parent message unavailable"),
+      (parent ? "Message without text" : "reply to earlier message"),
   };
 }

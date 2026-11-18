@@ -115,6 +115,17 @@ test("thread row keeps native quote jump, accessible first line and body identit
       1,
       "a refusing owner never falls through to route navigation",
     );
+    await render(message, new Map());
+    assert.equal(document.querySelector("button"), null);
+    assert.equal(
+      document.querySelector('[data-testid="thread-parent-stub"]').textContent,
+      "reply to earlier message",
+    );
+    assert.equal(
+      calls.length,
+      1,
+      "missing-parent stub never navigates or fetches",
+    );
     await render({ ...message, tags: [] });
     assert.equal(document.querySelector("button"), null);
     assert.equal(document.querySelector("article"), body);
