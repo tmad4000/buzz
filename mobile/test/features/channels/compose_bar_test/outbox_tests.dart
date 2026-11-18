@@ -137,13 +137,32 @@ void outboxTests() {
   testWidgets(
     'detach during preflight keeps the already copied capture paused',
     (tester) async {
-      final directory = await Directory.systemTemp.createTemp(
-        'buzz-preflight-widget-',
-      );
-      final outbox = MessageOutbox(directory);
-      final copied = Completer<void>();
-      final continuePreparation = Completer<void>();
-      final queued = Completer<void>();
+      // Keep the outbox's futures and I/O signals on the real event loop.
+      final (
+        directory,
+        outbox,
+        copied,
+        continuePreparation,
+        queued,
+      ) = (await tester.runAsync(() async {
+        final directory = await Directory.systemTemp.createTemp(
+          'buzz-preflight-widget-',
+        );
+        return (
+          directory,
+          MessageOutbox(directory),
+          Completer<void>(),
+          Completer<void>(),
+          Completer<void>(),
+        );
+      }))!;
+      final writeRequest = Completer<Future<void> Function()>();
+      final writeResult = Completer<void>();
+      addTearDown(() async {
+        if (!continuePreparation.isCompleted) continuePreparation.complete();
+        await outbox.close();
+        await directory.delete(recursive: true);
+      });
       final service = MediaUploadService(
         baseUrl: 'https://relay.example',
         nsec: nostr.Keys.generate().nsec,
@@ -165,30 +184,33 @@ void outboxTests() {
                 attachments = const [],
                 mentionKeys = const {},
                 prepare,
-              }) async {
-                try {
-                  await outbox.enqueue(
-                    {
-                      'relay': 'https://relay.example',
-                      'author': 'author',
-                      'channelId': 'channel',
-                      'parentId': 'parent',
-                      'rootId': 'root',
-                      'text': text,
-                      'mentions': mentions,
-                      'mediaTags': mediaTags,
-                      'mentionKeys': mentionKeys,
-                    },
-                    attachments,
-                    prepare: () async {
-                      copied.complete();
-                      await continuePreparation.future;
-                      return prepare!();
-                    },
-                  );
-                } finally {
-                  queued.complete();
-                }
+              }) {
+                writeRequest.complete(() async {
+                  try {
+                    await outbox.enqueue(
+                      {
+                        'relay': 'https://relay.example',
+                        'author': 'author',
+                        'channelId': 'channel',
+                        'parentId': 'parent',
+                        'rootId': 'root',
+                        'text': text,
+                        'mentions': mentions,
+                        'mediaTags': mediaTags,
+                        'mentionKeys': mentionKeys,
+                      },
+                      attachments,
+                      prepare: () async {
+                        copied.complete();
+                        await continuePreparation.future;
+                        return prepare!();
+                      },
+                    );
+                  } finally {
+                    queued.complete();
+                  }
+                });
+                return writeResult.future;
               },
         ),
       );
@@ -199,14 +221,21 @@ void outboxTests() {
         find.byType(TextField),
         'saved before membership check',
       );
+      await tester.pump();
       await tester.tap(find.byIcon(BuzzIcons.arrowUp));
-      await tester.runAsync(
-        () async => copied.future.timeout(const Duration(seconds: 5)),
-      );
+      await tester.pump();
+      await tester.pump();
+      expect(writeRequest.isCompleted, isTrue);
+      // The widget send supplies the real write, which runs outside fake time.
+      await tester.runAsync(() async {
+        final write = await writeRequest.future;
+        writeResult.complete(write());
+        await copied.future.timeout(const Duration(seconds: 5));
+      });
       expect(outbox.items.single.data['needsReview'], isTrue);
       await tester.pumpWidget(const SizedBox.shrink());
-      continuePreparation.complete();
       await tester.runAsync(() async {
+        continuePreparation.complete();
         await queued.future.timeout(const Duration(seconds: 5));
         final row = outbox.items.single;
         expect(row.text, 'saved before membership check');
@@ -217,8 +246,6 @@ void outboxTests() {
           _pngBytes,
         );
         await expectLater(outbox.retry(row.id), throwsStateError);
-        await outbox.close();
-        await directory.delete(recursive: true);
       });
     },
   );
