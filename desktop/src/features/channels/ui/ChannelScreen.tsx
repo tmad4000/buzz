@@ -103,7 +103,6 @@ export function ChannelScreen({
   targetMessageEvents, targetMessageId,
   ...searchTarget
 }: ChannelScreenProps) {
-  const { pageOpen, closePage, pageHeaderActions, pagePanel, requirePageEditResolution } = useChannelPageSurface(activeChannel, headerEndActions, registerPageLeaveGuard);
   const queryClient = useQueryClient();
   const { goHome } = useAppNavigation();
   const { activeCommunity } = useCommunities();
