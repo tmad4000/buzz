@@ -9,9 +9,12 @@ export function useChannelPageSurface(
   channel: Channel | null,
   endActions: React.ReactNode,
   registerTargetLeaveGuard?: PageLeaveGuardRegistrar,
+  canExpand = false,
 ) {
   const [pageChannel, setPageChannel] = React.useState<string | null>(null);
   const pageOpen = Boolean(channel && pageChannel === channel.id);
+  const [expanded, setExpanded] = React.useState(false);
+  const pageExpanded = pageOpen && canExpand && expanded;
   const guard = React.useRef<PageLeaveGuard>(() => true);
   const requirePageEditResolution = React.useCallback(
     () => guard.current(),
@@ -31,7 +34,10 @@ export function useChannelPageSurface(
     [registerTargetLeaveGuard, requirePageEditResolution],
   );
   const closePage = React.useCallback(() => {
-    if (requirePageEditResolution()) setPageChannel(null);
+    if (requirePageEditResolution()) {
+      setPageChannel(null);
+      setExpanded(false);
+    }
   }, [requirePageEditResolution]);
   const pageHeaderActions = React.useMemo(
     () => (
@@ -42,7 +48,10 @@ export function useChannelPageSurface(
             variant={pageOpen ? "secondary" : "outline"}
             onClick={() => {
               if (pageOpen) closePage();
-              else setPageChannel(channel.id);
+              else {
+                setPageChannel(channel.id);
+                setExpanded(false);
+              }
             }}
           >
             Page
@@ -53,6 +62,20 @@ export function useChannelPageSurface(
     ),
     [channel, pageOpen, endActions, closePage],
   );
+  const onShortcut = React.useCallback(
+    (action: "toggle" | "restore") => {
+      if (pageOpen && canExpand)
+        setExpanded((previous) => action === "toggle" && !previous);
+    },
+    [pageOpen, canExpand],
+  );
+  const onPageKeyDown = (event: React.KeyboardEvent) => {
+    if (pageExpanded && event.key === "Escape" && !event.defaultPrevented) {
+      event.preventDefault();
+      event.stopPropagation();
+      onShortcut("restore");
+    }
+  };
   const pagePanel =
     pageOpen && channel ? (
       <ChannelPage
@@ -60,10 +83,14 @@ export function useChannelPageSurface(
         channelId={channel.id}
         canEdit={channel.isMember}
         registerLeaveGuard={registerLeaveGuard}
+        expanded={pageExpanded}
+        onShortcut={canExpand ? onShortcut : undefined}
       />
     ) : null;
   return {
     pageOpen,
+    pageExpanded,
+    onPageKeyDown,
     closePage,
     pageHeaderActions,
     pagePanel,

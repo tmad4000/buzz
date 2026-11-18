@@ -16,11 +16,15 @@ export function ChannelPage({
   canEdit,
   onClose,
   registerLeaveGuard,
+  expanded = false,
+  onShortcut,
 }: {
   channelId: string;
   canEdit: boolean;
   onClose?: () => void;
   registerLeaveGuard?: PageLeaveGuardRegistrar;
+  expanded?: boolean;
+  onShortcut?: (action: "toggle" | "restore") => void;
 }) {
   const editorId = React.useId();
   const [head, setHead] = React.useState<RelayEvent | null>(null);
@@ -159,16 +163,18 @@ export function ChannelPage({
   }, [head, channelId]);
   React.useEffect(() => {
     const receive = (event: MessageEvent) => {
-      if (
-        event.source !== frame.current?.contentWindow ||
-        event.data?.type !== "buzz-page-link"
-      )
+      if (!frame.current || event.source !== frame.current.contentWindow)
         return;
-      setExternal(pageExternalLink(event.data.href));
+      if (event.data?.type === "buzz-page-link") {
+        setExternal(pageExternalLink(event.data.href));
+      } else if (event.data?.type === "buzz-page-shortcut") {
+        const action = event.data.action;
+        if (action === "toggle" || action === "restore") onShortcut?.(action);
+      }
     };
     window.addEventListener("message", receive);
     return () => window.removeEventListener("message", receive);
-  }, []);
+  }, [onShortcut]);
   const save = async () => {
     const version = channelGeneration.current;
     if (
@@ -207,6 +213,20 @@ export function ChannelPage({
     <section
       className="flex h-full min-h-0 flex-col gap-3"
       aria-label="Channel Page"
+      onKeyDown={(event) => {
+        if (
+          onShortcut &&
+          event.metaKey &&
+          event.shiftKey &&
+          !event.repeat &&
+          !event.defaultPrevented &&
+          event.key.toLowerCase() === "f"
+        ) {
+          event.preventDefault();
+          event.stopPropagation();
+          onShortcut("toggle");
+        }
+      }}
     >
       <div className="flex items-center justify-between gap-2">
         <span className="min-w-0 flex-1 break-all text-xs text-muted-foreground">
@@ -227,6 +247,16 @@ export function ChannelPage({
             }}
           >
             {head ? "Edit HTML" : "Create Page"}
+          </Button>
+        ) : null}
+        {onShortcut ? (
+          <Button
+            size="sm"
+            variant="outline"
+            aria-keyshortcuts="Meta+Shift+F"
+            onClick={() => onShortcut("toggle")}
+          >
+            {expanded ? "Restore" : "Expand"}
           </Button>
         ) : null}
         {onClose ? (

@@ -107,6 +107,7 @@ export const ChannelPane = React.memo(function ChannelPane({
   isMessageUnreadById,
   isJoining = false,
   isSinglePanelView = false,
+  pageExpanded = false,
   isSending,
   isTimelineError = false,
   isTimelineLoading,
@@ -466,7 +467,10 @@ export const ChannelPane = React.memo(function ChannelPane({
     threadHeadMessage,
   ]);
   const isOverlay = useIsThreadPanelOverlay();
-  const useSplitAuxiliaryPane = !isSinglePanelView && !isOverlay;
+  // Preserve the Page and any covered thread in their existing hosts while
+  // the Page drawer grows over the space previously occupied by the timeline.
+  const useSplitAuxiliaryPane =
+    (!isSinglePanelView || pageExpanded) && !isOverlay;
   const threadViewMode = useThreadViewMode();
   const hasThreadSurface =
     Boolean(threadHeadMessage) || shouldShowThreadSkeleton;
@@ -585,6 +589,8 @@ export const ChannelPane = React.memo(function ChannelPane({
         channelName={activeChannel?.name ?? "channel"}
         key="idle-auxiliary-surface"
         label={idleAuxiliaryTitle || "Panel"}
+        expanded={pageExpanded}
+        escapeEnabled={!pageExpanded}
         onClose={onCloseIdleAuxiliaryPanel}
         restoreFocusTarget={threadSurface.restoreFocusTarget}
       >

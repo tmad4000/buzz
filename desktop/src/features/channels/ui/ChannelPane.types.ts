@@ -61,6 +61,7 @@ export type ChannelPaneProps = {
   isHuddleTranscript?: boolean;
   isJoining?: boolean;
   isSinglePanelView?: boolean;
+  pageExpanded?: boolean;
   isSending: boolean;
   /** Terminal channel-history failure. Cached messages remain visible when present. */
   isTimelineError?: boolean;

@@ -22,6 +22,8 @@ type ForumChannelContentProps = {
   pagePanel?: React.ReactNode;
   onClosePage?: () => void;
   pageSinglePanel?: boolean;
+  pageExpanded?: boolean;
+  pageTitle?: string;
   onClosePost: () => void;
   onCloseProfilePanel: () => void;
   onOpenDm?: (pubkeys: string[]) => Promise<void> | void;
@@ -65,6 +67,8 @@ export function ForumChannelContent({
   pagePanel,
   onClosePage,
   pageSinglePanel = false,
+  pageExpanded = false,
+  pageTitle = "Page",
   onClosePost,
   onCloseProfilePanel,
   onOpenDm,
@@ -90,7 +94,7 @@ export function ForumChannelContent({
         <section
           aria-label="Forum posts"
           className={
-            pagePanel && pageSinglePanel
+            pagePanel && (pageSinglePanel || pageExpanded)
               ? "hidden"
               : "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
           }
@@ -115,7 +119,7 @@ export function ForumChannelContent({
             onClose={onClosePage}
             onResetWidth={onResetPanelWidth}
             onResizeStart={onPanelResizeStart}
-            title="Page"
+            title={pageTitle}
             useSplitAuxiliaryPane={!pageSinglePanel}
             widthPx={panelWidthPx}
           >
