@@ -58,3 +58,5 @@ That snippet is a field fragment, not a complete card. Include actual delegated 
 5. Verify Jacob's untouched default section reads Direct agents; rename/edit/delete it, sync a second device, and confirm those edits survive. P2 remains unchanged.
 
 Source/typecheck/unit tests do not verify macOS handler registration, live relay publication, native layout or human acceptance. Those remain release-captain gates. No dependencies, lockfiles, release versions or new relay kinds are introduced.
+
+Sidebar composition follow-up: the runtime sibling actions reserve `right-14`, leaving PR46's `right-6` Star toggle in a separate slot. Sidebar owner36ce8949 approved the seed-only rename guard and this positional reservation. Exact native narrow-row/focus/hit-target acceptance remains captain-scoped. A captain-authorized single M5 status lookup at2026-11-18T06:31:07Z failed without a server ID; the M5 allowlist value remains unverified live and no retry is authorized.

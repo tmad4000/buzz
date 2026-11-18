@@ -11,7 +11,7 @@ Built: compact message-action default/picker; Appearance opt-in; current Direct 
 
 Coordination: af293993 supplied the send mutation/picker ownership API and checked scope/receipt semantics. Its cache-side-effect concern is addressed with focused callback tests and the existing identity/community-keyed QueryClient boundary. Message row owner445b5cb9 and integration ownerfd0be4cf were notified. No outbox, native or sidebar-owner source files were changed.
 
-Validation: `tsc --noEmit` PASS;22/22 focused unit/model/production-callback tests PASS; changed-file Biome and whitespace checks PASS. Test commands use Python `Popen(start_new_session=True)` (setsid), deadlines150s/60s and whole-process-group TERM/KILL cleanup. No browser/native/Tauri/cargo/M5/Buzz actions, new dependencies, lockfiles, version changes or preview services. Full CI and native/human acceptance are not claimed.
+Validation: `tsc --noEmit` PASS;30/30 focused unit/model/production-callback tests PASS; changed-file Biome and whitespace checks PASS. Test commands use Python `Popen(start_new_session=True)` (setsid), deadlines150s/60s and whole-process-group TERM/KILL cleanup. No browser/native/Tauri/cargo/M5/Buzz actions, new dependencies, lockfiles, version changes or preview services. Full CI and native/human acceptance are not claimed.
 
 Delivery: separate draft PR URL and final source head are reported to root with an explicit independent Sol review request. Keep draft until review and captain-authorized native/human acceptance. Forward markers are private device-local history, not synced/public edits; missing publisher cards/private Direct agent membership from PR81 remain their original owners' rollout work.
 
@@ -22,3 +22,6 @@ Root's semantic safeguards are implemented in PR85: an optional one-line sender 
 Every send reads fresh channel details and writer-side source/target rosters. Different private member sets, group destinations, or open/community-visible targets require an explicit dialog naming the target, its audience/access policy, and its members' names/keys. Opening, cancellation and dismissal do not send. Confirmation binds a specific audience snapshot; a changed membership/visibility/target identity requires fresh confirmation. Unknown/incomplete audiences fail closed. An unchanged private two-member Paseo DM/P2 pair retains one-click forwarding. Native expected relay/signer fencing and no automatic send retry remain unchanged.
 
 Known cross-device limitation: **other devices do not show “Forwarded ↗”**, because the ACK receipt is stored only on the sending device, per relay/signer. The target forward and backlink still exist as ordinary signed messages. No new synced lane or read-state mutation is added.
+
+
+Stack refresh: merged the latest PR81head83d1462c1 into this owned branch, retaining its owner-approved Star/runtime slot reservation. The only merge conflict was DELIVERY.md; this file retains the forwarding report and the three semantic safeguards above. Final refreshed-stack typecheck is pending;30/30 focused tests pass for the forward changes. PR81 itself was not changed.
