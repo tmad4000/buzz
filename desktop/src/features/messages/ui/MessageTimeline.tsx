@@ -3,9 +3,13 @@ import {
   restoreReadingPosition,
   type TimelineReadingPosition,
 } from "./timelineReadingPosition";
+import { createReadingRestoreAdmission } from "./readingRestoreAdmission";
 import type { ThreadSummaryRenderer } from "./TimelineMessageRow";
 import * as React from "react";
-import { ConversationViewContext } from "@/features/conversations/ConversationViewContext";
+import {
+  ConversationViewContext,
+  useConversationControlScope,
+} from "@/features/conversations/ConversationViewContext";
 import { timelineScrollIdentity } from "@/features/conversations/timelineScrollIdentity";
 import { useTimelineView } from "@/features/channels/ui/TimelineViewContext";
 
@@ -235,6 +239,19 @@ const MessageTimelineBase = React.forwardRef<
 ) {
   const conversationView = React.useContext(ConversationViewContext);
   const { mode } = useTimelineView();
+  const { canHandle } = useConversationControlScope();
+  const restorationOwner = React.useRef({
+    channelId,
+    mode,
+    targetMessageId,
+    viewId: conversationView?.viewInstanceId,
+  });
+  restorationOwner.current = {
+    channelId,
+    mode,
+    targetMessageId,
+    viewId: conversationView?.viewInstanceId,
+  };
   const internalScrollRef = React.useRef<HTMLDivElement>(null);
   const scrollContainerRef = externalScrollRef ?? internalScrollRef;
   const contentRef = React.useRef<HTMLDivElement>(null);
@@ -254,6 +271,50 @@ const MessageTimelineBase = React.forwardRef<
     }),
     [scrollContainerRef, virtualizerScrollParent],
   );
+  const restoreAdmission = React.useRef<ReturnType<
+    typeof createReadingRestoreAdmission
+  > | null>(null);
+  const restoreAdmissionKey = conversationView
+    ? JSON.stringify([
+        conversationView.viewInstanceId,
+        conversationView.focused,
+        conversationView.visible,
+        conversationView.interactive,
+        channelId,
+        mode,
+        targetMessageId,
+      ])
+    : null;
+  React.useLayoutEffect(() => {
+    if (!restoreAdmissionKey) return;
+    const admission = createReadingRestoreAdmission({
+      windowEvents: window,
+      documentEvents: document,
+      canRestore: canHandle,
+    });
+    restoreAdmission.current = admission;
+    const observer = new MutationObserver(admission.invalidate);
+    for (
+      let node: HTMLElement | null = activeScrollContainerRef.current;
+      node;
+      node = node.parentElement
+    )
+      observer.observe(node, {
+        attributes: true,
+        attributeFilter: [
+          "hidden",
+          "inert",
+          "aria-hidden",
+          "data-focused-conversation",
+        ],
+      });
+    return () => {
+      observer.disconnect();
+      admission.dispose();
+      if (restoreAdmission.current === admission)
+        restoreAdmission.current = null;
+    };
+  }, [restoreAdmissionKey, activeScrollContainerRef, canHandle]);
 
   // Gate the heavy timeline render (each row runs a synchronous
   // react-markdown parse) behind React concurrency. `useDeferredValue` lets the
@@ -507,15 +568,36 @@ const MessageTimelineBase = React.forwardRef<
               messages.map((m) => m.id),
             )
           : null,
-      restoreReadingPosition: (snapshot) =>
-        activeScrollContainerRef.current
-          ? restoreReadingPosition(
-              activeScrollContainerRef.current,
-              snapshot,
-              messages.map((m) => m.id),
-              (id) => timelineVirtualizerApi?.scrollToMessage(id) ?? false,
-            )
-          : undefined,
+      restoreReadingPosition: (snapshot) => {
+        const element = activeScrollContainerRef.current;
+        if (!element) return;
+        const lease = conversationView
+          ? restoreAdmission.current?.capture()
+          : undefined;
+        if (conversationView && !lease) return;
+        return restoreReadingPosition(
+          element,
+          snapshot,
+          messages.map((m) => m.id),
+          (id) => timelineVirtualizerApi?.scrollToMessage(id) ?? false,
+          conversationView
+            ? () => {
+                const current = restorationOwner.current;
+                const container = activeScrollContainerRef.current;
+                return (
+                  lease?.() === true &&
+                  current.viewId === conversationView.viewInstanceId &&
+                  current.channelId === channelId &&
+                  current.mode === mode &&
+                  current.targetMessageId === targetMessageId &&
+                  container?.closest(
+                    '[hidden], [inert], [aria-hidden="true"]',
+                  ) === null
+                );
+              }
+            : undefined,
+        );
+      },
       scrollToBottomOnNextUpdate: prepareForOwnMessage,
       settleAtBottom: () => {
         if (!timelineVirtualizerApi) return false;
@@ -529,6 +611,10 @@ const MessageTimelineBase = React.forwardRef<
       timelineVirtualizerApi,
       activeScrollContainerRef,
       messages,
+      conversationView,
+      channelId,
+      mode,
+      targetMessageId,
     ],
   );
 
