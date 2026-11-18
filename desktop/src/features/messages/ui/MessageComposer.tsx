@@ -1,12 +1,9 @@
 import * as React from "react";
 import { toast } from "sonner";
 import { useConversationLeaveGuard } from "@/features/conversations/ConversationViewGuards";
+import { useConversationAutoSubmitEndpoint } from "@/features/conversations/useConversationAutoSubmitEndpoint";
 import { ConversationViewContext } from "@/features/conversations/ConversationViewContext";
-import { ConversationComposerOwnership } from "@/features/conversations/ConversationComposerOwnership";
-import {
-  ConversationDraftEditorsContext,
-  DraftEditorPresentationContext,
-} from "@/features/conversations/ConversationDraftEditors";
+import { DraftEditorPresentationContext } from "@/features/conversations/ConversationDraftEditors";
 import { EditorContent } from "@tiptap/react";
 import {
   useChannelLinks,
@@ -73,9 +70,13 @@ import { submitMessageEdit } from "./submitMessageEdit";
 import { prepareBackgroundLinkPreviews } from "@/features/messages/lib/linkPreviewPreparationStore";
 import { useComposerLinkPreviews } from "./useComposerLinkPreviews";
 import { useAddressedAgentMentionRestore } from "./useAddressedAgentMentionRestore";
-import { scheduleSettleGatedAutoSubmit } from "./messageComposerAutoSubmit";
+import { useLegacyDraftAutoSubmit } from "./useLegacyDraftAutoSubmit";
 import { SendToThreadPicker } from "./SendToThreadPicker";
 import type { MessageComposerProps } from "./MessageComposer.types";
+import { withConversationComposerOwnership } from "./withConversationComposerOwnership";
+type ComposerThreadContext = ReturnType<
+  NonNullable<MessageComposerProps["onCaptureSendContext"]>
+>;
 function MessageComposerImpl({
   audienceContext = null,
   channelId = null,
@@ -209,34 +210,38 @@ function MessageComposerImpl({
     media.queuedAttachmentsRef.current.length === 0;
   const ownsDropZone = mediaController === undefined;
   const backgroundUpload = useBackgroundMediaUpload();
-  const { trackAuthoredContent, getComposerRevision, runComposerUpdate } =
-    useDraftPersistLifecycle({
-      effectiveDraftKey,
-      channelId,
-      loadDraft: drafts.loadDraft,
-      persistDraft: drafts.persistDraft,
-      getMentionRefs: mentions.getDraftMentionRefs,
-      restoreMentionRefs: mentions.restoreDraftMentionRefs,
-      livePendingImeta: media.pendingImeta,
-      setPendingImeta: media.setPendingImeta,
-      getQueuedAttachments: () => media.queuedAttachmentsRef.current,
-      saveQueuedAttachmentsForDraft,
-      clearQueuedAttachments: media.clearQueuedAttachments,
-      restoreQueuedAttachments: media.restoreQueuedAttachments,
-      takeQueuedAttachmentsForDraft,
-      setContent: (content) => {
-        setComposerContent(content);
-        richText.setContent(content);
-      },
-      clearContent: () => {
-        setComposerContent("");
-        richText.clearContent();
-      },
-      setSpoileredAttachmentUrls,
-      spoileredAttachmentUrlsRef,
-      syncComposerContentFromEditor,
-      getImplicitAgentMentionPrefix: implicitAgentMentionProvenance.getPrefix,
-    });
+  const {
+    trackAuthoredContent,
+    getComposerRevision,
+    runComposerUpdate,
+    isDraftRestored,
+  } = useDraftPersistLifecycle({
+    effectiveDraftKey,
+    channelId,
+    loadDraft: drafts.loadDraft,
+    persistDraft: drafts.persistDraft,
+    getMentionRefs: mentions.getDraftMentionRefs,
+    restoreMentionRefs: mentions.restoreDraftMentionRefs,
+    livePendingImeta: media.pendingImeta,
+    setPendingImeta: media.setPendingImeta,
+    getQueuedAttachments: () => media.queuedAttachmentsRef.current,
+    saveQueuedAttachmentsForDraft,
+    clearQueuedAttachments: media.clearQueuedAttachments,
+    restoreQueuedAttachments: media.restoreQueuedAttachments,
+    takeQueuedAttachmentsForDraft,
+    setContent: (content) => {
+      setComposerContent(content);
+      richText.setContent(content);
+    },
+    clearContent: () => {
+      setComposerContent("");
+      richText.clearContent();
+    },
+    setSpoileredAttachmentUrls,
+    spoileredAttachmentUrlsRef,
+    syncComposerContentFromEditor,
+    getImplicitAgentMentionPrefix: implicitAgentMentionProvenance.getPrefix,
+  });
   // biome-ignore lint/correctness/useExhaustiveDependencies: effectiveDraftKey is the sole trigger
   React.useEffect(() => {
     media.setUploadState({ status: "idle" });
@@ -631,8 +636,9 @@ function MessageComposerImpl({
     onToggle: toggleAlwaysAddressAgent,
   });
   const submitMessage = React.useCallback(
-    async (id?: string | null) => {
+    async (id?: string | null, commandContext?: ComposerThreadContext) => {
       if (presentationRef.current && !presentationRef.current.canEdit()) return;
+      if (commandContext !== undefined && editTargetRef.current) return;
       const trimmed = syncComposerContentFromEditor().trim();
       // Edit mode
       if (editTargetRef.current && onEditSaveRef.current) {
@@ -703,11 +709,13 @@ function MessageComposerImpl({
         return;
       }
       const capturedThreadContext =
-        id === undefined
-          ? (onCaptureSendContext?.() ?? null)
-          : id === null
-            ? null
-            : { parentEventId: id, threadHeadId: id };
+        commandContext !== undefined
+          ? commandContext
+          : id === undefined
+            ? (onCaptureSendContext?.() ?? null)
+            : id === null
+              ? null
+              : { parentEventId: id, threadHeadId: id };
       if (
         capturedThreadContext !== null &&
         !capturedThreadContext.parentEventId
@@ -789,25 +797,64 @@ function MessageComposerImpl({
     ],
   );
   submitMessageRef.current = submitMessage;
-  // Draft auto-submit runs once after persisted editor state loads.
-  const onAutoSubmitCompleteRef = React.useRef(onAutoSubmitComplete);
-  onAutoSubmitCompleteRef.current = onAutoSubmitComplete;
-  // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally fires once on mount only
-  React.useEffect(() => {
-    if (
-      autoSubmitDraftKey === null ||
-      autoSubmitDraftKey !== effectiveDraftKey
-    ) {
-      return;
-    }
-    // Clear the trigger BEFORE firing so any navigation from the send cannot
-    // loop back with the param still present.
-    onAutoSubmitCompleteRef.current?.();
-    return scheduleSettleGatedAutoSubmit({
-      submit: () => submitMessageRef.current(),
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // mount-only
+  useConversationAutoSubmitEndpoint({
+    channelId,
+    draftKey: effectiveDraftKey,
+    editorKey: richText.editor,
+    getElement: () =>
+      richText.editor && !richText.editor.isDestroyed
+        ? richText.editor.view.dom
+        : null,
+    read: () => {
+      if (
+        !isDraftRestored() ||
+        !presentationRef.current?.canEdit() ||
+        composerDisabled ||
+        isSendingRef.current ||
+        isSubmitLockedRef.current ||
+        isUploadingRef.current ||
+        editTargetRef.current ||
+        voiceNote.statusRef.current !== "idle" ||
+        mentionSendFlow.isPreparingMentionSend
+      )
+        return null;
+      const content = syncComposerContentFromEditor();
+      const pending = media.pendingImetaRef.current;
+      const queued = media.queuedAttachmentsRef.current;
+      if (!content.trim() && pending.length === 0 && queued.length === 0)
+        return null;
+      const context = onCaptureSendContext?.() ?? null;
+      if (context && !context.parentEventId) return null;
+      return {
+        context: context ? Object.freeze({ ...context }) : null,
+        queued,
+        fingerprint: JSON.stringify([
+          getComposerRevision(),
+          content,
+          pending,
+          queued,
+          [...spoileredAttachmentUrlsRef.current].sort(),
+          mentions.getDraftMentionRefs(content),
+          persistentAudience.pubkeys,
+          context,
+          replyTarget?.id,
+          typingParentEventId,
+          typingRootEventId,
+          ownerPubkeyRef.current,
+        ]),
+      };
+    },
+    equals: (captured, current) =>
+      captured.queued === current.queued &&
+      captured.fingerprint === current.fingerprint,
+    submit: (captured) => submitMessage(undefined, captured.context),
+  });
+  useLegacyDraftAutoSubmit({
+    autoSubmitDraftKey,
+    effectiveDraftKey,
+    onAutoSubmitComplete,
+    submit: () => submitMessageRef.current(),
+  });
   const handleSubmit = React.useCallback(
     (event: React.FormEvent<HTMLFormElement>) => {
       event.preventDefault();
@@ -1147,28 +1194,5 @@ function MessageComposerImpl({
     </>
   );
 }
-function MessageComposerWithOwnership(props: MessageComposerProps) {
-  const coordinator = React.useContext(ConversationDraftEditorsContext);
-  const view = React.useContext(ConversationViewContext);
-  const draftKey = props.draftKey ?? props.channelId;
-  const composer = (
-    <MessageComposerImpl
-      {...props}
-      autoSubmitDraftKey={view ? null : props.autoSubmitDraftKey}
-    />
-  );
-  return coordinator && view && draftKey ? (
-    <ConversationComposerOwnership
-      coordinator={coordinator}
-      viewInstanceId={view.viewInstanceId}
-      draftKey={draftKey}
-      onAttachmentAcceptanceChange={props.onAttachmentAcceptanceChange}
-      containerClassName={props.containerClassName}
-    >
-      {composer}
-    </ConversationComposerOwnership>
-  ) : (
-    composer
-  );
-}
-export const MessageComposer = React.memo(MessageComposerWithOwnership);
+export const MessageComposer =
+  withConversationComposerOwnership(MessageComposerImpl);
