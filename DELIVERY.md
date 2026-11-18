@@ -1,8 +1,8 @@
 # Agent Stop / Continue client — Phase 2
 
-Owner: d809bb50-03b8-41d2-ba83-e2a18cb86a89. Own worktree `/home/dev/agent-worktrees/buzz-agent-controls-20261118`, branch `agent-stop-resume-client-20261118`. Separate draft PR stacked on PR67 branch `agent-reply-ux-20261118`, frozen base `18346c781cae213dc333fa5b009021cc962c5c0c`.
+Owner: d809bb50-03b8-41d2-ba83-e2a18cb86a89. Own worktree `/home/dev/agent-worktrees/buzz-agent-controls-20261118`, branch `agent-stop-resume-client-20261118`. Separate draft PR stacked on PR67 branch `agent-reply-ux-20261118`, reviewed base `3a1e41ec74e6de8b261fbb7b4e6667333b8c0e8a`.
 
-Jacob's ask: “a way to stop a running agent on Buzz.” Root assigned Phase2 after PR67's review verdict; no PR67 changes allowed. Verified3857fd1d's completed NO at oldd6d53c6d7 (owner-edit provenance), already fixed in frozen183 with an independent later source review at7d5893bd0. Parent worktree remains clean at183; this task does not change it or assert the old verdict reviewed new code. Parent source delivery is retained in `git show 18346c781:DELIVERY.md`.
+Jacob's ask: “a way to stop a running agent on Buzz.” Phase 2 is stacked on PR67, now including reviewed parent 3a1e41ec74e6de8b261fbb7b4e6667333b8c0e8a (same3857 SOURCE GO: issuecomment-6971137524). This child does not modify the parent worktree.
 
 Draft PR: https://github.com/tmad4000/buzz/pull/84, stacked on PR67 branch agent-reply-ux-20261118. Application change commit5a0ce1b09afcf328fe3b74aafa09f1f43880e425; subsequent delivery-only commit adds this receipt.
 
@@ -28,10 +28,20 @@ FINISH explicitly records no real-user interrupt/resume probe by the backend own
 
 All tests and tsc use inherited `validation/run-bounded.py`: setsid, parent timeout and process-group SIGKILL cleanup. No dependency/lock/version or native capability changes. Reuses existing installed dependency tree via ignored node_modules symlink.
 
-Final checks: **48 focused unit/model tests PASS, 11 DOM tests PASS, whole-desktop `tsc --noEmit` PASS (exit0, no diagnostics).** Biome and whitespace checks pass (test style infos only). Typecheck receipt: `validation/control-typecheck-receipt.json`.
+Initial historical checks at 6ed4e6951: **48 focused unit/model tests PASS, 11 DOM tests PASS, whole-desktop `tsc --noEmit` PASS (exit0, no diagnostics).** Biome and whitespace checks pass (test style infos only). Typecheck receipt: `validation/control-typecheck-receipt.json`.
 
 Focused checks: production native-message wrapper argument assertions (literal stop/continue, exact parent/root, expected Jacob+relay), signer/Root/pending/channel eligibility, bridge control labels/UTC/unavailable continuation, project wrapper, actual confirmation cancel/accept, disabled feature/wrong identity, no optimistic lifecycle, ambiguous-send hold, card/community change and unmount races, plus inherited parser/edit/parent guards. See `validation/control-model-tests.log`, `control-dom-tests.log`, `control-typecheck.log` for final receipts.
 
 Independent Sol review is requested **via root** after the separate draft PR exists. Keep draft; no review-completed attestation, native/human acceptance, release or deployment claim. The parent chip's separate footer/count-neutral projection remains open; it is not addressed or marked complete here.
 
 Parent updated to reviewed PR67 3a1e41ec7, including effective-body provenance hardening.
+
+## First review corrections
+
+Independent Sol be986aea first reviewed6ed4e6951: NO-GO with two P2 blockers, preserved at https://github.com/tmad4000/buzz/pull/84#issuecomment-6971199864.
+
+The actual Stop button is now Radix's AlertDialogTrigger. Cancel and Escape restore focus to it; a disabled invoker falls back to the controls group. An unresolved intent is persisted before publication, outside row lifetime, scoped by community, normalized relay, Jacob identity, channel, exact card, server and agent. Shared subscribers block a second mounted view; storage events synchronize other windows. Display labels/model changes never clear a hold. Only a changed bridge-signed relevant control report releases it: stopped/idle/interrupted for Stop; continuation queued for Continue. Late native results cannot overwrite a newer intent. Proven pre-publication cancellation can release its own intent. Unknown publication, corrupt/denied storage and quota failure fail closed. No timeout eviction or automatic retry. Up to128 unresolved intents are retained; capacity exhaustion prevents another send.
+
+The wire has no control generation/revision token available to this client. Identical same-minute control reports cannot prove a new cycle and conservatively retain the hold. Storage synchronization is not a cross-window transactional exactly-once guarantee; the bridge's durable action/cycle barriers remain authoritative. No recovery/delete-hold UI is introduced.
+
+Current correction checks: **15 focused model tests, 10 production DOM tests, whole-desktop tsc --noEmit PASS**. Logs: validation/control-fix-model.log, control-fix-dom.log, control-fix-typecheck.log. All runs bounded with process-group cleanup. These supersede only the corrected paths; original wider checks remain historical. Re-review through root is pending. No live stop/continue qualification.

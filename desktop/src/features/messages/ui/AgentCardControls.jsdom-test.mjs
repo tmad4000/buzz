@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { registerHooks } from "node:module";
-import { test } from "node:test";
+import { test, beforeEach } from "node:test";
 import React, { act } from "react";
 import { createRoot } from "react-dom/client";
 registerHooks({
@@ -19,7 +19,7 @@ registerHooks({
       "control-dom:identity":
         "export const useIdentityQuery=()=>({data:globalThis.__controlIdentity});",
       "control-dom:community":
-        "export const loadActiveCommunityId=()=>globalThis.__controlCommunity;",
+        "export const loadActiveCommunityId=()=>globalThis.__controlCommunity; export const loadCommunities=()=>[{id:'community',relayUrl:'wss://relay.example'}];",
       "control-dom:features":
         "export const useFeatureEnabled=()=>globalThis.__controlFeature;",
       "control-dom:native":
@@ -31,6 +31,7 @@ registerHooks({
   },
 });
 const { AgentCardControls } = await import("./AgentCardControls.tsx");
+beforeEach(() => localStorage.removeItem("buzz.agent-control-holds.v1"));
 const agent = "9e03d4e0-1234-4567-8901-234567890abc";
 const base = {
   id: "a".repeat(64),
@@ -202,4 +203,40 @@ test("unmount while capturing relay scope prevents a late control publication", 
   } finally {
     if (!closed) await f.close();
   }
+});
+
+test("Cancel and Escape restore focus to the actual Stop trigger", async () => {
+  const f = setup();
+  try {
+    await f.render();
+    button("Stop…").focus();
+    await act(() => button("Stop…").click());
+    await act(() => button("Keep working").click());
+    assert.equal(document.activeElement?.textContent, "Stop…");
+    await act(() => button("Stop…").click());
+    await act(() => document.dispatchEvent(new KeyboardEvent("keydown", {key:"Escape", bubbles:true})));
+    assert.equal(document.activeElement?.textContent, "Stop…");
+  } finally { await f.close(); }
+});
+test("Uncertain intent survives display edits, remount, and a second view", async () => {
+  let f = setup();
+  const stopped = {...base, body:body("🛑 Stopped by Jacob at 03:18 UTC", "jacob")};
+  try {
+    globalThis.__controlError = true;
+    await f.render(stopped);
+    await act(() => button("Continue").click());
+    await f.render({...stopped, body:stopped.body.replace("Worker", "Renamed")});
+    assert.equal(button("Continue").disabled, true);
+    await f.close();
+    f = setup();
+    await f.render(stopped);
+    assert.equal(button("Continue").disabled, true);
+    const second = setup();
+    try {
+      await second.render(stopped);
+      assert.equal(second.element.querySelector("button").disabled, true);
+    } finally { await second.close(); }
+    await f.render({...base, body:body("Continuation queued by Jacob at 03:19 UTC", "jacob")});
+    assert.equal(button("Stop…").disabled, false);
+  } finally { await f.close(); }
 });
