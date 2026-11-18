@@ -3,12 +3,20 @@ import {
   type ConversationAutoSubmitTarget,
 } from "./autoSubmitAttempt.ts";
 
-type Endpoint = {
-  target: ConversationAutoSubmitTarget;
+type Submission = {
   admit: (target: ConversationAutoSubmitTarget) => boolean;
   submit: (target: ConversationAutoSubmitTarget) => Promise<void>;
 };
-type Pending = { endpoint: Endpoint; attempt: ConversationAutoSubmitAttempt };
+type Endpoint = Submission & {
+  target: ConversationAutoSubmitTarget;
+  /** Pin draft revision/media/reply context per request, never when the editor mounts. */
+  capture?: (target: ConversationAutoSubmitTarget) => Submission | null;
+};
+type Pending = {
+  endpoint: Endpoint;
+  attempt: ConversationAutoSubmitAttempt;
+  admit: () => boolean;
+};
 type Outcome =
   | Awaited<ReturnType<ConversationAutoSubmitAttempt["run"]>>
   | "already-issued"
@@ -82,7 +90,7 @@ export class ConversationAutoSubmitCommands {
     this.retirementEpoch++;
     for (const pending of [...this.pending.values()]) {
       try {
-        if (!this.admit(pending.endpoint)) pending.attempt.retire();
+        if (!pending.admit()) pending.attempt.retire();
       } catch {
         pending.attempt.retire();
       }
@@ -139,15 +147,32 @@ export class ConversationAutoSubmitCommands {
     );
     if (matches.length !== 1 || this.disposed) return "unavailable";
     const endpoint = matches[0];
+    let submission: Submission | null = null;
+    const admit = () =>
+      submission !== null &&
+      this.admit(endpoint) &&
+      (submission === endpoint || submission.admit(endpoint.target));
     const attempt = new ConversationAutoSubmitAttempt({
       target: endpoint.target,
-      admit: () => this.admit(endpoint),
+      admit,
       clearTrigger: (target) => clearTrigger(entryKey, target),
-      submit: endpoint.submit,
+      submit: async (target) => {
+        if (submission) await submission.submit(target);
+      },
     });
-    const pending = { endpoint, attempt };
+    const pending = { endpoint, attempt, admit };
+    // Reserve before capture: it may synchronously notify, dispose or re-enter.
     this.pending.set(draftKey, pending);
     try {
+      if (endpoint.capture) {
+        const captured = endpoint.capture(endpoint.target);
+        submission = captured
+          ? Object.freeze({ admit: captured.admit, submit: captured.submit })
+          : null;
+      } else submission = endpoint;
+      if (this.disposed) return "disposed";
+      if (retirementEpoch !== this.retirementEpoch) return "ineligible";
+      if (!submission) return "unavailable";
       return await attempt.run();
     } finally {
       if (this.pending.get(draftKey) === pending) this.pending.delete(draftKey);
