@@ -5,6 +5,8 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { relayClient } from "@/shared/api/relayClient";
 import type { RelayEvent } from "@/shared/api/types";
 import { useUserProfileQuery } from "@/features/profile/hooks";
+import { useElementWidth } from "@/shared/hooks/use-mobile";
+import { PageContentsPopover, PageContentsRail } from "./PageContents";
 import { Button } from "@/shared/ui/button";
 import { pageHead, validatePage } from "./model";
 import { pageFilter, setPage, getPageHtml } from "./service";
@@ -27,6 +29,7 @@ export function ChannelPage({
   onShortcut?: (action: "toggle" | "restore") => void;
 }) {
   const editorId = React.useId();
+  const [sectionRef, sectionWidth] = useElementWidth<HTMLElement>();
   const [head, setHead] = React.useState<RelayEvent | null>(null);
   const [html, setHtml] = React.useState<string | null>(null);
   const [loadAttempt, setLoadAttempt] = React.useState(0);
@@ -205,12 +208,27 @@ export function ChannelPage({
       if (channelGeneration.current === version) setSaving(false);
     }
   };
+  const page = React.useMemo(
+    () => (html === null ? null : pageDocument(html)),
+    [html],
+  );
+  const showContents = Boolean(
+    head && page && page.headings.length >= 3 && draft === null,
+  );
+  const useContentsRail = showContents && expanded && sectionWidth >= 640;
+  const scrollToHeading = (id: string) => {
+    frame.current?.contentWindow?.postMessage(
+      { type: "buzz-page-scroll", id },
+      "*",
+    );
+  };
   const age = head
     ? Math.max(0, Math.floor((Date.now() / 1000 - head.created_at) / 60))
     : 0;
   void tick;
   return (
     <section
+      ref={sectionRef}
       className="flex h-full min-h-0 flex-col gap-3"
       aria-label="Channel Page"
       onKeyDown={(event) => {
@@ -228,7 +246,7 @@ export function ChannelPage({
         }
       }}
     >
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="min-w-0 flex-1 break-all text-xs text-muted-foreground">
           {head
             ? `Updated ${age < 1 ? "just now" : age < 60 ? `${age}m ago` : age < 1440 ? `${Math.floor(age / 60)}h ago` : `${Math.floor(age / 1440)}d ago`} by ${profile?.displayName || head.pubkey}`
@@ -248,6 +266,12 @@ export function ChannelPage({
           >
             {head ? "Edit HTML" : "Create Page"}
           </Button>
+        ) : null}
+        {showContents && !useContentsRail && page ? (
+          <PageContentsPopover
+            headings={page.headings}
+            onSelect={scrollToHeading}
+          />
         ) : null}
         {onShortcut ? (
           <Button
@@ -315,15 +339,26 @@ export function ChannelPage({
             </Button>
           </div>
         </>
-      ) : head && html !== null ? (
-        <iframe
-          ref={frame}
-          title="Channel Page HTML"
-          sandbox="allow-scripts"
-          referrerPolicy="no-referrer"
-          srcDoc={pageDocument(html ?? "")}
-          className="min-h-0 w-full flex-1 border-0 bg-white"
-        />
+      ) : head && page ? (
+        <div className="flex min-h-0 flex-1 gap-3">
+          {useContentsRail ? (
+            <PageContentsRail
+              key={channelId}
+              channelId={channelId}
+              headings={page.headings}
+              onSelect={scrollToHeading}
+            />
+          ) : null}
+          <iframe
+            key="page-frame"
+            ref={frame}
+            title="Channel Page HTML"
+            sandbox="allow-scripts"
+            referrerPolicy="no-referrer"
+            srcDoc={page.srcDoc}
+            className="min-h-0 min-w-0 w-full flex-1 border-0 bg-white"
+          />
+        </div>
       ) : (
         <p className="text-sm text-muted-foreground">
           {head

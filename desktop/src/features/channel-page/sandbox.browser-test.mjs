@@ -12,7 +12,7 @@ try {
   const requests = [];
   page.on("request", (r) => requests.push(r.url()));
   await page.setContent('<iframe sandbox="allow-scripts"></iframe>');
-  const html = `<meta http-equiv="refresh" content="0;url=https://escape.invalid/meta"><h1>Offline Page</h1><svg width="150" height="40"><a href="#safe"><text x="0" y="20">Animated link</text><animate attributeName="href" values="https://escape.invalid/animated" dur="1ms" fill="freeze"/></a></svg><span id="safe">Safe fragment</span><details><summary>Expand</summary>Native interaction</details><a href="https://example.com/path">External</a><img src="https://escape.invalid/image"><iframe src="https://escape.invalid/frame"></iframe><script>location='https://escape.invalid/script';fetch('https://escape.invalid/fetch');parent.document.body.innerHTML='escaped'</script><button onclick="location='https://escape.invalid/handler'">Try script</button><style>body{background-image:url('https://escape.invalid/style')}</style>`;
+  const html = `<meta http-equiv="refresh" content="0;url=https://escape.invalid/meta"><h1>Offline Page</h1><svg width="150" height="40"><a href="#safe"><text x="0" y="20">Animated link</text><animate attributeName="href" values="https://escape.invalid/animated" dur="1ms" fill="freeze"/></a></svg><span id="safe">Safe fragment</span><details><summary>Expand</summary>Native interaction</details><a href="https://example.com/path">External</a><img src="https://escape.invalid/image"><iframe src="https://escape.invalid/frame"></iframe><script>location='https://escape.invalid/script';fetch('https://escape.invalid/fetch');parent.document.body.innerHTML='escaped'</script><button onclick="location='https://escape.invalid/handler'">Try script</button><h2 id="destination" style="margin:100vh 0">Destination</h2><style>body{background-image:url('https://escape.invalid/style')}</style>`;
   const js = stripTypeScriptTypes(
     await readFile(new URL("./sandbox.ts", import.meta.url), "utf8"),
   );
@@ -23,7 +23,7 @@ try {
       );
       const { pageDocument } = await import(url);
       URL.revokeObjectURL(url);
-      return pageDocument(html);
+      return pageDocument(html).srcDoc;
     },
     { js, html },
   );
@@ -64,6 +64,20 @@ try {
     requests.filter((u) => u.startsWith("http")),
     [],
   );
+  await page.locator("iframe").evaluate((iframe) => {
+    iframe.contentWindow.postMessage(
+      { type: "buzz-page-scroll", id: "destination" },
+      "*",
+    );
+  });
+  await frame.locator("#destination").evaluate(async (target) => {
+    const start = performance.now();
+    while (Math.abs(target.getBoundingClientRect().top) > 2) {
+      if (performance.now() - start > 2000)
+        throw new Error("Heading was not reached");
+      await new Promise(requestAnimationFrame);
+    }
+  });
   if (process.env.BUZZ_PAGE_SCREENSHOT)
     await page.screenshot({ path: process.env.BUZZ_PAGE_SCREENSHOT });
   console.log(

@@ -32,7 +32,9 @@ if (!origin)
           .waitFor();
       }
       const { height, bodyHeight } = await iframe.evaluate((frame) => {
-        const body = frame.parentElement.parentElement;
+        const body = frame.closest(
+          'section[aria-label="Channel Page"]',
+        ).parentElement;
         const style = getComputedStyle(body);
         return {
           height: frame.getBoundingClientRect().height,
@@ -75,6 +77,64 @@ if (!origin)
       await expect(expand).toHaveCount(0);
       await page.close();
     }
+
+    const page = await browser.newPage({
+      viewport: { width: 1280, height: 800 },
+    });
+    await page.goto(
+      `${origin}/tests/fixtures/full-conversation-hosts.html?pageHost=stream`,
+    );
+    const pageButton = page.getByRole("button", { name: "Page", exact: true });
+    await pageButton.click();
+    const section = page.getByRole("region", { name: "Channel Page" });
+    const contents = section.getByRole("button", {
+      name: "Contents",
+      exact: true,
+    });
+    const popover = page.getByRole("dialog", { name: "Page contents" });
+    const frame = section.frameLocator("iframe");
+    await contents.click();
+    await popover.getByRole("button", { name: "Middle" }).press("Escape");
+    await expect(popover).toHaveCount(0);
+    await expect(contents).toBeVisible();
+    await contents.click();
+    await popover.getByRole("button", { name: "End of page" }).click();
+    await expect(popover).toHaveCount(0);
+    await expect
+      .poll(() =>
+        frame
+          .locator("h3")
+          .evaluate((heading) => Math.abs(heading.getBoundingClientRect().top)),
+      )
+      .toBeLessThan(2);
+    await section.getByRole("button", { name: "Expand" }).click();
+    const rail = section.getByRole("navigation", { name: "Page contents" });
+    await expect(rail).toBeVisible();
+    await rail.getByRole("button", { name: "Middle" }).click();
+    await expect
+      .poll(() =>
+        frame
+          .locator("#middle")
+          .evaluate((heading) => Math.abs(heading.getBoundingClientRect().top)),
+      )
+      .toBeLessThan(2);
+    await section.getByRole("button", { name: "Hide contents" }).click();
+    await expect(rail).toBeHidden();
+    await section.getByRole("button", { name: "Restore" }).click();
+    await section.getByRole("button", { name: "Expand" }).click();
+    await expect(
+      section.getByRole("button", { name: "Show contents" }),
+    ).toBeVisible();
+    await section.getByRole("button", { name: "Show contents" }).click();
+    await expect(rail).toBeVisible();
+    await page.goto(
+      `${origin}/tests/fixtures/full-conversation-hosts.html?pageHost=stream&shortPage`,
+    );
+    await pageButton.click();
+    await expect(
+      frame.getByRole("heading", { name: "Shared page" }),
+    ).toBeVisible();
+    await expect(contents).toHaveCount(0);
   } finally {
     await browser.close();
   }

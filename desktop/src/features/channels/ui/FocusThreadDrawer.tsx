@@ -207,6 +207,9 @@ export function FocusThreadDrawer({
     function handleEscape(event: KeyboardEvent) {
       if (event.key !== "Escape") return;
       const target = event.target;
+      // Popovers and dialogs own Escape while their controls have focus.
+      if (target instanceof Element && target.closest('[role="dialog"]'))
+        return;
       if (
         hasActiveEdit &&
         target instanceof Node &&
