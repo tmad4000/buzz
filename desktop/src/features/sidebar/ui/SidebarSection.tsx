@@ -1,3 +1,7 @@
+import {
+  AgentRuntimeHost,
+  AgentRuntimeRowAction,
+} from "@/features/agent-runtime/AgentRuntimeRow";
 import type * as React from "react";
 import { BellOff, ChevronDown, CircleDot, X } from "lucide-react";
 
@@ -265,6 +269,12 @@ export function ChannelMenuButton({
   presenceStatus?: PresenceStatus;
   onSelectChannel: (channelId: string) => void;
 }) {
+  const agentParticipant =
+    dmParticipants?.length === 1 &&
+    dmParticipants[0]?.isAgent &&
+    channel.participantPubkeys.includes(dmParticipants[0].pubkey)
+      ? dmParticipants[0].pubkey
+      : undefined;
   const resolvedLabel = label ?? channel.name;
   const ephemeralDisplay = getEphemeralChannelDisplay(channel);
   const { hasSidebarUnreadProjections, unreadThreadChannelIds } = useAppShell();
@@ -327,6 +337,7 @@ export function ChannelMenuButton({
           />
         ) : null}
       </span>
+      <AgentRuntimeHost pubkey={agentParticipant} />
       {showsEphemeralBadge && ephemeralDisplay ? (
         <EphemeralChannelBadge
           display={ephemeralDisplay}
@@ -364,13 +375,21 @@ export function ChannelMenuButton({
   );
 
   if (!activeWorking && !hasThreadUnread) {
-    return button;
+    return (
+      <>
+        {button}
+        <AgentRuntimeRowAction pubkey={agentParticipant} />
+      </>
+    );
   }
 
   return (
-    <ChannelActivityPopover activeWorking={activeWorking} channel={channel}>
-      {button}
-    </ChannelActivityPopover>
+    <>
+      <ChannelActivityPopover activeWorking={activeWorking} channel={channel}>
+        {button}
+      </ChannelActivityPopover>
+      <AgentRuntimeRowAction pubkey={agentParticipant} />
+    </>
   );
 }
 
