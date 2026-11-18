@@ -19,3 +19,5 @@ PR90 remaining M-OFF delta after reviewer comment6974045086: feature-gated chann
 Root superseded mobile pause: resume independently in parallel; same43467fd2 reviewer via coordinator. Mobile literal R3 now places authenticated scope/record/kind/index/count/random-bundle-ID headers in EVERY NIP44 chunk, with real tamper/splice/reorder/omit/duplicate/cross-bundle regressions. See the final literal-R3 handoff and `pr90-r3-*` receipts.
 
 Full second-review a/b/c reconciliation: actual encrypted disk thread hydration into the real ThreadDetailPage/banner, functional Retry and reconnect regression; corrected banner/app-bar overlap; fresh B/C production coverage. See the detailed handoff and `pr90-abc-final-mounted.log`, `pr90-abc-providers-verified.log`, `pr90-abc-final-source-analyze.log`.
+
+PR90 narrow follow-up to source NO-GO6974941514: preserve cached in-flow date visibility+semantics while banner disables floating header, reset stale suppression on transitions; real cached boundary/scroll/semantics regression and old-source mutation proof. See detailed handoff and `pr90-date-*` final receipts.

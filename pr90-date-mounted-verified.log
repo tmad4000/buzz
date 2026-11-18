@@ -1,0 +1,10 @@
+00:00 +0: loading /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channel_detail_page_test.dart
+00:00 +0: P1 cached channel bodies never advance read markers on open
+00:02 +1: P1 actual encrypted disk thread dates remain visible and semantic through scroll Retry and reconnect
+00:10 +2: P1 OFF covered channel readiness retains baseline read and observed-unread update
+00:11 +3: Channel links thread pins and updates the active date while scrolling
+00:15 +4: Channel links short thread keeps its head stable when the keyboard opens
+00:17 +5: Channel links cached writable 0-reply thread defers dock correction until measured
+00:17 +6: Channel links cached writable 1-reply thread defers dock correction until measured
+00:18 +7: Channel links cached initial thread settles between the app bar and measured composer
+00:19 +8: All tests passed!

@@ -322,6 +322,12 @@ class ThreadDetailPage extends HookConsumerWidget {
     );
 
     void updateStickyDateHeader(Iterable<ItemPosition> positions) {
+      // Only suppress an in-flow day when its floating replacement is enabled.
+      if (offlineBannerVisible) {
+        stickyDateHeaderState.value = StickyDateHeaderState.hidden;
+        stickyDayTimestamp.value = null;
+        return;
+      }
       final update = stickyDateIndex.resolve(
         positions: positions,
         viewportHeight: viewportHeight,
@@ -490,6 +496,7 @@ class ThreadDetailPage extends HookConsumerWidget {
         replies.length,
         liveHead.createdAt,
         viewportHeight,
+        offlineBannerVisible,
       ],
     );
 
@@ -497,7 +504,7 @@ class ThreadDetailPage extends HookConsumerWidget {
       stickyDateHeaderState.value = StickyDateHeaderState.hidden;
       stickyDayTimestamp.value = null;
       return null;
-    }, [threadHead.id]);
+    }, [threadHead.id, offlineBannerVisible]);
 
     void scrollToThreadLatest() {
       if (!itemScrollController.isAttached) return;

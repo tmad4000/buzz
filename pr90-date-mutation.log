@@ -1,0 +1,36 @@
+00:00 +0: loading /home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/channel_detail_page_test.dart
+00:00 +0: P1 actual encrypted disk thread dates remain visible and semantic through scroll Retry and reconnect
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <1>
+  Actual: <0.0>
+No floating header replaces this cached boundary date.
+
+When the exception was thrown, this was the stack:
+#4      _offlineP1ReadAdmissionTests.<anonymous closure>.expectInlineDateAt (file:///home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/offline_p1_read_admission_cases.dart:177:11)
+<asynchronous suspension>
+#5      _offlineP1ReadAdmissionTests.<anonymous closure> (file:///home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/offline_p1_read_admission_cases.dart:203:9)
+<asynchronous suspension>
+#6      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#7      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1682:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///home/dev/agent-worktrees/buzz-pr90-takeover-01d56/mobile/test/features/channels/offline_p1_read_admission_cases.dart line 177
+The test description was:
+  P1 actual encrypted disk thread dates remain visible and semantic through scroll Retry and
+  reconnect
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:06 +0 -1: P1 actual encrypted disk thread dates remain visible and semantic through scroll Retry and reconnect [E]
+  Test failed. See exception logs above.
+  The test description was: P1 actual encrypted disk thread dates remain visible and semantic through scroll Retry and reconnect
+
+Warning: At least one test in this suite creates an HttpClient. When running a test suite that uses
+TestWidgetsFlutterBinding, all HTTP requests will return status code 400, and no network request
+will actually be made. Any test expecting a real network connection and status code will fail.
+To test code that needs an HttpClient, provide your own HttpClient implementation to the code under
+test, so that your test can consistently provide a testable response to the code under test.
+00:06 +0 -1: Some tests failed.
