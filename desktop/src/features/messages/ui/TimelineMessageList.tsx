@@ -1,4 +1,5 @@
 import { useTimelineView } from "@/features/channels/ui/TimelineViewContext";
+import { orderThreadsByActivity, threadActivityKey } from "../lib/threadActivityOrder";
 import { buildFlatTimelineEntries } from "../lib/flatTimeline";
 import type { ThreadSummaryRenderer } from "./TimelineMessageRow";
 import * as React from "react";
@@ -68,6 +69,7 @@ type TimelineMessageListProps = {
   /** Hoisted main-timeline entries (computed once in ChannelPane). Falls back
    *  to deriving them here when omitted (e.g. the deferred-render pass). */
   mainEntries?: MainTimelineEntry[];
+  holdActivityOrder?: boolean;
   /** Relay thread summaries keyed by thread root id. Keeps badge rows alive on
    *  the deferred-render fallback — replies usually are not local timeline
    *  rows, so without the relay map every summary row unmounts mid-scrollback. */
@@ -148,6 +150,7 @@ export const TimelineMessageList = React.memo(function TimelineMessageList({
   onEntranceMessageComplete,
   messageFooters,
   mainEntries,
+  holdActivityOrder = false,
   threadSummaries,
   summaryMessages,
   messages,
@@ -182,7 +185,7 @@ export const TimelineMessageList = React.memo(function TimelineMessageList({
   onVirtualizerScrollerChange,
 }: TimelineMessageListProps) {
   const { mode } = useTimelineView();
-  const entries = React.useMemo(
+  const sourceEntries = React.useMemo(
     () =>
       mainEntries ??
       (mode === "timeline"
@@ -196,6 +199,27 @@ export const TimelineMessageList = React.memo(function TimelineMessageList({
           )),
     [mainEntries, messages, mode, profiles, threadSummaries, summaryMessages],
   );
+  const activityOrder = mode === "activity" && !hideDayDividers && channelType !== "forum";
+  const committedOrder = React.useRef<{ scope: string; ids: string[] }>({
+    scope: "", ids: [],
+  });
+  const orderScope = `${currentPubkey}:${channelId}:${mode}`;
+  const entries = React.useMemo(
+    () => activityOrder
+      ? orderThreadsByActivity(
+          sourceEntries,
+          committedOrder.current.scope === orderScope ? committedOrder.current.ids : [],
+          holdActivityOrder,
+        )
+      : sourceEntries,
+    [sourceEntries, activityOrder, orderScope, holdActivityOrder],
+  );
+  React.useLayoutEffect(() => {
+    committedOrder.current = { scope: orderScope, ids: entries.map(threadActivityKey) };
+  }, [entries, orderScope]);
+  // Activity roots are not chronological; a post-time New divider/date grouping
+  // would claim a false read frontier and repeated backward date boundaries.
+  hideDayDividers = hideDayDividers || activityOrder;
   // Contexts are memoized per message id so MessageRow/Markdown memo
   // comparisons hold across unrelated timeline re-renders (typing
   // indicators, presence updates) — a fresh context object per render would
@@ -225,8 +249,13 @@ export const TimelineMessageList = React.memo(function TimelineMessageList({
   // The flattened item stream, memoized on the entries and the unread boundary
   // (the unread divider is its own item, so it shifts subsequent rows).
   const itemsResult = React.useMemo(
-    () => buildTimelineItems(entries, firstUnreadMessageId),
-    [entries, firstUnreadMessageId],
+    () => {
+      const result = buildTimelineItems(entries, activityOrder ? null : firstUnreadMessageId);
+      return activityOrder
+        ? { items: result.items.filter(item => item.kind !== "day-divider") }
+        : result;
+    },
+    [entries, firstUnreadMessageId, activityOrder],
   );
   const dayGroups = React.useMemo(
     () => buildTimelineDayGroups(itemsResult.items),

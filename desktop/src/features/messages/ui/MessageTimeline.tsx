@@ -706,6 +706,7 @@ const MessageTimelineBase = React.forwardRef<
       onEntranceMessageComplete={onEntranceMessageComplete}
       messageFooters={messageFooters}
       mainEntries={renderedMessages === messages ? mainEntries : undefined}
+      holdActivityOrder={!isSemanticallyAtBottom}
       leadingContent={virtualizedLeadingContent}
       historyExhausted={renderedHistoryExhausted}
       hideDayDividers={hideDayDividers}

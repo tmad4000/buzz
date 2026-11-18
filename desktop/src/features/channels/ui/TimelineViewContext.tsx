@@ -1,9 +1,9 @@
 import * as React from "react";
 import type { TimelineMessage } from "@/features/messages/types";
 
-/** Stable setting identities include the reserved activity mode for the follow-up. */
+/** Stable per-channel order setting identities. */
 export type ChannelOrderMode = "threads" | "activity" | "timeline";
-export type ChannelViewMode = Exclude<ChannelOrderMode, "activity">;
+export type ChannelViewMode = ChannelOrderMode;
 const CHANNEL_ORDER_OPTIONS: readonly {
   value: ChannelOrderMode;
   label: string;
@@ -12,8 +12,8 @@ const CHANNEL_ORDER_OPTIONS: readonly {
   { value: "threads", label: "Threads by post time", available: true },
   {
     value: "activity",
-    label: "Threads by latest activity (coming soon)",
-    available: false,
+    label: "Latest activity",
+    available: true,
   },
   { value: "timeline", label: "Timeline", available: true },
 ];
@@ -28,8 +28,8 @@ export function useChannelViewMode(scope: string, channelId: string | null) {
   >({});
   let stored: ChannelViewMode = "threads";
   try {
-    if (globalThis.localStorage?.getItem(key) === "timeline")
-      stored = "timeline";
+    const saved = globalThis.localStorage?.getItem(key);
+    if (saved === "timeline" || saved === "activity") stored = saved;
   } catch {
     /* In-memory switching still works when storage is unavailable. */
   }
@@ -62,7 +62,7 @@ export const TimelineViewContext = React.createContext<TimelineView>({
 });
 export const useTimelineView = () => React.useContext(TimelineViewContext);
 
-/** One order setting; activity ordering waits for stable live-movement anchoring. */
+/** One opt-in order setting; post-time Threads remains the default. */
 export function ChannelOrderSetting() {
   const { mode, changeMode } = useTimelineView();
   return (
@@ -72,7 +72,13 @@ export function ChannelOrderSetting() {
         aria-label="Order"
         value={mode}
         onChange={(event) =>
-          changeMode(event.target.value === "timeline" ? "timeline" : "threads")
+          changeMode(
+            event.target.value === "timeline"
+              ? "timeline"
+              : event.target.value === "activity"
+                ? "activity"
+                : "threads",
+          )
         }
         className="min-w-0 max-w-48 bg-transparent font-medium text-foreground focus-visible:outline-2 focus-visible:outline-primary"
       >
