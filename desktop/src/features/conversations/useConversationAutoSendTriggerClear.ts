@@ -19,6 +19,11 @@ export function useConversationAutoSendTriggerClear({
   const router = useRouter();
   const [echoOwner] = React.useState(() => ({}));
   const mounted = React.useRef(false);
+  const lifetime = React.useRef<{
+    session: ConversationWorkspaceSession;
+    active: boolean;
+    controller: AbortController;
+  } | null>(null);
   const current = React.useRef({ session, active });
   current.current = { session, active };
   React.useLayoutEffect(() => {
@@ -30,11 +35,30 @@ export function useConversationAutoSendTriggerClear({
   React.useLayoutEffect(() => {
     if (!session) return;
     const echoes = projectionEchoesFor(session.controller);
-    return () => echoes.cancelOwner(echoOwner);
-  }, [session, echoOwner]);
+    const installed = { session, active, controller: new AbortController() };
+    lifetime.current = installed;
+    return () => {
+      installed.controller.abort();
+      if (lifetime.current === installed) lifetime.current = null;
+      echoes.cancelOwner(echoOwner);
+    };
+  }, [session, active, echoOwner]);
   return React.useCallback(
-    async (entryKey: string, target: ConversationAutoSubmitTarget) => {
-      if (!session) return false;
+    async (
+      entryKey: string,
+      target: ConversationAutoSubmitTarget,
+      onProjection?: (id: string) => void,
+      commandSignal?: AbortSignal,
+    ) => {
+      const installed = lifetime.current;
+      if (
+        !session ||
+        !installed ||
+        installed.session !== session ||
+        !installed.active ||
+        installed.controller.signal.aborted
+      )
+        return false;
       const controller = session.controller;
       const view = controller.getSnapshot().layout.views[target.viewId];
       if (!view) return false;
@@ -62,6 +86,8 @@ export function useConversationAutoSendTriggerClear({
         );
       };
       if (!admitted()) return false;
+      const projectionId = crypto.randomUUID();
+      onProjection?.(projectionId);
       return clearCapturedAutoSendTrigger({
         entryKey,
         target,
@@ -78,7 +104,10 @@ export function useConversationAutoSendTriggerClear({
         },
         echoes: projectionEchoesFor(controller),
         echoOwner,
-        projectionId: crypto.randomUUID(),
+        projectionId,
+        signal: commandSignal
+          ? AbortSignal.any([installed.controller.signal, commandSignal])
+          : installed.controller.signal,
       });
     },
     [router, session, echoOwner],

@@ -4,6 +4,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { ConversationWorkspaceSurface } from "@/features/conversations/ConversationWorkspaceSurface";
 import { useConversationWorkspace } from "@/features/conversations/useConversationWorkspace";
 import { useConversationAutoSendNavigationScope } from "@/features/conversations/useConversationAutoSendNavigationScope";
+import { useConversationAutoSendRouteCommand } from "@/features/conversations/useConversationAutoSendRouteCommand";
+import type { ConversationAutoSubmitScope } from "@/features/conversations/ConversationAutoSubmitScope";
 import { useConversationIncomingRoute } from "@/features/conversations/useConversationIncomingRoute";
 import { useConversationRouteProjection } from "@/features/conversations/useConversationRouteProjection";
 import { listPanes } from "@/features/conversations/layout/model";
@@ -163,6 +165,14 @@ export function AppConversationWorkspace({
     channelSurfaceActive && selectedChannelId && canOpen(selectedChannelId),
   );
   useConversationAutoSendNavigationScope(session?.scopeKey ?? null);
+  const autoSubmitScopeRef = React.useRef<ConversationAutoSubmitScope | null>(
+    null,
+  );
+  const autoSend = useConversationAutoSendRouteCommand({
+    session,
+    active,
+    scopeRef: autoSubmitScopeRef,
+  });
   const panes = snapshot ? listPanes(snapshot.layout.root) : [];
   const focusedViewId = panes.find(
     (pane) => pane.id === snapshot?.layout.focusedPaneId,
@@ -240,6 +250,7 @@ export function AppConversationWorkspace({
             search: location.search as Record<string, unknown>,
             state: location.state,
             historyTraversal: historyOrigin.traversal,
+            freshNavigation: historyOrigin.fresh,
             sidebarNavigation:
               historyOrigin.fresh &&
               hasSidebarConversationIntent(location.state),
@@ -248,6 +259,7 @@ export function AppConversationWorkspace({
     visibleViewIds: visible,
     recentViewIds: recent.current,
     onAdmitted: (viewId, route, { projectionEcho }) => {
+      autoSend.admitted(viewId, route, projectionEcho);
       if (!session) return;
       const view = session.controller.getSnapshot().layout.views[viewId];
       const visit = session.controller.visitToken(viewId);
@@ -268,7 +280,8 @@ export function AppConversationWorkspace({
         },
       }));
     },
-    onRejected: () => {
+    onRejected: (route) => {
+      autoSend.rejected(route);
       setRetryAction({ kind: "incoming" });
       setMessage(
         "Finish or cancel your current edit, upload or recording before changing this conversation.",
@@ -371,6 +384,7 @@ export function AppConversationWorkspace({
           <ConversationWorkspaceSurface
             key={session.scopeKey}
             session={session}
+            autoSubmitScopeRef={autoSubmitScopeRef}
             snapshot={snapshot}
             active={active}
             resolveConversation={resolveConversation}
@@ -442,6 +456,17 @@ export function AppConversationWorkspace({
               Keep current conversation
             </button>
           ) : null}
+        </div>
+      ) : null}
+      {active && autoSend.notice && !message && !error ? (
+        <div
+          role="status"
+          className="absolute inset-x-3 bottom-3 z-50 rounded-md border bg-background p-3 text-sm"
+        >
+          <p>{autoSend.notice}</p>
+          <button type="button" onClick={autoSend.dismiss}>
+            Dismiss
+          </button>
         </div>
       ) : null}
     </div>

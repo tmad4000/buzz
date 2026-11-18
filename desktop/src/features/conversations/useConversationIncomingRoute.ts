@@ -17,6 +17,7 @@ export type IncomingConversationRoute = {
   state: unknown;
   /** Set only from the observed router BACK/FORWARD/GO action. */
   historyTraversal?: boolean;
+  freshNavigation?: boolean;
   sidebarNavigation?: boolean;
 };
 
