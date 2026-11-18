@@ -120,9 +120,11 @@ export function createWorkspaceFocusCycle({
       if (!region) return false;
       const saved = last.get(region.id);
       const fallback = region.viewId
-        ? region.element.querySelector<HTMLElement>(
-            '[aria-label="Conversation pane options"]',
-          )
+        ? [
+            ...region.element.querySelectorAll<HTMLElement>(
+              '[aria-label="Conversation pane options"]',
+            ),
+          ].find(focusable)
         : region.element.matches(controls)
           ? region.element
           : [...region.element.querySelectorAll<HTMLElement>(controls)].find(

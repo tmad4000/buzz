@@ -9,7 +9,7 @@ test("shell focus cycling retains live controls, falls back after retirement and
     <aside data-sidebar="sidebar"><button id="sidebar">Conversation</button></aside>
     <main>
       <section data-layout-view="a"><button aria-label="Conversation pane options" id="ha">A</button><input id="a"></section>
-      <section data-layout-view="b"><button aria-label="Conversation pane options" id="hb">B</button><input id="b"></section>
+      <section data-layout-view="b"><div inert aria-hidden="true"><button aria-label="Conversation pane options" id="covered-header">Covered main header</button></div><button aria-label="Conversation pane options" id="hb">Visible drawer header</button><input id="b"></section>
     </main>`;
   document.body.append(scope);
   const workspace = scope.querySelector("main");
@@ -63,6 +63,7 @@ test("shell focus cycling retains live controls, falls back after retirement and
     );
     assert.equal(cycle.cycle(1, a), true);
     assert.equal(document.activeElement, node("hb"));
+    assert.notEqual(document.activeElement, node("covered-header"));
     assert.equal(focused, "b");
     b.focus();
     assert.equal(cycle.cycle(1, b), true);
