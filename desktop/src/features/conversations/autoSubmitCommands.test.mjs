@@ -47,6 +47,7 @@ function setup(extra = {}) {
     for (const listener of listeners) listener();
   };
   return {
+    target,
     commands,
     register,
     request,
@@ -341,5 +342,109 @@ test("foreign scopes and ambiguous owner endpoints cannot be selected", async ()
     assert.equal(h.sends(), 1);
   } finally {
     h.commands.dispose();
+  }
+});
+
+test("request capture pins context and retires changed drafts without reviving them", async () => {
+  const h = setup();
+  const clear = deferred();
+  let revision = 1;
+  let context = "reply-a";
+  const sent = [];
+  h.commands.register({
+    target: h.target,
+    admit: () => true,
+    submit: async () =>
+      assert.fail("captured requests must use their pinned submit"),
+    capture: () => {
+      const capturedRevision = revision;
+      const capturedContext = context;
+      return {
+        admit: () =>
+          revision === capturedRevision && context === capturedContext,
+        submit: async () => sent.push([capturedRevision, capturedContext]),
+      };
+    },
+  });
+  try {
+    const running = h.request("first", { clearTrigger: () => clear.promise });
+    revision++;
+    h.current(true); // notify without changing view admission
+    revision--;
+    clear.resolve(true);
+    assert.equal(await running, "ineligible");
+    assert.deepEqual(sent, []);
+    context = "reply-b";
+    revision = 3;
+    assert.equal(await h.request("explicit-new"), "submitted");
+    assert.deepEqual(sent, [[3, "reply-b"]]);
+  } finally {
+    h.commands.dispose();
+  }
+});
+
+test("capture has a draft reservation and cannot cross synchronous retirement", async () => {
+  for (const interrupt of [false, true]) {
+    const h = setup();
+    let nested;
+    let clears = 0;
+    let submits = 0;
+    h.commands.register({
+      target: h.target,
+      admit: () => true,
+      submit: async () => assert.fail("uncaptured submit"),
+      capture: () => {
+        nested = h.request("nested");
+        if (interrupt) h.commands.retireAll();
+        return {
+          admit: () => true,
+          submit: async () => {
+            submits++;
+          },
+        };
+      },
+    });
+    try {
+      assert.equal(
+        await h.request("outer", {
+          clearTrigger: async () => {
+            clears++;
+            return true;
+          },
+        }),
+        interrupt ? "ineligible" : "submitted",
+      );
+      assert.equal(await nested, "busy");
+      assert.equal(clears, interrupt ? 0 : 1);
+      assert.equal(submits, interrupt ? 0 : 1);
+    } finally {
+      h.commands.dispose();
+    }
+  }
+});
+
+test("unready and throwing capture release reservation but never replay the entry", async () => {
+  for (const throwing of [false, true]) {
+    const h = setup();
+    const stop = h.commands.register({
+      target: h.target,
+      admit: () => true,
+      submit: async () => assert.fail("unready submit"),
+      capture: () => {
+        if (throwing) throw new Error("capture failed");
+        return null;
+      },
+    });
+    try {
+      if (throwing) await assert.rejects(h.request("entry"), /capture failed/);
+      else assert.equal(await h.request("entry"), "unavailable");
+      stop();
+      h.register();
+      assert.equal(await h.request("entry"), "already-issued");
+      assert.equal(await h.request("explicit-new"), "submitted");
+      assert.equal(h.sends(), 1);
+    } finally {
+      h.commands.dispose();
+    }
   }
 });
