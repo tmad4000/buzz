@@ -18,9 +18,29 @@ export function bindVisitPreferences(
   | "initialThreadPanelWidthPx"
   | "onThreadViewModeChange"
   | "onThreadPanelWidthChange"
+  | "readingPositions"
+  | "onReadingPosition"
+  | "registerReadingCapture"
 > {
   const visit = controller.visitToken(view.id);
   return {
+    readingPositions: view.readingPositions,
+    onReadingPosition: (key, position) =>
+      controller.updateReadingPosition(
+        view.id,
+        view.channelId,
+        visit,
+        key,
+        position,
+      ),
+    registerReadingCapture: (key, capture) =>
+      controller.registerReadingCapture(
+        view.id,
+        view.channelId,
+        visit,
+        key,
+        capture,
+      ),
     initialExplicitExpansion: view.explicitExpansion,
     seedLegacyExpansions: view.legacyExpansionOwner === true,
     onExplicitExpansionChange: (explicitExpansion) =>

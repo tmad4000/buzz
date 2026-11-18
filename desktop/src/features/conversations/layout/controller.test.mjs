@@ -7,6 +7,117 @@ import { layoutStorageKey } from "./storage.ts";
 import { visitCacheStorageKey } from "./visitCacheStorage.ts";
 import { readingPositionKey, readPosition } from "./readingPositions.ts";
 
+test("outgoing viewport captures precede guards/cache snapshots and stale registrations retire", () => {
+  const h = setup();
+  const controller = h.controller;
+  const id = panes(controller)[0].viewInstanceId;
+  const key = readingPositionKey("main", "threads");
+  let captures = 0;
+  const stop = controller.registerReadingCapture(
+    id,
+    "chat",
+    controller.visitToken(id),
+    key,
+    () => {
+      captures++;
+      return { id: "live-before-leave", offset: -5, pixel: 350, neighbors: [] };
+    },
+  );
+  try {
+    assert.equal(
+      controller.navigate(id, "dm"),
+      true,
+      "capture must not mutate the guarded revision after the guard starts",
+    );
+    assert.equal(controller.navigate(id, "chat"), true);
+    assert.equal(
+      readPosition(
+        controller.getSnapshot().layout.views[id].readingPositions,
+        key,
+      ).id,
+      "live-before-leave",
+    );
+    const before = captures;
+    controller.flush();
+    assert.equal(
+      captures,
+      before,
+      "A-B-A must not invoke the old visit's capture",
+    );
+  } finally {
+    stop();
+    controller.dispose();
+  }
+});
+
+test("mode changes capture the outgoing context before committing the new preference", () => {
+  const h = setup();
+  const controller = h.controller;
+  const id = panes(controller)[0].viewInstanceId,
+    visit = controller.visitToken(id);
+  const key = readingPositionKey("main", "threads");
+  // The mode callback's first capture is the only one whose DOM still belongs
+  // to the outgoing mode. Remove its registration after that capture.
+  let first = true;
+  const stopOnce = controller.registerReadingCapture(
+    id,
+    "chat",
+    visit,
+    key,
+    () => {
+      if (!first) return null;
+      first = false;
+      assert.equal(
+        controller.getSnapshot().layout.views[id].preferences?.timelineMode,
+        undefined,
+      );
+      return { id: "old-mode-row", offset: 8, pixel: 150, neighbors: [] };
+    },
+  );
+  try {
+    assert.equal(
+      controller.update(id, "chat", visit, {
+        preferences: { timelineMode: "timeline" },
+      }),
+      true,
+    );
+    assert.equal(
+      readPosition(
+        controller.getSnapshot().layout.views[id].readingPositions,
+        key,
+      ).id,
+      "old-mode-row",
+    );
+  } finally {
+    stopOnce();
+    controller.dispose();
+  }
+});
+
+test("capture reentrancy that invalidates scope cannot continue navigation or write a stale snapshot", () => {
+  const h = setup(),
+    controller = h.controller;
+  const id = panes(controller)[0].viewInstanceId;
+  const before = controller.getSnapshot();
+  const stop = controller.registerReadingCapture(
+    id,
+    "chat",
+    controller.visitToken(id),
+    readingPositionKey("main", "threads"),
+    () => {
+      h.invalidate();
+      return { id: "forbidden", offset: 0, pixel: 0, neighbors: [] };
+    },
+  );
+  try {
+    assert.equal(controller.navigate(id, "dm"), false);
+    assert.equal(controller.getSnapshot(), before);
+  } finally {
+    stop();
+    controller.dispose();
+  }
+});
+
 test("reading positions merge live per-view contexts and reject retired visits", () => {
   const h = setup();
   const controller = h.controller;

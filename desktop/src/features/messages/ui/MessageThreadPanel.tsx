@@ -1,4 +1,5 @@
 import { useThreadReplyRenderItems } from "./useThreadReplyRenderItems";
+import { useThreadReadingCapture } from "./useThreadReadingCapture";
 import { useAppShell } from "@/app/AppShellContext";
 import { useSidebarOpening } from "./useSidebarOpening";
 import type { EarlierReplyRun } from "./sidebarOpeningPolicy";
@@ -503,6 +504,10 @@ export function MessageThreadPanel({
       threadHeadId,
     });
 
+  const threadViewportPending =
+    threadRepliesPending ||
+    !opening.readyToPosition ||
+    repliesRenderState === "pending";
   const {
     isAtBottom,
     newMessageCount,
@@ -512,10 +517,7 @@ export function MessageThreadPanel({
   } = useAnchoredScroll({
     channelId: threadHeadId,
     contentRef: threadContentRef,
-    isLoading:
-      threadRepliesPending ||
-      !opening.readyToPosition ||
-      repliesRenderState === "pending",
+    isLoading: threadViewportPending,
     messages: threadMessages,
     highlightTargetMessage: scrollTargetHighlights,
     onTargetReached: () => {
@@ -534,6 +536,13 @@ export function MessageThreadPanel({
     "padding",
     settleAtBottomAfterLayout,
   );
+  useThreadReadingCapture({
+    threadHeadId,
+    isFocusMode,
+    threadBodyRef,
+    threadMessages,
+    ready: !isHuddleTranscript && !threadViewportPending,
+  });
   const stableSendToChannel = useStableSendToChannel(
     channelId,
     threadHead,
