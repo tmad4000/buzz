@@ -2,27 +2,45 @@ TAP version 13
 # Subtest: compact card exposes exact agent link, signed original text, and in-place report edits
 ok 1 - compact card exposes exact agent link, signed original text, and in-place report edits
   ---
-  duration_ms: 58.069849
+  duration_ms: 79.100729
+  type: 'test'
+  ...
+# Subtest: read callbacks contain only committed rows and never descendants hidden by a collapsed root
+ok 2 - read callbacks contain only committed rows and never descendants hidden by a collapsed root
+  ---
+  duration_ms: 2083.575133
+  type: 'test'
+  ...
+# Subtest: focused panel restores branch/root disclosure focus for local and synchronized collapses without stealing outside focus
+ok 3 - focused panel restores branch/root disclosure focus for local and synchronized collapses without stealing outside focus
+  ---
+  duration_ms: 165.671398
+  type: 'test'
+  ...
+# Subtest: deep sidebar retains existing parent context when experiment is off and avoids duplicate context when on
+ok 4 - deep sidebar retains existing parent context when experiment is off and avoids duplicate context when on
+  ---
+  duration_ms: 39.45972
   type: 'test'
   ...
 # Subtest: thread row keeps native quote jump, accessible first line and body identity across pending/ack and quote removal
-ok 2 - thread row keeps native quote jump, accessible first line and body identity across pending/ack and quote removal
+ok 5 - thread row keeps native quote jump, accessible first line and body identity across pending/ack and quote removal
   ---
-  duration_ms: 90.606738
+  duration_ms: 135.550748
   type: 'test'
   ...
 # Subtest: quote presentation remains off when experiment is disabled
-ok 3 - quote presentation remains off when experiment is disabled
+ok 6 - quote presentation remains off when experiment is disabled
   ---
-  duration_ms: 13.73259
+  duration_ms: 20.99485
   type: 'test'
   ...
-1..3
-# tests 3
+1..6
+# tests 6
 # suites 0
-# pass 3
+# pass 6
 # fail 0
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 2161.64332
+# duration_ms 5130.317304

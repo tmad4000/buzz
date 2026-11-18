@@ -1,3 +1,4 @@
+import { useFeatureEnabled } from "@/shared/features";
 import { useThreadReplyRenderItems } from "./useThreadReplyRenderItems";
 import { useAppShell } from "@/app/AppShellContext";
 import { useSidebarOpening } from "./useSidebarOpening";
@@ -231,6 +232,7 @@ export function MessageThreadPanel({
   autoSendDraftKey = null,
   onAutoSubmitComplete,
 }: MessageThreadPanelProps) {
+  const agentReplyUx = useFeatureEnabled("agentReplyUx");
   const threadBodyRef = React.useRef<HTMLDivElement>(null);
   const threadContentRef = React.useRef<HTMLDivElement>(null);
   const threadComposerWrapperRef = React.useRef<HTMLDivElement>(null);
@@ -858,6 +860,24 @@ export function MessageThreadPanel({
                           </button>
                         ) : null}
                         {showUnreadDivider ? <UnreadDivider /> : null}
+                        {isSidebar &&
+                        !agentReplyUx &&
+                        entry.message.depth > 2 ? (
+                          <div
+                            className="min-w-0 pt-2 text-xs text-muted-foreground"
+                            style={{
+                              marginInlineStart: `${getThreadReplyIndentRem(2) + THREAD_REPLY_BODY_OFFSET_REM}rem`,
+                            }}
+                            data-testid="sidebar-reply-context"
+                          >
+                            <span className="inline-block max-w-full truncate rounded-full bg-muted px-2 py-0.5">
+                              Replying to{" "}
+                              {sidebar.index.messageById.get(
+                                entry.message.parentId ?? "",
+                              )?.author ?? "earlier reply"}
+                            </span>
+                          </div>
+                        ) : null}
                         <MessageThreadRow
                           parentMessages={sidebar.index.messageById}
                           onJumpToThreadMessage={onJumpToThreadMessage}

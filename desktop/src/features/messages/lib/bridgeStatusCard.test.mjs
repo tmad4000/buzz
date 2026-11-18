@@ -52,7 +52,7 @@ test("edits, watchdog source and stale metadata stay explicit", () => {
       body("⚠️ Agent response overdue", "watchdog") +
       "\nMetadata unavailable; last verified at Unix 123",
   });
-  assert.equal(overdue.label, "⚠️ Agent response overdue");
+  assert.equal(overdue.label, "⚠️ Reported overdue");
   assert.match(overdue.metadataUnavailable, /Unix 123/);
 });
 test("root+reply tags retain exact answered event", () =>

@@ -13,10 +13,10 @@ const IDENTITY = new RegExp(
 const LABELS: Readonly<Record<string, string>> = {
   "👀 Seen": "👀 Reported seen",
   "⏳ Working": "⏳ Reported working",
-  "❓ Needs Jacob": "❓ Needs Jacob",
+  "❓ Needs Jacob": "❓ Reported waiting",
   "✅ Done": "✅ Reported done",
-  "👍 Noted · no action": "👍 Noted · no action",
-  "⚠️ Agent response overdue": "⚠️ Agent response overdue",
+  "👍 Noted · no action": "👍 Reported noted",
+  "⚠️ Agent response overdue": "⚠️ Reported overdue",
 };
 
 /** Prefer signed machine tags; body parsing is only for untagged old cards. */
