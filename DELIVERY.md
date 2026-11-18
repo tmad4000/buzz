@@ -7,6 +7,8 @@ Jacob's original asks, recovered by the root dispatch and `buzz-request-audit-20
 - 2026-11-16 23:48 / 2026-11-17 08:19 DM: show which agent is working, with a link and less noise.
 - 2026-11-17 15:43 DM: agent answers should visibly attach to the exact answered message even in expanded inline threads.
 
+Draft PR: https://github.com/tmad4000/buzz/pull/67 (base `sol/buzz8-release`, .9 bucket).
+
 ## Source delivery
 
 Settings → Experiments → **Agent reply context** opts into compact reported-status cards and native-parent quotes. Default OFF. The shared MessageRow renders recognized bridge cards compactly across channel/thread surfaces, with executor, Open agent, report provenance/model, full original card text and copyable IDs. Unknown formats and substantive answer content retain the normal renderer. No runtime subscription, worker wakeup, inferred completion or seen-state write is added.
@@ -44,6 +46,6 @@ No browser/native/Tauri/cargo builds, M5 actions, release, install or Buzz posts
 
 ## Review / manual acceptance for the release owner
 
-Independent Sol review requested from root after draft creation. Keep draft pending review and release captain authorization for heavier validation.
+Independent Sol review requested from root for draft PR67. Keep draft pending review and release captain authorization for heavier validation.
 
 After an authorized build, enable Agent reply context. Expand a native reply-to-reply: verify its quote names the exact parent's first line and opens/highlights that parent through the guarded owning pane; preserve any newer draft. Collapse/reopen and verify exact-observed/read authority is unchanged. Show a bridge status card: verify compact reported executor + Open agent, raw original text in details, and an edit updates the same report. Confirm a non-bridge lookalike and a substantive answer stay ordinary content. Disable the experiment to restore ordinary status-body rendering and hide parent quotes.
