@@ -84,3 +84,12 @@ The zero-count IPC test was RED before this change and now covers the real API �
 Captain9888b74e explicitly returned HOLD: no cargo, no installs, no alternate-Mac/native grant; GTK3/WebKitGTK4.1/ALSA dev prerequisites are absent. No cargo was invoked. Per root's delayed-slot option this TS-only checkpoint is pushed clearly marked C3 PENDING NATIVE CHECK; root/captain must scope an existing-toolchain/cache audit and meaningful offline C3 subset or leave native validation pending. Keep draft/default-OFF/no integration.
 
 TS-first checkpoint validation: typecheck and95/95 focused tests PASS with bounded process-group cleanup; changed-file Biome/diff PASS. This commit adds no Rust changes over94e4d2c. Existing absolute1.95 toolchain binaries were found by read-only audit, but exact locked serde/serde_json subset sources/archives are absent from default and activated Hermit Cargo homes; no cargo command or installer was invoked. Captain HOLD continues, C3 PENDING NATIVE CHECK, no integration/release acceptance.
+
+
+## Attribution correction and recorded SOURCE disposition
+
+The answer “Freeze current 7998e81a8” came from ROOT, agent d3caa262-cdcd-454d-9d42-0cd05ac69156, through this builder's question prompt. It was a root coordination decision, NOT a statement or freeze decision from Jacob. PR81 remains final/frozen at7998e81a88134a03f578175c29eed20daecef5e0 with SOURCE GO6972530035; no PR81 source or push is authorized by this note.
+
+PR85 already has independent same-reviewer14632ddb SOURCE GO at exact94e4d2cdf3545f8a8be73d806137e72131a368aa/tree673632ea68aa5071385ac3a9288de7514b0e89b6, comment https://github.com/tmad4000/buzz/pull/85#issuecomment-6972995280 . This is the recorded SOURCE verdict, not a native/runtime approval. The current publishedb39a401b TS-only checkpoint has native files byte-identical to94 and author95 focused tests; no new independent exact-head verdict is invented for that checkpoint. Per Root's latest direction, the only pending acceptance gate is the captain's native/cargo gate, not another request to clear the already-resolved94 source findings.
+
+This correction is a local documentation commit and PR-body note only. No PR head is advanced, no source is changed, and no native check/test is started.
