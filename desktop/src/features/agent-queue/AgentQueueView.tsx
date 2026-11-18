@@ -31,7 +31,7 @@ export function AgentQueueRow({ pubkey }: { pubkey?: string }) {
   return (
     <span
       data-runtime-route
-      className="block max-w-40 whitespace-normal text-[10px] leading-tight text-muted-foreground"
+      className="block max-w-40 whitespace-normal text-2xs leading-tight text-muted-foreground"
       aria-label="Private queue summary"
     >
       {view.status === "ready" && view.snapshot ? (
