@@ -10,11 +10,16 @@ import { bindVisitPreferences } from "./layout/visitPreferences";
 import { listPanes, type ConversationView } from "./layout/model";
 import type { LayoutControllerSnapshot } from "./layout/controller";
 import type { ConversationWorkspaceSession } from "./useConversationWorkspace";
+import {
+  ConversationAutoSubmitProvider,
+  type ConversationAutoSubmitScope,
+} from "./ConversationAutoSubmitScope";
 
 type Props = {
   session: ConversationWorkspaceSession;
   snapshot: LayoutControllerSnapshot;
   active: boolean;
+  autoSubmitScopeRef?: React.RefObject<ConversationAutoSubmitScope | null>;
   /** Return authorized existing stream/DM resources; project homes, forums and huddle routes stay outside this surface. */
   resolveConversation: (channelId: string) => DraggedConversation | null;
   /** Reuse ChannelRouteScreen preparation, with a resource/visit key owned here. */
@@ -34,6 +39,7 @@ export function ConversationWorkspaceSurface({
   session,
   snapshot,
   active,
+  autoSubmitScopeRef,
   resolveConversation,
   renderRoute,
   onFocusedViewChange,
@@ -144,136 +150,148 @@ export function ConversationWorkspaceSurface({
     >
       <ConversationViewGuardsContext.Provider value={session.guards}>
         <ConversationDraftEditorsProvider key={session.scopeKey}>
-          <ConversationLayoutSurface
-            keyboardTraversal="shell"
-            layout={snapshot.layout}
-            canRestore={snapshot.canRestore}
-            focusRequest={
-              active &&
-              focusRequest?.owner === controller &&
-              focusRequest.epoch === activity.current.epoch
-                ? focusRequest
-                : undefined
-            }
-            labelForView={(view) =>
-              resolve(view.channelId)?.label ?? "Conversation unavailable"
-            }
-            onFocusPane={focusPane}
-            onResize={(id, sizes, commit) => {
-              if (canHandle()) controller.resize(id, sizes, commit);
-            }}
-            onCommand={command}
-            dragTarget={
-              active
-                ? {
-                    resolveConversation: (id) =>
-                      canHandle() ? resolve(id) : null,
-                    onOpen: (drop) => {
-                      if (!canHandle()) return;
-                      if (
-                        controller.open(
-                          drop.paneId,
-                          drop.channelId,
-                          drop.edge === "right" ? "horizontal" : "vertical",
-                          bounds(),
-                          window.innerWidth,
-                        )
-                      )
-                        announceFocus(true);
-                    },
-                  }
-                : undefined
-            }
-            renderPane={({
-              view,
-              pane,
-              focused: hasFocus,
-              visible,
-              headerEndActions,
-            }) => {
-              const available = resolve(view.channelId);
-              if (!available)
-                return (
-                  <section
-                    className="flex h-full min-w-0 flex-col p-4"
-                    aria-label="Conversation unavailable"
-                    onPointerDownCapture={() => focusPane(pane.id)}
-                    onFocusCapture={() => focusPane(pane.id)}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <h2 className="text-sm font-medium">
-                        Conversation unavailable
-                      </h2>
-                      {headerEndActions}
-                    </div>
-                    <p className="mt-3 text-sm text-muted-foreground">
-                      Choose a conversation from the sidebar, or close this
-                      pane.
-                    </p>
-                  </section>
-                );
-              const visit = controller.visitToken(view.id);
-              return (
-                <React.Fragment
-                  key={JSON.stringify([view.id, view.channelId, visit])}
-                >
-                  {renderRoute(view, (channel) => {
-                    if (
-                      channel.activeChannel?.id !== view.channelId ||
-                      channel.currentIdentity?.pubkey !==
-                        session.scope.identityPubkey
-                    ) {
-                      return (
-                        <section
-                          className="flex h-full min-w-0 flex-col p-4"
-                          aria-label={available.label}
-                          onPointerDownCapture={() => focusPane(pane.id)}
-                          onFocusCapture={() => focusPane(pane.id)}
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <h2 className="text-sm font-medium">
-                              {available.label}
-                            </h2>
-                            {headerEndActions}
-                          </div>
-                          <p
-                            role="status"
-                            className="mt-3 text-sm text-muted-foreground"
-                          >
-                            Loading conversation…
-                          </p>
-                        </section>
-                      );
-                    }
-                    return (
-                      <ConversationViewHost
-                        {...bindVisitPreferences(controller, view)}
-                        viewInstanceId={view.id}
-                        focused={hasFocus}
-                        visible={visible}
-                        interactive={active}
-                        label={available.label}
-                        initialPanelState={view.panelState}
-                        onPanelNavigate={(patch, options) => {
-                          if (!canHandle()) return;
-                          if (
-                            controller.update(view.id, view.channelId, visit, {
-                              panelState: patch,
-                            }) &&
-                            controller.getSnapshot().layout.focusedPaneId ===
-                              pane.id
+          <ConversationAutoSubmitProvider
+            session={session}
+            active={active}
+            isAuthorized={(id) => resolve(id) !== null}
+            scopeRef={autoSubmitScopeRef}
+          >
+            <ConversationLayoutSurface
+              keyboardTraversal="shell"
+              layout={snapshot.layout}
+              canRestore={snapshot.canRestore}
+              focusRequest={
+                active &&
+                focusRequest?.owner === controller &&
+                focusRequest.epoch === activity.current.epoch
+                  ? focusRequest
+                  : undefined
+              }
+              labelForView={(view) =>
+                resolve(view.channelId)?.label ?? "Conversation unavailable"
+              }
+              onFocusPane={focusPane}
+              onResize={(id, sizes, commit) => {
+                if (canHandle()) controller.resize(id, sizes, commit);
+              }}
+              onCommand={command}
+              dragTarget={
+                active
+                  ? {
+                      resolveConversation: (id) =>
+                        canHandle() ? resolve(id) : null,
+                      onOpen: (drop) => {
+                        if (!canHandle()) return;
+                        if (
+                          controller.open(
+                            drop.paneId,
+                            drop.channelId,
+                            drop.edge === "right" ? "horizontal" : "vertical",
+                            bounds(),
+                            window.innerWidth,
                           )
-                            announceFocus(false, options?.replace ?? false);
-                        }}
-                        onFocusView={() => focusPane(pane.id)}
-                        channel={{ ...channel, headerEndActions }}
-                      />
-                    );
-                  })}
-                </React.Fragment>
-              );
-            }}
-          />
+                        )
+                          announceFocus(true);
+                      },
+                    }
+                  : undefined
+              }
+              renderPane={({
+                view,
+                pane,
+                focused: hasFocus,
+                visible,
+                headerEndActions,
+              }) => {
+                const available = resolve(view.channelId);
+                if (!available)
+                  return (
+                    <section
+                      className="flex h-full min-w-0 flex-col p-4"
+                      aria-label="Conversation unavailable"
+                      onPointerDownCapture={() => focusPane(pane.id)}
+                      onFocusCapture={() => focusPane(pane.id)}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <h2 className="text-sm font-medium">
+                          Conversation unavailable
+                        </h2>
+                        {headerEndActions}
+                      </div>
+                      <p className="mt-3 text-sm text-muted-foreground">
+                        Choose a conversation from the sidebar, or close this
+                        pane.
+                      </p>
+                    </section>
+                  );
+                const visit = controller.visitToken(view.id);
+                return (
+                  <React.Fragment
+                    key={JSON.stringify([view.id, view.channelId, visit])}
+                  >
+                    {renderRoute(view, (channel) => {
+                      if (
+                        channel.activeChannel?.id !== view.channelId ||
+                        channel.currentIdentity?.pubkey !==
+                          session.scope.identityPubkey
+                      ) {
+                        return (
+                          <section
+                            className="flex h-full min-w-0 flex-col p-4"
+                            aria-label={available.label}
+                            onPointerDownCapture={() => focusPane(pane.id)}
+                            onFocusCapture={() => focusPane(pane.id)}
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <h2 className="text-sm font-medium">
+                                {available.label}
+                              </h2>
+                              {headerEndActions}
+                            </div>
+                            <p
+                              role="status"
+                              className="mt-3 text-sm text-muted-foreground"
+                            >
+                              Loading conversation…
+                            </p>
+                          </section>
+                        );
+                      }
+                      return (
+                        <ConversationViewHost
+                          {...bindVisitPreferences(controller, view)}
+                          viewInstanceId={view.id}
+                          focused={hasFocus}
+                          visible={visible}
+                          interactive={active}
+                          label={available.label}
+                          initialPanelState={view.panelState}
+                          onPanelNavigate={(patch, options) => {
+                            if (!canHandle()) return;
+                            if (
+                              controller.update(
+                                view.id,
+                                view.channelId,
+                                visit,
+                                {
+                                  panelState: patch,
+                                },
+                              ) &&
+                              controller.getSnapshot().layout.focusedPaneId ===
+                                pane.id
+                            )
+                              announceFocus(false, options?.replace ?? false);
+                          }}
+                          onFocusView={() => focusPane(pane.id)}
+                          channel={{ ...channel, headerEndActions }}
+                        />
+                      );
+                    })}
+                  </React.Fragment>
+                );
+              }}
+            />
+          </ConversationAutoSubmitProvider>
         </ConversationDraftEditorsProvider>
       </ConversationViewGuardsContext.Provider>
       {snapshot.message ? (
