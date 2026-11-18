@@ -1,11 +1,10 @@
+import { useOpenThreadPins } from "../lib/openThreadPinStore";
 import * as React from "react";
 import type { MainTimelineEntry } from "@/features/messages/lib/threadPanel";
 import type { TimelineMessage } from "@/features/messages/types";
 import {
   filterOpenThreadPins,
-  restoreOpenThreadPin,
   MAX_OPEN_THREAD_PINS,
-  parseOpenThreadPins,
   type OpenThreadPin,
 } from "../lib/openThreadPins";
 
@@ -22,13 +21,12 @@ export function OpenThreadsBar({
   currentThread,
   onOpen,
 }: Props) {
-  const [pins, setPins] = React.useState<OpenThreadPin[]>(() => {
-    try {
-      return parseOpenThreadPins(localStorage.getItem(storageKey));
-    } catch {
-      return [];
-    }
-  });
+  const {
+    pins,
+    addPin,
+    removePin,
+    sessionOnly: pinsSessionOnly,
+  } = useOpenThreadPins(storageKey);
   const [expanded, setExpanded] = React.useState(() => {
     try {
       return localStorage.getItem(`${storageKey}:expanded`) === "true";
@@ -46,22 +44,21 @@ export function OpenThreadsBar({
   const regionId = React.useId();
   const byId = new Map(
     entries
-      .filter((entry) => !entry.message.parentId)
+      .filter(
+        (entry) =>
+          !entry.message.parentId &&
+          !entry.message.pending &&
+          !entry.message.id.startsWith("optimistic-"),
+      )
       .map((entry) => [entry.message.id, entry.message]),
   );
   if (
     currentThread &&
+    !currentThread.pending &&
+    !currentThread.id.startsWith("optimistic-") &&
     (!currentThread.rootId || currentThread.rootId === currentThread.id)
   )
     byId.set(currentThread.id, currentThread);
-  const update = (next: OpenThreadPin[]) => {
-    setPins(next);
-    try {
-      localStorage.setItem(storageKey, JSON.stringify(next));
-    } catch {
-      setSessionOnly(true);
-    }
-  };
   const matches = filterOpenThreadPins(pins, query);
   return (
     <section
@@ -90,7 +87,7 @@ export function OpenThreadsBar({
             Automatic tracking unavailable. Pinned references only; removing one
             does not finish work or mark it read.
           </p>
-          {sessionOnly ? (
+          {sessionOnly || pinsSessionOnly ? (
             <p role="status">
               Changes are session-only; storage is unavailable.
             </p>
@@ -139,7 +136,7 @@ export function OpenThreadsBar({
                       pin,
                       index: pins.findIndex((item) => item.id === pin.id),
                     });
-                    update(pins.filter((item) => item.id !== pin.id));
+                    removePin(pin.id);
                   }}
                 >
                   Remove
@@ -179,13 +176,10 @@ export function OpenThreadsBar({
               onClick={() => {
                 const message = byId.get(selected);
                 if (!message) return;
-                update([
-                  ...pins,
-                  {
-                    id: message.id,
-                    title: message.body.split("\n")[0].slice(0, 240),
-                  },
-                ]);
+                addPin({
+                  id: message.id,
+                  title: message.body.split("\n")[0].slice(0, 240),
+                });
                 setSelected("");
               }}
             >
@@ -195,7 +189,7 @@ export function OpenThreadsBar({
               <button
                 type="button"
                 onClick={() => {
-                  update(restoreOpenThreadPin(pins, undo.pin, undo.index));
+                  addPin(undo.pin, undo.index);
                   setUndo(null);
                 }}
               >
