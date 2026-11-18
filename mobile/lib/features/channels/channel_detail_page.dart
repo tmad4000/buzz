@@ -557,7 +557,8 @@ class ChannelDetailPage extends HookConsumerWidget {
       }
       return deferReadStateUpdate(context, () {
         if (!ref.read(readAdmissionProvider('head:${channel.id}')) ||
-            ModalRoute.of(context)?.isCurrent == false) {
+            (ref.read(offlineEnabledProvider) &&
+                ModalRoute.of(context)?.isCurrent == false)) {
           return;
         }
         ref

@@ -12,26 +12,30 @@ import 'package:buzz/shared/offline/read_admission.dart';
 import 'package:buzz/shared/relay/relay.dart';
 
 class CommitSession extends RelaySessionNotifier {
+  int queries = 0;
   @override
   SessionState build() => const SessionState(status: SessionStatus.connected);
   @override
   Future<List<NostrEvent>> queryRelay(
     List<NostrFilter> filters, {
     Duration timeout = const Duration(seconds: 8),
-  }) async => [
-    const NostrEvent(
-      id: 'reply',
-      pubkey: 'alice',
-      createdAt: 1001,
-      kind: 9,
-      tags: [
-        ['h', 'general'],
-        ['e', 'root', '', 'reply'],
-      ],
-      content: 'fresh body',
-      sig: '',
-    ),
-  ];
+  }) async {
+    queries++;
+    return [
+      const NostrEvent(
+        id: 'reply',
+        pubkey: 'alice',
+        createdAt: 1001,
+        kind: 9,
+        tags: [
+          ['h', 'general'],
+          ['e', 'root', '', 'reply'],
+        ],
+        content: 'fresh body',
+        sig: '',
+      ),
+    ];
+  }
 }
 
 class CommitLifecycle extends AppLifecycleNotifier {
@@ -55,6 +59,33 @@ class CommitChannel extends ChannelMessagesNotifier {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  for (final offline in [false, true]) {
+    test(
+      'thread config scope watch exists only when cache is $offline',
+      () async {
+        final session = CommitSession();
+        final config = CommitConfig();
+        final c = ProviderContainer(
+          overrides: [
+            offlineEnabledProvider.overrideWithValue(offline),
+            offlineStoreProvider.overrideWith((ref) async => null),
+            relayConfigProvider.overrideWith(() => config),
+            relaySessionProvider.overrideWith(() => session),
+          ],
+        );
+        addTearDown(c.dispose);
+        c.read(relayConfigProvider);
+        const args = ThreadRepliesArgs(channelId: 'general', rootId: 'root');
+        c.listen(threadRepliesProvider(args), (_, _) {}, fireImmediately: true);
+        await c.read(threadRepliesProvider(args).future);
+        expect(session.queries, 1);
+        config.update(baseUrl: 'https://other.test');
+        await c.pump();
+        await c.read(threadRepliesProvider(args).future);
+        expect(session.queries, offline ? 2 : 1);
+      },
+    );
+  }
   test(
     'live thread authority follows AsyncData commit and never waits for optional cache initialization',
     () async {

@@ -41,7 +41,8 @@ class _ThreadCursor {
 final FutureProviderFamily<List<NostrEvent>, ThreadRepliesArgs>
 threadRepliesProvider = FutureProvider.autoDispose
     .family<List<NostrEvent>, ThreadRepliesArgs>((ref, args) async {
-      ref.watch(relayConfigProvider);
+      final offline = ref.read(offlineEnabledProvider);
+      if (offline) ref.watch(relayConfigProvider);
       // A reply missed while the socket is stale cannot invalidate this
       // one-shot query. Refresh mounted threads when the session recovers;
       // auto-dispose also makes reopening a thread start from relay truth.
@@ -53,7 +54,6 @@ threadRepliesProvider = FutureProvider.autoDispose
       });
       final session = ref.read(relaySessionProvider.notifier);
       final writeEpoch = OfflineCacheStore.writeEpoch;
-      final offline = ref.read(offlineEnabledProvider);
       if (offline) {
         ref.listen(networkAvailableProvider, (previous, next) {
           if (previous == false && next) ref.invalidateSelf();
