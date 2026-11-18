@@ -72,6 +72,7 @@ function actionHarness(enabled = true) {
   let current = sections;
   const cleanups = [];
   const successes = [];
+  const dismissals = [];
   let deferred = false;
   let finish;
   let queryOptions;
@@ -170,7 +171,18 @@ function actionHarness(enabled = true) {
   });
   const mod = load("./ForwardToAgentAction.tsx", {
     ...mocks,
-    "./useForwardAgentSend": controller,
+    "./useForwardAgentSend": {
+      useForwardAgentSend: (input) => {
+        const state = controller.useForwardAgentSend(input);
+        return {
+          ...state,
+          dismissNote: () => {
+            dismissals.push(true);
+            state.dismissNote();
+          },
+        };
+      },
+    },
     "./ForwardAudienceConfirm": { ForwardAudienceConfirm: () => null },
     "@/shared/ui/input": { Input: "input" },
   });
@@ -184,6 +196,7 @@ function actionHarness(enabled = true) {
     changeSections: (v) => (current = v),
     queryOptions,
     successes,
+    dismissals,
     unmount: () =>
       cleanups.forEach((fn) => {
         fn();
@@ -412,4 +425,13 @@ test("Home Inbox row mounts receipt line with the same source identity as its fo
   );
   assert.equal(line.props.channelId, action.props.channelId);
   assert.equal(line.props.messageId, action.props.message.id);
+});
+
+test("dismissing the actual dropdown clears picker-owned note state", () => {
+  const h = actionHarness();
+  const dropdown = nodes(h.tree).find((n) => n.type === "DropdownMenu");
+  dropdown.props.onOpenChange(true);
+  assert.equal(h.dismissals.length, 0);
+  dropdown.props.onOpenChange(false);
+  assert.equal(h.dismissals.length, 1);
 });

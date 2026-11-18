@@ -97,7 +97,7 @@ test("marker persistence failure retains acknowledged ID; retry saves marker wit
       send,
       "self",
     ),
-    /Forward sent/,
+    /Forward sent.*Do not send again/,
   );
   assert.equal(
     forwardReceipts("scope", "save-failure")[0].targetId,

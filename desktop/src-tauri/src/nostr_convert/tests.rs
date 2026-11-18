@@ -161,7 +161,23 @@ fn channel_detail_basic() {
             vec!["ttl_deadline", "2026-06-11T00:00:00Z"],
         ],
     );
-    let d = channel_detail_from_event(&e).unwrap();
+    let pk1 = "a".repeat(64);
+    let pk2 = "b".repeat(64);
+    let roster = channel_members_from_event(&ev(
+        39002,
+        "",
+        vec![
+            vec!["d", "uuid"],
+            vec!["p", &pk1],
+            vec!["p", &pk2, "", "bot"],
+        ],
+    ))
+    .unwrap();
+    let d = channel_detail_from_event(&e, &roster).unwrap();
+    assert_eq!(d.member_count, 2);
+    assert_eq!(d.member_pubkeys, vec![pk1, pk2]);
+    assert_eq!(d.participant_pubkeys, d.member_pubkeys);
+    assert_eq!(d.participants.len(), 2);
     assert_eq!(d.id, "uuid");
     assert_eq!(d.topic.as_deref(), Some("tt"));
     assert_eq!(d.purpose.as_deref(), Some("pp"));
@@ -171,6 +187,25 @@ fn channel_detail_basic() {
     assert_eq!(d.ttl_deadline.as_deref(), Some("2026-06-11T00:00:00Z"));
     assert!(d.created_at.ends_with("Z"));
     assert_eq!(d.created_by, e.pubkey.to_hex());
+    let ipc = serde_json::to_value(&d).unwrap();
+    assert_eq!(ipc["member_count"], 2);
+    assert_eq!(ipc["participant_pubkeys"].as_array().unwrap().len(), 2);
+}
+
+#[test]
+fn metadata_only_detail_preserves_legacy_empty_roster_projection() {
+    let pk = "a".repeat(64);
+    let event = ev(
+        39000,
+        "",
+        vec![vec!["d", "uuid"], vec!["t", "dm"], vec!["p", &pk]],
+    );
+    let detail = channel_metadata_detail_from_event(&event).unwrap();
+    let ipc = serde_json::to_value(&detail).unwrap();
+    assert_eq!(detail.member_count, 0);
+    assert!(ipc.get("participant_pubkeys").is_none());
+    assert!(ipc.get("member_pubkeys").is_none());
+    assert!(ipc.get("participants").is_none());
 }
 
 #[test]

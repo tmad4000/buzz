@@ -53,8 +53,13 @@ export function useForwardAgentSend(input: Input) {
   const [pending, setPending] = React.useState<Pending | null>(null);
   const lock = React.useRef(false);
   const activeOwner = `${scope}:${message.id}`;
-  const ownerRef = React.useRef(activeOwner);
-  ownerRef.current = activeOwner;
+  const generation = React.useRef({ owner: activeOwner, revision: 0 });
+  if (generation.current.owner !== activeOwner)
+    generation.current = {
+      owner: activeOwner,
+      revision: generation.current.revision + 1,
+    };
+  const uiGeneration = generation.current.revision;
   const mounted = React.useRef(true);
   React.useEffect(() => {
     mounted.current = true;
@@ -69,7 +74,8 @@ export function useForwardAgentSend(input: Input) {
     setNote("");
     setPending(null);
   }, [activeOwner]);
-  const ownsUi = () => mounted.current && ownerRef.current === activeOwner;
+  const ownsUi = () =>
+    mounted.current && generation.current.revision === uiGeneration;
   const run = async (intent: Intent, confirmedAudience?: string) => {
     if (lock.current || !signer || !relayUrl || !channelId || !sectionIds)
       return;
@@ -121,6 +127,7 @@ export function useForwardAgentSend(input: Input) {
         channelId,
         intent.targetId,
         signer,
+        relayUrl,
       );
       if (!ownsUi()) return;
       if (
@@ -139,8 +146,10 @@ export function useForwardAgentSend(input: Input) {
           "The default lane audience changed. Choose the destination explicitly.",
         );
       if (
-        needsAudienceConfirmation(audiences) &&
-        confirmedAudience !== audienceKey(audiences)
+        (confirmedAudience !== undefined &&
+          confirmedAudience !== audienceKey(audiences)) ||
+        (needsAudienceConfirmation(audiences) &&
+          confirmedAudience !== audienceKey(audiences))
       ) {
         setPending({ intent, audiences });
         if (confirmedAudience)
@@ -178,7 +187,10 @@ export function useForwardAgentSend(input: Input) {
         signer,
         revision,
       );
-      if (ownsUi()) toast.success(`Forwarded to ${receipt.label}`);
+      if (ownsUi()) {
+        setNote("");
+        toast.success(`Forwarded to ${receipt.label}`);
+      }
     } catch (error) {
       if (ownsUi()) {
         toast.error(forwardFailureMessage(error, publicationStarted));
@@ -196,13 +208,17 @@ export function useForwardAgentSend(input: Input) {
     setNote,
     pending,
     forward: (targetId: string, label: string, isDefault = false) =>
-      run({ targetId, label, isDefault, message, note }),
+      run({ targetId, label, isDefault, message, note: isDefault ? "" : note }),
     confirm: () =>
       pending
         ? run(pending.intent, audienceKey(pending.audiences))
         : Promise.resolve(),
+    dismissNote: () => setNote(""),
     cancel: () => {
-      if (!lock.current) setPending(null);
+      if (!lock.current) {
+        setPending(null);
+        setNote("");
+      }
     },
   };
 }

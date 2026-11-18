@@ -93,22 +93,30 @@ function EnabledForwardAction({
       ? directAgentLanes(channels, liveSections, query.data.ids, signer, known)
       : [];
   const targetDefault = channelId ? defaultAgentLane(channelId, lanes) : null;
-  const { busy, note, setNote, pending, forward, confirm, cancel } =
-    useForwardAgentSend({
-      channelId,
-      message,
-      signer,
-      relayUrl,
-      scope,
-      channels,
-      known,
-      sectionIds: query.data?.ids,
-      send: mutation.mutateAsync,
-      closeMenu: () => {
-        setOpen(false);
-        onOpenChange?.(false);
-      },
-    });
+  const {
+    busy,
+    note,
+    setNote,
+    pending,
+    forward,
+    confirm,
+    cancel,
+    dismissNote,
+  } = useForwardAgentSend({
+    channelId,
+    message,
+    signer,
+    relayUrl,
+    scope,
+    channels,
+    known,
+    sectionIds: query.data?.ids,
+    send: mutation.mutateAsync,
+    closeMenu: () => {
+      setOpen(false);
+      onOpenChange?.(false);
+    },
+  });
   if (!source || !signer || !relayUrl || identity?.locked) return null;
   return (
     <>
@@ -131,7 +139,7 @@ function EnabledForwardAction({
             variant="ghost"
             className="h-8 w-8 rounded-full p-0"
             aria-label={`Forward to ${targetDefault.label}`}
-            title={`Forward to ${targetDefault.label}`}
+            title={`Forward reference material to ${targetDefault.label}`}
             disabled={
               busy ||
               query.isError ||
@@ -153,6 +161,7 @@ function EnabledForwardAction({
           open={open}
           onOpenChange={(next) => {
             setOpen(next);
+            if (!next) dismissNote();
             onOpenChange?.(next);
             if (next) void query.refetch();
           }}

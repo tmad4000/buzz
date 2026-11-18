@@ -87,7 +87,7 @@ export async function forwardOnce(
       save(scope, existing);
     } catch {
       throw new ForwardMarkerError(
-        "Forward sent, but its marker could not be saved. Choose the same target to retry only the marker.",
+        "Forward sent, but its marker could not be saved. Do not send again; check the target.",
       );
     }
     return existing;
@@ -120,7 +120,7 @@ export async function forwardOnce(
       save(scope, receipt);
     } catch {
       throw new ForwardMarkerError(
-        "Forward sent, but its marker could not be saved. Choose the same target to retry only the marker.",
+        "Forward sent, but its marker could not be saved. Do not send again; check the target.",
       );
     }
     return receipt;

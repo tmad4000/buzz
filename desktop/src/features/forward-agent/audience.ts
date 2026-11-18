@@ -43,13 +43,19 @@ export async function readForwardAudiences(
   sourceId: string,
   targetId: string,
   signer: string,
+  relayUrl: string,
   io = { getChannelDetails, getChannelMembers },
 ): Promise<ForwardAudiences> {
+  if (!relayUrl) throw new Error("No captured forwarding relay.");
+  const options = {
+    readYourWrites: true,
+    expectedScope: { relayUrl, signerPubkey: signer },
+  };
   const [source, target, sourceMembers, targetMembers] = await Promise.all([
-    io.getChannelDetails(sourceId),
-    io.getChannelDetails(targetId),
-    io.getChannelMembers(sourceId, { readYourWrites: true }),
-    io.getChannelMembers(targetId, { readYourWrites: true }),
+    io.getChannelDetails(sourceId, options),
+    io.getChannelDetails(targetId, options),
+    io.getChannelMembers(sourceId, options),
+    io.getChannelMembers(targetId, options),
   ]);
   const validate = (channel: Channel, members: ChannelMember[], id: string) => {
     if (
@@ -58,6 +64,8 @@ export async function readForwardAudiences(
       channel.archivedAt ||
       !members.some((m) => m.pubkey === signer) ||
       members.length !== channel.memberCount ||
+      JSON.stringify([...new Set(channel.memberPubkeys)].sort()) !==
+        JSON.stringify([...new Set(members.map((m) => m.pubkey))].sort()) ||
       new Set(members.map((m) => m.pubkey)).size !== members.length
     )
       throw new Error(
@@ -66,8 +74,24 @@ export async function readForwardAudiences(
   };
   validate(source, sourceMembers, sourceId);
   validate(target, targetMembers, targetId);
+  const complete = (channel: Channel, members: ChannelMember[]): Channel => ({
+    ...channel,
+    memberPubkeys: members.map((m) => m.pubkey),
+    participantPubkeys:
+      channel.channelType === "dm" ? members.map((m) => m.pubkey) : [],
+    participants:
+      channel.channelType === "dm"
+        ? members.map((m) => m.displayName ?? m.pubkey)
+        : [],
+  });
   return {
-    source: { channel: source, members: sourceMembers },
-    target: { channel: target, members: targetMembers },
+    source: {
+      channel: complete(source, sourceMembers),
+      members: sourceMembers,
+    },
+    target: {
+      channel: complete(target, targetMembers),
+      members: targetMembers,
+    },
   };
 }

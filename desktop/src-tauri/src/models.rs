@@ -152,6 +152,12 @@ pub struct ChannelDetailInfo {
     pub updated_at: String,
     pub archived_at: Option<String>,
     pub member_count: i64,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub member_pubkeys: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub participants: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub participant_pubkeys: Vec<String>,
     pub topic_required: bool,
     pub max_members: Option<i32>,
     pub nip29_group_id: Option<String>,

@@ -1,9 +1,9 @@
 # Forward to agent — separate .9 source delivery
 
 Draft PR: https://github.com/tmad4000/buzz/pull/85
-Feature commit: `78e71a621` (stacked on PR81; current base refresh below).
+Initial feature commit: `78e71a621`. Current follow-up addresses all nine review findings; exact head is the PR branch tip.
 
-Owner: Sol session5e7bc9da. Worktree `/home/dev/agent-worktrees/forward-to-agent-20261118`; branch `sol/forward-to-agent-20261118`. Stacked on Direct Agents PR81, currently `daf6e9dbbb4d8874a38bf41bb0e018f7c765dacf`. That base descends from the requested .8 tag69eda1ff (peeled source16fa57df).
+Owner: Sol session5e7bc9da. Worktree `/home/dev/agent-worktrees/forward-to-agent-20261118`; branch `sol/forward-to-agent-20261118`. Stacked on Direct Agents PR81 via included display-only product fix `daf6e9dbbb4d8874a38bf41bb0e018f7c765dacf`. Current PR81 head7998e81a8 adds only expanded tests/evidence/docs over independently SOURCE-GO18f8599a; no product-source difference. That base descends from the requested .8 tag69eda1ff (peeled source16fa57df).
 
 Original ask: Jacob, Buzz P2 2026-11-18 05:50Z, one-click forwarding to another orchestrator alongside Send to thread. Root's approved nonrecursive contract: Paseo DM→P2(later), P2→Paseo DM(now), plus existing Direct agents picker; quote/backlink sent by Jacob's own client; original Forwarded-to-target marker; no new relay kind; default OFF; separate .9 draft and independent Sol review via root.
 
@@ -48,3 +48,22 @@ Regressions cover all five findings, hydration/readiness transitions, failed-per
 
 
 PR81 dependency disposition: independent19ed01b1 posted SOURCE GO/P1 resolved for exact18f8599adc7a250675447e1b861a0f163e5f868b, after confirming its product/test source is byte-identical to our included daf6e9dbb base;18f8599a adds only two M5 bridge-evidence documentation lines. Review: https://github.com/tmad4000/buzz/pull/81#issuecomment-6972124334 . This clears only the PR81 source P1, not PR85 review or release/native gates.
+
+
+## Four additional source blockers C1–C4
+
+Scope expanded into native channel detail projection, at root's explicit request. The full broader-audience feature remains in this separate default-OFF draft; no new kind, dependencies or release changes. Existing B1–B5 and A1/A2 fixes/regressions remain.
+
+- C1/P0: strict get_channel_details now joins metadata with the complete kind39002 roster. The native converter consumes that roster and serializes its true count/member keys plus aligned DM participant keys/names. API mapping and the validated send target preserve those arrays, so production DM recipient resolution works. Metadata-only/nonjoined callers keep the old one-argument behavior; strict completeness is opt-in through readYourWrites:true, which forwarding always requests. Existing update_channel readback stays metadata-only and adds no new post-commit roster dependency.
+- C2/P1: any supplied confirmation token must match the fresh audience fingerprint unconditionally, including a broader target becoming the same private pair. A mismatch refreshes the dialog and sends nothing until the new audience is explicitly confirmed.
+- C3/P1: forwarding requests writer consistency for metadata as well as full rosters. The strict native detail read uses the existing strong metadata filter and captures one relay API base/signing key pair across its metadata/roster queries. It does not infer visibility from a count. A private→open edit with unchanged roster cannot use a replica-private detail path. All four metadata/roster API calls carry the same captured expected relay/signer; both native commands assert that scope and retain the captured endpoint/keys through awaits (including profile joins). Exact detail/roster member-key sets must match, even when counts match. A scope/source UI generation change cancels old work, including A→B→A transitions.
+- C4/P2: the primary shortcut is explicitly reference-only. Picker notes belong to the selected captured intent and clear on dismiss, cancel and success. A hidden abandoned instruction cannot be picked up by a later shortcut.
+
+Final checks: typecheck PASS;91/91 focused Node model/hook/API/IPC-contract tests PASS with150s/60s process-group deadlines and whole-group cleanup; changed-file Biome, rustfmt and whitespace PASS. Regressions include raw snake_case IPC → actual API conversion → audience validation → production DM recipients; source contracts for strict native metadata/roster scope and default-call compatibility; changed-to-same-private and unchanged-roster private→open re-confirmation; cancel/dismiss/shortcut note isolation, equal-count key mismatch refusal, four-read expected-scope propagation and A→B→A cancellation. Rust converter/serialization assertions were added but **not executed**: cargo/native/Tauri builds and Rust unit execution remain outside this dispatch's authorized checks. Rustfmt verifies syntax/formatting, not compilation or runtime behavior.
+
+Exact native/API/frontend diff was sent before push to send/API owneraf293993, composed integrationfd0be4cf and detail/cache authority ownera027d58a. Independent14632ddb exact-head source re-review is required for all nine findings; earlier GO/green tests do not transfer to this new source delta. Native compile/actual IPC/relay/human acceptance remains a captain gate. No heavy build, Mac/M5 action, live forward or deployment occurred.
+
+
+Scope-growth note sent to root as requested: the P0/P1 fixes touch native detail/member read contracts. They remain additive optional parameters on existing commands and stay within the same feature; splitting broader audiences would not remove the private shortcut's need for these native count/participant, writer metadata and scope fences. No broader product work was added.
+
+Note/recovery interaction: confirmed marker-save failure no longer tells users to choose the same target, because a cleared note would change the envelope revision. It explicitly says the forward was sent and not to send again. The captured original revision still deduplicates/permits marker-only persistence retry; no send is retried automatically.

@@ -195,8 +195,21 @@ pub fn channel_info_from_event(
     })
 }
 
+/// Compatibility projection for metadata-only directory/readback callers.
+/// Counts remain metadata hints here; forwarding requires the complete writer-roster join.
+pub fn channel_metadata_detail_from_event(event: &Event) -> Result<ChannelDetailInfo, String> {
+    let metadata_only = ChannelMembersResponse {
+        members: Vec::new(),
+        next_cursor: None,
+    };
+    channel_detail_from_event(event, &metadata_only)
+}
+
 /// Convert a NIP-29 kind:39000 event to [`ChannelDetailInfo`].
-pub fn channel_detail_from_event(event: &Event) -> Result<ChannelDetailInfo, String> {
+pub fn channel_detail_from_event(
+    event: &Event,
+    members: &ChannelMembersResponse,
+) -> Result<ChannelDetailInfo, String> {
     let id = first_tag_value(event, "d")
         .ok_or_else(|| "kind:39000 missing required `d` tag".to_string())?
         .to_string();
@@ -232,6 +245,23 @@ pub fn channel_detail_from_event(event: &Event) -> Result<ChannelDetailInfo, Str
         None
     };
 
+    // Metadata has no authoritative member count. Join the complete kind:39002 roster.
+    let member_pubkeys: Vec<String> = members.members.iter().map(|m| m.pubkey.clone()).collect();
+    let participant_pubkeys = if channel_type == "dm" {
+        member_pubkeys.clone()
+    } else {
+        Vec::new()
+    };
+    let participants = if channel_type == "dm" {
+        members
+            .members
+            .iter()
+            .map(|m| m.display_name.clone().unwrap_or_else(|| m.pubkey.clone()))
+            .collect()
+    } else {
+        Vec::new()
+    };
+
     Ok(ChannelDetailInfo {
         id,
         name,
@@ -248,7 +278,10 @@ pub fn channel_detail_from_event(event: &Event) -> Result<ChannelDetailInfo, Str
         created_at: created_at_iso.clone(),
         updated_at: created_at_iso,
         archived_at,
-        member_count: 0,
+        member_count: member_pubkeys.len() as i64,
+        member_pubkeys,
+        participants,
+        participant_pubkeys,
         topic_required: false,
         max_members: None,
         nip29_group_id: None,

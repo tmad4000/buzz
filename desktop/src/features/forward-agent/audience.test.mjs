@@ -14,6 +14,7 @@ const lane = (id, members, visibility = "private") => ({
     visibility,
     isMember: true,
     memberCount: members.length,
+    memberPubkeys: members,
     archivedAt: null,
   },
   members: members.map((pubkey) => ({ pubkey, displayName: pubkey })),
@@ -63,33 +64,57 @@ test("fresh writer-side roster completeness and current membership are checked b
   const source = lane("dm", ["self", "agent"]);
   const target = lane("target", ["self", "agent", "third"]);
   const io = {
-    getChannelDetails: async (id) =>
-      id === "dm" ? source.channel : target.channel,
+    getChannelDetails: async (id, options) => {
+      calls.push([id, options]);
+      return id === "dm" ? source.channel : target.channel;
+    },
     getChannelMembers: async (id, options) => {
       calls.push([id, options]);
       return id === "dm" ? source.members : target.members;
     },
   };
-  const read = await readForwardAudiences("dm", "target", "self", io);
+  const read = await readForwardAudiences(
+    "dm",
+    "target",
+    "self",
+    "https://relay.test",
+    io,
+  );
   assert.equal(read.target.members.length, 3);
   assert.equal(
     calls.every(([, o]) => o.readYourWrites === true),
     true,
   );
   await assert.rejects(
-    readForwardAudiences("dm", "target", "self", {
+    readForwardAudiences("dm", "target", "self", "https://relay.test", {
       ...io,
       getChannelMembers: async () => [{ pubkey: "self" }],
     }),
     /full current audience/,
   );
   await assert.rejects(
-    readForwardAudiences("dm", "target", "self", {
+    readForwardAudiences("dm", "target", "self", "https://relay.test", {
       ...io,
       getChannelMembers: async (id) =>
         id === "dm"
           ? source.members
           : [{ pubkey: "other" }, { pubkey: "agent" }, { pubkey: "third" }],
+    }),
+    /full current audience/,
+  );
+});
+
+test("same-size writer snapshots with different keys fail closed instead of silently replacing the detail roster", async () => {
+  const source = lane("dm", ["self", "agent"]),
+    target = lane("target", ["self", "agent"]);
+  await assert.rejects(
+    readForwardAudiences("dm", "target", "self", "https://relay.test", {
+      getChannelDetails: async (id) =>
+        id === "dm" ? source.channel : target.channel,
+      getChannelMembers: async (id) =>
+        id === "dm"
+          ? source.members
+          : [{ pubkey: "self" }, { pubkey: "other" }],
     }),
     /full current audience/,
   );

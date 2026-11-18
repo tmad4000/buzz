@@ -312,3 +312,57 @@ test("post-mutation malformed ACK guidance differs from preflight, definite reje
   assert.equal(h.sends.length, 0);
   assert.doesNotMatch(h.errors[0], /Check the target/);
 });
+
+test("stale confirmation is refused even when a broader audience becomes the same private pair", async () => {
+  const h = harness(audience(["self", "agent", "third"]));
+  await h.render().forward("p2", "Project");
+  h.setAudience(audience(["self", "agent"]));
+  await h.render().confirm();
+  assert.equal(h.sends.length, 0);
+  assert.equal(h.render().pending.audiences.target.members.length, 2);
+  assert.match(h.errors[0], /audience changed/);
+  await h.render().confirm();
+  assert.equal(h.sends.length, 1);
+});
+
+test("private-to-open same-roster change invalidates a pending audience key", async () => {
+  const h = harness(audience(["self", "agent", "third"]));
+  await h.render().forward("p2", "Project");
+  h.setAudience(audience(["self", "agent", "third"], "open"));
+  await h.render().confirm();
+  assert.equal(h.sends.length, 0);
+  assert.equal(h.render().pending.audiences.target.channel.visibility, "open");
+  await h.render().confirm();
+  assert.equal(h.sends.length, 1);
+});
+
+test("cancel/dismiss clears abandoned note; primary shortcut is always reference-only", async () => {
+  const h = harness(audience(["self", "agent", "third"]));
+  h.render().setNote("Instruction for another agent");
+  await h.render().forward("p2", "Project");
+  h.render().cancel();
+  assert.equal(h.render().note, "");
+  h.setAudience(audience(["self", "agent"]));
+  await h.render().forward("p2", "P2 (later)", true);
+  assert.match(h.messages[0], /^Sender note: none\./);
+  assert.doesNotMatch(h.messages[0], /Instruction for another agent/);
+  h.render().setNote("Dismissed instruction");
+  h.render().dismissNote();
+  assert.equal(h.render().note, "");
+  h.render().setNote("Hidden note even without dismiss");
+  await h.render().forward("p2", "P2 (later)", true);
+  assert.doesNotMatch(h.messages[1], /Hidden note/);
+  assert.equal(h.render().note, "");
+});
+
+test("A-to-B-to-A view generation change cancels the original pending forward before publication", async () => {
+  const h = harness(audience(["self", "agent"]));
+  h.afterAudienceRead(() => {
+    h.input.scope = "other identity";
+    h.render();
+    h.input.scope = "scope";
+    h.render();
+  });
+  await h.render().forward("p2", "P2 (later)", true);
+  assert.equal(h.sends.length, 0);
+});
