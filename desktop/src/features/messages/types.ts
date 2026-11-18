@@ -25,6 +25,8 @@ export type TimelineMessage = {
    * user that cryptographically signed the event.
    */
   signerPubkey?: string;
+  /** Raw signer of the authorized body edit, when one is applied. */
+  editSignerPubkey?: string;
   author: string;
   /** True when the displayed author is known to be an agent. */
   isAgent?: boolean;

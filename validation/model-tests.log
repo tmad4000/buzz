@@ -1,0 +1,280 @@
+TAP version 13
+# Subtest: owning pane rejects quote navigation before changing any state when Page or thread edit guard refuses
+ok 1 - owning pane rejects quote navigation before changing any state when Page or thread edit guard refuses
+  ---
+  duration_ms: 96.939808
+  type: 'test'
+  ...
+# Subtest: same-thread parent jump exposes an exact target without retargeting the newer composer draft
+ok 2 - same-thread parent jump exposes an exact target without retargeting the newer composer draft
+  ---
+  duration_ms: 13.56498
+  type: 'test'
+  ...
+# Subtest: opening a different thread sets only its root as the default composer target, not the navigation parent
+ok 3 - opening a different thread sets only its root as the default composer target, not the navigation parent
+  ---
+  duration_ms: 9.36453
+  type: 'test'
+  ...
+# Subtest: allowed owning-pane jump closes the covering Page before opening the parent target
+ok 4 - allowed owning-pane jump closes the covering Page before opening the parent target
+  ---
+  duration_ms: 9.35299
+  type: 'test'
+  ...
+# Subtest: report preserves exact executor and host without claiming live work
+ok 5 - report preserves exact executor and host without claiming live work
+  ---
+  duration_ms: 2.09685
+  type: 'test'
+  ...
+# Subtest: unknown, impersonated and substantive content retain original body
+ok 6 - unknown, impersonated and substantive content retain original body
+  ---
+  duration_ms: 0.7402
+  type: 'test'
+  ...
+# Subtest: edits, watchdog source and stale metadata stay explicit
+ok 7 - edits, watchdog source and stale metadata stay explicit
+  ---
+  duration_ms: 0.75025
+  type: 'test'
+  ...
+# Subtest: root+reply tags retain exact answered event
+ok 8 - root+reply tags retain exact answered event
+  ---
+  duration_ms: 1.34934
+  type: 'test'
+  ...
+# Subtest: structured bridge tags outrank body and bind exact originating request
+ok 9 - structured bridge tags outrank body and bind exact originating request
+  ---
+  duration_ms: 0.83374
+  type: 'test'
+  ...
+# Subtest: malformed machine envelopes cannot downgrade into legacy body trust
+ok 10 - malformed machine envelopes cannot downgrade into legacy body trust
+  ---
+  duration_ms: 3.23704
+  type: 'test'
+  ...
+# Subtest: production formatter applies only bridge-signed status snapshots and preserves immutable ancestry
+ok 11 - production formatter applies only bridge-signed status snapshots and preserves immutable ancestry
+  ---
+  duration_ms: 349.644055
+  type: 'test'
+  ...
+# Subtest: reviewer P1 reproduction: latest owner-signed Done body never inherits the original bridge signer
+ok 12 - reviewer P1 reproduction: latest owner-signed Done body never inherits the original bridge signer
+  ---
+  duration_ms: 16.160319
+  type: 'test'
+  ...
+# Subtest: a far-future edit still rewrites the body of an old message
+ok 13 - a far-future edit still rewrites the body of an old message
+  ---
+  duration_ms: 4.89049
+  type: 'test'
+  ...
+# Subtest: a far-future deletion still hides an old message
+ok 14 - a far-future deletion still hides an old message
+  ---
+  duration_ms: 0.61794
+  type: 'test'
+  ...
+# Subtest: kind:5 (NIP-09) deletion hides the target message
+ok 15 - kind:5 (NIP-09) deletion hides the target message
+  ---
+  duration_ms: 0.43632
+  type: 'test'
+  ...
+# Subtest: kind:9005 (NIP-29 / Buzz-native) deletion hides the target message
+ok 16 - kind:9005 (NIP-29 / Buzz-native) deletion hides the target message
+  ---
+  duration_ms: 0.25704
+  type: 'test'
+  ...
+# Subtest: non-deletion event kinds do NOT hide the target message
+ok 17 - non-deletion event kinds do NOT hide the target message
+  ---
+  duration_ms: 1.17056
+  type: 'test'
+  ...
+# Subtest: user-signed actor tag does not affect timeline identity or profile loading
+ok 18 - user-signed actor tag does not affect timeline identity or profile loading
+  ---
+  duration_ms: 2.25594
+  type: 'test'
+  ...
+# Subtest: relay-signed actor tag resolves the delegated timeline author
+ok 19 - relay-signed actor tag resolves the delegated timeline author
+  ---
+  duration_ms: 16.24828
+  type: 'test'
+  ...
+# Subtest: collectReactionActorPubkeys returns active kind:7 actors only
+ok 20 - collectReactionActorPubkeys returns active kind:7 actors only
+  ---
+  duration_ms: 0.64904
+  type: 'test'
+  ...
+# Subtest: huddle start renders as a timeline row
+ok 21 - huddle start renders as a timeline row
+  ---
+  duration_ms: 0.88399
+  type: 'test'
+  ...
+# Subtest: deletion target with non-hex `e` tag value is ignored
+ok 22 - deletion target with non-hex `e` tag value is ignored
+  ---
+  duration_ms: 1.80661
+  type: 'test'
+  ...
+# Subtest: reaction pills sort by earliest created_at ascending
+ok 23 - reaction pills sort by earliest created_at ascending
+  ---
+  duration_ms: 3.44386
+  type: 'test'
+  ...
+# Subtest: reaction pills with equal created_at tiebreak deterministically on emoji string
+ok 24 - reaction pills with equal created_at tiebreak deterministically on emoji string
+  ---
+  duration_ms: 2.802901
+  type: 'test'
+  ...
+# Subtest: reaction pill order is invariant to duplicate same-actor same-emoji delivery order
+ok 25 - reaction pill order is invariant to duplicate same-actor same-emoji delivery order
+  ---
+  duration_ms: 1.13738
+  type: 'test'
+  ...
+# Subtest: countTopLevelTimelineRows counts top-level messages
+ok 26 - countTopLevelTimelineRows counts top-level messages
+  ---
+  duration_ms: 0.37915
+  type: 'test'
+  ...
+# Subtest: countTopLevelTimelineRows ignores collapsed thread replies
+ok 27 - countTopLevelTimelineRows ignores collapsed thread replies
+  ---
+  duration_ms: 0.352251
+  type: 'test'
+  ...
+# Subtest: countTopLevelTimelineRows counts broadcast replies as top-level
+ok 28 - countTopLevelTimelineRows counts broadcast replies as top-level
+  ---
+  duration_ms: 0.95235
+  type: 'test'
+  ...
+# Subtest: countTopLevelTimelineRows excludes deleted messages
+ok 29 - countTopLevelTimelineRows excludes deleted messages
+  ---
+  duration_ms: 0.538619
+  type: 'test'
+  ...
+# Subtest: countTopLevelTimelineRows ignores non-content kinds (reactions)
+ok 30 - countTopLevelTimelineRows ignores non-content kinds (reactions)
+  ---
+  duration_ms: 0.38488
+  type: 'test'
+  ...
+# Subtest: countTopLevelTimelineRows counts huddle start rows
+ok 31 - countTopLevelTimelineRows counts huddle start rows
+  ---
+  duration_ms: 0.21969
+  type: 'test'
+  ...
+# Subtest: huddle ended stays lifecycle-only, not a timeline row
+ok 32 - huddle ended stays lifecycle-only, not a timeline row
+  ---
+  duration_ms: 0.22718
+  type: 'test'
+  ...
+# Subtest: CHANNEL_TIMELINE_CONTENT_KINDS matches isTimelineContentEvent
+ok 33 - CHANNEL_TIMELINE_CONTENT_KINDS matches isTimelineContentEvent
+  ---
+  duration_ms: 0.405749
+  type: 'test'
+  ...
+# Subtest: original message link-preview none marker suppresses all generated previews
+ok 34 - original message link-preview none marker suppresses all generated previews
+  ---
+  duration_ms: 0.534379
+  type: 'test'
+  ...
+# Subtest: authorized suppression edit remains monotonic across later body edits
+ok 35 - authorized suppression edit remains monotonic across later body edits
+  ---
+  duration_ms: 0.498161
+  type: 'test'
+  ...
+# Subtest: spoofed suppression edit cannot hide another author's previews
+ok 36 - spoofed suppression edit cannot hide another author's previews
+  ---
+  duration_ms: 0.367489
+  type: 'test'
+  ...
+# Subtest: verified agent owner may publish a suppression edit
+ok 37 - verified agent owner may publish a suppression edit
+  ---
+  duration_ms: 0.42213
+  type: 'test'
+  ...
+# Subtest: native nested reply quotes only the parent's current first line, independent of presentation depth
+ok 38 - native nested reply quotes only the parent's current first line, independent of presentation depth
+  ---
+  duration_ms: 3.323981
+  type: 'test'
+  ...
+# Subtest: root replies, self references and messages without native reply tags have no quote
+ok 39 - root replies, self references and messages without native reply tags have no quote
+  ---
+  duration_ms: 0.48656
+  type: 'test'
+  ...
+# Subtest: unloaded and nontext parents keep exact native jump identity without inventing a quote
+ok 40 - unloaded and nontext parents keep exact native jump identity without inventing a quote
+  ---
+  duration_ms: 0.383031
+  type: 'test'
+  ...
+# Subtest: cross-channel or ambiguous channel tags never expose a parent chip
+ok 41 - cross-channel or ambiguous channel tags never expose a parent chip
+  ---
+  duration_ms: 0.262209
+  type: 'test'
+  ...
+# Subtest: actual Markdown transform preserves canonical local and remote session hrefs
+ok 42 - actual Markdown transform preserves canonical local and remote session hrefs
+  ---
+  duration_ms: 2.785559
+  type: 'test'
+  ...
+# Subtest: arbitrary schemes, other Paseo actions and malformed routes stay sanitized
+ok 43 - arbitrary schemes, other Paseo actions and malformed routes stay sanitized
+  ---
+  duration_ms: 0.57997
+  type: 'test'
+  ...
+# Subtest: production link click opens exact session through native opener and respects cancellation
+ok 44 - production link click opens exact session through native opener and respects cancellation
+  ---
+  duration_ms: 347.673265
+  type: 'test'
+  ...
+# Subtest: native capability only grants the main window's canonical agent route
+ok 45 - native capability only grants the main window's canonical agent route
+  ---
+  duration_ms: 0.76648
+  type: 'test'
+  ...
+1..45
+# tests 45
+# suites 0
+# pass 45
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 3858.25756

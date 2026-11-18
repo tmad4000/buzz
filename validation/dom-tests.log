@@ -1,0 +1,46 @@
+TAP version 13
+# Subtest: compact card exposes exact agent link, signed original text, and in-place report edits
+ok 1 - compact card exposes exact agent link, signed original text, and in-place report edits
+  ---
+  duration_ms: 94.110299
+  type: 'test'
+  ...
+# Subtest: read callbacks contain only committed rows and never descendants hidden by a collapsed root
+ok 2 - read callbacks contain only committed rows and never descendants hidden by a collapsed root
+  ---
+  duration_ms: 2402.477269
+  type: 'test'
+  ...
+# Subtest: focused panel restores branch/root disclosure focus for local and synchronized collapses without stealing outside focus
+ok 3 - focused panel restores branch/root disclosure focus for local and synchronized collapses without stealing outside focus
+  ---
+  duration_ms: 241.364467
+  type: 'test'
+  ...
+# Subtest: deep sidebar retains existing parent context when experiment is off and avoids duplicate context when on
+ok 4 - deep sidebar retains existing parent context when experiment is off and avoids duplicate context when on
+  ---
+  duration_ms: 81.054959
+  type: 'test'
+  ...
+# Subtest: thread row keeps native quote jump, accessible first line and body identity across pending/ack and quote removal
+ok 5 - thread row keeps native quote jump, accessible first line and body identity across pending/ack and quote removal
+  ---
+  duration_ms: 154.555588
+  type: 'test'
+  ...
+# Subtest: quote presentation remains off when experiment is disabled
+ok 6 - quote presentation remains off when experiment is disabled
+  ---
+  duration_ms: 30.942599
+  type: 'test'
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 6
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 5844.396813
