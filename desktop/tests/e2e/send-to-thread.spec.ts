@@ -1,6 +1,52 @@
 import { expect, test, type Page } from "@playwright/test";
 import fs from "node:fs";
+import { waitForAnimations } from "../helpers/animations";
 import { installMockBridge, TEST_IDENTITIES } from "../helpers/bridge";
+
+// Make the normally pointer-transparent glass participate in paint-order hit testing.
+async function expectAboveDockGlass(
+  page: Page,
+  testId: string,
+  selector = "span",
+) {
+  await expect
+    .poll(() =>
+      page.evaluate(
+        ({ testId, selector }) => {
+          const notice = document.querySelector<HTMLElement>(
+            `[data-testid="${testId}"]`,
+          );
+          const glass = notice
+            ?.closest(".composer-dock")
+            ?.querySelector<HTMLElement>(
+              '[data-testid="composer-dock-backdrop"]',
+            );
+          if (!notice || !glass) return "missing";
+          const target = notice.querySelector<HTMLElement>(selector);
+          if (!target) return "missing target";
+          const rect = target.getBoundingClientRect();
+          const layers = [glass, ...glass.querySelectorAll<HTMLElement>("*")];
+          const previous = layers.map((el) => el.style.pointerEvents);
+          for (const el of layers) el.style.pointerEvents = "auto";
+          try {
+            const top = document.elementFromPoint(
+              rect.left + rect.width / 2,
+              rect.top + rect.height / 2,
+            );
+            return target.contains(top)
+              ? "notice"
+              : (top?.getAttribute("data-testid") ?? top?.tagName ?? "none");
+          } finally {
+            layers.forEach((el, index) => {
+              el.style.pointerEvents = previous[index];
+            });
+          }
+        },
+        { testId, selector },
+      ),
+    )
+    .toBe("notice");
+}
 
 async function published(page: Page) {
   return page.evaluate(() =>
@@ -205,6 +251,22 @@ test("explicit keyboard routing, cancel and new-message fallback preserve inline
   await expect(page.getByTestId("routed-send-notice")).toContainText(
     "Sent to Signed release rollback plan",
   );
+  await expectAboveDockGlass(page, "routed-send-notice");
+  // The interactive controls stay above the glass as the composer grows.
+  await editor.fill("A newer draft\nwith a second line\nand a third line");
+  await expectAboveDockGlass(
+    page,
+    "routed-send-notice",
+    "button[data-routed-open]",
+  );
+  await expectAboveDockGlass(
+    page,
+    "routed-send-notice",
+    'button[aria-label="Dismiss sent confirmation"]',
+  );
+  await editor.clear();
+  await waitForAnimations(page);
+  await page.screenshot({ path: `${shots}/crisp-routed-receipt.png` });
   // The routed reply is in the existing inline thread and opens no other panel.
   const disclosure = page.locator(
     `[data-testid="message-thread-summary"][data-thread-head-id="${root}"]`,
@@ -541,4 +603,34 @@ test("DM committed publish failure keeps the queued reply and explicit Retry del
   await expect(page.getByTestId("routed-send-notice")).toContainText(
     "Sent to Committed DM route",
   );
+});
+
+test("timeout banner stays above composer dock glass", async ({ page }) => {
+  await installMockBridge(page);
+  await page.goto("/");
+  await page.getByTestId("channel-general").click();
+  const before = (await published(page)).length;
+  await page.evaluate(() => {
+    const activate = (
+      window as Window & {
+        __BUZZ_E2E_ACTIVATE_TIMEOUT__?: (expiresAtMs: number) => void;
+      }
+    ).__BUZZ_E2E_ACTIVATE_TIMEOUT__;
+    if (!activate) throw Error("Missing timeout fixture");
+    activate(Date.now() + 60000);
+  });
+  const banner = page.getByTestId("composer-timeout-banner");
+  await expect(banner).toContainText(
+    "You're timed out by community moderators",
+  );
+  await expectAboveDockGlass(page, "composer-timeout-banner");
+  await page.evaluate(() => document.documentElement.classList.add("dark"));
+  await expectAboveDockGlass(page, "composer-timeout-banner");
+  const shots =
+    process.env.BUZZ_THREAD_ROUTING_SCREENSHOTS ??
+    "test-results/send-to-thread";
+  fs.mkdirSync(shots, { recursive: true });
+  await waitForAnimations(page);
+  await page.screenshot({ path: `${shots}/crisp-timeout-banner-dark.png` });
+  expect((await published(page)).length).toBe(before);
 });

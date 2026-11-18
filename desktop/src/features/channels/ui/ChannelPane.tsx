@@ -865,7 +865,9 @@ export const ChannelPane = React.memo(function ChannelPane({
                   {timeoutActive ? <ComposerTimeoutBanner /> : null}
                   <ComposerDockBackdrop gutterClassName="inset-x-5" />
                   {routedSend.notice ? (
-                    <div className="px-5">{routedSend.notice}</div>
+                    <div className="relative z-10 px-5">
+                      {routedSend.notice}
+                    </div>
                   ) : null}
                   <MessageComposer
                     channelId={activeChannel?.id ?? null}
