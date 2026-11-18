@@ -1,3 +1,4 @@
+import { OfflineConversation } from "./OfflineConversation";
 import * as React from "react";
 import { ChannelScreen } from "@/features/channels/ui/ChannelScreen";
 import type { ChannelScreenProps } from "@/features/channels/ui/ChannelScreen.types";
@@ -61,7 +62,9 @@ export function ConversationViewHost({
             initialValues={initialPanelState}
             onNavigate={onPanelNavigate}
           >
-            <ChannelScreen {...channel} />
+            <OfflineConversation channelId={channel.activeChannel?.id ?? null}>
+              <ChannelScreen {...channel} />
+            </OfflineConversation>
           </HistorySearchScopeProvider>
         </MainInsetProvider>
       </ConversationViewContext.Provider>

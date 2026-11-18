@@ -1,3 +1,5 @@
+import { hydrateOfflineProfiles } from "@/features/messages/lib/offlineQueryCache";
+import { channelHeadCacheScope } from "@/features/messages/lib/channelHeadCache";
 import type {
   InfiniteData,
   QueryClient,
@@ -352,6 +354,8 @@ export function useUsersBatchQuery(
     // per-pubkey entry cache first and hit the network only for pubkeys not
     // freshly resolved.
     queryFn: async () => {
+      const offlineScope = channelHeadCacheScope(queryClient);
+      if (offlineScope) await hydrateOfflineProfiles(queryClient, offlineScope, normalizedPubkeys).catch(error => console.warn("Offline profile hydration failed", error));
       const now = Date.now();
       const profiles: UsersBatchResponse["profiles"] = {};
       const missing: string[] = [];

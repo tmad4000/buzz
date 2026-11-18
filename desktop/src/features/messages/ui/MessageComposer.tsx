@@ -1,3 +1,4 @@
+import { offlineNeedsConnection } from "@/shared/api/offlineConnection";
 import { OutboxContext } from "../outbox/OutboxProvider";
 import { OutboxRows } from "../outbox/OutboxRows";
 import * as React from "react";
@@ -310,6 +311,7 @@ function MessageComposerImpl({
     getMentionIdentities: mentions.getMentionIdentities,
     onSubmit: () => submitMessageRef.current(),
     onEditLastOwnMessage: () => {
+      if (offlineNeedsConnection()) return false;
       if (editTargetRef.current) return false;
       const handler = onEditLastOwnMessageRef.current;
       return handler ? handler() : false;

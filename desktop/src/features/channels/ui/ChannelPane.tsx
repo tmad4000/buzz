@@ -1,3 +1,4 @@
+import { useDeviceOffline } from "@/shared/api/offlineConnection";
 import { useRoutedSendReturn } from "./useRoutedSendReturn";
 import { useTimelineView } from "./TimelineViewContext";
 import { ChannelTimelineProviders } from "./ChannelTimelineProviders";
@@ -198,6 +199,7 @@ export const ChannelPane = React.memo(function ChannelPane({
   threadFirstUnreadReplyId,
   typingPubkeys,
 }: ChannelPaneProps) {
+  const offline = useDeviceOffline();
   const timelineScrollRef = React.useRef<HTMLDivElement>(null);
   const messageTimelineRef = React.useRef<MessageTimelineHandle>(null);
   const composerWrapperRef = React.useRef<HTMLDivElement>(null);
@@ -755,12 +757,12 @@ export const ChannelPane = React.memo(function ChannelPane({
                 ownerProfiles={ownerProfiles}
                 unfollowThreadById={unfollowThreadById}
                 emptyDescription={
-                  activeChannel?.channelType === "forum"
+                  offline ? "Connect to load this conversation. Cached messages are shown when available." : activeChannel?.channelType === "forum"
                     ? "Select a stream or DM to load real message history in this first integration pass."
                     : "Messages and sub-replies will appear here once the relay has history for this channel."
                 }
                 emptyTitle={
-                  activeChannel
+                  offline ? "Not available offline" : activeChannel
                     ? activeChannel.channelType === "forum"
                       ? "Forum channels are next"
                       : "No messages yet"

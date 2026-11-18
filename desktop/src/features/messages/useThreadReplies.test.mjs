@@ -48,6 +48,7 @@ registerHooks({
         // Delegate to test-controlled global so each hook test can swap the
         // fetcher without reloading the cached module.
         source: `
+export * from ${JSON.stringify(new URL("../../shared/api/tauri.ts", import.meta.url).href)};
 export async function getThreadReplies(rootId, channelId, options) {
   return globalThis.__tauriGetThreadReplies(rootId, channelId, options);
 }

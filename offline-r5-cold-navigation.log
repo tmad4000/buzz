@@ -1,0 +1,10 @@
+✔ R5 flag OFF preserves legacy load/store/hydration and opening Storage has zero encrypted IPC/migration (76.076449ms)
+✔ R5 OFF cold navigation dispatches relay without a second legacy cache read (226.497057ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3795.244858

@@ -22,13 +22,17 @@ export { isRelayConnectionDegraded };
 export function useRelayConnection(options?: {
   /** Min ms a non-healthy state must persist before being reported. */
   degradedAfterMs?: number;
+  /** Avoid subscriptions for disabled opt-in consumers. */
+  enabled?: boolean;
 }): ConnectionState {
   const degradedAfterMs = options?.degradedAfterMs ?? 2_000;
+  const enabled = options?.enabled ?? true;
   const [state, setState] = React.useState<ConnectionState>(() =>
     relayClient.getConnectionState(),
   );
 
   React.useEffect(() => {
+    if (!enabled) return;
     let pendingTimer: number | null = null;
 
     const clearPending = () => {
@@ -58,7 +62,7 @@ export function useRelayConnection(options?: {
       clearPending();
       unsubscribe();
     };
-  }, [degradedAfterMs]);
+  }, [degradedAfterMs, enabled]);
 
   return state;
 }

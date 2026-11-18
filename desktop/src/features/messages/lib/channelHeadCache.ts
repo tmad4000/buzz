@@ -1,3 +1,4 @@
+import { offlineCacheEnabled } from "@/shared/api/offlineCache";
 import type { QueryClient } from "@tanstack/react-query";
 import {
   loadChannelHeadCache,
@@ -17,6 +18,7 @@ const hydratedChannels = new WeakMap<QueryClient, Set<string>>();
 const persistedHydratedChannels = new WeakMap<QueryClient, Set<string>>();
 const cacheScopes = new WeakMap<QueryClient, ChannelHeadScope>();
 export function isChannelHeadCacheEnabled(): boolean {
+  if (offlineCacheEnabled()) return true;
   if (typeof window === "undefined") return false;
   if (import.meta.env?.VITE_BUZZ_CHANNEL_HEAD_CACHE === "off") return false;
   return window.localStorage.getItem("buzz-channel-head-cache") !== "off";
@@ -60,14 +62,29 @@ export function hydrateChannelHeads(
   hydrations.set(queryClient, hydration);
   return hydration;
 }
+/** Load an older cached conversation only when navigation actually opens it. */
+export async function hydrateChannelHeadForNavigation(
+  queryClient: QueryClient,
+  channelId: string,
+): Promise<void> {
+  const scope = cacheScopes.get(queryClient);
+  if (scope && !queryClient.getQueryData(channelMessagesKey(channelId)))
+    await seedChannelHeads(queryClient, scope, channelId);
+}
 async function seedChannelHeads(
   queryClient: QueryClient,
   scope: ChannelHeadScope,
+  channelId?: string,
 ): Promise<void> {
   if (!isChannelHeadCacheEnabled()) return;
   cacheScopes.set(queryClient, scope);
-  const entries = await loadChannelHeadCache(scope, 12);
-  const hydrated = new Set<string>();
+  const entries = await loadChannelHeadCache(
+    scope,
+    channelId ? 1 : 12,
+    channelId,
+  );
+  if (cacheScopes.get(queryClient) !== scope) return;
+  const hydrated = hydratedChannels.get(queryClient) ?? new Set<string>();
   for (const entry of entries) {
     try {
       const page = parseChannelWindowResponse(
@@ -80,6 +97,20 @@ async function seedChannelHeads(
       // empty-channel intro over rows that are still revalidating.
       if (page.rows.length === 0) continue;
       const windowKey = channelWindowKey(entry.channelId);
+      if (
+        queryClient.getQueryData(["offline-live", entry.channelId]) !==
+        undefined
+      )
+        continue;
+      if (offlineCacheEnabled()) {
+        queryClient.setQueryData(["offline-snapshot", entry.channelId], {
+          savedAt: entry.savedAt,
+          source: "cache",
+        });
+        queryClient.setQueryData(["offline-cached-at", entry.channelId], {
+          savedAt: entry.savedAt,
+        });
+      }
       const messagesKey = channelMessagesKey(entry.channelId);
       // Merge, don't replace: the app mounts while this load is in flight, so
       // the live subscription may already have overlaid events on this store.
@@ -105,6 +136,12 @@ async function seedChannelHeads(
   }
   if (hydrated.size > 0) {
     hydratedChannels.set(queryClient, hydrated);
-    persistedHydratedChannels.set(queryClient, new Set(hydrated));
+    persistedHydratedChannels.set(
+      queryClient,
+      new Set([
+        ...(persistedHydratedChannels.get(queryClient) ?? []),
+        ...hydrated,
+      ]),
+    );
   }
 }

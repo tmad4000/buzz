@@ -1,0 +1,47 @@
+✔ loadThreadReplies throws ThreadExpectedEventMissingError when expected event is absent (733.346921ms)
+✔ loadThreadReplies resolves normally when expected event is present (10.17219ms)
+✔ loadThreadReplies returns fetched replies when target is in exhaustedTargets (3.90677ms)
+✔ loadThreadReplies resolves normally with no expectedEventId (3.85761ms)
+✔ loadThreadReplies aggregates events across multiple pages (6.97769ms)
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+✔ useThreadReplies resolves to data after exhausting missing-event retries (717.892691ms)
+✔ useThreadReplies null-to-target change retries on missing-target page and lands target data (1060.236867ms)
+✔ useThreadReplies cancels stale in-flight cold fetch when target arrives (91.391019ms)
+✔ thread replies trust the relay-provided aux closure (17.83534ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5243.161776

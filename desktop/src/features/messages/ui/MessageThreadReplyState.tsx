@@ -1,3 +1,4 @@
+import { useDeviceOffline } from "@/shared/api/offlineConnection";
 import type { ReactNode } from "react";
 
 import {
@@ -113,6 +114,26 @@ export function ThreadReplyRegion({
   renderSkeleton: () => ReactNode;
   renderList: () => ReactNode;
 }) {
+  const offline = useDeviceOffline();
+  if (offline && deferredCount === 0 && liveCount === 0 && !isHuddleTranscript)
+    return (
+      <div
+        role="status"
+        className="rounded-2xl border border-dashed px-4 py-6 text-center text-sm"
+      >
+        Replies load when you're back online
+        {onRetry ? (
+          <Button
+            className="mt-3"
+            onClick={onRetry}
+            size="sm"
+            variant="outline"
+          >
+            Retry
+          </Button>
+        ) : null}
+      </div>
+    );
   const surface = selectThreadRepliesSurface({
     isPending,
     isError,

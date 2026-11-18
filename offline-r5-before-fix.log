@@ -1,0 +1,33 @@
+✔ R5 flag OFF preserves legacy load/store/hydration and opening Storage has zero encrypted IPC/migration (57.5776ms)
+✖ R5 OFF cold navigation dispatches relay without a second legacy cache read (162.708209ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 1
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2274.125834
+
+✖ failing tests:
+
+test at src/features/settings/ui/offlineOffBaseline.jsdom-test.mjs:122:1
+✖ R5 OFF cold navigation dispatches relay without a second legacy cache read (162.708209ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    [
+      12,
+  +   1
+    ]
+  
+      at TestContext.<anonymous> (file:///home/dev/agent-worktrees/buzz-offline-p1-20261118/desktop/src/features/settings/ui/offlineOffBaseline.jsdom-test.mjs:151:12)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ 12, 1 ],
+    expected: [ 12 ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

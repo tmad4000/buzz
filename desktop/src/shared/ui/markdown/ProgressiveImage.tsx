@@ -1,3 +1,4 @@
+import { useDeviceOffline } from "@/shared/api/offlineConnection";
 import * as React from "react";
 
 import { cn } from "@/shared/lib/cn";
@@ -50,6 +51,8 @@ export function ProgressiveImage({
   thumbSrc,
   width,
 }: ProgressiveImageProps) {
+  const offline = useDeviceOffline();
+  const [unavailable, setUnavailable] = React.useState(false);
   const thumbnailSrc = isSameImageSource(thumbSrc, resolvedSrc)
     ? undefined
     : thumbSrc;
@@ -101,6 +104,7 @@ export function ProgressiveImage({
       data-progressive-image-frame=""
       style={frameStyle}
     >
+      {offline && unavailable ? <span className="flex h-full items-center justify-center text-sm text-muted-foreground">Available when online</span> : null}
       {thumbnailSrc ? (
         <img
           alt=""
@@ -136,7 +140,8 @@ export function ProgressiveImage({
           src={resolvedSrc}
           style={style}
           width={width}
-          onLoad={(event) => void handleFullLoad(event.currentTarget)}
+          onError={() => setUnavailable(true)}
+          onLoad={(event) => { setUnavailable(false); void handleFullLoad(event.currentTarget); }}
         />
       ) : null}
     </span>

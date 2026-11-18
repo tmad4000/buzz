@@ -1,3 +1,7 @@
+import {
+  useDeviceOffline,
+  offlineNeedsConnection,
+} from "@/shared/api/offlineConnection";
 import { Plus } from "lucide-react";
 
 import { Button } from "@/shared/ui/button";
@@ -17,11 +21,15 @@ export function CreateNewButton({
   onClick,
   variant = "default",
 }: CreateNewButtonProps) {
+  const offline = useDeviceOffline();
   return (
     <Button
       aria-label={ariaLabel}
-      disabled={disabled}
-      onClick={onClick}
+      disabled={disabled || offline}
+      title={offline ? "Needs a connection" : undefined}
+      onClick={() => {
+        if (!offlineNeedsConnection()) onClick();
+      }}
       size="sm"
       type="button"
       variant={variant}
