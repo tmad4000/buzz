@@ -241,7 +241,11 @@ function Filter({
 
 function QuickAdd() {
   const [open, setOpen] = useState(false);
-  const [text, setText] = useState("");
+  const [text, setText] = useState(() =>
+    new URLSearchParams(location.search).get("view") === "quick-add"
+      ? "Fix the pin-edit guard @Sol #PR70 due Fri 9am"
+      : "",
+  );
   const [delegate, setDelegate] = useState<Entry | null>(null);
   const input = useRef<HTMLInputElement>(null);
   useEffect(() => {
@@ -463,6 +467,12 @@ export default {
   async prepare(view) {
     await waitFor('[data-testid="home-inbox"]');
     await waitFor('[data-testid^="home-inbox-item-"]');
+    if (view === "filters") {
+      (await waitFor('[data-testid="mockup-inbox-filter"]')).dispatchEvent(
+        new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }),
+      );
+      await waitFor('[role="menu"] [role="menuitem"]');
+    }
     if (view === "quick-add") {
       (await waitFor('[data-testid="mockup-inbox-new"]')).click();
       await waitFor('[role="dialog"] input');

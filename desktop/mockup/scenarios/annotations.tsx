@@ -367,6 +367,9 @@ export default {
   async prepare(view) {
     await waitFor('[data-testid="message-thread-panel"]');
     await waitFor('[data-testid="mockup-annotations"]');
+    await waitFor(
+      `[data-testid="message-thread-panel"] [data-message-id="${answer}"]`,
+    );
     if (view === "feedback") {
       (await waitFor("[data-mockup-feedback]")).click();
       await waitFor('[role="dialog"]');

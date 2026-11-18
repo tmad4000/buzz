@@ -28,6 +28,7 @@ const designs = {
     title: "Inbox v2",
     views: [
       ["", "Inbox with proposed filters"],
+      ["filters", "Filter counts"],
       ["quick-add", "Quick add"],
     ],
   },

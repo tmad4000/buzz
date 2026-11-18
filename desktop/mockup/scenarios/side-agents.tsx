@@ -356,7 +356,12 @@ export default {
   },
   async prepare(view) {
     await waitFor('[data-testid="message-thread-panel"]');
-    if (view === "association") return;
+    if (view === "association") {
+      await waitFor(
+        `[data-testid="message-thread-panel"] [data-message-id="${eventId(34)}"]`,
+      );
+      return;
+    }
     (await waitFor('[data-testid="mockup-page-toggle"]')).click();
     await waitFor('iframe[title="Channel Page HTML"]');
     if (view !== "docked")

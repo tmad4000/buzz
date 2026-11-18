@@ -16,7 +16,7 @@ Open `/mockup.html?scenario=shell&theme=light` on the preview server. Use `theme
 
 ```sh
 pnpm mockup:build
-pnpm mockup:shots "$PREVIEW_URL" "$PREVIEW_DIR/shots" send-to-thread send-to-thread:origin side-agents side-agents:docked side-agents:association inbox inbox:quick-add annotations annotations:feedback lanes
+pnpm mockup:shots "$PREVIEW_URL" "$PREVIEW_DIR/shots" send-to-thread send-to-thread:origin side-agents side-agents:docked side-agents:association inbox inbox:filters inbox:quick-add annotations annotations:feedback lanes
 pnpm mockup:index "$PREVIEW_DIR" send-to-thread side-agents inbox annotations lanes
 ```
 
