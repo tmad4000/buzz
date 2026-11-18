@@ -9,6 +9,8 @@ import {
   createRouter,
   RouterProvider,
 } from "@tanstack/react-router";
+import { PAGE_ANCHOR, PAGE_KIND } from "@/features/channel-page/model";
+import { relayClient } from "@/shared/api/relayClient";
 import { AppShellProvider, useAppShell } from "@/app/AppShellContext";
 import { ConversationViewHost } from "@/features/conversations/ConversationViewHost";
 import { ConversationDraftEditorsProvider } from "@/features/conversations/ConversationDraftEditors";
@@ -65,13 +67,69 @@ window.__BUZZ_E2E__ = {
       }
     : undefined,
 };
+const pageHost = new URLSearchParams(location.search).get("pageHost");
 const { maybeInstallE2eTauriMocks } = await import("@/testing/e2eBridge");
 maybeInstallE2eTauriMocks();
 const identity: Identity = await getIdentity();
-const channel: Channel | undefined = (await getChannels(null)).channels?.find(
+const general: Channel | undefined = (await getChannels(null)).channels?.find(
   (value) => value.name === "general",
 );
-if (!channel) throw new Error("Missing synthetic general channel");
+if (!general) throw new Error("Missing synthetic general channel");
+const channel =
+  pageHost === "forum" || pageHost === "dm"
+    ? { ...general, channelType: pageHost }
+    : general;
+if (pageHost) {
+  const html = "<h1>Shared page</h1>";
+  const publication = "00000000-0000-4000-8000-000000000001";
+  const chunk = {
+    id: "a".repeat(64),
+    pubkey: identity.pubkey,
+    kind: PAGE_KIND,
+    created_at: 100,
+    sig: "",
+    tags: [
+      ["h", channel.id],
+      ["d", `buzz-page:chunk:${publication}:0`],
+    ],
+    content: JSON.stringify({
+      type: "buzz.page.chunk",
+      version: 1,
+      page: "page",
+      publication,
+      index: 0,
+      html,
+    }),
+  };
+  const manifest = {
+    ...chunk,
+    id: "b".repeat(64),
+    tags: [
+      ["h", channel.id],
+      ["d", "buzz-page:page"],
+      ["e", PAGE_ANCHOR],
+      ["t", "buzz-page-v1"],
+    ],
+    content: JSON.stringify({
+      type: "buzz.page",
+      version: 1,
+      page: "page",
+      publication,
+      chunks: [chunk.id],
+      bytes: new TextEncoder().encode(html).byteLength,
+    }),
+  };
+  const fetchEvents = relayClient.fetchEvents.bind(relayClient);
+  relayClient.fetchEvents = (filter, ...args) =>
+    filter.kinds?.includes(PAGE_KIND)
+      ? Promise.resolve(filter.ids ? [chunk] : [manifest])
+      : fetchEvents(filter, ...args);
+  const subscribeLive = relayClient.subscribeLive.bind(relayClient);
+  relayClient.subscribeLive = (filter, ...args) =>
+    filter.kinds?.includes(PAGE_KIND)
+      ? Promise.resolve(noop)
+      : subscribeLive(filter, ...args);
+}
 initDraftStore(identity.pubkey, community.relayUrl);
 persistDraftEntry(
   channel.id,
@@ -186,9 +244,11 @@ function Screen() {
           </div>
           <div
             className="grid min-h-0 flex-1"
-            style={{ gridTemplateColumns: showA ? "1fr 1fr" : "1fr" }}
+            style={{
+              gridTemplateColumns: showA && !pageHost ? "1fr 1fr" : "1fr",
+            }}
           >
-            {[...(showA ? ["a"] : []), "b"].map((id) => (
+            {(pageHost ? ["a"] : [...(showA ? ["a"] : []), "b"]).map((id) => (
               <PerViewShell key={id} id={id}>
                 <ConversationViewHost
                   viewInstanceId={id}
@@ -196,7 +256,11 @@ function Screen() {
                   visible
                   label={`General ${id}`}
                   onFocusView={setFocused}
-                  initialPanelState={{ thread: id === "a" ? rootA : rootB }}
+                  initialPanelState={
+                    pageHost === "focus" || !pageHost
+                      ? { thread: id === "a" ? rootA : rootB }
+                      : undefined
+                  }
                   channel={{
                     activeChannel: channel ?? null,
                     currentIdentity: identity,
