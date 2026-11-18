@@ -37,6 +37,8 @@ type UseAnchoredScrollOptions = {
   channelId?: string | null;
   /** Suppresses initial scroll-to-bottom while a skeleton is showing. */
   isLoading: boolean;
+  /** Reserve initial positioning for a saved slot; scope must own this initial choice. */
+  deferInitialPosition?: boolean;
   /** Source of truth for the rendered list. Used to detect new-at-bottom
    *  arrivals and to seed/refresh the anchor pre-render. */
   messages: Array<{ id: string }>;
@@ -159,6 +161,7 @@ export function useAnchoredScroll({
   contentRef,
   channelId,
   isLoading,
+  deferInitialPosition = false,
   messages,
   splitPanelOpen = false,
 
@@ -186,11 +189,34 @@ export function useAnchoredScroll({
   });
   React.useLayoutEffect(() => {
     committedVisit.current = visit;
+    if (deferInitialPosition) readingOwner.reserve();
+    const container = scrollContainerRef.current;
+    const gesture = () => {
+      if (
+        !readingOwner.blocked() ||
+        committedVisit.current !== visit ||
+        !container?.isConnected
+      )
+        return;
+      readingOwner.retire();
+      hasInitializedRef.current = true;
+      settlingRef.current = false;
+      anchorRef.current = computeAnchor(container);
+      const bottom = anchorRef.current.kind === "at-bottom";
+      virtualizerAtBottomRef.current = bottom;
+      setIsAtBottom(bottom);
+    };
+    const events = ["wheel", "touchstart", "keydown", "pointerdown"];
+    if (deferInitialPosition)
+      for (const event of events)
+        container?.addEventListener(event, gesture, { passive: true });
     return () => {
+      for (const event of events)
+        container?.removeEventListener(event, gesture);
       readingOwner.retire();
       if (committedVisit.current === visit) committedVisit.current = null;
     };
-  }, [visit, readingOwner]);
+  }, [visit, readingOwner, deferInitialPosition, scrollContainerRef]);
   const anchorRef = React.useRef<AnchorState>({ kind: "at-bottom" });
   const virtualizerAtBottomRef = React.useRef(true);
   const [isAtBottom, setIsAtBottom] = React.useState(true);

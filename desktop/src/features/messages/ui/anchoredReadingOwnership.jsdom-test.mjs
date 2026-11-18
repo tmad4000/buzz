@@ -269,3 +269,91 @@ test("virtualized mid-history release does not revive bottom settlement on resiz
     globalThis.ResizeObserver = previousObserver;
   }
 });
+
+test("a saved-slot reservation blocks the first pin and yields to a reading gesture or explicit latest", async () => {
+  const previousObserver = globalThis.ResizeObserver;
+  const observers = [];
+  globalThis.ResizeObserver = class {
+    constructor(callback) {
+      this.callback = callback;
+      observers.push(this);
+    }
+    observe() {}
+    disconnect() {}
+  };
+  const scroller = document.createElement("div");
+  const row = document.createElement("div");
+  row.dataset.messageId = "m1";
+  scroller.append(row);
+  document.body.append(scroller);
+  Object.defineProperties(scroller, {
+    scrollHeight: { value: 1000 },
+    clientHeight: { value: 100 },
+  });
+  scroller.getBoundingClientRect = () => ({ top: 0, bottom: 100 });
+  row.getBoundingClientRect = () => ({
+    top: 300 - scroller.scrollTop,
+    bottom: 350 - scroller.scrollTop,
+  });
+  let writes = 0;
+  scroller.scrollTop = 300;
+  scroller.scrollTo = (options) => {
+    writes++;
+    scroller.scrollTop = options.top;
+  };
+  const container = { current: scroller };
+  const mount = document.createElement("div");
+  document.body.append(mount);
+  const root = createRoot(mount);
+  let view;
+  const messages = [{ id: "m1" }];
+  function Harness({ channelId = "reserved" }) {
+    view = useAnchoredScroll({
+      scrollContainerRef: container,
+      contentRef: container,
+      channelId,
+      isLoading: false,
+      messages,
+      deferInitialPosition: true,
+    });
+    return null;
+  }
+  const render = async (props = {}) =>
+    act(() => root.render(React.createElement(Harness, props)));
+  try {
+    await render();
+    await act(() => {
+      for (const observer of observers) observer.callback([]);
+    });
+    assert.equal(
+      writes,
+      0,
+      "mount and resize cannot consume a saved slot before its restore starts",
+    );
+    await act(() => scroller.dispatchEvent(new Event("wheel")));
+    await render();
+    await act(() => {
+      for (const observer of observers) observer.callback([]);
+    });
+    assert.equal(
+      writes,
+      0,
+      "a reader gesture adopts the current position without pinning",
+    );
+    assert.equal(view.isAtBottom, false);
+    await render({ channelId: "next-reserved" });
+    assert.equal(writes, 0);
+    await act(() => view.scrollToBottom());
+    assert.equal(
+      writes,
+      1,
+      "explicit latest retires an unclaimed reservation immediately",
+    );
+    assert.equal(view.isAtBottom, true);
+  } finally {
+    await act(() => root.unmount());
+    scroller.remove();
+    mount.remove();
+    globalThis.ResizeObserver = previousObserver;
+  }
+});
