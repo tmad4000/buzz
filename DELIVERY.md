@@ -25,3 +25,6 @@ Known cross-device limitation: **other devices do not show “Forwarded ↗”**
 
 
 Stack refresh: merged the latest PR81head83d1462c1 into this owned branch, retaining its owner-approved Star/runtime slot reservation. The only merge conflict was DELIVERY.md; this file retains the forwarding report and the three semantic safeguards above. Final refreshed-stack typecheck PASS;30/30 focused tests PASS for the forward changes. PR81 itself was not changed.
+
+
+PR81 P1 base fix: merged eeaa2c2d62d31025b7b2c9651c456ec3ffef5d53. Zero-version DEFAULT_DEV is explicitly a placeholder, so delayed authored legacy names (including same-name Paseo and local-cache1 A) replace the upgraded baseline; genuine authored strings/null/false remain protected. The independent NO-GO requires exact-head re-review; this branch no longer retains the known bad base source. PR81's37-case focused suite and typecheck pass; refreshed forwarding-stack checks are pending. Only DELIVERY.md conflicted in the base merge, resolved by keeping this forwarding report.

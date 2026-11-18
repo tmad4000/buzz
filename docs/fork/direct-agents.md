@@ -10,7 +10,7 @@ Agent cards are global per community, like profiles. Do not publish secrets, hos
 
 The reviewed native opener commits 7472d44a and b04b419e are included as two separate prerequisite cherry-picks. Runtime links further restrict the TS path to the same three exact paired server IDs as the native capability. Host/session mismatches are rejected. Query/hash/extra-path routes are rejected.
 
-The Jacob-only encrypted bootstrap loader upgrades only the exact seed's untouched Paseo section name register. A stamp-zero successor survives re-merging the old seed; authored changes to any section field and legacy data win. No section IDs, membership, order, Starred sources, P2 channel name or forwarding contract change. Adding Hermes/Buzz DM membership requires the existing private seed owner/device workflow; this PR does not invent identity/channel IDs or mutate Jacob's live preferences.
+The Jacob-only encrypted bootstrap loader upgrades only the exact seed's untouched Paseo section name register. A stamp-zero reserved DEFAULT_DEV successor survives re-merging the old seed and is explicitly treated as a cache placeholder, including after persistence/reload; delayed legacy local-cache or remote authored heads can replace it. Authored changes to any section field remain protected. No section IDs, membership, order, Starred sources, P2 channel name or forwarding contract change. Adding Hermes/Buzz DM membership requires the existing private seed owner/device workflow; this PR does not invent identity/channel IDs or mutate Jacob's live preferences.
 
 ## Writer contract and owner integration
 
@@ -60,3 +60,6 @@ That snippet is a field fragment, not a complete card. Include actual delegated 
 Source/typecheck/unit tests do not verify macOS handler registration, live relay publication, native layout or human acceptance. Those remain release-captain gates. No dependencies, lockfiles, release versions or new relay kinds are introduced.
 
 Sidebar composition follow-up: the runtime sibling actions reserve `right-14`, leaving PR46's `right-6` Star toggle in a separate slot. Sidebar owner36ce8949 approved the seed-only rename guard and this positional reservation. Exact native narrow-row/focus/hit-target acceptance remains captain-scoped. A captain-authorized single M5 status lookup at2026-11-18T06:31:07Z failed without a server ID; the M5 allowlist value remains unverified live and no retry is authorized.
+
+
+Independent P1 correction: zero-version DEFAULT_DEV is now explicitly a placeholder. This fixes delayed meta-less authored renames (including back to Paseo) after the upgraded bootstrap and persistence/reload, without treating any nonzero authored DEFAULT_DEV register as a placeholder. The regression also covers local-cache stamp1 names alphabetically before Direct agents; using stamp1 for the upgraded baseline would not preserve that case. Exact-head source re-review is required.
