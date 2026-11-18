@@ -3,6 +3,10 @@ import {
   type ExplicitExpansionSnapshot,
 } from "./explicitExpansion";
 import { z } from "zod";
+import {
+  isViewReadingPositions,
+  type ViewReadingPositions,
+} from "./readingPositions";
 import { CHANNEL_SEARCH_KEYS } from "@/features/channels/ui/channelSearchKeys";
 import {
   FIRST_SLICE_PANE_LIMIT,
@@ -46,6 +50,9 @@ export const conversationViewSchema = z
       .optional(),
     timelineAnchor: anchor,
     threadAnchor: anchor,
+    readingPositions: z
+      .custom<ViewReadingPositions>(isViewReadingPositions)
+      .optional(),
   })
   .strict();
 const node: z.ZodType<LayoutNode> = z.lazy(() =>

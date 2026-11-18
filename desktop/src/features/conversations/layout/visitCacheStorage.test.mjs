@@ -3,6 +3,11 @@ import test from "node:test";
 import { ConversationVisitCache, parseVisitCache } from "./visitCache.ts";
 import { MAX_LAYOUT_BYTES } from "./schema.ts";
 import {
+  readingPositionKey,
+  readPosition,
+  updateReadingPosition,
+} from "./readingPositions.ts";
+import {
   restoreVisitCache,
   saveVisitCache,
   visitCacheStorageKey,
@@ -22,6 +27,48 @@ const chat = (channelId, id = "a") => ({
 });
 const serialize = (chats) =>
   JSON.stringify({ version: 1, views: [{ viewId: "a", chats }] });
+
+test("visit serialization retains bounded mode positions and returns defensive copies", () => {
+  const key = readingPositionKey("thread", "split", "root");
+  const value = {
+    ...chat("channel"),
+    readingPositions: updateReadingPosition(undefined, key, {
+      id: "reply",
+      offset: -8,
+      pixel: 100,
+      neighbors: ["root"],
+    }),
+  };
+  const cache = new ConversationVisitCache();
+  cache.remember(value);
+  value.readingPositions[0].position.neighbors.push("source-mutation");
+  const restored = new ConversationVisitCache();
+  assert.equal(restored.restore(cache.serialize()), true);
+  const first = restored.recall("a", "channel");
+  assert.deepEqual(readPosition(first.readingPositions, key).neighbors, [
+    "root",
+  ]);
+  first.readingPositions[0].position.neighbors.push("caller-mutation");
+  assert.deepEqual(
+    readPosition(restored.recall("a", "channel").readingPositions, key)
+      .neighbors,
+    ["root"],
+  );
+  assert.equal(
+    parseVisitCache(
+      serialize([
+        {
+          ...value,
+          readingPositions: Array.from(
+            { length: 9 },
+            () => value.readingPositions[0],
+          ),
+        },
+      ]),
+    ),
+    null,
+  );
+});
 
 test("stored visit cache rejects unbounded, duplicate, mismatched and command-bearing data", () => {
   for (const raw of [
