@@ -613,9 +613,11 @@ test("incoming replies above and below a scrolled reader preserve anchor, focuse
     return { viewport, aboveBox, belowBox, bottomGap };
   };
   await assertOffscreenBaseline();
-  const main = page
-    .getByTestId("message-composer")
-    .filter({ has: page.getByTestId("send-to-thread") });
+  const main = page.getByTestId("message-composer").filter({
+    has: page.locator(
+      '[data-testid="send-to-thread"]:not([data-thread-routing-head])',
+    ),
+  });
   const editor = main.getByTestId("message-input");
   const draft = "Keep this exact draft and middle caret";
   await editor.fill(draft);

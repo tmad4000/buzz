@@ -34,6 +34,7 @@ export default defineConfig({
         "**/inline-threads.spec.ts",
         "**/unseen-replies.spec.ts",
         "**/send-to-thread.spec.ts",
+        "**/nested-thread-routing.spec.ts",
         "**/identity-key-help.spec.ts",
         "**/exact-key-profile.spec.ts",
         "**/key-import-reveal.spec.ts",

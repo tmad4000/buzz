@@ -62,3 +62,60 @@ test("summary participant and reply recency contribute without treating scores a
   assert.equal(result[0].replyCount, 7);
   assert.equal(result[0].reason, "Participant mentioned in draft");
 });
+
+test("nested ranking admits only proved descendants, including deep replies, and keeps main ranking unchanged", () => {
+  const entries = [
+    entry("root", "Other topic"),
+    entry("child", "Release", 900, { parentId: "root" }),
+    entry("deep", "Release rollback", 500, { parentId: "child" }),
+    entry("sibling", "Release rollback exact", 1000, {
+      parentId: "elsewhere",
+      rootId: "root",
+    }),
+    entry("orphan", "Release rollback", 1000, {
+      parentId: "missing",
+      rootId: "root",
+    }),
+    entry("pending-child", "Release rollback", 1000, {
+      parentId: "root",
+      pending: true,
+    }),
+    entry("system-child", "Release rollback", 1000, {
+      parentId: "root",
+      kind: 40099,
+    }),
+  ];
+  assert.deepEqual(
+    rankThreadDestinations(entries, "release rollback", 1000, "root").map(
+      (x) => x.id,
+    ),
+    ["deep", "child"],
+  );
+  assert.deepEqual(
+    rankThreadDestinations(entries, "release rollback", 1000).map((x) => x.id),
+    ["root"],
+  );
+  assert.deepEqual(
+    rankThreadDestinations(entries, "anything", 1000, "missing-root"),
+    [],
+  );
+});
+
+test("a subthread scope excludes ancestors and sibling branches; cycles terminate", () => {
+  const entries = [
+    entry("root", "Release"),
+    entry("branch", "Release", 1, { parentId: "root" }),
+    entry("nested", "Release", 1, { parentId: "branch" }),
+    entry("other", "Release", 1, { parentId: "root" }),
+    entry("loop-a", "Release", 1, { parentId: "loop-b" }),
+    entry("loop-b", "Release", 1, { parentId: "loop-a" }),
+  ];
+  assert.deepEqual(
+    rankThreadDestinations(entries, "release", 10, "branch").map((x) => x.id),
+    ["nested"],
+  );
+  assert.equal(
+    rankThreadDestinations(entries, "release", 10, "loop-a").length,
+    1,
+  );
+});

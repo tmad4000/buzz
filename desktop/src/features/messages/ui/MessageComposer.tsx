@@ -74,6 +74,7 @@ import { prepareBackgroundLinkPreviews } from "@/features/messages/lib/linkPrevi
 import { useComposerLinkPreviews } from "./useComposerLinkPreviews";
 import { useAddressedAgentMentionRestore } from "./useAddressedAgentMentionRestore";
 import { scheduleSettleGatedAutoSubmit } from "./messageComposerAutoSubmit";
+import { resolveNestedRoutingTarget } from "../lib/threadRouting";
 import { SendToThreadPicker } from "./SendToThreadPicker";
 import type { MessageComposerProps } from "./MessageComposer.types";
 function MessageComposerImpl({
@@ -112,6 +113,7 @@ function MessageComposerImpl({
   showTopBorder = false,
   toolbarExtraActions,
   threadRoutingEntries,
+  threadRoutingScope,
   onCaptureRoutedSend,
   typingParentEventId = null,
   typingRootEventId = null,
@@ -690,12 +692,24 @@ function MessageComposerImpl({
       ) {
         return;
       }
-      const capturedThreadContext =
-        id === undefined
-          ? (onCaptureSendContext?.() ?? null)
-          : id === null
-            ? null
-            : { parentEventId: id, threadHeadId: id };
+      let capturedThreadContext: ReturnType<
+        NonNullable<MessageComposerProps["onCaptureSendContext"]>
+      > = null;
+      if (id === undefined) {
+        capturedThreadContext = onCaptureSendContext?.() ?? null;
+      } else if (threadRoutingScope) {
+        if (effectiveDraftKeyRef.current !== effectiveDraftKey) return;
+        const chosen = resolveNestedRoutingTarget(
+          threadRoutingScope,
+          threadRoutingEntries ?? [],
+          id,
+        );
+        if (!chosen) return;
+        capturedThreadContext = { ...onCaptureSendContext?.(), ...chosen };
+      } else {
+        capturedThreadContext =
+          id === null ? null : { parentEventId: id, threadHeadId: id };
+      }
       if (
         capturedThreadContext !== null &&
         !capturedThreadContext.parentEventId
@@ -703,7 +717,9 @@ function MessageComposerImpl({
         return;
       }
       const onPublished =
-        typeof id === "string" ? onCaptureRoutedSend?.(id) : undefined;
+        typeof id === "string" && !threadRoutingScope
+          ? onCaptureRoutedSend?.(id)
+          : undefined;
       presentationRef.current?.setLocked(true);
       isSubmitLockedRef.current = true;
       setIsSubmitLocked(true);
@@ -742,6 +758,8 @@ function MessageComposerImpl({
     },
     [
       onCaptureRoutedSend,
+      threadRoutingScope,
+      threadRoutingEntries,
       channelId,
       durableOutbox,
       channelLinks.clearChannels,
@@ -1082,8 +1100,9 @@ function MessageComposerImpl({
                     {toolbarExtraActions}
                     {threadRoutingEntries && editTarget == null ? (
                       <SendToThreadPicker
-                        key={`${channelId}:${effectiveDraftKey}`}
+                        key={`${channelId}:${effectiveDraftKey}:${threadRoutingScope?.headId ?? "main"}`}
                         entries={threadRoutingEntries}
+                        threadHeadId={threadRoutingScope?.headId}
                         disabled={
                           sendDisabled ||
                           isSubmitLocked ||
@@ -1097,6 +1116,7 @@ function MessageComposerImpl({
                     ) : null}
                   </>
                 }
+                wrapControls={Boolean(threadRoutingScope)}
                 formattingDisabled={composerDisabled}
                 gifMediaController={media}
                 isEmojiPickerOpen={isEmojiPickerOpen}

@@ -84,3 +84,65 @@ test("simultaneous picker instances keep candidates, choice and disabled ownersh
     cleanup();
   }
 });
+
+test("nested picker excludes foreign branches and offers explicit root fallback without sending on open or ownership loss", async () => {
+  const calls = [];
+  const message = (id, parentId, body) => ({
+    message: {
+      id,
+      parentId,
+      body,
+      author: "Jacob",
+      createdAt: 100,
+      depth: 0,
+      time: "now",
+      kind: 9,
+    },
+    summary: null,
+  });
+  const props = {
+    entries: [
+      message("root", null, "Root"),
+      message("child", "root", "Receipt branch"),
+      message("other", null, "Foreign root"),
+      message("foreign", "other", "Receipt foreign"),
+    ],
+    threadHeadId: "root",
+    disabled: false,
+    getDraft: () => "receipt",
+    onPick: (id) => calls.push(id),
+  };
+  const view = render(React.createElement(SendToThreadPicker, props));
+  try {
+    await act(async () =>
+      fireEvent.click(view.getByRole("button", { name: "Send to thread…" })),
+    );
+    assert.match(view.getByRole("menu").textContent, /Receipt branch/);
+    assert.doesNotMatch(
+      view.getByRole("menu").textContent,
+      /Receipt foreign|New message/,
+    );
+    assert.deepEqual(calls, []);
+    await act(async () =>
+      view.rerender(
+        React.createElement(SendToThreadPicker, { ...props, disabled: true }),
+      ),
+    );
+    assert.equal(view.queryByRole("menu"), null);
+    assert.deepEqual(calls, []);
+    await act(async () =>
+      view.rerender(React.createElement(SendToThreadPicker, props)),
+    );
+    await act(async () =>
+      fireEvent.click(view.getByRole("button", { name: "Send to thread…" })),
+    );
+    await act(async () =>
+      fireEvent.click(
+        view.getByRole("menuitem", { name: "Reply to thread root" }),
+      ),
+    );
+    assert.deepEqual(calls, [null]);
+  } finally {
+    cleanup();
+  }
+});
