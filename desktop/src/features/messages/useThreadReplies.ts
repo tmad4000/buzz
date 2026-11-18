@@ -1,3 +1,5 @@
+import { hydrateOpenedThread } from "./lib/offlineQueryCache";
+import { channelHeadCacheScope } from "./lib/channelHeadCache";
 import { boundedInlineThreadRead as boundedThreadReplyRead } from "./lib/inlineThreadFetch";
 import {
   type QueryClient,
@@ -52,6 +54,8 @@ export async function loadThreadReplies(
   signal?: AbortSignal,
 ): Promise<RelayEvent[]> {
   const queryKey = threadRepliesKey(channelId, rootId);
+  const scope = channelHeadCacheScope(queryClient);
+  if (scope) await hydrateOpenedThread(queryClient, scope, channelId, rootId).catch(error => console.warn("Offline thread hydration failed", error));
   const cacheAtStart = queryClient.getQueryData<RelayEvent[]>(queryKey) ?? [];
   const idsAtStart = new Set(cacheAtStart.map((event) => event.id));
   const replies: RelayEvent[] = [];
@@ -90,6 +94,7 @@ export async function loadThreadReplies(
       ) {
         throw new ThreadExpectedEventMissingError(expectedEventId);
       }
+      queryClient.removeQueries({ queryKey: ["offline-source", ...queryKey], exact: true });
       return result;
     }
     cursor = response.nextCursor;

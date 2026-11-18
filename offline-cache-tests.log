@@ -1,0 +1,243 @@
+TAP version 13
+# [localStorageQuota] write failed after cache eviction: buzz-channels.v1:wss://relay.example.com:abcdef Error: quota exceeded
+#     at window.localStorage.setItem (file:///home/dev/agent-worktrees/buzz-offline-p1-20261118/desktop/src/features/channels/channelSnapshot.test.mjs:296:11)
+#     at setLocalStorageItemWithRecovery (file:///home/dev/agent-worktrees/buzz-offline-p1-20261118/desktop/src/shared/lib/localStorageQuota.ts:153:25)
+#     at writeChannelSnapshot (file:///home/dev/agent-worktrees/buzz-offline-p1-20261118/desktop/src/features/channels/channelSnapshot.ts:256:5)
+#     at file:///home/dev/agent-worktrees/buzz-offline-p1-20261118/desktop/src/features/channels/channelSnapshot.test.mjs:300:7
+#     at getActual (node:assert:609:5)
+#     at Function.doesNotThrow (node:assert:777:32)
+#     at TestContext.<anonymous> (file:///home/dev/agent-worktrees/buzz-offline-p1-20261118/desktop/src/features/channels/channelSnapshot.test.mjs:299:12)
+#     at Test.runInAsyncScope (node:async_hooks:214:14)
+#     at Test.run (node:internal/test_runner/test:1047:25)
+#     at async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+# Subtest: channelSnapshotKey: normalizes trailing slash and case
+ok 1 - channelSnapshotKey: normalizes trailing slash and case
+  ---
+  duration_ms: 3.92416
+  type: 'test'
+  ...
+# Subtest: read after write returns the complete list and matching hash
+ok 2 - read after write returns the complete list and matching hash
+  ---
+  duration_ms: 3.95988
+  type: 'test'
+  ...
+# Subtest: inspection distinguishes absent from invalid snapshots
+ok 3 - inspection distinguishes absent from invalid snapshots
+  ---
+  duration_ms: 0.54951
+  type: 'test'
+  ...
+# Subtest: inspection memoizes parsing for repeated reads of the same document
+ok 4 - inspection memoizes parsing for repeated reads of the same document
+  ---
+  duration_ms: 1.729021
+  type: 'test'
+  ...
+# Subtest: inspection tolerates denied storage without retrying the read
+ok 5 - inspection tolerates denied storage without retrying the read
+  ---
+  duration_ms: 0.906301
+  type: 'test'
+  ...
+# Subtest: write replaces list and hash in lockstep
+ok 6 - write replaces list and hash in lockstep
+  ---
+  duration_ms: 0.737231
+  type: 'test'
+  ...
+# Subtest: read for an unknown relay returns null
+ok 7 - read for an unknown relay returns null
+  ---
+  duration_ms: 0.39532
+  type: 'test'
+  ...
+# Subtest: read rejects malformed JSON
+ok 8 - read rejects malformed JSON
+  ---
+  duration_ms: 0.4142
+  type: 'test'
+  ...
+# Subtest: read rejects a legacy channel-only snapshot
+ok 9 - read rejects a legacy channel-only snapshot
+  ---
+  duration_ms: 1.22537
+  type: 'test'
+  ...
+# Subtest: read rejects a snapshot whose hash and list were partially changed
+ok 10 - read rejects a snapshot whose hash and list were partially changed
+  ---
+  duration_ms: 0.86731
+  type: 'test'
+  ...
+# Subtest: read rejects a v2 snapshot with a missing hash
+ok 11 - read rejects a v2 snapshot with a missing hash
+  ---
+  duration_ms: 0.530001
+  type: 'test'
+  ...
+# Subtest: read rejects a snapshot owned by another identity
+ok 12 - read rejects a snapshot owned by another identity
+  ---
+  duration_ms: 0.336151
+  type: 'test'
+  ...
+# Subtest: same-relay identities retain independent snapshots
+ok 13 - same-relay identities retain independent snapshots
+  ---
+  duration_ms: 0.619331
+  type: 'test'
+  ...
+# Subtest: remove clears every identity snapshot for that relay
+ok 14 - remove clears every identity snapshot for that relay
+  ---
+  duration_ms: 0.499559
+  type: 'test'
+  ...
+# Subtest: cache write evicts disposable entries and retries at quota
+ok 15 - cache write evicts disposable entries and retries at quota
+  ---
+  duration_ms: 0.756351
+  type: 'test'
+  ...
+# Subtest: write is tolerant of storage failures
+ok 16 - write is tolerant of storage failures
+  ---
+  duration_ms: 5.754311
+  type: 'test'
+  ...
+# Subtest: mount fetches cold and prefetched channels but consumes hydrated data
+ok 17 - mount fetches cold and prefetched channels but consumes hydrated data
+  ---
+  duration_ms: 256.055007
+  type: 'test'
+  ...
+# Subtest: hydrates stale data and consumes its mount gate once
+ok 18 - hydrates stale data and consumes its mount gate once
+  ---
+  duration_ms: 4.04751
+  type: 'test'
+  ...
+# Ignoring invalid persisted channel head bad Error: Channel window response must contain exactly one bounds event.
+#     at parseChannelWindowResponse (file:///home/dev/agent-worktrees/buzz-offline-p1-20261118/desktop/src/features/messages/lib/channelWindowResponse.ts:111:11)
+#     at seedChannelHeads (file:///home/dev/agent-worktrees/buzz-offline-p1-20261118/desktop/src/features/messages/lib/channelHeadCache.ts:87:20)
+#     at async TestContext.<anonymous> (file:///home/dev/agent-worktrees/buzz-offline-p1-20261118/desktop/src/features/messages/lib/channelHeadCache.test.mjs:250:3)
+#     at async Test.run (node:internal/test_runner/test:1054:7)
+#     at async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+# Subtest: authoritative refresh deletes a vanished hydrated row
+ok 19 - authoritative refresh deletes a vanished hydrated row
+  ---
+  duration_ms: 3.79076
+  type: 'test'
+  ...
+# Subtest: drops malformed entries independently
+ok 20 - drops malformed entries independently
+  ---
+  duration_ms: 4.35909
+  type: 'test'
+  ...
+# Subtest: a channel mounted during a slow cache load still takes the hydrated path
+ok 21 - a channel mounted during a slow cache load still takes the hydrated path
+  ---
+  duration_ms: 161.409478
+  type: 'test'
+  ...
+# Subtest: a bounds-only persisted head is not hydrated
+ok 22 - a bounds-only persisted head is not hydrated
+  ---
+  duration_ms: 63.756389
+  type: 'test'
+  ...
+# Subtest: a hydrated channel still revalidates when live subscription setup fails
+ok 23 - a hydrated channel still revalidates when live subscription setup fails
+  ---
+  duration_ms: 65.939449
+  type: 'test'
+  ...
+# Subtest: a live subscription that settles before a slow cache load still revalidates
+ok 24 - a live subscription that settles before a slow cache load still revalidates
+  ---
+  duration_ms: 163.053468
+  type: 'test'
+  ...
+# Subtest: a cold channel with an immediate live subscription fetches the window once
+ok 25 - a cold channel with an immediate live subscription fetches the window once
+  ---
+  duration_ms: 60.6463
+  type: 'test'
+  ...
+# Subtest: folded head reparses with bounded rows, committed live events, aux and reply summaries
+ok 26 - folded head reparses with bounded rows, committed live events, aux and reply summaries
+  ---
+  duration_ms: 16.95796
+  type: 'test'
+  ...
+# Subtest: reads cached labels as safe stale profile summaries
+ok 27 - reads cached labels as safe stale profile summaries
+  ---
+  duration_ms: 324.455596
+  type: 'test'
+  ...
+# Subtest: keeps previous full profiles ahead of persisted label placeholders
+ok 28 - keeps previous full profiles ahead of persisted label placeholders
+  ---
+  duration_ms: 4.88987
+  type: 'test'
+  ...
+# Subtest: writes merge with existing labels and remain bounded
+ok 29 - writes merge with existing labels and remain bounded
+  ---
+  duration_ms: 49.384939
+  type: 'test'
+  ...
+# Subtest: removes a stale label when the fresh profile clears all names
+ok 30 - removes a stale label when the fresh profile clears all names
+  ---
+  duration_ms: 2.25845
+  type: 'test'
+  ...
+# Subtest: removes stale labels for profiles the relay reports missing
+ok 31 - removes stale labels for profiles the relay reports missing
+  ---
+  duration_ms: 1.56455
+  type: 'test'
+  ...
+# Subtest: removes only the selected relay cache
+ok 32 - removes only the selected relay cache
+  ---
+  duration_ms: 5.32633
+  type: 'test'
+  ...
+# Subtest: ignores malformed cache payloads
+ok 33 - ignores malformed cache payloads
+  ---
+  duration_ms: 3.20105
+  type: 'test'
+  ...
+# Subtest: off by default; all payloads encrypted with actual NIP44, Unicode chunks and scope binding
+ok 34 - off by default; all payloads encrypted with actual NIP44, Unicode chunks and scope binding
+  ---
+  duration_ms: 107.397898
+  type: 'test'
+  ...
+# Subtest: clear fences encryption in flight and oversized JSON is never persisted
+ok 35 - clear fences encryption in flight and oversized JSON is never persisted
+  ---
+  duration_ms: 6.08665
+  type: 'test'
+  ...
+# Subtest: production eviction policy bounds each unit and total encrypted bytes
+ok 36 - production eviction policy bounds each unit and total encrypted bytes
+  ---
+  duration_ms: 1.93706
+  type: 'test'
+  ...
+1..36
+# tests 36
+# suites 0
+# pass 36
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 3812.928482

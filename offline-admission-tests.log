@@ -1,0 +1,36 @@
+TAP version 13
+# An update to OfflineConversation inside a test was not wrapped in act(...).
+# When testing, code that causes React state updates should be wrapped into act(...):
+# act(() => {
+#   /* fire events that update state */
+# });
+# /* assert on the output */
+# This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+# An update to OfflineConversation inside a test was not wrapped in act(...).
+# When testing, code that causes React state updates should be wrapped into act(...):
+# act(() => {
+#   /* fire events that update state */
+# });
+# /* assert on the output */
+# This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+# Subtest: cached heads and a reconnect generation never admit cached reading, including queued callbacks
+ok 1 - cached heads and a reconnect generation never admit cached reading, including queued callbacks
+  ---
+  duration_ms: 98.457919
+  type: 'test'
+  ...
+# Subtest: background mount/arrival, compact-hidden views and hidden documents cannot acknowledge
+ok 2 - background mount/arrival, compact-hidden views and hidden documents cannot acknowledge
+  ---
+  duration_ms: 83.906999
+  type: 'test'
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 2
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2653.586297

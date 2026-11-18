@@ -5,6 +5,7 @@ mod archive;
 mod build_identity;
 mod builderlab;
 mod channel_head_cache;
+mod offline_cache;
 mod commands;
 mod deep_link;
 mod egress_guard;
@@ -753,6 +754,9 @@ pub fn run() {
             unread_catch_up::unread_catch_up,
             observed_unread::observed_unread_open_scope,
             observed_unread::observed_unread_ingest,
+            offline_cache::offline_cache_list,
+            offline_cache::offline_cache_put,
+            offline_cache::offline_cache_clear,
             channel_head_cache::channel_head_cache_load,
             channel_head_cache::channel_head_cache_store,
             channel_head_cache::channel_head_cache_clear,

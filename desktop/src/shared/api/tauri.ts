@@ -269,11 +269,23 @@ export function toTauriError(error: unknown): Error {
   }
 }
 
+// Reads and durable outbox preparation retain their existing retry semantics.
+const OFFLINE_CONNECTION_ACTIONS = new Set([
+  "add_reaction", "remove_reaction", "edit_message", "delete_message",
+  "join_channel", "leave_channel", "archive_channel", "unarchive_channel",
+  "delete_channel", "move_message", "search_messages", "search_messages_page",
+  "start_huddle", "join_huddle", "create_managed_agent", "start_managed_agent",
+]);
+
 export async function invokeTauri<T>(
   command: string,
   args?: Record<string, unknown>,
 ): Promise<T> {
   try {
+    if (OFFLINE_CONNECTION_ACTIONS.has(command)) {
+      const { offlineNeedsConnection } = await import("./offlineConnection");
+      if (offlineNeedsConnection()) throw new Error("Needs a connection");
+    }
     return await tauriInvoke<T>(command, args);
   } catch (error) {
     // HTTP backoff lives in Rust. Do not apply its separate ApiCalls quota

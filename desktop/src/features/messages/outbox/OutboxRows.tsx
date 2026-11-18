@@ -1,3 +1,4 @@
+import { useDeviceOffline } from "@/shared/api/offlineConnection";
 import { OutboxEditor, prepareOutboxEditor } from "./OutboxEditor";
 import * as React from "react";
 import { toast } from "sonner";
@@ -6,6 +7,7 @@ import { deleteOutbox, outboxProgress, retryOutbox } from "./runtime";
 import type { OutboxRecord } from "./types";
 
 function PendingMessage({ row }: { row: OutboxRecord }) {
+  const offline = useDeviceOffline();
   const [editing, setEditing] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   const run = async (action: () => Promise<void>) => {
@@ -84,7 +86,7 @@ function PendingMessage({ row }: { row: OutboxRecord }) {
                 ? "Could not send"
                 : row.state === "sending"
                   ? "Sending…"
-                  : "Waiting to send…"}
+                  : offline ? "Will send when online" : "Waiting to send…"}
         </span>
         {row.error ? (
           <span className="min-w-0 truncate" title={row.error}>

@@ -1,3 +1,4 @@
+import { offlineCacheEnabled } from "@/shared/api/offlineCache";
 /**
  * Per-relay cache of the last successfully fetched channel list.
  *
@@ -182,6 +183,7 @@ export function inspectChannelSnapshot(
 
   try {
     raw = window.localStorage.getItem(key);
+    if (raw && offlineCacheEnabled()) { window.localStorage.removeItem(key); return { diagnostics: absent, snapshot: null }; }
     if (!raw) return { diagnostics: absent, snapshot: null };
     return snapshotResultFromRaw(key, raw, ownerPubkey);
   } catch {
@@ -226,6 +228,7 @@ export function writeChannelSnapshot(
     if (!ownerPubkey || !hash) return;
 
     const key = channelSnapshotKey(relayUrl, ownerPubkey);
+    if (offlineCacheEnabled()) { window.localStorage.removeItem(key); return; }
     const previous = window.localStorage.getItem(key);
     if (previous) {
       try {

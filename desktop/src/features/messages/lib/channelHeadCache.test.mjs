@@ -1,3 +1,4 @@
+import { offlineScopeKey } from "@/shared/api/offlineCache";
 import assert from "node:assert/strict";
 import { after, afterEach, before, mock, test } from "node:test";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -87,14 +88,53 @@ function bounds() {
 function install(entries, { loadDelayMs = 0 } = {}) {
   channelWindowCalls = 0;
   channelWindowEvents = [replacement, bounds()];
+  globalThis.isTauri = true;
   window.localStorage.clear();
+  window.localStorage.setItem("buzz-offline-cache-v1", "on");
+  window.__TAURI_INTERNALS__ = {};
   window.__TAURI_INTERNALS__ = {
-    invoke: async (command) => {
-      if (command === "channel_head_cache_load") {
+    invoke: async (command, args) => {
+      if (command === "get_identity") return { pubkey: "f".repeat(64) };
+      if (command === "nip44_decrypt_from_self") return args.ciphertext;
+      if (command === "nip44_encrypt_to_self") return args.plaintext;
+      if (command === "offline_cache_list") {
         if (loadDelayMs > 0) {
           await new Promise((resolve) => setTimeout(resolve, loadDelayMs));
         }
-        return entries;
+        return entries.map((entry) => ({
+          scope: offlineScopeKey({
+            pubkey: "f".repeat(64),
+            relayUrl: "wss://relay",
+          }),
+          kind: "head",
+          id: entry.channelId,
+          savedAt: entry.savedAt,
+          lastVisitedAt: entry.lastVisitedAt,
+          bytes: new TextEncoder().encode(
+            JSON.stringify([
+              JSON.stringify({
+                scope: offlineScopeKey({
+                  pubkey: "f".repeat(64),
+                  relayUrl: "wss://relay",
+                }),
+                kind: "head",
+                id: entry.channelId,
+                payload: entry.events,
+              }),
+            ]),
+          ).length,
+          ciphertext: JSON.stringify([
+            JSON.stringify({
+              scope: offlineScopeKey({
+                pubkey: "f".repeat(64),
+                relayUrl: "wss://relay",
+              }),
+              kind: "head",
+              id: entry.channelId,
+              payload: entry.events,
+            }),
+          ]),
+        }));
       }
       if (command === "get_channel_window") {
         channelWindowCalls += 1;
