@@ -2,6 +2,7 @@ part of '../thread_detail_page.dart';
 
 class _ThreadMessageList extends HookWidget {
   final double headHeight;
+  final double? topInset;
   final ValueChanged<double> onHeadHeightChanged;
   final LaidOutViewport viewport;
   final VoidCallback onUserScrollStart;
@@ -31,6 +32,7 @@ class _ThreadMessageList extends HookWidget {
 
   const _ThreadMessageList({
     required this.headHeight,
+    this.topInset,
     required this.onHeadHeightChanged,
     required this.viewport,
     required this.onUserScrollStart,
@@ -147,6 +149,7 @@ class _ThreadMessageList extends HookWidget {
 
   @override
   Widget build(BuildContext context) {
+    final topInset = this.topInset ?? frostedAppBarHeight(context);
     final headLink = useMemoized(LayerLink.new);
     final loadingHeadLink = useMemoized(LayerLink.new);
     final headScrollPosition = useRef<ScrollPosition?>(null);
@@ -179,7 +182,7 @@ class _ThreadMessageList extends HookWidget {
                       padding: EdgeInsets.only(
                         left: Grid.gutter,
                         right: Grid.gutter,
-                        top: frostedAppBarHeight(context),
+                        top: topInset,
                         bottom: Grid.xs + bottomInset,
                       ),
                       // Head + replies + a stable zero-content tail target. The
@@ -300,7 +303,7 @@ class _ThreadMessageList extends HookWidget {
                 Positioned(
                   left: Grid.gutter,
                   right: Grid.gutter,
-                  top: frostedAppBarHeight(context),
+                  top: topInset,
                   child: CompositedTransformTarget(
                     link: loadingHeadLink,
                     child: const SizedBox(),
@@ -319,8 +322,7 @@ class _ThreadMessageList extends HookWidget {
                       onUserScrollEnd: onUserScrollEnd,
                       scrollPosition: () => headScrollPosition.value,
                       positions: itemPositionsListener.itemPositions,
-                      viewportTopEdge:
-                          frostedAppBarHeight(context) / constraints.maxHeight,
+                      viewportTopEdge: topInset / constraints.maxHeight,
                       child: ConstrainedBox(
                         constraints: BoxConstraints(
                           maxHeight: visible
@@ -328,7 +330,7 @@ class _ThreadMessageList extends HookWidget {
                               : math.max(
                                   0,
                                   constraints.maxHeight -
-                                      frostedAppBarHeight(context) -
+                                      topInset -
                                       Grid.xs -
                                       bottomInset,
                                 ),

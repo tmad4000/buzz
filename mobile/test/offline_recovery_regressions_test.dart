@@ -127,6 +127,9 @@ void main() {
         () => c.read(userCacheProvider)['alice'] != null && session.calls > 0,
       );
       expect(c.read(userCacheProvider)['alice']?.displayName, 'Disk Alice');
+      final beforeUse = session.calls;
+      expect(cache.get('alice')?.displayName, 'Disk Alice');
+      await until(() => session.calls > beforeUse);
       expect(await cache.preload(['alice']), isFalse);
       final before = session.calls;
       session.fail = false;

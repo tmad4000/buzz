@@ -1,5 +1,6 @@
 import 'package:buzz/shared/offline/read_admission.dart';
 import 'package:buzz/shared/offline/offline_provider.dart';
+import 'package:buzz/shared/offline/offline_cache.dart';
 import 'dart:async';
 import 'package:buzz/features/channels/channel_actions_sheet.dart';
 
@@ -246,6 +247,7 @@ Widget _buildTestable({
   ReadStateNotifier? readStateNotifier,
   bool denyCachedReading = false,
   bool offlineCacheEnabled = false,
+  OfflineCacheStore? offlineStore,
   _FakeMessagesNotifier? messagesNotifier,
   _FakeTypingNotifier? typingNotifier,
   _FakeTypingNotifier? huddleTypingNotifier,
@@ -284,6 +286,8 @@ Widget _buildTestable({
     retry: providerRetry ?? (disableRetries ? (_, _) => null : null),
     overrides: [
       offlineEnabledProvider.overrideWithValue(offlineCacheEnabled),
+      if (offlineStore != null)
+        offlineStoreProvider.overrideWith((ref) async => offlineStore),
       if (denyCachedReading)
         readAdmissionProvider('head:$_channelId').overrideWith((ref) => false),
       if (videoPreviewLoader != null)
