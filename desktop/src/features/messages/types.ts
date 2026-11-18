@@ -27,6 +27,8 @@ export type TimelineMessage = {
   signerPubkey?: string;
   /** Raw signer of the authorized body edit, when one is applied. */
   editSignerPubkey?: string;
+  /** Signed revision metadata, distinct from the original message timestamp. */
+  editRevision?: { id: string; createdAt: number };
   author: string;
   /** True when the displayed author is known to be an agent. */
   isAgent?: boolean;

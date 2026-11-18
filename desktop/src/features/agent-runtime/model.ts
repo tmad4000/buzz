@@ -3,7 +3,7 @@ import type { RelayEvent } from "@/shared/api/types";
 
 export const AGENT_RUNTIME_KIND = 30078;
 export const AGENT_RUNTIME_D_TAG = "agent-runtime";
-const HOST_SERVERS = {
+export const HOST_SERVERS = {
   gcp: "srv_KIFHQ_zsBnI2",
   m4: "srv_uvq8mbWTDr9Y",
   m5: "srv_xmGYpGqxNnXR",
