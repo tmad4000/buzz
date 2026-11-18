@@ -21,8 +21,12 @@ import {
 } from "@/shared/hooks/HistorySearchScope";
 import { ConversationViewContext } from "./ConversationViewContext";
 import { ConversationDraftEditorsContext } from "./ConversationDraftEditors";
+import {
+  ConversationReadingPositionsProvider,
+  type ConversationReadingProps,
+} from "./ConversationReadingPositions";
 
-export type ConversationViewHostProps = {
+export type ConversationViewHostProps = ConversationReadingProps & {
   viewInstanceId: string;
   focused: boolean;
   visible: boolean;
@@ -63,6 +67,9 @@ export function ConversationViewHost({
   initialThreadPanelWidthPx,
   onThreadPanelWidthChange,
   onPanelNavigate,
+  readingPositions,
+  onReadingPosition,
+  registerReadingCapture,
   onFocusView,
   channel,
 }: ConversationViewHostProps) {
@@ -128,7 +135,13 @@ export function ConversationViewHost({
                     seedLegacy={seedLegacyExpansions}
                     onChange={onExplicitExpansionChange}
                   >
-                    <ChannelScreen {...channel} />
+                    <ConversationReadingPositionsProvider
+                      readingPositions={readingPositions}
+                      onReadingPosition={onReadingPosition}
+                      registerReadingCapture={registerReadingCapture}
+                    >
+                      <ChannelScreen {...channel} />
+                    </ConversationReadingPositionsProvider>
                   </ThreadExpansionScopeProvider>
                 </ChannelModeScopeProvider>
               </HistorySearchScopeProvider>

@@ -56,6 +56,75 @@ type Options = {
 
 /** One authorized workspace lifetime. Canonical resources/drafts and compact projection live elsewhere. */
 export class ConversationLayoutController {
+  private readingCaptures = new Set<{
+    viewId: string;
+    channelId: string;
+    visit: number;
+    key: string;
+    capture: () => TimelineReadingPosition | null;
+  }>();
+  private capturingReadings = false;
+  registerReadingCapture(
+    viewId: string,
+    channelId: string,
+    visit: number | undefined,
+    key: string,
+    capture: () => TimelineReadingPosition | null,
+  ) {
+    if (
+      !this.current() ||
+      visit === undefined ||
+      this.visits.get(viewId) !== visit
+    )
+      return () => {};
+    const entry = { viewId, channelId, visit, key, capture };
+    this.readingCaptures.add(entry);
+    return () => {
+      this.readingCaptures.delete(entry);
+    };
+  }
+  captureReadingPositions(viewId?: string) {
+    if (this.capturingReadings) return true;
+    if (!this.current()) return false;
+    this.capturingReadings = true;
+    try {
+      for (const entry of [...this.readingCaptures]) {
+        if (
+          (viewId !== undefined && entry.viewId !== viewId) ||
+          !this.readingCaptures.has(entry) ||
+          this.visits.get(entry.viewId) !== entry.visit ||
+          this.snapshot.layout.views[entry.viewId]?.channelId !==
+            entry.channelId
+        )
+          continue;
+        const revision = this.revision;
+        let position: TimelineReadingPosition | null;
+        try {
+          position = entry.capture();
+        } catch {
+          if (!this.current() || revision !== this.revision) return false;
+          continue;
+        }
+        if (
+          !this.current() ||
+          revision !== this.revision ||
+          !this.readingCaptures.has(entry)
+        )
+          return false;
+        if (position)
+          this.updateReadingPosition(
+            entry.viewId,
+            entry.channelId,
+            entry.visit,
+            entry.key,
+            position,
+          );
+      }
+      return true;
+    } finally {
+      this.capturingReadings = false;
+    }
+  }
   private snapshot: LayoutControllerSnapshot;
   private savedSplit: ConversationLayout | null = null;
   private listeners = new Set<() => void>();
@@ -168,6 +237,11 @@ export class ConversationLayoutController {
     return this.current() && revision === this.revision;
   }
   focus(paneId: string) {
+    if (
+      !listPanes(this.snapshot.layout.root).some((pane) => pane.id === paneId)
+    )
+      return false;
+    if (!this.captureReadingPositions()) return false;
     return this.change(focusPane(this.snapshot.layout, paneId));
   }
   open(
@@ -178,6 +252,13 @@ export class ConversationLayoutController {
     viewport: number,
   ) {
     if (!this.current() || !this.options.canOpen(channelId)) return false;
+    const before = listPanes(this.snapshot.layout.root);
+    if (
+      !before.some((pane) => pane.id === paneId) ||
+      (before.length === 1 && !canSplit(bounds, axis, viewport))
+    )
+      return false;
+    if (!this.captureReadingPositions()) return false;
     const layout = this.snapshot.layout;
     const panes = listPanes(layout.root);
     const target = panes.find((pane) => pane.id === paneId);
@@ -203,6 +284,7 @@ export class ConversationLayoutController {
     routePanelState?: PanelState,
   ) {
     if (!this.current() || !this.options.canOpen(channelId)) return false;
+    if (!this.captureReadingPositions(viewId)) return false;
     const layout = this.snapshot.layout;
     const outgoing = layout.views[viewId];
     if (
@@ -289,6 +371,13 @@ export class ConversationLayoutController {
       this.visits.get(viewId) !== visit
     )
       return false;
+    if (
+      (patch.panelState ||
+        patch.preferences?.timelineMode ||
+        patch.preferences?.threadMode) &&
+      !this.captureReadingPositions(viewId)
+    )
+      return false;
     return this.change(
       updateViewPresentation(this.snapshot.layout, viewId, channelId, patch),
     );
@@ -320,6 +409,10 @@ export class ConversationLayoutController {
   }
   close(paneId: string, wholeSplit = false) {
     if (!this.current()) return false;
+    const before = listPanes(this.snapshot.layout.root);
+    if (before.length < 2 || !before.some((pane) => pane.id === paneId))
+      return false;
+    if (!this.captureReadingPositions()) return false;
     const layout = this.snapshot.layout;
     const panes = listPanes(layout.root);
     const pane = panes.find((candidate) => candidate.id === paneId);
@@ -347,6 +440,7 @@ export class ConversationLayoutController {
   }
   restore() {
     if (!this.current() || !this.savedSplit) return false;
+    if (!this.captureReadingPositions()) return false;
     const saved = this.savedSplit;
     const current = this.snapshot.layout;
     const outgoing = Object.values(current.views).filter(
@@ -396,6 +490,7 @@ export class ConversationLayoutController {
     return changed;
   }
   flush = () => {
+    if (!this.captureReadingPositions()) return;
     if (this.timer !== null) {
       clearTimeout(this.timer);
       this.timer = null;
@@ -421,6 +516,7 @@ export class ConversationLayoutController {
   dispose() {
     this.flush();
     this.disposed = true;
+    this.readingCaptures.clear();
     this.listeners.clear();
     if (this.timer !== null) clearTimeout(this.timer);
     this.timer = null;

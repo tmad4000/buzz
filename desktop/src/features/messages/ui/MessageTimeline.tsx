@@ -11,6 +11,8 @@ import {
   useConversationControlScope,
 } from "@/features/conversations/ConversationViewContext";
 import { timelineScrollIdentity } from "@/features/conversations/timelineScrollIdentity";
+import { useCaptureConversationReadingPosition } from "@/features/conversations/ConversationReadingPositions";
+import { readingPositionKey } from "@/features/conversations/layout/readingPositions";
 import { useTimelineView } from "@/features/channels/ui/TimelineViewContext";
 
 import {
@@ -546,6 +548,12 @@ const MessageTimelineBase = React.forwardRef<
     activePinnedIntro !== null;
   const showGenericEmpty = timelineBodySurface === "empty" && !showIntro;
   const showMessageList = timelineBodySurface === "list";
+  useCaptureConversationReadingPosition({
+    key: readingPositionKey("main", mode),
+    container: activeScrollContainerRef,
+    ids: messages.map((message) => message.id),
+    ready: showMessageList && !isLoading,
+  });
   const showChannelIntroOnly = activeChannelIntro !== null && !showMessageList;
   const showPinnedIntroOnly = activePinnedIntro !== null && !showMessageList;
   const omitHistoryLeadIn = showChannelIntroOnly || showPinnedIntroOnly;
