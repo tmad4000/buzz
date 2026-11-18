@@ -25,6 +25,7 @@ export class ConversationAutoSubmitCommands {
   private issued = new Set<string>();
   private pending = new Map<string, Pending>();
   private disposed = false;
+  private retirementEpoch = 0;
   private unsubscribe: (() => void) | undefined;
   private readonly options;
   private readonly entryLimit: number;
@@ -59,7 +60,8 @@ export class ConversationAutoSubmitCommands {
     });
     this.endpoints.add(record);
     return () => {
-      this.endpoints.delete(record);
+      if (!this.endpoints.delete(record)) return;
+      this.retirementEpoch++;
       for (const pending of this.pending.values())
         if (pending.endpoint === record) pending.attempt.retire();
     };
@@ -77,6 +79,7 @@ export class ConversationAutoSubmitCommands {
   }
 
   retireInvalid() {
+    this.retirementEpoch++;
     for (const pending of [...this.pending.values()]) {
       try {
         if (!this.admit(pending.endpoint)) pending.attempt.retire();
@@ -88,6 +91,7 @@ export class ConversationAutoSubmitCommands {
 
   /** Window blur/coverage and lifetime events retire even false -> true intervals. */
   retireAll() {
+    this.retirementEpoch++;
     for (const pending of this.pending.values()) pending.attempt.retire();
   }
 
@@ -102,6 +106,7 @@ export class ConversationAutoSubmitCommands {
       target: ConversationAutoSubmitTarget,
     ) => Promise<boolean>;
   }): Promise<Outcome> {
+    const retirementEpoch = this.retirementEpoch;
     const { entryKey, viewId, channelId, visit, draftKey, clearTrigger } =
       request;
     if (this.disposed) return "disposed";
@@ -116,10 +121,12 @@ export class ConversationAutoSubmitCommands {
     if (this.issued.size >= this.entryLimit) return "entry-limit";
     // Reserve before getters/callbacks; never evict a tombstone and revive Back.
     this.issued.add(entryKey);
+    if (retirementEpoch !== this.retirementEpoch) return "ineligible";
     if (this.pending.has(draftKey)) return "busy";
     const owner = this.options.ownerForDraft(draftKey);
     // A getter may synchronously issue another command or dispose the scope.
     if (this.disposed) return "disposed";
+    if (retirementEpoch !== this.retirementEpoch) return "ineligible";
     if (this.pending.has(draftKey)) return "busy";
     if (!owner) return "unavailable";
     const matches = [...this.endpoints].filter(

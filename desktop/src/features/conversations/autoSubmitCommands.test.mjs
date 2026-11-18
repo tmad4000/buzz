@@ -70,6 +70,115 @@ function deferred() {
   return { promise, resolve };
 }
 
+test("retirement during initial owner resolution consumes the entry without clear or submit", async () => {
+  for (const method of ["retireAll", "retireInvalid"]) {
+    let commands,
+      interrupted = false,
+      clears = 0,
+      sends = 0;
+    commands = new ConversationAutoSubmitCommands({
+      scopeKey: "scope",
+      isCurrent: () => true,
+      ownerForDraft: () => {
+        if (!interrupted) {
+          interrupted = true;
+          commands[method]();
+        }
+        return "owner";
+      },
+    });
+    commands.register({
+      target: {
+        scopeKey: "scope",
+        viewId: "a",
+        channelId: "chat",
+        visit: 1,
+        draftKey: "root",
+        ownerId: "owner",
+      },
+      admit: () => true,
+      submit: async () => {
+        sends++;
+      },
+    });
+    const request = (entryKey) =>
+      commands.request({
+        entryKey,
+        viewId: "a",
+        channelId: "chat",
+        visit: 1,
+        draftKey: "root",
+        clearTrigger: async () => {
+          clears++;
+          return true;
+        },
+      });
+    try {
+      assert.equal(await request("interrupted"), "ineligible");
+      assert.deepEqual([clears, sends], [0, 0]);
+      assert.equal(await request("interrupted"), "already-issued");
+      assert.equal(await request("fresh-explicit"), "submitted");
+      assert.deepEqual([clears, sends], [1, 1]);
+    } finally {
+      commands.dispose();
+    }
+  }
+});
+
+test("endpoint retirement and replacement during lookup cannot revive the constructing request", async () => {
+  let commands,
+    stop,
+    interrupted = false,
+    sends = 0,
+    clears = 0;
+  const endpoint = {
+    target: {
+      scopeKey: "scope",
+      viewId: "a",
+      channelId: "chat",
+      visit: 1,
+      draftKey: "root",
+      ownerId: "owner",
+    },
+    admit: () => true,
+    submit: async () => {
+      sends++;
+    },
+  };
+  commands = new ConversationAutoSubmitCommands({
+    scopeKey: "scope",
+    isCurrent: () => true,
+    ownerForDraft: () => {
+      if (!interrupted) {
+        interrupted = true;
+        stop();
+        commands.register(endpoint);
+      }
+      return "owner";
+    },
+  });
+  stop = commands.register(endpoint);
+  try {
+    assert.equal(
+      await commands.request({
+        entryKey: "interrupted",
+        viewId: "a",
+        channelId: "chat",
+        visit: 1,
+        draftKey: "root",
+        clearTrigger: async () => {
+          clears++;
+          return true;
+        },
+      }),
+      "ineligible",
+    );
+    assert.deepEqual([clears, sends], [0, 0]);
+  } finally {
+    commands.dispose();
+  }
+});
+
 test("missing/preview endpoints stay consumed after later mount or takeover", async () => {
   const h = setup();
   try {
