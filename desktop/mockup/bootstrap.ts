@@ -5,6 +5,7 @@ import {
 import { CHANNEL, JACOB, SIDE, profiles } from "./fixtures";
 import { configureMockup, type Scenario } from "./runtime";
 import "./mockup.css";
+import { installMockupNavigationGuard } from "./navigation";
 import { waitFor } from "./presentation";
 
 const scenarios = import.meta.glob<{ default: Scenario }>("./scenarios/*.tsx");
@@ -14,6 +15,7 @@ const relayUrl = "wss://buzz-mockup.invalid";
 const communityId = "buzz-mockup";
 
 async function bootstrap() {
+  installMockupNavigationGuard();
   const scenario = (await scenarios[`./scenarios/${slug}.tsx`]?.())?.default;
   if (!scenario) throw new Error(`Unknown Buzz scenario: ${slug}`);
   const theme = params.get("theme") === "dark" ? "buzz-dark" : "buzz";

@@ -1,6 +1,6 @@
 # Buzz desktop mockup kit
 
-This separate Vite entry boots the Buzz Ideaflow desktop app from the release 8 source with the existing desktop E2E Tauri/relay mock. It uses the real sidebar, conversation header, timeline, composer, thread panel, Inbox, profile controls, and channel Page component. The fixture document blocks external resource loads and connections with CSP. The release feed and relay capability probe return fixtures.
+This separate Vite entry boots the Buzz Ideaflow desktop app from the release 8 source with the existing desktop E2E Tauri/relay mock. It uses the real sidebar, conversation header, timeline, composer, thread panel, Inbox, profile controls, and channel Page component. The fixture document blocks external resource loads and connections with CSP. The browser preview also guards external link activation, including clicks, keyboard activation, and context menus. The release feed and relay capability probe return fixtures.
 
 ## Run and capture
 
