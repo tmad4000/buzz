@@ -1,0 +1,13 @@
+{
+  "package": "@tanstack/router-core",
+  "version": "1.171.5",
+  "patchSha256": "f12a6a9cc18dd1663e92c45461f509b87e7b911f0bf81dd64e5fe35e9365d743",
+  "sourceSha256": {
+    "src/scroll-restoration.ts": "e93518e3e0259a7a7931edc78b2a2a6505a922104201dfa15f86bbe2683ecd05",
+    "dist/esm/scroll-restoration.js": "201c5e918938edc6785fe77ac309f7cda5a63cfe7c163dc119e6b019b64dbdcc",
+    "dist/cjs/scroll-restoration.cjs": "a90f35d1d579d7a5c12fe46f5096a94aedb5ad447aa16eb9318e289a14733483",
+    "src/router.ts": "3c81c6b47870cf495fdafff891c0b0b6ec2a8adf04227f2097905d7bac6755f1",
+    "dist/esm/router.d.ts": "b485dcda88ed8040568701e04d46090549af479c9808ff2eb3be92db19a844ec",
+    "dist/cjs/router.d.cts": "14488d6471760248fc6064026aceba8d51b4ffd079f9b8adf4fed688514b90a0"
+  }
+}

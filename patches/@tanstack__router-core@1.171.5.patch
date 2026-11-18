@@ -1,0 +1,231 @@
+diff --git a/src/scroll-restoration.ts b/src/scroll-restoration.ts
+--- a/src/scroll-restoration.ts
++++ b/src/scroll-restoration.ts
+@@ -178,6 +178,8 @@
+ 
+   router.isScrollRestorationSetup = true
+   ignoreScroll = false
++  const shouldRestoreElement = (element: Element) =>
++    router.options.shouldRestoreScrollElement?.(element) !== false
+ 
+   const getKey =
+     router.options.getScrollRestorationKey || defaultGetScrollRestorationKey
+@@ -205,6 +207,7 @@
+       setTrackedScrollEntry(windowScrollTarget, scrollX, scrollY)
+     } else {
+       const target = event.target as Element
++      if (!shouldRestoreElement(target)) return
+       setTrackedScrollEntry(target, target.scrollLeft, target.scrollTop)
+     }
+   }
+@@ -221,7 +224,7 @@
+     for (const [target, position] of trackedScrollEntries) {
+       if (target === windowScrollTarget) {
+         keyEntry[windowScrollTarget] = position
+-      } else if (target.isConnected) {
++      } else if (target.isConnected && shouldRestoreElement(target)) {
+         keyEntry[getScrollRestorationSelector(target)] = position
+       }
+     }
+@@ -278,7 +281,7 @@
+             }
+           } else {
+             const element = getElement(elementSelector)
+-            if (!element) {
++            if (!element || !shouldRestoreElement(element)) {
+               continue
+             }
+ 
+@@ -338,7 +341,7 @@
+               windowRestored = true
+             } else {
+               const element = getElement(elementSelector)
+-              if (element) {
++              if (element && shouldRestoreElement(element)) {
+                 element.scrollLeft = scrollX
+                 element.scrollTop = scrollY
+               }
+@@ -357,14 +360,16 @@
+           if (scrollToTopSelectors) {
+             scrollToTopElements ??= getScrollToTopElements(scrollToTopSelectors)
+             for (const element of scrollToTopElements) {
+-              element.scrollTo(scrollOptions)
++              if (shouldRestoreElement(element)) element.scrollTo(scrollOptions)
+             }
+           }
+         }
+       }
+ 
+       if (!windowRestored && hash && hashScrollIntoViewOptions) {
+-        document.getElementById(hash)?.scrollIntoView(hashScrollIntoViewOptions)
++        const element = document.getElementById(hash)
++        if (element && shouldRestoreElement(element))
++          element.scrollIntoView(hashScrollIntoViewOptions)
+       }
+     } finally {
+       ignoreScroll = false
+diff --git a/dist/esm/scroll-restoration.js b/dist/esm/scroll-restoration.js
+--- a/dist/esm/scroll-restoration.js
++++ b/dist/esm/scroll-restoration.js
+@@ -80,6 +80,7 @@
+ 	if ((isServer ?? router.isServer) || router.isScrollRestorationSetup) return;
+ 	router.isScrollRestorationSetup = true;
+ 	ignoreScroll = false;
++	const shouldRestoreElement = (element) => router.options.shouldRestoreScrollElement?.(element) !== false;
+ 	const getKey = router.options.getScrollRestorationKey || defaultGetScrollRestorationKey;
+ 	const trackedScrollEntries = /* @__PURE__ */ new Map();
+ 	const setTrackedScrollEntry = (target, scrollX, scrollY) => {
+@@ -94,6 +95,7 @@
+ 		if (event.target === document) setTrackedScrollEntry(windowScrollTarget, scrollX, scrollY);
+ 		else {
+ 			const target = event.target;
++			if (!shouldRestoreElement(target)) return;
+ 			setTrackedScrollEntry(target, target.scrollLeft, target.scrollTop);
+ 		}
+ 	};
+@@ -101,7 +103,7 @@
+ 		if (!router.isScrollRestoring) return;
+ 		const keyEntry = scrollRestorationCache[restoreKey] ||= {};
+ 		for (const [target, position] of trackedScrollEntries) if (target === windowScrollTarget) keyEntry[windowScrollTarget] = position;
+-		else if (target.isConnected) keyEntry[getScrollRestorationSelector(target)] = position;
++		else if (target.isConnected && shouldRestoreElement(target)) keyEntry[getScrollRestorationSelector(target)] = position;
+ 	};
+ 	document.addEventListener("scroll", onScroll, true);
+ 	router.subscribe("onBeforeLoad", (event) => {
+@@ -131,7 +133,7 @@
+ 						if (shouldResetScroll) continue;
+ 					} else {
+ 						const element = getElement(elementSelector);
+-						if (!element) continue;
++						if (!element || !shouldRestoreElement(element)) continue;
+ 						if (shouldResetScroll && scrollToTopSelectors) {
+ 							scrollToTopElements ??= getScrollToTopElements(scrollToTopSelectors);
+ 							if (scrollToTopElements.includes(element)) continue;
+@@ -163,7 +165,7 @@
+ 						windowRestored = true;
+ 					} else {
+ 						const element = getElement(elementSelector);
+-						if (element) {
++						if (element && shouldRestoreElement(element)) {
+ 							element.scrollLeft = scrollX;
+ 							element.scrollTop = scrollY;
+ 						}
+@@ -178,11 +180,14 @@
+ 					scrollTo(scrollOptions);
+ 					if (scrollToTopSelectors) {
+ 						scrollToTopElements ??= getScrollToTopElements(scrollToTopSelectors);
+-						for (const element of scrollToTopElements) element.scrollTo(scrollOptions);
++						for (const element of scrollToTopElements) if (shouldRestoreElement(element)) element.scrollTo(scrollOptions);
+ 					}
+ 				}
+ 			}
+-			if (!windowRestored && hash && hashScrollIntoViewOptions) document.getElementById(hash)?.scrollIntoView(hashScrollIntoViewOptions);
++			if (!windowRestored && hash && hashScrollIntoViewOptions) {
++				const element = document.getElementById(hash);
++				if (element && shouldRestoreElement(element)) element.scrollIntoView(hashScrollIntoViewOptions);
++			}
+ 		} finally {
+ 			ignoreScroll = false;
+ 		}
+diff --git a/dist/cjs/scroll-restoration.cjs b/dist/cjs/scroll-restoration.cjs
+--- a/dist/cjs/scroll-restoration.cjs
++++ b/dist/cjs/scroll-restoration.cjs
+@@ -80,6 +80,7 @@
+ 	if ((_tanstack_router_core_isServer.isServer ?? router.isServer) || router.isScrollRestorationSetup) return;
+ 	router.isScrollRestorationSetup = true;
+ 	ignoreScroll = false;
++	const shouldRestoreElement = (element) => router.options.shouldRestoreScrollElement?.(element) !== false;
+ 	const getKey = router.options.getScrollRestorationKey || defaultGetScrollRestorationKey;
+ 	const trackedScrollEntries = /* @__PURE__ */ new Map();
+ 	const setTrackedScrollEntry = (target, scrollX, scrollY) => {
+@@ -94,6 +95,7 @@
+ 		if (event.target === document) setTrackedScrollEntry(windowScrollTarget, scrollX, scrollY);
+ 		else {
+ 			const target = event.target;
++			if (!shouldRestoreElement(target)) return;
+ 			setTrackedScrollEntry(target, target.scrollLeft, target.scrollTop);
+ 		}
+ 	};
+@@ -101,7 +103,7 @@
+ 		if (!router.isScrollRestoring) return;
+ 		const keyEntry = scrollRestorationCache[restoreKey] ||= {};
+ 		for (const [target, position] of trackedScrollEntries) if (target === windowScrollTarget) keyEntry[windowScrollTarget] = position;
+-		else if (target.isConnected) keyEntry[getScrollRestorationSelector(target)] = position;
++		else if (target.isConnected && shouldRestoreElement(target)) keyEntry[getScrollRestorationSelector(target)] = position;
+ 	};
+ 	document.addEventListener("scroll", onScroll, true);
+ 	router.subscribe("onBeforeLoad", (event) => {
+@@ -131,7 +133,7 @@
+ 						if (shouldResetScroll) continue;
+ 					} else {
+ 						const element = getElement(elementSelector);
+-						if (!element) continue;
++						if (!element || !shouldRestoreElement(element)) continue;
+ 						if (shouldResetScroll && scrollToTopSelectors) {
+ 							scrollToTopElements ??= getScrollToTopElements(scrollToTopSelectors);
+ 							if (scrollToTopElements.includes(element)) continue;
+@@ -163,7 +165,7 @@
+ 						windowRestored = true;
+ 					} else {
+ 						const element = getElement(elementSelector);
+-						if (element) {
++						if (element && shouldRestoreElement(element)) {
+ 							element.scrollLeft = scrollX;
+ 							element.scrollTop = scrollY;
+ 						}
+@@ -178,11 +180,14 @@
+ 					scrollTo(scrollOptions);
+ 					if (scrollToTopSelectors) {
+ 						scrollToTopElements ??= getScrollToTopElements(scrollToTopSelectors);
+-						for (const element of scrollToTopElements) element.scrollTo(scrollOptions);
++						for (const element of scrollToTopElements) if (shouldRestoreElement(element)) element.scrollTo(scrollOptions);
+ 					}
+ 				}
+ 			}
+-			if (!windowRestored && hash && hashScrollIntoViewOptions) document.getElementById(hash)?.scrollIntoView(hashScrollIntoViewOptions);
++			if (!windowRestored && hash && hashScrollIntoViewOptions) {
++				const element = document.getElementById(hash);
++				if (element && shouldRestoreElement(element)) element.scrollIntoView(hashScrollIntoViewOptions);
++			}
+ 		} finally {
+ 			ignoreScroll = false;
+ 		}
+diff --git a/src/router.ts b/src/router.ts
+--- a/src/router.ts
++++ b/src/router.ts
+@@ -454,6 +454,9 @@
+     | boolean
+     | ((opts: { location: ParsedLocation }) => boolean)
+ 
++  /** Opt individual elements out of automatic tracking and restoration. Window restoration is unchanged. */
++  shouldRestoreScrollElement?: (element: Element) => boolean
++
+   /**
+    * A function that will be called to get the key for the scroll restoration cache.
+    *
+diff --git a/dist/esm/router.d.ts b/dist/esm/router.d.ts
+--- a/dist/esm/router.d.ts
++++ b/dist/esm/router.d.ts
+@@ -314,6 +314,9 @@
+     scrollRestoration?: boolean | ((opts: {
+         location: ParsedLocation;
+     }) => boolean);
++    /** Opt individual elements out of automatic tracking and restoration. Window restoration is unchanged. */
++    shouldRestoreScrollElement?: (element: Element) => boolean;
++
+     /**
+      * A function that will be called to get the key for the scroll restoration cache.
+      *
+diff --git a/dist/cjs/router.d.cts b/dist/cjs/router.d.cts
+--- a/dist/cjs/router.d.cts
++++ b/dist/cjs/router.d.cts
+@@ -314,6 +314,9 @@
+     scrollRestoration?: boolean | ((opts: {
+         location: ParsedLocation;
+     }) => boolean);
++    /** Opt individual elements out of automatic tracking and restoration. Window restoration is unchanged. */
++    shouldRestoreScrollElement?: (element: Element) => boolean;
++
+     /**
+      * A function that will be called to get the key for the scroll restoration cache.
+      *
