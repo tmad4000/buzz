@@ -4,6 +4,8 @@ Owner: d809bb50-03b8-41d2-ba83-e2a18cb86a89. Own worktree `/home/dev/agent-workt
 
 Jacob's ask: “a way to stop a running agent on Buzz.” Root assigned Phase2 after PR67's review verdict; no PR67 changes allowed. Verified3857fd1d's completed NO at oldd6d53c6d7 (owner-edit provenance), already fixed in frozen183 with an independent later source review at7d5893bd0. Parent worktree remains clean at183; this task does not change it or assert the old verdict reviewed new code. Parent source delivery is retained in `git show 18346c781:DELIVERY.md`.
 
+Draft PR: https://github.com/tmad4000/buzz/pull/84, stacked on PR67 branch agent-reply-ux-20261118. Application change commit5a0ce1b09afcf328fe3b74aafa09f1f43880e425; subsequent delivery-only commit adds this receipt.
+
 ## Behavior
 
 Same default-OFF **Agent reply context** experiment. Recognized bridge-signed reports expose a compact **Stop…** control when appropriate; it opens the shared accessible confirmation dialog identifying the exact attributed worker. Only confirmation sends a literal `stop` reply to the **card event**, using the existing signed kind9 message path. A bridge-confirmed resumable stopped report exposes **Continue**, sending literal `continue` to that same card. No reaction toggle, new protocol/event kind, or client Paseo call.
