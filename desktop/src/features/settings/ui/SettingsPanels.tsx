@@ -1,3 +1,4 @@
+import { ForwardAgentSetting } from "@/features/forward-agent/ForwardAgentSetting";
 import { ThreadDisplaySettings } from "./ThreadDisplaySettings";
 import { useMemo, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
@@ -792,6 +793,7 @@ function ThemeSettingsCard({ currentPubkey }: { currentPubkey?: string }) {
           title="Preferences"
         >
           <ConversationDisplaySettings />
+          <ForwardAgentSetting />
           <LinkPreviewStyleSetting />
           <ThreadLayoutSetting />
         </SettingsOptionGroup>
