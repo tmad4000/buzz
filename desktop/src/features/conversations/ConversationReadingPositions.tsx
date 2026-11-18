@@ -89,6 +89,16 @@ export function ConversationReadingPositionsProvider({
   );
 }
 
+/** Freeze the initial saved choice for this context visit; captures must not
+ * turn a live reader into a new restoration request. */
+export function useInitialConversationReadingPosition(key: string | null) {
+  const scope = React.useContext(ReadingContext);
+  return React.useMemo(
+    () => (key ? scope?.read(key) : undefined),
+    [scope, key],
+  );
+}
+
 /** Capture is a DOM read, not a read acknowledgement, scroll, focus or reveal. */
 export function useCaptureConversationReadingPosition({
   key,
