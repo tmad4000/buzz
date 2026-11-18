@@ -1,0 +1,9 @@
+{
+  "check": "whole-desktop TypeScript",
+  "command": "python3 ../validation/run-bounded.py 180 node node_modules/typescript/bin/tsc --noEmit",
+  "exitCode": 0,
+  "diagnostics": "validation/typecheck.log is empty",
+  "evidenceType": "author observed process completion, not independent reviewer rerun",
+  "validatedApplicationRevision": "7d5893bd07395d2ec22676eef94ad2e4940ffd43",
+  "recordedAt": "2026-11-18T06:07:14.616572+00:00"
+}
