@@ -163,3 +163,25 @@ test("nonce callback reentrancy cannot exceed pending capacity or reuse a token"
   duplicate.cancel(token);
   assert.equal(duplicate.arm("chat", "draft"), null);
 });
+
+test("cancellation inside scope admission rejects the claimed permit permanently", () => {
+  const h = setup();
+  let token;
+  let cancelDuringConsume = false;
+  h.permits.bindScope("scope", () => {
+    if (cancelDuringConsume) h.permits.cancel(token);
+    return true;
+  });
+  token = h.arm();
+  assert.equal(h.permits.bindEntry(token, bound), true);
+  cancelDuringConsume = true;
+  assert.equal(h.permits.consume(token, incoming), null);
+  cancelDuringConsume = false;
+  assert.equal(h.permits.consume(token, incoming), null);
+  const fresh = h.arm();
+  assert.equal(h.permits.bindEntry(fresh, bound), true);
+  assert.ok(
+    h.permits.consume(fresh, incoming),
+    "only a fresh confirmation can proceed",
+  );
+});

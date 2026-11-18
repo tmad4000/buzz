@@ -4,6 +4,7 @@ type Permit = {
   channelId: string;
   draftKey: string;
   entryKey: string | null;
+  claimed: boolean;
 };
 export type AdmittedAutoSendPermit = Readonly<{
   scopeKey: string;
@@ -71,7 +72,13 @@ export class ConversationAutoSendPermits {
     )
       return null;
     this.used.add(token);
-    this.pending.set(token, { scope, channelId, draftKey, entryKey: null });
+    this.pending.set(token, {
+      scope,
+      channelId,
+      draftKey,
+      entryKey: null,
+      claimed: false,
+    });
     return token;
   }
 
@@ -95,6 +102,7 @@ export class ConversationAutoSendPermits {
     if (
       !this.isCurrent(permit.scope) ||
       this.pending.get(token) !== permit ||
+      permit.claimed ||
       permit.entryKey !== null ||
       (action !== "PUSH" && action !== "REPLACE") ||
       !key ||
@@ -121,26 +129,33 @@ export class ConversationAutoSendPermits {
     },
   ): AdmittedAutoSendPermit | null {
     const permit = this.pending.get(token);
-    // Claim before calling the scope port; reentrant reads cannot duplicate it.
-    this.pending.delete(token);
-    const { scopeKey, key, channelId, draftKey, fresh, projectionEcho } = entry;
-    if (
-      !permit ||
-      !fresh ||
-      projectionEcho ||
-      scopeKey !== permit.scope.key ||
-      !permit.entryKey ||
-      key !== permit.entryKey ||
-      channelId !== permit.channelId ||
-      draftKey !== permit.draftKey ||
-      !this.isCurrent(permit.scope)
-    )
-      return null;
-    return Object.freeze({
-      scopeKey: permit.scope.key,
-      channelId: permit.channelId,
-      draftKey: permit.draftKey,
-      entryKey: permit.entryKey,
-    });
+    if (!permit || permit.claimed) return null;
+    // Keep the claimed record observable to cancel during external callbacks.
+    // Reentrant consumption sees claimed and cannot take this authorization.
+    permit.claimed = true;
+    try {
+      const { scopeKey, key, channelId, draftKey, fresh, projectionEcho } =
+        entry;
+      if (
+        !fresh ||
+        projectionEcho ||
+        scopeKey !== permit.scope.key ||
+        !permit.entryKey ||
+        key !== permit.entryKey ||
+        channelId !== permit.channelId ||
+        draftKey !== permit.draftKey ||
+        !this.isCurrent(permit.scope) ||
+        this.pending.get(token) !== permit
+      )
+        return null;
+      return Object.freeze({
+        scopeKey: permit.scope.key,
+        channelId: permit.channelId,
+        draftKey: permit.draftKey,
+        entryKey: permit.entryKey,
+      });
+    } finally {
+      if (this.pending.get(token) === permit) this.pending.delete(token);
+    }
   }
 }
