@@ -16,6 +16,8 @@ import {
 } from "@/features/conversations/layout/explicitExpansion";
 
 type ExpansionStorage = {
+  /** Only explicit interaction deltas persist when automatic reveals are visit-local. */
+  persistManualInVisits?: true;
   load: (key: string | null) => ThreadExpansion;
   save: (key: string, branches: ThreadExpansion) => boolean;
 };
@@ -143,6 +145,7 @@ function ThreadExpansionVisit({
   }, [initial.migrated]);
   const storage = React.useMemo<ExpansionStorage>(
     () => ({
+      persistManualInVisits: true,
       load: (key) => {
         const canonical = key
           ? canonicalExplicitExpansionKey(key, viewId)
