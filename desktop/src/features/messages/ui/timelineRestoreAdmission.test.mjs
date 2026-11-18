@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { restoreReadingPosition } from "./timelineReadingPosition.ts";
+import { createReadingRestoreAdmission } from "./readingRestoreAdmission.ts";
 
 function harness(run) {
   const original = {
@@ -42,6 +43,81 @@ function harness(run) {
   }
 }
 const snapshot = { id: null, offset: 0, pixel: 42, neighbors: [] };
+
+test("blur and visibility interruptions retire queued restores even with no intervening frame", () =>
+  harness(({ element, tick, frames, writes }) => {
+    let admitted = true;
+    const windowEvents = new EventTarget(),
+      documentEvents = new EventTarget();
+    const admission = createReadingRestoreAdmission({
+      windowEvents,
+      documentEvents,
+      canRestore: () => admitted,
+    });
+    try {
+      for (const [events, type] of [
+        [windowEvents, "blur"],
+        [documentEvents, "visibilitychange"],
+      ]) {
+        const before = writes();
+        restoreReadingPosition(
+          element,
+          snapshot,
+          [],
+          () => assert.fail("retired realization"),
+          admission.capture(),
+        );
+        admitted = false;
+        events.dispatchEvent(new Event(type));
+        admitted = true; // No animation frame observed the denied interval.
+        tick();
+        assert.equal(writes(), before);
+        assert.equal(frames.size, 0);
+      }
+      restoreReadingPosition(
+        element,
+        snapshot,
+        [],
+        () => false,
+        admission.capture(),
+      );
+      tick();
+      assert.equal(writes(), 1, "a new restore after return may proceed");
+    } finally {
+      admission.dispose();
+    }
+  }));
+
+test("scope cleanup and coverage invalidation permanently retire their captured leases", () =>
+  harness(({ element, tick, writes }) => {
+    const windowEvents = new EventTarget(),
+      documentEvents = new EventTarget();
+    const admission = createReadingRestoreAdmission({
+      windowEvents,
+      documentEvents,
+      canRestore: () => true,
+    });
+    restoreReadingPosition(
+      element,
+      snapshot,
+      [],
+      () => false,
+      admission.capture(),
+    );
+    admission.invalidate();
+    tick();
+    assert.equal(writes(), 0);
+    restoreReadingPosition(
+      element,
+      snapshot,
+      [],
+      () => false,
+      admission.capture(),
+    );
+    admission.dispose();
+    tick();
+    assert.equal(writes(), 0);
+  }));
 
 test("retirement also fences the final pixel fallback after unrealized-anchor retries", () =>
   harness(({ element, tick, frames, writes }) => {
