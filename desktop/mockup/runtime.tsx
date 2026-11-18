@@ -9,7 +9,7 @@ import type { RelayEvent } from "@/shared/api/types";
 
 type Slots = {
   sidebar: Record<string, never>;
-  channelHeader: { openThread: (id: string) => void };
+  channelHeader: Record<string, never>;
   timeline: { children: ReactNode; openThread: (id: string) => void };
   composer: Record<string, never>;
   channelMargin: Record<string, never>;

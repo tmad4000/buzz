@@ -95,6 +95,29 @@ const statusNames: Record<string, string> = {
   "✅": "Done",
   "👍": "Acknowledged",
 };
+const statusIcons = {
+  "❓": CircleHelp,
+  "⏳": Hourglass,
+  "✅": CircleCheck,
+  "👍": ThumbsUp,
+} as const;
+
+function LaneStatus({ glyph, time }: { glyph: string; time?: string }) {
+  const Icon = statusIcons[glyph as keyof typeof statusIcons];
+  if (!Icon) return null;
+  const label = time ? `${statusNames[glyph]} · ${time}` : statusNames[glyph];
+  return (
+    <span
+      title={label}
+      aria-label={label}
+      role="img"
+      className="inline-flex items-center text-muted-foreground"
+    >
+      <Icon className="size-3.5" aria-hidden />
+    </span>
+  );
+}
+
 const storageKey = "buzz.mockup.lanes.moves.v1";
 
 let lanesVisible = true;
@@ -117,7 +140,7 @@ function ViewSwitch() {
   const active = useLanesVisible();
   return (
     <fieldset
-      className="z-10 shrink-0 border-b bg-background px-4 py-1.5"
+      className="flex shrink-0 items-center gap-1"
       aria-label="Channel view"
     >
       <Button
@@ -190,7 +213,7 @@ function LaneCard({
       <div className="mb-2 flex items-center gap-1.5 text-xs text-muted-foreground">
         <span className="font-medium text-foreground">tmad4000</span>
         <time>{card.time}</time>
-        <span title={statusNames[card.glyph]}>{card.glyph}</span>
+        <LaneStatus glyph={card.glyph} />
         {root !== undefined && (
           <Button
             variant="ghost"
@@ -254,8 +277,8 @@ function LaneCard({
       <div className="mt-2 flex flex-wrap gap-1">
         {card.is_root && (
           <span className="buzz-mockup-chip">
-            {card.thread} · {threadCount} msgs · {laneCount}{" "}
-            {laneCount === 1 ? "lane" : "lanes"}
+            {card.thread} · {threadCount} {threadCount === 1 ? "msg" : "msgs"} ·{" "}
+            {laneCount} {laneCount === 1 ? "lane" : "lanes"}
           </span>
         )}
         {card.also
@@ -347,7 +370,7 @@ function Lanes({
   return (
     <div
       data-testid="mockup-lanes"
-      className="relative flex min-h-0 min-w-0 flex-1 flex-col bg-background"
+      className="relative flex min-h-0 min-w-0 flex-1 flex-col bg-background pt-[var(--buzz-channel-content-top-padding,3.25rem)]"
     >
       <div className="flex shrink-0 flex-wrap items-center gap-2 border-b px-4 py-2">
         {["All", "Needs me", "Working", "Done"].map((name) => (
@@ -438,11 +461,10 @@ function Lanes({
                     {members.length}
                   </span>
                   {latest && (
-                    <span
-                      title={`${statusNames[latest.glyph]} · ${latest.glyph_at ?? latest.time}`}
-                    >
-                      {latest.glyph}
-                    </span>
+                    <LaneStatus
+                      glyph={latest.glyph}
+                      time={latest.glyph_at ?? latest.time}
+                    />
                   )}
                   <Button
                     size="icon-xs"

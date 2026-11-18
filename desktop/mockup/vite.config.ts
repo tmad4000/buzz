@@ -16,6 +16,12 @@ const patches = {
   "/features/sidebar/ui/AppSidebar.tsx": [
     ["</SidebarSections>", '<MockupSlot name="sidebar" /></SidebarSections>'],
   ],
+  "/features/channels/ui/ChannelScreen.tsx": [
+    [
+      "{pageHeaderActions}",
+      '<MockupSlot name="channelHeader" />{pageHeaderActions}',
+    ],
+  ],
   "/features/channels/ui/ChannelPane.tsx": [
     [
       "const useFocusIdleDrawer = shouldUseFocusIdleDrawer({",
@@ -24,10 +30,6 @@ const patches = {
     [
       "{showIdleAuxiliaryOverThread ? idleAuxiliarySurface : null}",
       "{showIdleAuxiliaryOverThread || (dockMockupPage && threadHeadMessage) ? idleAuxiliarySurface : null}",
-    ],
-    [
-      "{isHuddleTranscript ? null : header}",
-      '{isHuddleTranscript ? null : header}<MockupSlot name="channelHeader" context={{ openThread: onOpenThread }} />',
     ],
     [
       '<div className="relative isolate flex min-h-0 min-w-0 flex-1 flex-col">',
