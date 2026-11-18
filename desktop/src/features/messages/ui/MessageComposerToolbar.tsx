@@ -38,6 +38,7 @@ export const MessageComposerToolbar = React.memo(
     composerDisabled,
     editor,
     extraActions,
+    wrapControls = false,
     formattingDisabled,
     gifMediaController,
     isEmojiPickerOpen,
@@ -70,6 +71,8 @@ export const MessageComposerToolbar = React.memo(
     composerDisabled: boolean;
     editor: Editor | null;
     extraActions?: React.ReactNode;
+    /** Keep extra thread actions from overlapping tools in narrow reply panes. */
+    wrapControls?: boolean;
     formattingDisabled: boolean;
     gifMediaController: Pick<MediaUploadController, "setPendingImeta">;
     isEmojiPickerOpen: boolean;
@@ -109,7 +112,9 @@ export const MessageComposerToolbar = React.memo(
           editor={editor}
           onLinkButton={onLinkButton}
         />
-        <div className="-ml-2 flex min-h-10 min-w-0 flex-1 items-center gap-1 py-1">
+        <div
+          className={`-ml-2 flex min-h-10 flex-1 items-center gap-1 py-1 ${wrapControls ? "min-w-52" : "min-w-0"}`}
+        >
           {/*
            * AnimatePresence with mode="popLayout" — exiting elements
            * are popped out of flow immediately so entering elements
@@ -319,7 +324,13 @@ export const MessageComposerToolbar = React.memo(
           </AnimatePresence>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div
+          className={
+            wrapControls
+              ? "ml-auto flex items-center gap-2"
+              : "flex items-center gap-2"
+          }
+        >
           {extraActions}
           <ComposerSendButton
             isSending={isSending}

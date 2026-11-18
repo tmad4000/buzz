@@ -1,3 +1,4 @@
+import { buildThreadRoutingEntries } from "../lib/threadRouting";
 import { useThreadReplyRenderItems } from "./useThreadReplyRenderItems";
 import { useAppShell } from "@/app/AppShellContext";
 import { useSidebarOpening } from "./useSidebarOpening";
@@ -322,6 +323,10 @@ export function MessageThreadPanel({
     isUnread: isMessageUnreadById,
     scrollTargetId,
   });
+  const nestedRoutingEntries = React.useMemo(
+    () => buildThreadRoutingEntries(sidebarMessages, sidebar.index),
+    [sidebarMessages, sidebar.index],
+  );
   const onCaptureSendContext = React.useCallback(
     () => ({
       parentEventId: replyTargetMessageRef.current?.id ?? threadHeadId,
@@ -1106,6 +1111,13 @@ export function MessageThreadPanel({
               onCancelEdit={onCancelEdit}
               onCancelReply={composerReplyTarget ? onCancelReply : undefined}
               onCaptureSendContext={onCaptureSendContext}
+              threadRoutingEntries={
+                isHuddleTranscript ? undefined : nestedRoutingEntries
+              }
+              threadRoutingScope={{
+                headId: threadHead.id,
+                rootEventId: threadHead.rootId ?? threadHead.id,
+              }}
               onEditLastOwnMessage={onEditLastOwnMessage}
               onEditSave={onEditSave}
               onSend={onSend}

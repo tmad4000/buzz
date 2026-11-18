@@ -6,6 +6,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/shared/ui/popover";
 
 type Props = {
   entries: readonly MainTimelineEntry[];
+  threadHeadId?: string;
   disabled: boolean;
   getDraft: () => string;
   onPick: (threadId: string | null) => void;
@@ -13,6 +14,7 @@ type Props = {
 /** Explicit destination selection; opening and dismissal never publish. */
 export function SendToThreadPicker({
   entries,
+  threadHeadId,
   disabled,
   getDraft,
   onPick,
@@ -21,8 +23,11 @@ export function SendToThreadPicker({
   const [open, setOpen] = React.useState(false);
   const [draft, setDraft] = React.useState("");
   const options = React.useMemo(
-    () => (open ? rankThreadDestinations(entries, draft) : []),
-    [open, entries, draft],
+    () =>
+      open
+        ? rankThreadDestinations(entries, draft, undefined, threadHeadId)
+        : [],
+    [open, entries, draft, threadHeadId],
   );
   React.useEffect(() => {
     if (disabled) setOpen(false);
@@ -51,6 +56,7 @@ export function SendToThreadPicker({
           size="sm"
           disabled={disabled}
           data-testid="send-to-thread"
+          data-thread-routing-head={threadHeadId}
         >
           Send to thread…
         </Button>
@@ -71,7 +77,9 @@ export function SendToThreadPicker({
           Choose where to send
         </div>
         <p className="px-2 pb-2 text-xs text-muted-foreground">
-          Top matches in loaded messages. Choose to send.
+          {threadHeadId
+            ? "Top matches in loaded replies to this thread. Choose to send."
+            : "Top matches in loaded messages. Choose to send."}
         </p>
         <div
           ref={contentRef}
@@ -122,7 +130,9 @@ export function SendToThreadPicker({
           ))}
           {!options.length && (
             <p className="p-2 text-xs text-muted-foreground">
-              No existing threads loaded.
+              {threadHeadId
+                ? "No subthreads loaded."
+                : "No existing threads loaded."}
             </p>
           )}
           <button
@@ -131,7 +141,7 @@ export function SendToThreadPicker({
             onClick={() => pick(null)}
             className="mt-1 w-full rounded-lg border-t p-2 text-left text-sm hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
           >
-            New message
+            {threadHeadId ? "Reply to thread root" : "New message"}
           </button>
         </div>
       </PopoverContent>

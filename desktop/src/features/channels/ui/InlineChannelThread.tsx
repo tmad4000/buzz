@@ -1,3 +1,4 @@
+import { buildThreadRoutingEntries } from "@/features/messages/lib/threadRouting";
 import * as React from "react";
 import { useThreadDisclosureFocus } from "@/features/messages/ui/useThreadDisclosureFocus";
 import { PanelRight, ChevronDown, ChevronRight } from "lucide-react";
@@ -259,6 +260,10 @@ function InlineThreadContent({
   focusReply: boolean;
 }) {
   const { query, thread, combinedProfiles, canonicalRoot } = data;
+  const nestedRoutingEntries = React.useMemo(
+    () => buildThreadRoutingEntries(data.messages, thread.index),
+    [data.messages, thread.index],
+  );
   const [replyTarget, setReplyTarget] = React.useState<TimelineMessage | null>(
     null,
   );
@@ -438,6 +443,8 @@ function InlineThreadContent({
         isSending={isSending}
         profiles={combinedProfiles}
         replyTarget={replyTarget}
+        threadRoutingEntries={nestedRoutingEntries}
+        threadRoutingScope={{ headId: root.id, rootEventId: canonicalRoot }}
         onCancelReply={() => setReplyTarget(null)}
         onCaptureSendContext={() => ({
           parentEventId: replyTarget?.id ?? root.id,
