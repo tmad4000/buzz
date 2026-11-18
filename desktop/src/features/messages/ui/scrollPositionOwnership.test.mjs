@@ -35,3 +35,18 @@ test("queued automatic work stays retired after acquisition and release", () => 
   assert.equal(owner.blocked(), false);
   assert.notEqual(owner.epoch(), queuedEpoch);
 });
+
+test("initial reservation blocks automatic positioning until acquisition or explicit retirement", () => {
+  const owner = createScrollPositionOwnership();
+  owner.reserve();
+  assert.equal(owner.blocked(), true);
+  const restore = owner.acquire();
+  assert.equal(owner.blocked(), true);
+  assert.equal(restore.current(), true);
+  restore.release();
+  assert.equal(owner.blocked(), false);
+  owner.reserve();
+  owner.retire();
+  assert.equal(owner.blocked(), false);
+  assert.equal(restore.current(), false);
+});
