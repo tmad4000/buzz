@@ -15,6 +15,7 @@ async function fixture({
   endpoint = true,
   ownerView = "a",
   deferred = false,
+  strict = false,
 } = {}) {
   const container = document.createElement("div");
   document.body.append(container);
@@ -136,15 +137,22 @@ async function fixture({
     });
     return null;
   }
+  const content = React.createElement(
+    RouterContextProvider,
+    { router },
+    React.createElement(Harness),
+  );
   await act(() =>
     root.render(
-      React.createElement(
-        RouterContextProvider,
-        { router },
-        React.createElement(Harness),
-      ),
+      strict ? React.createElement(React.StrictMode, null, content) : content,
     ),
   );
+  let unmounted = false;
+  const unmount = async () => {
+    if (unmounted) return;
+    await act(() => root.unmount());
+    unmounted = true;
+  };
   function incoming() {
     const token = permits.arm("chat", "thread:root");
     const location = {
@@ -181,18 +189,23 @@ async function fixture({
     sent,
     coordinator,
     history,
+    permits,
     historyListeners,
     viewListeners,
     incoming,
     emit,
+    unmount,
     replacements: () => replacements,
     settle: () => settle?.(),
     register: () => {
       stopEndpoint = register();
     },
     close: async () => {
-      await act(() => root.unmount());
-      settle?.();
+      await unmount();
+      await act(async () => {
+        settle?.();
+        await Promise.resolve();
+      });
       stopEndpoint();
       commands.dispose();
       stopOwner();
@@ -300,6 +313,95 @@ test("a second replace with copied clear metadata retires while clearing", async
       { ...clear, state: { ...clear.state, __TSR_key: "copied-replace" } },
       "REPLACE",
     );
+    await act(async () => {
+      h.settle();
+    });
+    await flush();
+    assert.equal(h.sent.length, 0);
+    assert.ok(h.api.notice);
+  } finally {
+    await h.close();
+  }
+});
+
+test("Strict Mode setup and cleanup do not duplicate a fresh committed command", async () => {
+  const h = await fixture({ strict: true });
+  try {
+    const route = h.incoming();
+    await act(() => h.api.admitted("a", route, false));
+    await flush();
+    assert.equal(h.sent.length, 1);
+    assert.equal(h.replacements(), 1);
+  } finally {
+    await h.close();
+  }
+});
+
+test("retained callbacks after unmount cannot consume or cancel another live permission", async () => {
+  const h = await fixture();
+  try {
+    const retained = h.api;
+    const route = h.incoming();
+    await h.unmount();
+    await act(() => {
+      retained.admitted("a", route, false);
+      retained.rejected(route);
+    });
+    assert.equal(h.historyListeners.size, 0);
+    assert.equal(h.viewListeners.size, 0);
+    assert.equal(h.sent.length, 0);
+    assert.equal(h.replacements(), 0);
+    assert.ok(
+      h.permits.consume(route.state.buzzConversationAutoSend.token, {
+        scopeKey: "scope",
+        key: route.state.__TSR_key,
+        channelId: "chat",
+        draftKey: "thread:root",
+        fresh: true,
+        projectionEcho: false,
+      }),
+      "stale callback must leave the live registry untouched",
+    );
+  } finally {
+    await h.close();
+  }
+});
+
+test("unmount during pending clear drains owned history listeners before navigation settles", async () => {
+  const h = await fixture({ deferred: true });
+  try {
+    const route = h.incoming();
+    await act(() => h.api.admitted("a", route, false));
+    await flush();
+    assert.equal(h.replacements(), 1);
+    await h.unmount();
+    await flush();
+    assert.equal(h.historyListeners.size, 0);
+    assert.equal(h.viewListeners.size, 0);
+    assert.equal(h.sent.length, 0);
+    await act(async () => {
+      h.settle();
+    });
+    await flush();
+    assert.equal(h.sent.length, 0);
+  } finally {
+    await h.close();
+  }
+});
+
+test("blur and return during pending clear permanently retire the command", async () => {
+  const h = await fixture({ deferred: true });
+  try {
+    const route = h.incoming();
+    await act(() => h.api.admitted("a", route, false));
+    await flush();
+    await act(() => {
+      window.dispatchEvent(new Event("blur"));
+      window.dispatchEvent(new Event("focus"));
+    });
+    await flush();
+    assert.equal(h.historyListeners.size, 0);
+    assert.equal(h.sent.length, 0);
     await act(async () => {
       h.settle();
     });

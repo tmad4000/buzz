@@ -51,6 +51,7 @@ export async function clearCapturedAutoSendTrigger({
   echoes,
   echoOwner,
   projectionId,
+  signal,
 }: {
   entryKey: string;
   target: ConversationAutoSubmitTarget;
@@ -65,7 +66,9 @@ export async function clearCapturedAutoSendTrigger({
   echoes: ConversationProjectionEchoes;
   echoOwner: object;
   projectionId: string;
+  signal?: AbortSignal;
 }): Promise<boolean> {
+  if (signal?.aborted) return false;
   const captured = readLocation();
   const sameChannel = (href: string) => {
     try {
@@ -126,7 +129,24 @@ export async function clearCapturedAutoSendTrigger({
   );
   let stop: (() => void) | undefined;
   let success = false;
+  let aborted = false;
+  let resolveAbort: () => void = () => {};
+  const interrupted = new Promise<void>((resolve) => {
+    resolveAbort = resolve;
+  });
+  const abort = () => {
+    aborted = true;
+    stop?.();
+    stop = undefined;
+    echoes.cancel(projectionId);
+    resolveAbort();
+  };
+  signal?.addEventListener("abort", abort, { once: true });
   try {
+    if (signal?.aborted) {
+      abort();
+      return false;
+    }
     stop = subscribe((location, action) => {
       if (
         action !== "REPLACE" ||
@@ -140,9 +160,9 @@ export async function clearCapturedAutoSendTrigger({
       echoes.bindHistoryEntry(projectionId, key);
     });
     // Subscription is an external port too; it cannot retarget this command.
-    if (!stillCaptured()) return false;
-    await navigate(projection);
-    if (!admitted()) return false;
+    if (aborted || !stillCaptured() || aborted) return false;
+    await Promise.race([navigate(projection), interrupted]);
+    if (aborted || !admitted() || aborted) return false;
     const actual = readLocation(),
       history = readHistory();
     success = Boolean(
@@ -154,12 +174,14 @@ export async function clearCapturedAutoSendTrigger({
         conversationProjectionId(actual.state) === projectionId &&
         actual.search.autoSend === undefined &&
         actual.hash === captured.hash &&
-        sameSearch(search, actual.search),
+        sameSearch(search, actual.search) &&
+        !aborted,
     );
     return success;
   } catch {
     return false;
   } finally {
+    signal?.removeEventListener("abort", abort);
     stop?.();
     if (!success) echoes.cancel(projectionId);
   }

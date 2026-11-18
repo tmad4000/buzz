@@ -161,3 +161,37 @@ test("navigation failure or unconfirmed/foreign settlement denies submission and
     );
   }
 });
+
+test("abort settles an unfinished clear and removes its history subscription immediately", async () => {
+  const h = fixture();
+  const controller = new AbortController();
+  h.options.signal = controller.signal;
+  let resolve;
+  h.options.navigate = () =>
+    new Promise((done) => {
+      resolve = done;
+    });
+  const running = clearCapturedAutoSendTrigger(h.options);
+  assert.equal(h.listeners.size, 1);
+  controller.abort();
+  assert.equal(h.listeners.size, 0);
+  assert.equal(await running, false, "must settle before navigation finishes");
+  resolve();
+});
+
+test("pre-aborted and reentrant-aborted admission cannot start navigation", async () => {
+  for (const duringAdmission of [false, true]) {
+    const h = fixture();
+    const controller = new AbortController();
+    h.options.signal = controller.signal;
+    if (duringAdmission)
+      h.options.admitted = () => {
+        controller.abort();
+        return true;
+      };
+    else controller.abort();
+    assert.equal(await clearCapturedAutoSendTrigger(h.options), false);
+    assert.equal(h.navigations(), 0);
+    assert.equal(h.listeners.size, 0);
+  }
+});

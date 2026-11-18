@@ -23,6 +23,7 @@ type Pending = {
   owner: string | undefined;
   projectionId: string | null;
   projectionEntry: string | null;
+  abort: AbortController;
   stop: () => void;
   retire: () => void;
 };
@@ -42,6 +43,7 @@ export function useConversationAutoSendRouteCommand({
   const [notice, setNotice] = React.useState<string | null>(null);
   const [pending, setPending] = React.useState<Pending | null>(null);
   const owned = React.useRef<Pending | null>(null);
+  const mounted = React.useRef(false);
   const current = React.useRef({ session, active, clear });
   current.current = { session, active, clear };
   React.useLayoutEffect(() => {
@@ -49,21 +51,23 @@ export function useConversationAutoSendRouteCommand({
       owned.current.retire();
     setNotice(null);
   }, [session, active]);
-  React.useLayoutEffect(
-    () => () => {
+  React.useLayoutEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
       owned.current?.retire();
       owned.current?.stop();
       owned.current = null;
-    },
-    [],
-  );
+    };
+  }, []);
 
   const rejected = React.useCallback(
     (route: IncomingConversationRoute) => {
+      if (!mounted.current || current.current.session !== session) return;
       const token = autoSendPermitToken(route.state);
       if (token) autoSendPermitsFor(router.history).cancel(token);
     },
-    [router],
+    [router, session],
   );
 
   const admitted = React.useCallback(
@@ -72,6 +76,12 @@ export function useConversationAutoSendRouteCommand({
       route: IncomingConversationRoute,
       projectionEcho: boolean,
     ) => {
+      if (
+        !mounted.current ||
+        current.current.session !== session ||
+        !current.current.active
+      )
+        return;
       if (projectionEcho) return;
       if (typeof route.search.autoSend !== "string" || !route.search.autoSend) {
         setNotice(null);
@@ -122,12 +132,14 @@ export function useConversationAutoSendRouteCommand({
         owner: scope.coordinator.owner(permit.draftKey),
         projectionId: null,
         projectionEntry: null,
+        abort: new AbortController(),
         stop: () => {},
         retire: () => {},
       };
       lease.retire = () => {
         if (lease.retired) return;
         lease.retired = true;
+        lease.abort.abort();
         scope.commands.retireAll();
       };
       const checkView = () => {
@@ -229,6 +241,7 @@ export function useConversationAutoSendRouteCommand({
             (id) => {
               pending.projectionId = id;
             },
+            pending.abort.signal,
           );
           return cleared && !pending.retired;
         },
