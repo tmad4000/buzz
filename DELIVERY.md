@@ -28,3 +28,7 @@ Stack refresh: merged the latest PR81head83d1462c1 into this owned branch, retai
 
 
 PR81 P1 base fix: merged eeaa2c2d62d31025b7b2c9651c456ec3ffef5d53. Zero-version DEFAULT_DEV is explicitly a placeholder, so delayed authored legacy names (including same-name Paseo and local-cache1 A) replace the upgraded baseline; genuine authored strings/null/false remain protected. The independent NO-GO requires exact-head re-review; this branch no longer retains the known bad base source. PR81's37-case focused suite and typecheck pass; refreshed forwarding-stack typecheck and30/30 focused tests PASS. Only DELIVERY.md conflicted in the base merge, resolved by keeping this forwarding report.
+
+## PR81 display-only P1 base refresh
+
+Includes PR81daf6e9dbbb4d8874a38bf41bb0e018f7c765dacf: Direct agents is now a pure view-only label for the exact untouched seed node. No stored name or stamp upgrade; generic sidebar merge source/tests restored to .8. Delayed legacy authored renames, including rename-back, beat the baseline. Owner36ce confirmed exact diff; independent19ed01b1 re-review requested. Prior unshipped successor candidates are superseded. Forward behavior and device-local receipt limitation remain unchanged. Stack typecheck and30 focused forward tests are rerun with bounded process-group cleanup before push.
