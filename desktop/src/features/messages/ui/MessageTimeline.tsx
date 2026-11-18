@@ -4,7 +4,7 @@ import {
   type TimelineReadingPosition,
   type ReadingRestoreStop,
 } from "./timelineReadingPosition";
-import { createReadingRestoreAdmission } from "./readingRestoreAdmission";
+import { useReadingRestoreAdmission } from "./useReadingRestoreAdmission";
 import type { ThreadSummaryRenderer } from "./TimelineMessageRow";
 import * as React from "react";
 import {
@@ -280,9 +280,6 @@ const MessageTimelineBase = React.forwardRef<
     }),
     [scrollContainerRef, virtualizerScrollParent],
   );
-  const restoreAdmission = React.useRef<ReturnType<
-    typeof createReadingRestoreAdmission
-  > | null>(null);
   const restoreAdmissionKey = conversationView
     ? JSON.stringify([
         conversationView.viewInstanceId,
@@ -294,36 +291,11 @@ const MessageTimelineBase = React.forwardRef<
         readingTargetKey,
       ])
     : null;
-  React.useLayoutEffect(() => {
-    if (!restoreAdmissionKey) return;
-    const admission = createReadingRestoreAdmission({
-      windowEvents: window,
-      documentEvents: document,
-      canRestore: canHandle,
-    });
-    restoreAdmission.current = admission;
-    const observer = new MutationObserver(admission.invalidate);
-    for (
-      let node: HTMLElement | null = activeScrollContainerRef.current;
-      node;
-      node = node.parentElement
-    )
-      observer.observe(node, {
-        attributes: true,
-        attributeFilter: [
-          "hidden",
-          "inert",
-          "aria-hidden",
-          "data-focused-conversation",
-        ],
-      });
-    return () => {
-      observer.disconnect();
-      admission.dispose();
-      if (restoreAdmission.current === admission)
-        restoreAdmission.current = null;
-    };
-  }, [restoreAdmissionKey, activeScrollContainerRef, canHandle]);
+  const restoreAdmission = useReadingRestoreAdmission(
+    restoreAdmissionKey,
+    activeScrollContainerRef,
+    canHandle,
+  );
 
   // Gate the heavy timeline render (each row runs a synchronous
   // react-markdown parse) behind React concurrency. `useDeferredValue` lets the
@@ -617,6 +589,7 @@ const MessageTimelineBase = React.forwardRef<
       channelId,
       mode,
       readingTargetKey,
+      restoreAdmission,
     ],
   );
   useRestoreConversationReadingPosition({
