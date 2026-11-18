@@ -38,6 +38,7 @@ type SurfaceProps = {
   canRestore?: boolean;
   focusRequest?: { viewId: string; sequence: number };
   dragTarget?: ConversationDragTarget;
+  keyboardTraversal?: "local" | "shell";
 };
 
 /** Layout topology determines rectangles; stable view keys own mounted conversation state. */
@@ -51,6 +52,7 @@ export function ConversationLayoutSurface({
   canRestore = false,
   focusRequest,
   dragTarget,
+  keyboardTraversal = "local",
 }: SurfaceProps) {
   const rootRef = React.useRef<HTMLDivElement>(null);
   const [bounds, setBounds] = React.useState({
@@ -138,6 +140,7 @@ export function ConversationLayoutSurface({
       onKeyDownCapture={(event) => {
         if (
           event.key !== "F6" ||
+          keyboardTraversal === "shell" ||
           event.altKey ||
           event.ctrlKey ||
           event.metaKey ||

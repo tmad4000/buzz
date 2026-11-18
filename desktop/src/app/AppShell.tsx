@@ -150,6 +150,11 @@ export function AppShell() {
   const workspaceNavigationRef = React.useRef<AppConversationNavigation | null>(
     null,
   );
+  const handleWorkspaceFocusCycle = React.useCallback(
+    (direction: 1 | -1, target: EventTarget | null) =>
+      workspaceNavigationRef.current?.cycleFocus(direction, target) ?? false,
+    [],
+  );
   const location = useLocation();
   const queryClient = useQueryClient();
   useManagedAgentRuntimeReconciliation(communitiesHook.communities); // sync storage snapshot
@@ -724,7 +729,8 @@ export function AppShell() {
     [],
   );
   useAppShellKeyboardShortcuts({
-    activeChannelId: selectedView === "channel" ? selectedChannelId : null,
+    activeChannelId:
+      selectedView === "channel" ? (activeChannel?.id ?? null) : null,
     canSearchCurrentChannel:
       selectedView === "channel" && Boolean(activeChannel),
     disabled: settingsOpen || isHuddleRoom,
@@ -734,6 +740,7 @@ export function AppShell() {
     onNewMessage: goNewMessage,
     onSearchCurrentChannel: handleOpenChannelSearch,
     onSearchEverything: handleOpenSearch,
+    onCycleWorkspaceFocus: handleWorkspaceFocusCycle,
   });
   useSettingsShortcuts({
     onClose: handleCloseSettings,
@@ -823,6 +830,7 @@ export function AppShell() {
               />
             ) : null}
             <SidebarProvider
+              data-conversation-focus-scope
               className="relative z-10 min-h-0 min-w-0 flex-1 flex-col overflow-visible"
               data-testid="app-sidebar-layer"
             >

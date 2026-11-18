@@ -16,6 +16,10 @@ type AppShellKeyboardShortcutsOptions = {
   onNewMessage: () => unknown;
   onSearchCurrentChannel: () => void;
   onSearchEverything: () => void;
+  onCycleWorkspaceFocus?: (
+    direction: 1 | -1,
+    target: EventTarget | null,
+  ) => boolean;
 };
 
 export function useAppShellKeyboardShortcuts({
@@ -28,6 +32,7 @@ export function useAppShellKeyboardShortcuts({
   onNewMessage,
   onSearchCurrentChannel,
   onSearchEverything,
+  onCycleWorkspaceFocus,
 }: AppShellKeyboardShortcutsOptions) {
   React.useLayoutEffect(() => {
     if (disabled) return;
@@ -54,6 +59,19 @@ export function useAppShellKeyboardShortcuts({
     }
 
     function handleKeyDown(event: KeyboardEvent) {
+      if (
+        event.key === "F6" &&
+        !event.altKey &&
+        !event.ctrlKey &&
+        !event.metaKey &&
+        !event.repeat &&
+        !event.isComposing &&
+        !event.defaultPrevented &&
+        onCycleWorkspaceFocus?.(event.shiftKey ? -1 : 1, event.target)
+      ) {
+        event.preventDefault();
+        return;
+      }
       if (
         !hasPrimaryShortcutModifier(event) ||
         event.altKey ||
@@ -120,5 +138,6 @@ export function useAppShellKeyboardShortcuts({
     onNewMessage,
     onSearchCurrentChannel,
     onSearchEverything,
+    onCycleWorkspaceFocus,
   ]);
 }
