@@ -3,6 +3,8 @@
 Owner: eabf0ed3-28da-4de6-bcbe-0d290a98c5a0. Worktree `/home/dev/agent-worktrees/buzz-thread-activity-20261118`, branch `feat/thread-activity-20261118`.
 Base: annotated tag `buzz-ideaflow-v0.5.28-ideaflow.8` object `69eda1ffddf61c70c52420904deef8e79861c6f2`, peeled source `16fa57dfc97f115d00382fcb75128295b5fb3def`. PR base `sol/buzz8-release` matches that source. Target release bucket **.9**; no deployment or release claim.
 
+Draft PR: https://github.com/tmad4000/buzz/pull/70
+
 ## Jacob's asks
 
 - 2026-11-17 05:41Z DM: optionally bump a whole thread to the bottom when replies arrive; 22:46Z follow-up asks status on latest-activity threads.
@@ -30,6 +32,6 @@ All runs use `/home/dev/code/buzz-thread-activity-20261118/run-bounded.py`: chil
 - Real React/jsdom unit controls: 2 passed (Order defaults/switching/persistence/channel isolation; pin canonical root picker/open callback/removal/Undo/remount/scope isolation).
 - Biome: nine new/changed standalone files pass. `git diff --check` passes.
 - Logs: `/home/dev/code/buzz-thread-activity-20261118/{unit,controls,typecheck}.log`.
-- Draft PR and independent Sol review request are recorded in the final root handoff. Runtime/composed archive/attention integration and human acceptance stay with release owners.
+- Draft PR70 is open; independent Sol source review is requested through root d3caa262 in the final five-line handoff. Runtime/composed archive/attention integration and human acceptance stay with release owners.
 
 Owners notified: 36ce8949 order; 445b5cb9 thread/composer/seen; 2d576c28 count selectors; 9e03d4e scroll (source compatibility guidance incorporated); fd0be4cf composition. Archive exclusions must be applied by the composed pipeline before count projection; shown-archived bodies must never enter observation callbacks.
