@@ -1,3 +1,4 @@
+import { AgentQueueRow } from "@/features/agent-queue/AgentQueueView";
 import { RuntimeRouteAge } from "./RuntimeRouteAge";
 import { useProfilePanel } from "@/shared/context/ProfilePanelContext";
 import { useAgentRuntime } from "./useAgentRuntime";
@@ -15,9 +16,12 @@ export function AgentRuntimeHost({ pubkey }: { pubkey?: string }) {
       <span className="font-mono">{data.card.host.toUpperCase()}</span>
       <span className="block whitespace-normal">
         <RuntimeRouteAge attestedAt={data.attestedAt} />
+        <AgentQueueRow pubkey={pubkey} />
       </span>
     </span>
-  ) : null;
+  ) : (
+    <AgentQueueRow pubkey={pubkey} />
+  );
 }
 export function AgentRuntimeRowAction({ pubkey }: { pubkey?: string }) {
   const { data } = useAgentRuntime(pubkey);

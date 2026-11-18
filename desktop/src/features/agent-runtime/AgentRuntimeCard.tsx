@@ -1,3 +1,4 @@
+import { AgentQueuePanel } from "@/features/agent-queue/AgentQueueView";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { toast } from "sonner";
 import { copyTextToClipboard } from "@/shared/lib/clipboard";
@@ -129,11 +130,11 @@ export function AgentRuntimeCard({ pubkey }: { pubkey: string }) {
             <br />
             Self-signed · self-reported{" "}
             {new Date(data.attestedAt * 1000).toLocaleString()}
-
             {query.isError ? " · Refresh failed" : ""}
           </p>
         </div>
       ) : null}
+      <AgentQueuePanel pubkey={pubkey} />
     </section>
   );
 }

@@ -626,6 +626,7 @@ pub fn run() {
             sign_nostr_identity_binding,
             sign_out,
             decrypt_observer_event,
+            decrypt_agent_queue_event,
             build_observer_control_event,
             create_auth_event,
             nip44_encrypt_to_self,
