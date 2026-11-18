@@ -62,3 +62,65 @@ test("focused row windows stay bounded, retain their anchor, and honor explicit 
     node.remove();
   }
 });
+
+test("loaded anchor preparation is bounded, target-safe and retired with its scope", async () => {
+  const entries = Array.from({ length: 1000 }, (_, i) => ({
+    message: { id: `m${i}` },
+    summary: null,
+  }));
+  let view;
+  const node = document.createElement("div");
+  document.body.append(node);
+  const root = createRoot(node);
+  function Harness({
+    scope = "a",
+    target = null,
+    pending = false,
+    enabled = true,
+  }) {
+    view = useThreadRowWindow(
+      entries,
+      scope,
+      enabled,
+      pending,
+      undefined,
+      target,
+    );
+    return null;
+  }
+  const render = async (props = {}) =>
+    act(() => root.render(React.createElement(Harness, props)));
+  try {
+    await render();
+    const retired = view.ensureVisible;
+    await act(() =>
+      assert.equal(view.ensureVisible(["missing", "m700"]), true),
+    );
+    assert.equal(view.entries.length, 40);
+    assert.ok(view.entries.some((e) => e.message.id === "m700"));
+    const anchor = view.entries[0];
+    await act(() => assert.equal(view.ensureVisible(["collapsed"]), false));
+    assert.equal(view.entries[0], anchor);
+    await render({ target: "m999" });
+    await act(() => assert.equal(view.ensureVisible(["m1"]), false));
+    assert.equal(view.entries.at(-1).message.id, "m999");
+    await render({ pending: true });
+    assert.equal(view.ensureVisible(["m1"]), false);
+    await render({ enabled: false });
+    assert.equal(view.ensureVisible(["m1"]), false);
+    await render({ scope: "b" });
+    assert.equal(retired(["m700"]), false);
+    await render({ scope: "a" });
+    assert.equal(
+      retired(["m700"]),
+      false,
+      "returning to the same scope cannot revive a retired visit",
+    );
+    const afterUnmount = view.ensureVisible;
+    await act(() => root.unmount());
+    assert.equal(afterUnmount(["m700"]), false);
+  } finally {
+    await act(() => root.unmount());
+    node.remove();
+  }
+});
