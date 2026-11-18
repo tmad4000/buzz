@@ -3,6 +3,7 @@ import { useLocation } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { ConversationWorkspaceSurface } from "@/features/conversations/ConversationWorkspaceSurface";
 import { useConversationWorkspace } from "@/features/conversations/useConversationWorkspace";
+import { useConversationAutoSendNavigationScope } from "@/features/conversations/useConversationAutoSendNavigationScope";
 import { useConversationIncomingRoute } from "@/features/conversations/useConversationIncomingRoute";
 import { useConversationRouteProjection } from "@/features/conversations/useConversationRouteProjection";
 import { listPanes } from "@/features/conversations/layout/model";
@@ -161,6 +162,7 @@ export function AppConversationWorkspace({
   const active = Boolean(
     channelSurfaceActive && selectedChannelId && canOpen(selectedChannelId),
   );
+  useConversationAutoSendNavigationScope(session?.scopeKey ?? null);
   const panes = snapshot ? listPanes(snapshot.layout.root) : [];
   const focusedViewId = panes.find(
     (pane) => pane.id === snapshot?.layout.focusedPaneId,

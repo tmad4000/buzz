@@ -57,6 +57,7 @@ test("history carries initiating view and scope while retaining unrelated router
     routerKey: "keep",
     unrelated: 42,
     searchHighlight: { activationId: "previous" },
+    buzzConversationAutoSend: { version: 1, token: "old-confirmation" },
   };
   const state = projection.state(previous);
   assert.equal(conversationHistoryViewId(state, "scope"), "private-view");
@@ -64,10 +65,12 @@ test("history carries initiating view and scope while retaining unrelated router
   assert.equal(state.routerKey, "keep");
   assert.equal(state.unrelated, 42);
   assert.equal(state.searchHighlight, null);
+  assert.equal(state.buzzConversationAutoSend, null);
   assert.deepEqual(previous, {
     routerKey: "keep",
     unrelated: 42,
     searchHighlight: { activationId: "previous" },
+    buzzConversationAutoSend: { version: 1, token: "old-confirmation" },
   });
   assert.equal(projection.replace, false);
 });

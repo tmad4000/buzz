@@ -63,6 +63,7 @@ export function conversationRouteProjection(
       // its highlight locally instead of inheriting the previous route's one.
       searchHighlight: null,
       buzzConversationIntent: null,
+      buzzConversationAutoSend: null,
       [HISTORY_KEY]: { ...metadata, ...(projectionId ? { projectionId } : {}) },
     }),
     replace,

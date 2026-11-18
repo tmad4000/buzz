@@ -15,6 +15,10 @@ import {
 } from "@/app/navigation/navigationGuard";
 import type { SearchHit } from "@/shared/api/types";
 import { buildChannelNavigationState } from "@/features/conversations/conversationNavigationIntent";
+import {
+  autoSendPermitsFor,
+  withAutoSendPermitState,
+} from "@/features/conversations/autoSendNavigation";
 
 type NavigationBehavior = {
   force?: boolean;
@@ -288,7 +292,11 @@ export function useAppNavigation() {
         threadRootId?: string | null;
       },
     ) => {
-      return commitNavigation(
+      const permits = autoSendPermitsFor(router.history);
+      const token = options?.autoSend
+        ? permits.arm(channelId, options.autoSend)
+        : null;
+      const pending = commitNavigation(
         {
           to: "/channels/$channelId",
           params: {
@@ -308,7 +316,10 @@ export function useAppNavigation() {
             ...(options?.autoSend ? { autoSend: options.autoSend } : {}),
           },
           state: (previousState: Record<string, unknown>) =>
-            buildChannelNavigationState(previousState, options),
+            withAutoSendPermitState(
+              buildChannelNavigationState(previousState, options),
+              token,
+            ),
         },
         {
           force: options?.force,
@@ -324,8 +335,18 @@ export function useAppNavigation() {
             }
           : undefined,
       );
+      return pending.then(
+        (accepted) => {
+          if (!accepted && token) permits.cancel(token);
+          return accepted;
+        },
+        (error: unknown) => {
+          if (token) permits.cancel(token);
+          throw error;
+        },
+      );
     },
-    [commitNavigation],
+    [commitNavigation, router],
   );
 
   const goNewMessage = React.useCallback(

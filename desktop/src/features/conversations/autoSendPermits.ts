@@ -87,6 +87,11 @@ export class ConversationAutoSendPermits {
     this.pending.delete(token);
   }
 
+  /** Foreground interruption retires pending confirmation without resetting tombstones. */
+  retirePending() {
+    this.pending.clear();
+  }
+
   bindEntry(
     token: string,
     entry: {
