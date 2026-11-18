@@ -1,7 +1,7 @@
 # Forward to agent — separate .9 source delivery
 
 Draft PR: https://github.com/tmad4000/buzz/pull/85
-Initial feature commit: `78e71a621`. Current follow-up addresses all nine review findings; exact head is the PR branch tip.
+Initial feature commit: `78e71a621`. Current local follow-up applies root’s TS-only C1 authority plan; C3 cargo validation is pending captain START before push. Published SOURCE-GO head remains94e4d2c until that check.
 
 Owner: Sol session5e7bc9da. Worktree `/home/dev/agent-worktrees/forward-to-agent-20261118`; branch `sol/forward-to-agent-20261118`. Stacked on Direct Agents PR81 via included display-only product fix `daf6e9dbbb4d8874a38bf41bb0e018f7c765dacf`. Current PR81 head7998e81a8 adds only expanded tests/evidence/docs over independently SOURCE-GO18f8599a; no product-source difference. That base descends from the requested .8 tag69eda1ff (peeled source16fa57df).
 
@@ -73,3 +73,12 @@ Note/recovery interaction: confirmed marker-save failure no longer tells users t
 Merged PR81 exact7998e81a88134a03f578175c29eed20daecef5e0 (expanded production regression/validation/M5 documentation only; display-only product code unchanged). Independent19ed01b1 SOURCE GO/P1 resolved at that exact base: https://github.com/tmad4000/buzz/pull/81#issuecomment-6972530035 . It independently confirmed historical RED → stamp1 RED → display-only GREEN. Only DELIVERY.md conflicted; this forwarding report was preserved. Updated forward stack reruns the three new label-convergence regressions alongside its91 focused checks. The PR81 source gate is resolved; PR85 still needs14632ddb exact-head source disposition and separate captain native/release acceptance.
 
 Final restacked validation PASS: TypeScript and94/94 focused tests (91 forward/shared/API/sidebar checks plus3 PR81 production label regressions), under the existing bounded process-group runner. Rustfmt/Biome/diff PASS. Af293993 and fd0be4cf rechecked exact staged scope/key-set/legacy compatibility corrections and found no additional concrete blocker in their bounded ownership review; no native jobs run. Independent14632ddb exact-head review remains required. All product behavior is still default-OFF; native compile/actual IPC acceptance remains explicitly unverified.
+
+
+## Root's TS-only C1 / captain-checked C3 revision
+
+This revision supersedes the earlier native-C1 projection approach in94e4d2c. C1 now accepts the ACTUAL existing native metadata detail: member_count0, no participant_pubkeys/member array. Metadata is access policy, not membership authority. The complete writer kind39002 roster alone supplies count, signer presence, unique member keys and normalized targetChannel member/DM participant arrays. The API refuses any nonterminal/missing next_cursor when requireComplete is set. C1 native model/converter/Rust-test changes are removed; those three files are byte-identical to frozen PR81. The old exact detail/roster key-set comparison is deliberately removed because the legacy detail is not an authoritative roster.
+
+The actual zero-count IPC fixture failed before this TS change, then passed through production API → audience validation → production DM recipient resolution. Paginated rosters fail closed. Existing C2 unconditional saved-token comparison, C4 reference-only shortcut/note clearing and all B1–B5 fixes remain covered. Current typecheck PASS;95/95 focused tests PASS under bounded process-group cleanup. Biome/rustfmt/diff checks accompany the local commit. Red log retained at /tmp/pr85-zero-count-legacy-red.log.
+
+Only commands/channels.rs remains changed on the native side relative to the PR81 base: C3 uses the existing strong channel_metadata_filter for opted-in reads and retains captured expected relay/signer fences through metadata/member/profile awaits. Default one-argument metadata/readback behavior stays unchanged. No cargo/check/native job has run: captain9888b74e is asked for a bounded exact-revision cargo-check slot; do not run until explicit grant. Combined push/new14632 review waits for that check, or an explicitly marked TS-first/C3-pending delivery if the slot is delayed. PR81 remains frozen7998e81a8. No deployment/live forward/M5 action or dependency/kind/version change.

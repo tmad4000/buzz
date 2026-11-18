@@ -88,7 +88,7 @@ test("fresh writer-side roster completeness and current membership are checked b
   await assert.rejects(
     readForwardAudiences("dm", "target", "self", "https://relay.test", {
       ...io,
-      getChannelMembers: async () => [{ pubkey: "self" }],
+      getChannelMembers: async () => [{ pubkey: "self" }, { pubkey: "self" }],
     }),
     /full current audience/,
   );
@@ -104,18 +104,24 @@ test("fresh writer-side roster completeness and current membership are checked b
   );
 });
 
-test("same-size writer snapshots with different keys fail closed instead of silently replacing the detail roster", async () => {
+test("writer roster alone determines membership; metadata count/key hints cannot bypass audience disclosure", async () => {
   const source = lane("dm", ["self", "agent"]),
     target = lane("target", ["self", "agent"]);
-  await assert.rejects(
-    readForwardAudiences("dm", "target", "self", "https://relay.test", {
+  const result = await readForwardAudiences(
+    "dm",
+    "target",
+    "self",
+    "https://relay.test",
+    {
       getChannelDetails: async (id) =>
         id === "dm" ? source.channel : target.channel,
       getChannelMembers: async (id) =>
         id === "dm"
           ? source.members
           : [{ pubkey: "self" }, { pubkey: "other" }],
-    }),
-    /full current audience/,
+    },
   );
+  assert.deepEqual(result.target.channel.memberPubkeys, ["self", "other"]);
+  assert.equal(result.target.channel.memberCount, 2);
+  assert.equal(needsAudienceConfirmation(result), true);
 });

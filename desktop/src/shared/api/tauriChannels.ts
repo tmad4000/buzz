@@ -334,6 +334,7 @@ export async function getChannelMembers(
   channelId: string,
   options?: {
     readYourWrites?: boolean;
+    requireComplete?: boolean;
     expectedScope?: { relayUrl: string; signerPubkey: string };
   },
 ): Promise<ChannelMember[]> {
@@ -349,6 +350,10 @@ export async function getChannelMembers(
       expectedSignerPubkey: options?.expectedScope?.signerPubkey,
     },
   );
+  if (options?.requireComplete && response.next_cursor !== null)
+    throw new Error(
+      "The complete writer roster is unavailable. Reopen the destination picker.",
+    );
   return response.members.map(fromRawChannelMember);
 }
 

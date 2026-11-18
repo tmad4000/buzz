@@ -49,6 +49,7 @@ export async function readForwardAudiences(
   if (!relayUrl) throw new Error("No captured forwarding relay.");
   const options = {
     readYourWrites: true,
+    requireComplete: true,
     expectedScope: { relayUrl, signerPubkey: signer },
   };
   const [source, target, sourceMembers, targetMembers] = await Promise.all([
@@ -63,9 +64,6 @@ export async function readForwardAudiences(
       !channel.isMember ||
       channel.archivedAt ||
       !members.some((m) => m.pubkey === signer) ||
-      members.length !== channel.memberCount ||
-      JSON.stringify([...new Set(channel.memberPubkeys)].sort()) !==
-        JSON.stringify([...new Set(members.map((m) => m.pubkey))].sort()) ||
       new Set(members.map((m) => m.pubkey)).size !== members.length
     )
       throw new Error(
@@ -76,6 +74,7 @@ export async function readForwardAudiences(
   validate(target, targetMembers, targetId);
   const complete = (channel: Channel, members: ChannelMember[]): Channel => ({
     ...channel,
+    memberCount: members.length,
     memberPubkeys: members.map((m) => m.pubkey),
     participantPubkeys:
       channel.channelType === "dm" ? members.map((m) => m.pubkey) : [],

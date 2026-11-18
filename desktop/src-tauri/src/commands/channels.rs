@@ -111,63 +111,25 @@ pub async fn get_channel_details(
     expected_signer_pubkey: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<ChannelDetailInfo, String> {
-    fetch_channel_detail(
-        &state,
-        &channel_id,
-        read_your_writes.unwrap_or(false),
-        expected_relay_url.as_deref(),
-        expected_signer_pubkey.as_deref(),
-    )
-    .await
-}
-
-/// Join metadata and the complete roster; send-influencing reads pin BOTH to the writer.
-async fn fetch_channel_detail(
-    state: &AppState,
-    channel_id: &str,
-    read_your_writes: bool,
-    expected_relay_url: Option<&str>,
-    expected_signer_pubkey: Option<&str>,
-) -> Result<ChannelDetailInfo, String> {
-    let metadata_filter = if read_your_writes {
-        channel_metadata_filter(&[channel_id])
+    let metadata_filter = if read_your_writes.unwrap_or(false) {
+        channel_metadata_filter(&[&channel_id])
     } else {
-        serde_json::json!({"kinds": [39000], "#d": [channel_id], "limit": 1})
+        serde_json::json!({"kinds": [39000], "#d": [&channel_id], "limit": 1})
     };
-    let api_base = relay_api_base_url_with_override(state);
-    assert_expected_relay_scope(expected_relay_url, &api_base)?;
+    let api_base = relay_api_base_url_with_override(&state);
+    assert_expected_relay_scope(expected_relay_url.as_deref(), &api_base)?;
     let keys = state.signing_keys()?;
-    assert_expected_signer(expected_signer_pubkey, &keys.public_key().to_hex())?;
+    assert_expected_signer(
+        expected_signer_pubkey.as_deref(),
+        &keys.public_key().to_hex(),
+    )?;
     let events =
-        query_relay_at_with_keys(state, &api_base, &[metadata_filter], &keys, None).await?;
-    let event = events
+        query_relay_at_with_keys(&state, &api_base, &[metadata_filter], &keys, None).await?;
+    events
         .first()
-        .ok_or_else(|| "channel not found".to_string())?;
-    // Existing metadata-only callers (including nonjoined directory browsing)
-    // keep their old contract. Forwarding explicitly requests the strict writer join.
-    if !read_your_writes {
-        return nostr_convert::channel_metadata_detail_from_event(event);
-    }
-    let roster = query_relay_at_with_keys(
-        state,
-        &api_base,
-        &[channel_members_filter(channel_id, read_your_writes)],
-        &keys,
-        None,
-    )
-    .await?;
-    let roster_event = roster
-        .first()
-        .ok_or_else(|| "channel members not found".to_string())?;
-    if !roster_event.tags.iter().any(|tag| {
-        let values = tag.as_slice();
-        values.first().map(String::as_str) == Some("d")
-            && values.get(1).map(String::as_str) == Some(channel_id)
-    }) {
-        return Err("channel roster did not match metadata".to_string());
-    }
-    let members = nostr_convert::channel_members_from_event(roster_event)?;
-    nostr_convert::channel_detail_from_event(event, &members)
+        .map(nostr_convert::channel_detail_from_event)
+        .transpose()?
+        .ok_or_else(|| "channel not found".to_string())
 }
 
 /// Cap for the kind:0 profile join in `get_channel_members`. Enriching a
@@ -577,7 +539,7 @@ pub async fn update_channel(
     let events = query_relay(&state, &[channel_metadata_filter(&[&input.channel_id])]).await?;
     events
         .first()
-        .map(nostr_convert::channel_metadata_detail_from_event)
+        .map(nostr_convert::channel_detail_from_event)
         .transpose()?
         .ok_or_else(|| "channel updated but metadata not yet available".to_string())
 }
