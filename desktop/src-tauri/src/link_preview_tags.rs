@@ -122,35 +122,50 @@ pub fn append(
     Ok(())
 }
 
-/// Redacted tag shape for local diagnostics; never include body or URL secrets.
+const MAX_LOG_PREVIEWS: usize = 8;
+const MAX_LOG_FIELDS: usize = 11;
+const MAX_REJECTION_LOG_BYTES: usize = 4096;
+
+/// Bounded tag shape; URL and text values are never copied into diagnostics.
 pub fn diagnostic(tag: &[String]) -> serde_json::Value {
-    let canonical = tag.get(3).and_then(|value| url::Url::parse(value).ok());
     serde_json::json!({
-        "field_bytes": tag.iter().map(String::len).collect::<Vec<_>>(),
-        "canonical_origin": canonical.map(|url| url.origin().ascii_serialization()),
+        "field_bytes": tag.iter().take(MAX_LOG_FIELDS).map(String::len).collect::<Vec<_>>(),
+        "omitted_fields": tag.len().saturating_sub(MAX_LOG_FIELDS),
     })
 }
 
-/// Structured HTTP rejection context, limited to signed ID and redacted previews.
+/// Structured HTTP rejection context with a hard serialized record budget.
 pub fn rejection_diagnostic(event: &nostr::Event, status: u16, error: &str) -> serde_json::Value {
+    let is_preview =
+        |tag: &nostr::Tag| tag.as_slice().first().map(String::as_str) == Some("link-preview");
+    let total = event.tags.iter().filter(|tag| is_preview(tag)).count();
     let previews: Vec<_> = event
         .tags
         .iter()
         .enumerate()
-        .filter(|(_, tag)| tag.as_slice().first().map(String::as_str) == Some("link-preview"))
+        .filter(|(_, tag)| is_preview(tag))
+        .take(MAX_LOG_PREVIEWS)
         .map(|(index, tag)| {
             serde_json::json!({
                 "tag_index": index, "tag": diagnostic(tag.as_slice()),
             })
         })
         .collect();
-    serde_json::json!({
+    let mut record = serde_json::json!({
         "event": "relay_event_rejected", "event_id": event.id.to_hex(),
         "status": status, "link_preview_tags": previews,
+        "omitted_previews": total.saturating_sub(MAX_LOG_PREVIEWS),
         "reason": if error.contains("invalid link-preview canonical URL") {
             "invalid_link_preview_canonical_url"
         } else { "relay_client_error" },
-    })
+    });
+    // Reserve one byte for the newline emitted by the stderr writer. Even if
+    // fields are added later, the diagnostic never exceeds this fixed budget.
+    if record.to_string().len() >= MAX_REJECTION_LOG_BYTES {
+        record["link_preview_tags"] = serde_json::json!([]);
+        record["omitted_previews"] = serde_json::json!(total);
+    }
+    record
 }
 
 #[cfg(test)]
@@ -233,7 +248,7 @@ mod tests {
         let mut preview = tag("", "");
         preview[3] = "https://user:password@example.com/private?token=secret#secret".into();
         let diagnostic = diagnostic(&preview);
-        assert_eq!(diagnostic["canonical_origin"], "https://example.com");
+        assert!(diagnostic.get("canonical_origin").is_none());
         let serialized = diagnostic.to_string();
         for secret in ["password", "secret", "private", "Example", "Description"] {
             assert!(!serialized.contains(secret));
@@ -258,6 +273,36 @@ mod tests {
         assert_eq!(
             rejection_diagnostic(&event, 403, "untrusted secret response")["reason"],
             "relay_client_error"
+        );
+    }
+
+    #[test]
+    fn oversized_rejection_diagnostics_have_count_field_and_byte_caps() {
+        let keys = nostr::Keys::parse(&"1".repeat(64)).unwrap();
+        let mut fields = vec!["link-preview".to_string(); 10_000];
+        fields[3] = format!("https://{}.example/", "a".repeat(10_000));
+        let preview = Tag::parse(fields).unwrap();
+        let event = nostr::EventBuilder::text_note("private")
+            .tags(vec![preview; 100])
+            .sign_with_keys(&keys)
+            .unwrap();
+        let record = rejection_diagnostic(&event, 400, "invalid link-preview canonical URL");
+        let summaries = record["link_preview_tags"].as_array().unwrap();
+        assert_eq!(summaries.len(), MAX_LOG_PREVIEWS);
+        assert_eq!(record["omitted_previews"], 92);
+        for summary in summaries {
+            assert_eq!(
+                summary["tag"]["field_bytes"].as_array().unwrap().len(),
+                MAX_LOG_FIELDS
+            );
+            assert_eq!(summary["tag"]["omitted_fields"], 9989);
+        }
+        assert!(record.to_string().len() + 1 <= MAX_REJECTION_LOG_BYTES);
+        assert!(
+            diagnostic(event.tags.iter().next().unwrap().as_slice())
+                .to_string()
+                .len()
+                < 256
         );
     }
 

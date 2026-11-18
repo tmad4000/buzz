@@ -145,7 +145,7 @@ export function createOptimisticMessage(
     }
   }
 
-  for (const tag of mediaTags) {
+  for (const tag of filterOutgoingLinkPreviewTags(mediaTags, content.trim())) {
     tags.push(tag);
   }
   if (sentFromThreadRootId) {
@@ -604,7 +604,7 @@ export function useSendMessageMutation(
             rootEventId,
             mentionPubkeys: recipientPubkeys,
             tags: [
-              ...(mediaTags ?? []),
+              ...filterOutgoingLinkPreviewTags(mediaTags ?? [], content.trim()),
               ...(sentFromThreadTag ? [sentFromThreadTag] : []),
             ],
             relayUrl:

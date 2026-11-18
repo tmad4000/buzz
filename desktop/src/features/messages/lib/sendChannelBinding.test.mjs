@@ -343,3 +343,37 @@ test("resolveCachedReplyRootId sends only roots proven by a cached parent", () =
   assert.equal(resolveCachedReplyRootId(parentId, [[], [parent]]), rootId);
   assert.equal(resolveCachedReplyRootId(parentId, [[], []]), null);
 });
+
+test("optimistic construction omits incompatible previews while preserving body and other tags", () => {
+  const content =
+    "<https://humanityinfrastructure.com> <https://x.com/kevinrose/status/123>";
+  const bad = [
+    "link-preview",
+    "snapshot",
+    "1",
+    "https://humanityinfrastructure.com/",
+    "Humanity",
+    "site",
+    "",
+    "",
+    "",
+    "",
+    "",
+  ];
+  const good = [...bad];
+  good[3] = "https://x.com/kevinrose/status/123";
+  const emoji = ["emoji", "wave", "https://relay.example/wave.png"];
+  const message = createOptimisticMessage(
+    "channel",
+    content,
+    IDENTITY,
+    [],
+    [],
+    null,
+    [bad, good, emoji],
+  );
+  assert.equal(message.content, content);
+  assert.ok(!message.tags.some((tag) => tag[3] === bad[3]));
+  assert.ok(message.tags.some((tag) => tag[3] === good[3]));
+  assert.ok(message.tags.some((tag) => tag[0] === "emoji"));
+});
