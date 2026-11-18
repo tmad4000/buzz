@@ -298,7 +298,13 @@ export function formatTimelineMessages(
     }
 
     const existing = editsByTargetId.get(targetId);
-    if (!existing || event.created_at > existing.createdAt) {
+    if (
+      !existing ||
+      event.created_at > existing.createdAt ||
+      (normalizePubkey(target.pubkey) === BRIDGE_STATUS_SIGNER &&
+        event.created_at === existing.createdAt &&
+        event.id < existing.eventId)
+    ) {
       editsByTargetId.set(targetId, {
         content: event.content,
         eventId: event.id,

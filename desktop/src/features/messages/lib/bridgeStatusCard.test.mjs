@@ -293,3 +293,15 @@ test("reviewer P1 reproduction: latest owner-signed Done body never inherits the
     "an edited TimelineMessage without provenance fails closed",
   );
 });
+
+test("bridge body revision selection uses lowest event ID for equal signed created_at in either input order", async () => {
+  const {formatTimelineMessages}=await import("./formatTimelineMessages.ts");
+  const original={id:"f".repeat(64),kind:9,pubkey:message.signerPubkey,created_at:1,content:body(),tags:[["h","channel"],["e","b".repeat(64),"","reply"]]};
+  const low={id:"1".repeat(64),kind:40003,pubkey:message.signerPubkey,created_at:2,content:body("✅ Done"),tags:[["e",original.id],["h","channel"]]};
+  const high={...low,id:"e".repeat(64),content:body()};
+  for(const edits of [[low,high],[high,low]]) {
+    const projected=formatTimelineMessages([original,...edits],null)[0];
+    assert.equal(projected.body,low.content);
+    assert.deepEqual(projected.bodyRevision,{eventId:low.id,createdAt:low.created_at});
+  }
+});

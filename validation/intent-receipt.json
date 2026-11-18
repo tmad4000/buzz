@@ -1,0 +1,31 @@
+{
+  "at": "2026-11-18T07:19:12.361692+00:00",
+  "parent": "3a1e41ec74e6de8b261fbb7b4e6667333b8c0e8a",
+  "priorSource": "ee80af6f47288f15ba903285d3a94b2b5a4bb282",
+  "freshness": "signed revision.created_at strictly greater than max(baseline.createdAt,persisted intentAfter); missing/tied/older evidence holds",
+  "canonicalEditTie": "bridge-original equal-created_at winner is lowest eventID",
+  "modelTests": {
+    "pass": 17,
+    "fail": 0,
+    "timeoutSeconds": 60
+  },
+  "domTests": {
+    "pass": 11,
+    "fail": 0,
+    "timeoutSeconds": 60
+  },
+  "unchangedReviewerProbe": {
+    "pass": 6,
+    "fail": 0,
+    "timeoutSeconds": 45,
+    "sha256": "daa40b669c03d344808e12671f7e075a3c7f87c62d5809392a14773c49cb1fdd"
+  },
+  "wholeDesktopTypecheck": {
+    "exitCode": 0,
+    "diagnostics": 0,
+    "timeoutSeconds": 90
+  },
+  "isolation": "setsid plus process-group kill cleanup",
+  "realControlPublication": false,
+  "independentSourceRecheck": "pending be986 via root"
+}

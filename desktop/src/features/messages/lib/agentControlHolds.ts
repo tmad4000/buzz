@@ -1,7 +1,7 @@
 // Persist intent before publication. Never evict unresolved attempts or retry them.
 export const HOLD_STORAGE_KEY = "buzz.agent-control-holds.v1";
 type Revision = {eventId: string; createdAt: number};
-type Hold = { revision?: Revision; id: string; intent: "stop" | "continue"; baseline: string; status: "sending" | "sent" | "unknown" };
+type Hold = { intentAfter?: number; revision?: Revision; id: string; intent: "stop" | "continue"; baseline: string; status: "sending" | "sent" | "unknown" };
 const listeners = new Set<() => void>();
 export const subscribeHolds = (notify: () => void) => {
   listeners.add(notify);
@@ -32,8 +32,10 @@ export function claimHold(key: string, intent: Hold["intent"], baseline: string,
   try {
     const records = read();
     if (records[key] || Object.keys(records).length >= 128) return null;
+    const intentAfter = Math.floor(Date.now() / 1000);
+    if (!Number.isSafeInteger(intentAfter) || intentAfter <= 0) return null;
     const id = crypto.randomUUID();
-    records[key] = { id, intent, baseline, revision: validRevision(revision) ? revision : undefined, status: "sending" };
+    records[key] = { id, intent, baseline, intentAfter, revision: validRevision(revision) ? revision : undefined, status: "sending" };
     write(records);
     return id;
   } catch { return null; }
@@ -56,8 +58,11 @@ export function reconcileHold(key: string, token: string, source: string, state:
   if (!hold || hold.baseline === token || source !== "jacob" ||
       !validRevision(hold.revision) || !validRevision(revision) ||
       revision.eventId === hold.revision.eventId ||
-      revision.createdAt <= hold.revision.createdAt) return;
-  // Ties, missing metadata and old views cannot establish a newer control cycle.
+      !Number.isSafeInteger(hold.intentAfter) ||
+      revision.createdAt <= Math.max(hold.revision.createdAt, hold.intentAfter!)) return;
+  // Canonical equal-time selection is lowest event ID, but a tie does not prove
+  // post-intent freshness. Keep the hold even when a tied ID wins selection.
+  // Clock uncertainty can delay reconciliation; it must never authorize a retry.
   if (hold.intent === "stop" ? ["stopped", "idle", "interrupted"].includes(state) : state === "continuation")
     updateHold(key, hold.id, null);
 }
