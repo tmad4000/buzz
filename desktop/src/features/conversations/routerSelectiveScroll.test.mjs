@@ -14,6 +14,7 @@ import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import { spawnSync } from "node:child_process";
 import vm from "node:vm";
+import { createHash } from "node:crypto";
 import { shouldRestoreRouterElement } from "./routerScrollPolicy.ts";
 
 const require = createRequire(import.meta.url);
@@ -25,6 +26,16 @@ const pkg = JSON.parse(
 );
 assert.equal(pkg.name, "@tanstack/router-core");
 assert.equal(pkg.version, "1.171.5");
+const sourceManifest = JSON.parse(
+  readFileSync(
+    new URL(
+      "../../../../patches/router-core-selective-scroll.source.json",
+      import.meta.url,
+    ),
+    "utf8",
+  ),
+);
+const digest = (bytes) => createHash("sha256").update(bytes).digest("hex");
 const directory = mkdtempSync(resolve(tmpdir(), "buzz-router-selective-"));
 const files = [
   "src/scroll-restoration.ts",
@@ -37,6 +48,11 @@ const files = [
 for (const file of files) {
   const source = resolve(sourceRoot, file);
   assert.equal(lstatSync(source).isFile(), true);
+  assert.equal(
+    digest(readFileSync(source)),
+    sourceManifest.sourceSha256[file],
+    `source hash changed: ${file}`,
+  );
   mkdirSync(dirname(resolve(directory, file)), { recursive: true });
   copyFileSync(source, resolve(directory, file));
 }
@@ -47,6 +63,7 @@ if (!process.env.BUZZ_ROUTER_PATCH_BASELINE) {
       import.meta.url,
     ),
   );
+  assert.equal(digest(readFileSync(patch)), sourceManifest.patchSha256);
   const result = spawnSync("git", ["apply", patch], {
     cwd: directory,
     encoding: "utf8",
