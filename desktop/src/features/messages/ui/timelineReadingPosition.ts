@@ -39,6 +39,7 @@ export function restoreReadingPosition(
   snapshot: TimelineReadingPosition,
   ids: string[],
   realize: (id: string) => boolean,
+  canRestore: () => boolean = () => true,
 ) {
   const id = [snapshot.id, ...snapshot.neighbors].find(
     (candidate) => candidate && ids.includes(candidate),
@@ -53,8 +54,12 @@ export function restoreReadingPosition(
     container.removeEventListener("keydown", stop);
   };
   const restore = () => {
-    if (!container.isConnected || ++tries > 30) {
-      if (tries > 30) container.scrollTop = snapshot.pixel;
+    if (!container.isConnected || !canRestore()) {
+      stop();
+      return;
+    }
+    if (++tries > 30) {
+      container.scrollTop = snapshot.pixel;
       stop();
       return;
     }

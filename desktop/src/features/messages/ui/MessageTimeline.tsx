@@ -5,7 +5,10 @@ import {
 } from "./timelineReadingPosition";
 import type { ThreadSummaryRenderer } from "./TimelineMessageRow";
 import * as React from "react";
-import { ConversationViewContext } from "@/features/conversations/ConversationViewContext";
+import {
+  ConversationViewContext,
+  useConversationControlScope,
+} from "@/features/conversations/ConversationViewContext";
 import { timelineScrollIdentity } from "@/features/conversations/timelineScrollIdentity";
 import { useTimelineView } from "@/features/channels/ui/TimelineViewContext";
 
@@ -235,6 +238,19 @@ const MessageTimelineBase = React.forwardRef<
 ) {
   const conversationView = React.useContext(ConversationViewContext);
   const { mode } = useTimelineView();
+  const { canHandle } = useConversationControlScope();
+  const restorationOwner = React.useRef({
+    channelId,
+    mode,
+    targetMessageId,
+    viewId: conversationView?.viewInstanceId,
+  });
+  restorationOwner.current = {
+    channelId,
+    mode,
+    targetMessageId,
+    viewId: conversationView?.viewInstanceId,
+  };
   const internalScrollRef = React.useRef<HTMLDivElement>(null);
   const scrollContainerRef = externalScrollRef ?? internalScrollRef;
   const contentRef = React.useRef<HTMLDivElement>(null);
@@ -514,6 +530,22 @@ const MessageTimelineBase = React.forwardRef<
               snapshot,
               messages.map((m) => m.id),
               (id) => timelineVirtualizerApi?.scrollToMessage(id) ?? false,
+              conversationView
+                ? () => {
+                    const current = restorationOwner.current;
+                    const container = activeScrollContainerRef.current;
+                    return (
+                      canHandle() &&
+                      current.viewId === conversationView.viewInstanceId &&
+                      current.channelId === channelId &&
+                      current.mode === mode &&
+                      current.targetMessageId === targetMessageId &&
+                      container?.closest(
+                        '[hidden], [inert], [aria-hidden="true"]',
+                      ) === null
+                    );
+                  }
+                : undefined,
             )
           : undefined,
       scrollToBottomOnNextUpdate: prepareForOwnMessage,
@@ -529,6 +561,11 @@ const MessageTimelineBase = React.forwardRef<
       timelineVirtualizerApi,
       activeScrollContainerRef,
       messages,
+      canHandle,
+      conversationView,
+      channelId,
+      mode,
+      targetMessageId,
     ],
   );
 
