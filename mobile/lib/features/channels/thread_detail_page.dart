@@ -1,3 +1,6 @@
+import 'pending_local_messages_provider.dart';
+import '../../shared/offline/read_admission.dart';
+import '../../shared/offline/offline_banner.dart';
 import 'dart:async';
 import 'dart:math' as math;
 
@@ -705,7 +708,7 @@ class ThreadDetailPage extends HookConsumerWidget {
       );
       return null;
     }, [hasFetchedReplies, replies.length, settleGeometry, headHeight.value]);
-    _useThreadReplyReadState(ref, threadHead.id, replies);
+    _useThreadReplyReadState(ref, context, channelId, threadHead.id, replies);
 
     // Thread-scoped typing indicators (exclude self).
     final allTyping = ref.watch(channelTypingProvider(channelId));
@@ -839,6 +842,19 @@ class ThreadDetailPage extends HookConsumerWidget {
         children: [
           Column(
             children: [
+              OfflineBanner(
+                sourceId: 'thread:$channelId:${threadHead.id}',
+                onRetry: () {
+                  ref.invalidate(
+                    threadRepliesProvider(
+                      ThreadRepliesArgs(
+                        channelId: channelId,
+                        rootId: threadHead.id,
+                      ),
+                    ),
+                  );
+                },
+              ),
               Expanded(
                 child: _ThreadMessageList(
                   headHeight: headHeight.value ?? 0,

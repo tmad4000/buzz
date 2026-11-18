@@ -1,3 +1,4 @@
+import '../offline/offline_provider.dart';
 import 'dart:async';
 
 import 'package:flutter/widgets.dart';
@@ -155,6 +156,7 @@ class ReadStateNotifier extends Notifier<ReadStateState> {
     int unixTimestamp, {
     bool clearForcedMessages = false,
   }) {
+    if (offlineConnectionRequired(ref)) return;
     var removed = _forcedUnreadContexts.remove(contextId) != null;
     if (clearForcedMessages) {
       final before = _forcedUnreadContexts.length;

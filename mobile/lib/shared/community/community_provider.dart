@@ -1,3 +1,6 @@
+import '../offline/offline_provider.dart';
+import '../offline/offline_cache.dart';
+import '../relay/relay_provider.dart';
 import 'dart:async';
 import 'dart:developer' as developer;
 import 'dart:math';
@@ -318,6 +321,19 @@ class CommunityListNotifier extends AsyncNotifier<List<Community>> {
         revocationJournaled = await ref.read(
           communityPushLeaseRevocationEnqueuerProvider,
         )(current[removedIndex]);
+      }
+      if (removedIndex >= 0) {
+        final removed = current[removedIndex];
+        final pubkey = removed.pubkey ?? pubkeyFromNsec(removed.nsec);
+        if (pubkey != null) {
+          final root = await ref.read(offlineDirectoryProvider)();
+          final relay = RelayConfig(baseUrl: removed.relayUrl).wsUrl;
+          await OfflineCacheStore.clearScope(
+            root,
+            offlineMobileScope(relay, pubkey),
+            retire: true,
+          );
+        }
       }
       await storage.remove(id);
 

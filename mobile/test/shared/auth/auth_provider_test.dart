@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'package:buzz/shared/offline/offline_provider.dart';
 import 'dart:async';
 
 import 'package:flutter/services.dart';
@@ -13,6 +15,13 @@ import 'package:buzz/shared/push/push_bridge.dart';
 import '../community/community_storage_test.dart';
 
 void main() {
+  late Directory offlineRoot;
+  setUp(() async {
+    offlineRoot = await Directory.systemTemp.createTemp('buzz-auth-offline-');
+  });
+  tearDown(() async {
+    await offlineRoot.delete(recursive: true);
+  });
   test('waits for transition teardown before replacing credentials', () async {
     final storage = CommunityStorage(secure: FakeSecureStorage());
     final active = Community.create(
@@ -28,7 +37,10 @@ void main() {
     await storage.save(active);
     await storage.saveActiveId(active.id);
     final container = ProviderContainer(
-      overrides: [communityStorageProvider.overrideWithValue(storage)],
+      overrides: [
+        offlineDirectoryProvider.overrideWithValue(() async => offlineRoot),
+        communityStorageProvider.overrideWithValue(storage),
+      ],
     );
     addTearDown(container.dispose);
     await container.read(authProvider.future);
@@ -64,7 +76,10 @@ void main() {
     await storage.save(community);
     await storage.saveActiveId(community.id);
     final container = ProviderContainer(
-      overrides: [communityStorageProvider.overrideWithValue(storage)],
+      overrides: [
+        offlineDirectoryProvider.overrideWithValue(() async => offlineRoot),
+        communityStorageProvider.overrideWithValue(storage),
+      ],
     );
     addTearDown(container.dispose);
     await container.read(authProvider.future);
@@ -100,7 +115,10 @@ void main() {
     await storage.save(replacement);
     await storage.saveActiveId(active.id);
     final container = ProviderContainer(
-      overrides: [communityStorageProvider.overrideWithValue(storage)],
+      overrides: [
+        offlineDirectoryProvider.overrideWithValue(() async => offlineRoot),
+        communityStorageProvider.overrideWithValue(storage),
+      ],
     );
     addTearDown(container.dispose);
     await container.read(authProvider.future);
@@ -142,6 +160,7 @@ void main() {
       final snapshots = <List<Community>>[];
       final container = ProviderContainer(
         overrides: [
+          offlineDirectoryProvider.overrideWithValue(() async => offlineRoot),
           communityStorageProvider.overrideWithValue(storage),
           communitySnapshotWriterProvider.overrideWithValue((
             communities,
@@ -177,6 +196,7 @@ void main() {
     final snapshots = <List<Community>>[];
     final container = ProviderContainer(
       overrides: [
+        offlineDirectoryProvider.overrideWithValue(() async => offlineRoot),
         communityStorageProvider.overrideWithValue(storage),
         communitySnapshotWriterProvider.overrideWithValue((communities) async {
           snapshots.add(List.of(communities));
@@ -216,6 +236,7 @@ void main() {
       final journaledCommunityIds = <String>[];
       final container = ProviderContainer(
         overrides: [
+          offlineDirectoryProvider.overrideWithValue(() async => offlineRoot),
           communityStorageProvider.overrideWithValue(storage),
           communitySnapshotWriterProvider.overrideWithValue((
             communities,
@@ -265,6 +286,7 @@ void main() {
       await storage.saveActiveId(community.id);
       final container = ProviderContainer(
         overrides: [
+          offlineDirectoryProvider.overrideWithValue(() async => offlineRoot),
           communityStorageProvider.overrideWithValue(storage),
           communitySnapshotWriterProvider.overrideWithValue((_) async {
             throw PlatformException(
@@ -293,6 +315,7 @@ void main() {
     );
     final container = ProviderContainer(
       overrides: [
+        offlineDirectoryProvider.overrideWithValue(() async => offlineRoot),
         communityStorageProvider.overrideWithValue(storage),
         communitySnapshotWriterProvider.overrideWithValue((_) async {
           throw PlatformException(
@@ -329,7 +352,10 @@ void main() {
     await storage.save(valid);
     await storage.saveActiveId(invalid.id);
     final container = ProviderContainer(
-      overrides: [communityStorageProvider.overrideWithValue(storage)],
+      overrides: [
+        offlineDirectoryProvider.overrideWithValue(() async => offlineRoot),
+        communityStorageProvider.overrideWithValue(storage),
+      ],
     );
     addTearDown(container.dispose);
 

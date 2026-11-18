@@ -1,3 +1,6 @@
+import 'package:flutter/foundation.dart';
+import '../../shared/offline/offline_provider.dart';
+import '../../shared/offline/read_admission.dart';
 import 'dart:async';
 
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -34,6 +37,7 @@ class _ThreadCursor {
 
 final threadRepliesProvider = FutureProvider.autoDispose
     .family<List<NostrEvent>, ThreadRepliesArgs>((ref, args) async {
+      ref.watch(relayConfigProvider);
       // A reply missed while the socket is stale cannot invalidate this
       // one-shot query. Refresh mounted threads when the session recovers;
       // auto-dispose also makes reopening a thread start from relay truth.
@@ -44,6 +48,37 @@ final threadRepliesProvider = FutureProvider.autoDispose
         }
       });
       final session = ref.read(relaySessionProvider.notifier);
+      final offline = ref.read(offlineEnabledProvider);
+      final offlineStoreFuture = offline
+          ? ref.read(offlineStoreProvider.future).catchError((Object error) {
+              debugPrint('Offline thread store unavailable: $error');
+              return null;
+            })
+          : null;
+      final sourceId = 'thread:${args.channelId}:${args.rootId}';
+      final offlineGeneration = session.connectionGeneration;
+      if (offline &&
+          ref.read(relaySessionProvider).status != SessionStatus.connected) {
+        final store = await offlineStoreFuture;
+        final snapshot = await store?.load(
+          'thread',
+          '${args.channelId}:${args.rootId}',
+        );
+        if (!ref.mounted) return [];
+        if (snapshot == null) {
+          throw StateError("Replies load when you're back online");
+        }
+        ref
+            .read(offlineSourceProvider(sourceId).notifier)
+            .cached(snapshot.savedAt);
+        final payload = Map<String, dynamic>.from(snapshot.payload as Map);
+        return (payload['events'] as List)
+            .map(
+              (row) =>
+                  NostrEvent.fromJson(Map<String, dynamic>.from(row as Map)),
+            )
+            .toList();
+      }
       final channelProvider = channelMessagesProvider(args.channelId);
       final channelMessages = ref.exists(channelProvider)
           ? ref.read(channelProvider.notifier)
@@ -108,6 +143,30 @@ final threadRepliesProvider = FutureProvider.autoDispose
               deletions,
               scopedTargetIds: targets.toSet(),
               reconciledTargetIds: applied ? missingIds : const {},
+            );
+          }
+        }
+        if (offline && ref.mounted) {
+          ref
+              .read(offlineSourceProvider(sourceId).notifier)
+              .authoritative(offlineGeneration);
+          final store = await offlineStoreFuture;
+          if (ref.mounted) {
+            final sorted = [...replies]
+              ..sort(compareChannelTimelineEventsChronologically);
+            unawaited(
+              store
+                      ?.save('thread', '${args.channelId}:${args.rootId}', {
+                        'events': sorted
+                            .skip((sorted.length - 200).clamp(0, sorted.length))
+                            .map((event) => event.toJson())
+                            .toList(),
+                        'truncated': sorted.length > 200,
+                      })
+                      .catchError((Object error) {
+                        debugPrint('Offline thread write failed: $error');
+                      }) ??
+                  Future<void>.value(),
             );
           }
         }

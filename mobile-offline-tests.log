@@ -1,0 +1,12 @@
+00:00 +0: loading /home/dev/agent-worktrees/buzz-offline-p1-mobile-20261118/mobile/test/offline_cache_p1_test.dart
+00:00 +0: /home/dev/agent-worktrees/buzz-offline-p1-mobile-20261118/mobile/test/offline_cache_p1_test.dart: actual NIP44 file roundtrip survives new store, Unicode chunks, and isolates scopes
+00:00 +1: /home/dev/agent-worktrees/buzz-offline-p1-mobile-20261118/mobile/test/offline_cache_p1_test.dart: file model caps heads/threads and rejects oversized complete units
+00:01 +2: /home/dev/agent-worktrees/buzz-offline-p1-mobile-20261118/mobile/test/offline_cache_p1_test.dart: file model caps heads/threads and rejects oversized complete units
+00:01 +3: /home/dev/agent-worktrees/buzz-offline-p1-mobile-20261118/mobile/test/offline_cache_p1_test.dart: file model caps heads/threads and rejects oversized complete units
+00:02 +4: /home/dev/agent-worktrees/buzz-offline-p1-mobile-20261118/mobile/test/offline_cache_p1_test.dart: file model caps heads/threads and rejects oversized complete units
+00:02 +4: /home/dev/agent-worktrees/buzz-offline-p1-mobile-20261118/mobile/test/offline_channel_hydration_p1_test.dart: production channel notifier paints encrypted heads/summaries without authoritative read admission
+[ChannelMessagesNotifier] channel window unavailable for general, falling back to WS history: Exception: Channel window response must contain exactly one bounds event.
+00:02 +5: /home/dev/agent-worktrees/buzz-offline-p1-mobile-20261118/mobile/test/offline_cache_p1_test.dart: file model caps heads/threads and rejects oversized complete units
+00:07 +6: /home/dev/agent-worktrees/buzz-offline-p1-mobile-20261118/mobile/test/offline_cache_p1_test.dart: production LRU enforces byte budget and retired scopes cannot refill
+00:07 +7: /home/dev/agent-worktrees/buzz-offline-p1-mobile-20261118/mobile/test/offline_cache_p1_test.dart: clear fences encryption in flight and leaves no committed payload
+00:07 +8: All tests passed!

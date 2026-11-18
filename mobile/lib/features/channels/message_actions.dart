@@ -1,3 +1,4 @@
+import '../../shared/offline/offline_provider.dart';
 import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
@@ -554,6 +555,10 @@ class _MarkReadUnreadTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final readState = ref.watch(readStateProvider);
+    final offline =
+        ref.watch(offlineEnabledProvider) &&
+        (!ref.watch(networkAvailableProvider) ||
+            ref.watch(relaySessionProvider).status != SessionStatus.connected);
     if (!readState.isReady) return const SizedBox.shrink();
 
     final unread = messageActionShowsUnread(
@@ -566,6 +571,8 @@ class _MarkReadUnreadTile extends ConsumerWidget {
     return ListTile(
       leading: Icon(unread ? BuzzIcons.mailCheck : BuzzIcons.mailOpen),
       title: Text(unread ? 'Mark read' : 'Mark unread'),
+      enabled: !offline,
+      subtitle: offline ? const Text('Needs a connection') : null,
       onTap: () {
         Navigator.of(context).pop();
         final notifier = ref.read(readStateProvider.notifier);

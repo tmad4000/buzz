@@ -1,3 +1,6 @@
+import 'dart:async';
+import '../../shared/offline/offline_provider.dart';
+import '../../shared/offline/read_admission.dart';
 import 'package:flutter/foundation.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
@@ -27,6 +30,9 @@ const _channelLiveEventKinds = [
 /// relay does not return a valid NIP-CW bounds overlay.
 class ChannelMessagesNotifier extends Notifier<AsyncValue<List<NostrEvent>>> {
   final String channelId;
+  String? _offlineScope;
+  bool _offlineHydrated = false;
+  Timer? _offlineSaveTimer;
   void Function()? _unsubscribe;
   bool _reachedOldest = false;
   bool _initInFlight = false;
@@ -44,11 +50,12 @@ class ChannelMessagesNotifier extends Notifier<AsyncValue<List<NostrEvent>>> {
   final Map<String, int> _threadEvidenceVersions = {};
   int _threadQuerySerial = 0;
   final _deletionSummaryUncertainty = <String, _DeletionSummaryUncertainty>{};
-  final _replyOwnership = ThreadReplyOwnership();
+  var _replyOwnership = ThreadReplyOwnership();
   final _processedDeletionTargets = <String>{};
   final _deferredDeletionTargets =
       <String, ({Set<String> candidates, int version})>{};
-  late final _deletionOwnerQueue = _DeletionOwnerQueue(
+  late _DeletionOwnerQueue _deletionOwnerQueue = _newDeletionOwnerQueue();
+  _DeletionOwnerQueue _newDeletionOwnerQueue() => _DeletionOwnerQueue(
     onCapacity: _drainDeferredDeletionOwners,
     canRun: () =>
         ref.mounted &&
@@ -56,7 +63,8 @@ class ChannelMessagesNotifier extends Notifier<AsyncValue<List<NostrEvent>>> {
         ref.read(relaySessionProvider).status == SessionStatus.connected,
   );
   bool _hasListeners = true;
-  late final _summaryRefreshes = ThreadSummaryRefreshQueue(
+  late ThreadSummaryRefreshQueue _summaryRefreshes = _newSummaryRefreshes();
+  ThreadSummaryRefreshQueue _newSummaryRefreshes() => ThreadSummaryRefreshQueue(
     refresh: _refreshOverflowSummary,
     canRun: () =>
         ref.mounted &&
@@ -111,9 +119,34 @@ class ChannelMessagesNotifier extends Notifier<AsyncValue<List<NostrEvent>>> {
 
   @override
   AsyncValue<List<NostrEvent>> build() {
+    final config = ref.watch(relayConfigProvider);
+    final scope = '${config.wsUrl}:${ref.watch(myPubkeyProvider)}';
+    if (_offlineScope != scope) {
+      _deletionOwnerQueue.pause();
+      _summaryRefreshes.pause();
+      _deletionOwnerQueue = _newDeletionOwnerQueue();
+      _summaryRefreshes = _newSummaryRefreshes();
+      _offlineScope = scope;
+      _lastKnownMessages = null;
+      _offlineHydrated = false;
+      _replyOwnership = ThreadReplyOwnership();
+      _windowStore = const ChannelWindowStore.empty();
+      _deepLinkEvents.clear();
+      _retainedDeepLinkEventIds.clear();
+      _localReplyRoots.clear();
+      _queryThreadSummaries.clear();
+      _overflowFloors.clear();
+      _threadQueryVersions.clear();
+      _threadEvidenceVersions.clear();
+      _deletionSummaryUncertainty.clear();
+      _processedDeletionTargets.clear();
+      _deferredDeletionTargets.clear();
+    }
     final sessionState = ref.watch(relaySessionProvider);
     ref.onCancel(() {
       _hasListeners = false;
+      _offlineSaveTimer?.cancel();
+      if (ref.read(offlineEnabledProvider)) unawaited(_saveOffline());
       _deletionOwnerQueue.pause();
       _summaryRefreshes.pause();
     });
@@ -124,6 +157,7 @@ class ChannelMessagesNotifier extends Notifier<AsyncValue<List<NostrEvent>>> {
     });
     ref.onDispose(() {
       _initVersion++;
+      _offlineSaveTimer?.cancel();
       _deletionOwnerQueue.pause();
       _summaryRefreshes.pause();
       _clearSubscription();
@@ -134,6 +168,7 @@ class ChannelMessagesNotifier extends Notifier<AsyncValue<List<NostrEvent>>> {
       _initInFlight = false;
       _initialWindowQueryInFlight = false;
       _liveSummaryRootsDuringInitialWindowQuery.clear();
+      if (_lastKnownMessages == null) unawaited(_hydrateOffline(scope));
       return AsyncData(_lastKnownMessages ?? const []);
     }
 
@@ -157,6 +192,97 @@ class ChannelMessagesNotifier extends Notifier<AsyncValue<List<NostrEvent>>> {
       return AsyncData(cached);
     }
     return const AsyncLoading();
+  }
+
+  Future<void> _hydrateOffline(String scope) async {
+    if (!ref.read(offlineEnabledProvider)) return;
+    try {
+      final store = await ref.read(offlineStoreProvider.future);
+      final snapshot = await store?.load('head', channelId);
+      if (!ref.mounted ||
+          _offlineScope != scope ||
+          _lastKnownMessages != null ||
+          snapshot == null) {
+        return;
+      }
+      final payload = Map<String, dynamic>.from(snapshot.payload as Map);
+      final summaries = Map<String, dynamic>.from(payload['summaries'] as Map);
+      for (final entry in summaries.entries) {
+        final value = Map<String, dynamic>.from(entry.value as Map);
+        _queryThreadSummaries[entry.key] = ChannelWindowThreadSummary(
+          replyCount: value['replyCount'] as int,
+          descendantCount: value['descendantCount'] as int,
+          lastReplyAt: value['lastReplyAt'] as int?,
+          participantPubkeys: (value['participantPubkeys'] as List)
+              .cast<String>(),
+          isLowerBound: value['isLowerBound'] as bool? ?? false,
+          isCountPending: value['isCountPending'] as bool? ?? false,
+        );
+      }
+      final events = (payload['events'] as List)
+          .map(
+            (row) => NostrEvent.fromJson(Map<String, dynamic>.from(row as Map)),
+          )
+          .toList();
+      ref
+          .read(offlineSourceProvider('head:$channelId').notifier)
+          .cached(snapshot.savedAt);
+      _lastKnownMessages = events;
+      _offlineHydrated = true;
+      state = AsyncData(events);
+    } catch (error) {
+      debugPrint('Offline head unavailable: $error');
+    }
+  }
+
+  Future<void> _saveOffline() async {
+    final scope = _offlineScope;
+    final events = _lastKnownMessages;
+    if (!ref.mounted || events == null || !ref.read(offlineEnabledProvider)) {
+      return;
+    }
+    try {
+      final store = await ref.read(offlineStoreProvider.future);
+      if (!ref.mounted || scope != _offlineScope) return;
+      final content =
+          events
+              .where(
+                (event) =>
+                    EventKind.channelTimelineContentKinds.contains(
+                      event.kind,
+                    ) &&
+                    event.threadReference.parentId == null &&
+                    !ref
+                        .read(pendingLocalMessagesProvider(channelId))
+                        .containsKey(event.id),
+              )
+              .toList()
+            ..sort(compareChannelTimelineEventsChronologically);
+      final heads = content
+          .skip((content.length - 100).clamp(0, content.length))
+          .toList();
+      final ids = heads.map((event) => event.id).toSet();
+      final aux = events.where(
+        (event) => !EventKind.channelTimelineContentKinds.contains(event.kind),
+      );
+      await store?.save('head', channelId, {
+        'events': [...heads, ...aux].map((event) => event.toJson()).toList(),
+        'summaries': {
+          for (final entry in threadSummaries.entries)
+            if (ids.contains(entry.key))
+              entry.key: {
+                'replyCount': entry.value.replyCount,
+                'descendantCount': entry.value.descendantCount,
+                'lastReplyAt': entry.value.lastReplyAt,
+                'participantPubkeys': entry.value.participantPubkeys,
+                'isLowerBound': entry.value.isLowerBound,
+                'isCountPending': entry.value.isCountPending,
+              },
+        },
+      });
+    } catch (error) {
+      debugPrint('Offline head write failed: $error');
+    }
   }
 
   Future<void> _init() async {
@@ -190,12 +316,17 @@ class ChannelMessagesNotifier extends Notifier<AsyncValue<List<NostrEvent>>> {
         );
       }
 
+      if (_lastKnownMessages == null) await _hydrateOffline(_offlineScope!);
+      final offlineGeneration = session.connectionGeneration;
       final historyVersion = ++_threadQuerySerial;
       final history = await _fetchNewestHistory(session);
       if (!_isCurrentInit(initVersion)) return;
       _confirmLocalMessages(history.map((event) => event.id));
 
-      final existing = state.value ?? const <NostrEvent>[];
+      final existing = _offlineHydrated
+          ? const <NostrEvent>[]
+          : (state.value ?? const <NostrEvent>[]);
+      _offlineHydrated = false;
       final existingIds = existing.map((event) => event.id).toSet();
       final merged = _withDeepLinkEvents([
         ...existing,
@@ -205,6 +336,12 @@ class ChannelMessagesNotifier extends Notifier<AsyncValue<List<NostrEvent>>> {
       _reconcileRetainedSummaryPayloads(merged);
       _reconcileRetainedAggregates(historyVersion);
       state = AsyncData(merged);
+      if (ref.read(offlineEnabledProvider)) {
+        ref
+            .read(offlineSourceProvider('head:$channelId').notifier)
+            .authoritative(offlineGeneration);
+        unawaited(_saveOffline());
+      }
       _summaryRefreshes.resume();
     } catch (e, st) {
       if (!_isCurrentInit(initVersion)) return;
@@ -274,7 +411,7 @@ class ChannelMessagesNotifier extends Notifier<AsyncValue<List<NostrEvent>>> {
     tags: {
       '#h': [channelId],
     },
-    limit: 50,
+    limit: ref.read(offlineEnabledProvider) && cursor == null ? 100 : 50,
     until: cursor?.createdAt,
     extensions: {
       'top_level': true,
@@ -289,6 +426,12 @@ class ChannelMessagesNotifier extends Notifier<AsyncValue<List<NostrEvent>>> {
     bool authoritative = true,
     int? summaryVersion,
   }) {
+    if (ref.read(offlineEnabledProvider)) {
+      _offlineSaveTimer?.cancel();
+      _offlineSaveTimer = Timer(const Duration(seconds: 2), () {
+        if (ref.mounted) unawaited(_saveOffline());
+      });
+    }
     final before = _lastKnownMessages ?? const <NostrEvent>[];
     _replyOwnership.record([event]);
     // Invalidate the thread query independently of the selected channel-history

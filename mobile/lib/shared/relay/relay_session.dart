@@ -1,3 +1,5 @@
+import '../offline/offline_provider.dart';
+import 'app_lifecycle_provider.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
@@ -125,6 +127,9 @@ class RelaySessionNotifier extends Notifier<SessionState> {
   bool _paused = false;
   bool _hasConnectedOnce = false;
   int _connectionGeneration = 0;
+
+  /// Current transport generation, shared with offline read admission.
+  int get connectionGeneration => _connectionGeneration;
   int _contextGeneration = 0;
   final Map<Object, String> _visibleChannelsByOwner = {};
   final Map<Object, Future<void> Function()> _beforePauseCallbacks = {};
@@ -158,6 +163,10 @@ class RelaySessionNotifier extends Notifier<SessionState> {
     List<NostrFilter> filters, {
     Duration timeout = const Duration(seconds: 8),
   }) async {
+    if (ref.read(offlineEnabledProvider) &&
+        !ref.read(networkAvailableProvider)) {
+      throw StateError('Needs a connection');
+    }
     if (_disposed || _ageRestricted) {
       throw StateError('Relay session is unavailable');
     }
@@ -230,6 +239,11 @@ class RelaySessionNotifier extends Notifier<SessionState> {
     NostrFilter filter, {
     Duration timeout = const Duration(seconds: 8),
   }) async {
+    if (_disposed) throw StateError('Relay session is disposed');
+    if (ref.read(offlineEnabledProvider) &&
+        !ref.read(networkAvailableProvider)) {
+      throw StateError('Needs a connection');
+    }
     if (_rateLimitGate.isActive) await _rateLimitGate.wait();
     if (_disposed) throw StateError('Relay session is disposed');
     final subId = _nextSubId('h');
@@ -324,6 +338,11 @@ class RelaySessionNotifier extends Notifier<SessionState> {
     Duration timeout = const Duration(seconds: 8),
   }) async {
     final generation = _connectionGeneration;
+    if (_disposed) throw StateError('Relay session is disposed');
+    if (ref.read(offlineEnabledProvider) &&
+        !ref.read(networkAvailableProvider)) {
+      throw StateError('Needs a connection');
+    }
     if (_rateLimitGate.isActive) await _rateLimitGate.wait();
     if (!_isActiveConnection(generation) || !_socketConnected) {
       throw StateError('Relay session is not connected');

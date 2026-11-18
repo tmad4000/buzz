@@ -156,6 +156,7 @@ class _MessageImageCarousel extends HookConsumerWidget {
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(Radii.md),
                             child: MediaImage(
+                              offlinePlaceholder: true,
                               url: item.url,
                               decodeWidth: previewDecodeWidths[index],
                               fit: BoxFit.cover,

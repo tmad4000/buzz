@@ -1,3 +1,6 @@
+import '../../shared/offline/offline_provider.dart';
+import '../../shared/offline/read_admission.dart';
+import '../../shared/offline/channel_codec.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
@@ -188,6 +191,26 @@ class ChannelsNotifier extends AsyncNotifier<List<Channel>> {
     if (sessionState.status != SessionStatus.connected) {
       // Preserve cached channels only for a reconnect within the same scope.
       if (_hasLoaded) return state.value ?? const [];
+      if (ref.read(offlineEnabledProvider)) {
+        final store = await ref.read(offlineStoreProvider.future);
+        final snapshot = await store?.load('sidebar', 'sidebar');
+        if (ref.mounted &&
+            snapshot != null &&
+            ref.read(relayConfigProvider).baseUrl == relayBaseUrl &&
+            ref.read(myPubkeyProvider)?.toLowerCase() == pubkey) {
+          final cached = (snapshot.payload as List)
+              .map(
+                (row) =>
+                    Channel.fromJson(Map<String, dynamic>.from(row as Map)),
+              )
+              .toList();
+          _hasLoaded = true;
+          ref
+              .read(offlineSourceProvider('sidebar').notifier)
+              .cached(snapshot.savedAt);
+          return cached;
+        }
+      }
       await connected.future;
     }
 
@@ -199,12 +222,51 @@ class ChannelsNotifier extends AsyncNotifier<List<Channel>> {
     bool fetchLastMessage = true,
     bool fetchDirectory = false,
   }) async {
+    final configAtStart = ref.read(relayConfigProvider);
+    final pubkeyAtStart = ref.read(myPubkeyProvider);
+    final offlineStoreFuture = ref.read(offlineEnabledProvider)
+        ? ref.read(offlineStoreProvider.future).catchError((Object error) {
+            debugPrint('Offline sidebar store unavailable: $error');
+            return null;
+          })
+        : null;
+    final offlineGeneration = ref
+        .read(relaySessionProvider.notifier)
+        .connectionGeneration;
     final channels = await _fetchChannels(
       subscribeLive: subscribeLive,
       fetchLastMessage: fetchLastMessage,
       fetchDirectory: fetchDirectory,
     );
+    if (!ref.mounted ||
+        ref.read(relayConfigProvider).wsUrl != configAtStart.wsUrl ||
+        ref.read(myPubkeyProvider) != pubkeyAtStart) {
+      throw const _StaleChannelRefresh();
+    }
     _hasLoaded = true;
+    if (ref.read(offlineEnabledProvider)) {
+      ref
+          .read(offlineSourceProvider('sidebar').notifier)
+          .authoritative(offlineGeneration);
+      final store = await offlineStoreFuture;
+      if (!ref.mounted ||
+          ref.read(relayConfigProvider).wsUrl != configAtStart.wsUrl ||
+          ref.read(myPubkeyProvider) != pubkeyAtStart) {
+        throw const _StaleChannelRefresh();
+      }
+      unawaited(
+        store
+                ?.save(
+                  'sidebar',
+                  'sidebar',
+                  channels.map(offlineChannelJson).toList(),
+                )
+                .catchError((Object error) {
+                  debugPrint('Offline sidebar write failed: $error');
+                }) ??
+            Future<void>.value(),
+      );
+    }
     return channels;
   }
 

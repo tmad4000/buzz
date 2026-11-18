@@ -1,3 +1,5 @@
+import '../../shared/offline/read_admission.dart';
+import '../../shared/offline/offline_banner.dart';
 import 'dart:async';
 import 'dart:math' show cos, max, min, pi;
 import 'dart:ui' show ImageFilter, lerpDouble;
@@ -279,6 +281,9 @@ class ChannelDetailPage extends HookConsumerWidget {
         ref.watch(huddleLifecycleProvider(channel.id)).value ?? const [];
     final sessionStatus = ref.watch(relaySessionProvider).status;
     final readState = ref.watch(readStateProvider);
+    final offlineAdmitted = ref.watch(
+      readAdmissionProvider('head:${channel.id}'),
+    );
     final channelsNotifier = ref.read(channelsProvider.notifier);
     final initialOrdinaryUnreadMessageIdsRef = useRef<Set<String>>(const {});
     final initialOldestOrdinaryUnreadMessageIdRef = useRef<String?>(null);
@@ -546,10 +551,14 @@ class ChannelDetailPage extends HookConsumerWidget {
     );
 
     useEffect(() {
-      if (!readState.isReady || readTimestamp == null) {
+      if (!offlineAdmitted || !readState.isReady || readTimestamp == null) {
         return null;
       }
       return deferReadStateUpdate(context, () {
+        if (!ref.read(readAdmissionProvider('head:${channel.id}')) ||
+            ModalRoute.of(context)?.isCurrent == false) {
+          return;
+        }
         ref
             .read(readStateProvider.notifier)
             .markContextRead(channel.id, readTimestamp);
@@ -557,7 +566,7 @@ class ChannelDetailPage extends HookConsumerWidget {
             .read(channelsProvider.notifier)
             .clearObservedUnreadCoveredByRead(channel.id, readTimestamp);
       });
-    }, [channel.id, readState.isReady, readTimestamp]);
+    }, [channel.id, readState.isReady, readTimestamp, offlineAdmitted]);
 
     final dmHeader = resolvedChannel.isDm
         ? _watchDmHeader(ref, resolvedChannel, currentPubkey)
@@ -671,6 +680,12 @@ class ChannelDetailPage extends HookConsumerWidget {
         children: [
           Column(
             children: [
+              OfflineBanner(
+                sourceId: 'head:${channel.id}',
+                onRetry: () {
+                  ref.invalidate(channelMessagesProvider(channel.id));
+                },
+              ),
               Expanded(
                 child: resolvedChannel.isForum
                     ? Stack(

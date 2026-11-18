@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+import '../offline/offline_provider.dart';
 import 'dart:async';
 
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -19,6 +21,8 @@ class UserCacheNotifier extends Notifier<Map<String, UserProfile>> {
   static const _maximumProfilesPerQuery = 1000;
 
   final Set<String> _pending = {};
+  final Set<String> _offlineRequested = {};
+  Future<void> _offlineWrites = Future<void>.value();
   final _pushExport = PushPresentationExportRecovery();
   final Map<String, ({int createdAt, String eventId})> _profileEventOrders = {};
   int _generation = 0;
@@ -32,6 +36,7 @@ class UserCacheNotifier extends Notifier<Map<String, UserProfile>> {
     ref.watch(relayConfigProvider);
     _generation++;
     _profileEventOrders.clear();
+    _offlineRequested.clear();
     ref.onDispose(() {
       _generation++;
       _pending.clear();
@@ -43,18 +48,63 @@ class UserCacheNotifier extends Notifier<Map<String, UserProfile>> {
     return {};
   }
 
+  Future<void> _hydrateOfflineProfile(String pubkey, int generation) async {
+    try {
+      final store = await ref.read(offlineStoreProvider.future);
+      final snapshot = await store?.load('profile', pubkey);
+      if (!_isCurrent(generation) ||
+          state.containsKey(pubkey) ||
+          snapshot == null) {
+        return;
+      }
+      final profile = UserProfile.fromJson(
+        Map<String, dynamic>.from(snapshot.payload as Map),
+      );
+      if (profile.pubkey != pubkey) return;
+      // Cached presentation never grants verified owner/agent authority.
+      state = {...state, pubkey: profile};
+    } catch (error) {
+      debugPrint('Offline author label unavailable: $error');
+    }
+  }
+
+  void _saveOfflineProfile(UserProfile profile) {
+    if (!ref.read(offlineEnabledProvider)) return;
+    final generation = _generation;
+    _offlineWrites = _offlineWrites
+        .then((_) async {
+          if (!_isCurrent(generation)) return;
+          final store = await ref.read(offlineStoreProvider.future);
+          if (!_isCurrent(generation)) return;
+          await store?.save('profile', profile.pubkey, {
+            'pubkey': profile.pubkey,
+            'display_name': profile.displayName,
+            'avatar_url': profile.avatarUrl,
+            'nip05_handle': profile.nip05Handle,
+          });
+        })
+        .catchError((Object error) {
+          debugPrint('Offline author label write failed: $error');
+        });
+  }
+
   /// Request a profile for [pubkey]. Returns immediately from cache if
   /// available, otherwise schedules a batch fetch.
   UserProfile? get(String pubkey) {
     final cached = state[pubkey.toLowerCase()];
     if (cached != null) return cached;
-    _scheduleFetch(pubkey.toLowerCase());
+    final normalized = pubkey.toLowerCase();
+    if (ref.read(offlineEnabledProvider) && _offlineRequested.add(normalized)) {
+      unawaited(_hydrateOfflineProfile(normalized, _generation));
+    }
+    _scheduleFetch(normalized);
     return null;
   }
 
   /// Stores a profile that was fetched or updated outside the batch loader.
   void put(UserProfile profile) {
     state = {...state, profile.pubkey.toLowerCase(): profile};
+    _saveOfflineProfile(profile);
   }
 
   /// Preload profiles for a list of pubkeys (e.g. channel members).
@@ -222,6 +272,7 @@ class UserCacheNotifier extends Notifier<Map<String, UserProfile>> {
         continue;
       }
       updated[parsed.profile.pubkey] = parsed.profile;
+      _saveOfflineProfile(parsed.profile);
       _profileEventOrders[parsed.profile.pubkey] = (
         createdAt: parsed.createdAt,
         eventId: parsed.eventId,
