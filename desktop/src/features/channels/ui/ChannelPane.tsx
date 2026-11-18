@@ -1,3 +1,6 @@
+import { OpenThreadsBar } from "./OpenThreadsBar";
+import { openThreadPinsKey } from "../lib/openThreadPins";
+import { useCommunities } from "@/features/communities/useCommunities";
 import { useRoutedSendReturn } from "./useRoutedSendReturn";
 import { useTimelineView } from "./TimelineViewContext";
 import { ChannelTimelineProviders } from "./ChannelTimelineProviders";
@@ -646,6 +649,8 @@ export const ChannelPane = React.memo(function ChannelPane({
     isSinglePanelView,
     useSplitAuxiliaryPane,
   });
+  const { activeCommunity: barCommunity } = useCommunities();
+  const barKey = openThreadPinsKey(barCommunity?.relayUrl ?? "", currentPubkey ?? "", activeChannelId ?? "");
   const timelineView = useTimelineView();
   const flatTimeline = timelineView.mode === "timeline" && !isHuddleTranscript;
   const timelineReplyHandler =
@@ -866,6 +871,15 @@ export const ChannelPane = React.memo(function ChannelPane({
                   <ComposerDockBackdrop gutterClassName="inset-x-5" />
                   {routedSend.notice ? (
                     <div className="px-5">{routedSend.notice}</div>
+                  ) : null}
+                  {!isHuddleTranscript && activeChannel && currentPubkey ? (
+                    <OpenThreadsBar
+                      key={barKey}
+                      storageKey={barKey}
+                      entries={mainTimelineEntries}
+                      currentThread={threadHeadMessage}
+                      onOpen={onOpenThread}
+                    />
                   ) : null}
                   <MessageComposer
                     channelId={activeChannel?.id ?? null}
