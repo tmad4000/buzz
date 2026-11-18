@@ -25,7 +25,7 @@ export function AgentRuntimeRowAction({ pubkey }: { pubkey?: string }) {
     openProfilePanel
   )
     return (
-      <span className="absolute right-7 top-1/2 -translate-y-1/2 rounded bg-sidebar px-1 opacity-0 focus-within:opacity-100 group-hover/menu-item:opacity-100 group-focus-within/menu-item:opacity-100">
+      <span className="absolute right-14 top-1/2 -translate-y-1/2 rounded bg-sidebar px-1 opacity-0 focus-within:opacity-100 group-hover/menu-item:opacity-100 group-focus-within/menu-item:opacity-100">
         <button
           type="button"
           onPointerDown={(e) => e.stopPropagation()}
@@ -38,7 +38,7 @@ export function AgentRuntimeRowAction({ pubkey }: { pubkey?: string }) {
       </span>
     );
   return data?.card.session ? (
-    <span className="absolute right-7 top-1/2 -translate-y-1/2 rounded bg-sidebar px-1 opacity-0 focus-within:opacity-100 group-hover/menu-item:opacity-100 group-focus-within/menu-item:opacity-100">
+    <span className="absolute right-14 top-1/2 -translate-y-1/2 rounded bg-sidebar px-1 opacity-0 focus-within:opacity-100 group-hover/menu-item:opacity-100 group-focus-within/menu-item:opacity-100">
       <OpenRuntimeSession session={data.card.session} />
     </span>
   ) : null;
