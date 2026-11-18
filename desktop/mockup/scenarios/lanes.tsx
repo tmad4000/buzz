@@ -549,6 +549,18 @@ function Lanes({
   );
 }
 
+// Keep the private lane cards verbatim. The real message renderer would
+// turn some URLs in those cards into live media attachments in Timeline.
+function offlineTimelineText(text: string) {
+  return text.replace(/https?:\/\/[^\s<>"')\]]+/gi, (url) => {
+    try {
+      return `[External link: ${new URL(url).hostname}]`;
+    } catch {
+      return "[External link]";
+    }
+  });
+}
+
 export default {
   title: "Lanes",
   channels,
@@ -557,14 +569,20 @@ export default {
       const parent = roots.get(card.thread);
       const age = (board.messages.length - index) * 2;
       return [
-        message(1000 + card.i, JACOB, card.body, age, {
+        message(1000 + card.i, JACOB, offlineTimelineText(card.body), age, {
           root:
             card.is_root || parent === undefined ? undefined : 1000 + parent,
         }),
         ...card.replies.map((reply, i) =>
-          message(2000 + card.i * 10 + i, SOL, reply.body, age - 1, {
-            root: parent === undefined ? 1000 + card.i : 1000 + parent,
-          }),
+          message(
+            2000 + card.i * 10 + i,
+            SOL,
+            offlineTimelineText(reply.body),
+            age - 1,
+            {
+              root: parent === undefined ? 1000 + card.i : 1000 + parent,
+            },
+          ),
         ),
       ];
     }),
