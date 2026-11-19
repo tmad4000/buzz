@@ -6,7 +6,7 @@ use crate::{
     models::{ChannelDetailInfo, ChannelInfo, ChannelMembersResponse, GetChannelsPayload},
     nostr_convert,
     relay::{
-        assert_expected_relay_scope, assert_expected_signer, query_relay,
+        assert_expected_relay_scope, assert_expected_signer, query_relay, query_relay_at_with_keys,
         relay_api_base_url_with_override, submit_event, submit_event_at_with_keys,
         submit_event_with_keys,
     },
@@ -106,18 +106,25 @@ pub async fn get_open_channel_directory(
 #[tauri::command]
 pub async fn get_channel_details(
     channel_id: String,
+    read_your_writes: Option<bool>,
+    expected_relay_url: Option<String>,
+    expected_signer_pubkey: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<ChannelDetailInfo, String> {
-    let events = query_relay(
-        &state,
-        &[serde_json::json!({
-            "kinds": [39000],
-            "#d": [channel_id],
-            "limit": 1
-        })],
-    )
-    .await?;
-
+    let metadata_filter = if read_your_writes.unwrap_or(false) {
+        channel_metadata_filter(&[&channel_id])
+    } else {
+        serde_json::json!({"kinds": [39000], "#d": [&channel_id], "limit": 1})
+    };
+    let api_base = relay_api_base_url_with_override(&state);
+    assert_expected_relay_scope(expected_relay_url.as_deref(), &api_base)?;
+    let keys = state.signing_keys()?;
+    assert_expected_signer(
+        expected_signer_pubkey.as_deref(),
+        &keys.public_key().to_hex(),
+    )?;
+    let events =
+        query_relay_at_with_keys(&state, &api_base, &[metadata_filter], &keys, None).await?;
     events
         .first()
         .map(nostr_convert::channel_detail_from_event)
@@ -147,14 +154,26 @@ fn profile_join_pubkeys(members: &[crate::models::ChannelMemberInfo], limit: usi
 pub async fn get_channel_members(
     channel_id: String,
     read_your_writes: Option<bool>,
+    expected_relay_url: Option<String>,
+    expected_signer_pubkey: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<ChannelMembersResponse, String> {
-    let events = query_relay(
+    let api_base = relay_api_base_url_with_override(&state);
+    assert_expected_relay_scope(expected_relay_url.as_deref(), &api_base)?;
+    let keys = state.signing_keys()?;
+    assert_expected_signer(
+        expected_signer_pubkey.as_deref(),
+        &keys.public_key().to_hex(),
+    )?;
+    let events = query_relay_at_with_keys(
         &state,
+        &api_base,
         &[channel_members_filter(
             &channel_id,
             read_your_writes.unwrap_or(false),
         )],
+        &keys,
+        None,
     )
     .await?;
 
@@ -168,13 +187,16 @@ pub async fn get_channel_members(
     // query cost is bounded on large rosters (see MEMBER_PROFILE_JOIN_LIMIT).
     let pubkeys = profile_join_pubkeys(&response.members, MEMBER_PROFILE_JOIN_LIMIT);
     if !pubkeys.is_empty() {
-        let profile_events = query_relay(
+        let profile_events = query_relay_at_with_keys(
             &state,
+            &api_base,
             &[serde_json::json!({
                 "kinds": [0],
                 "authors": pubkeys,
                 "limit": pubkeys.len()
             })],
+            &keys,
+            None,
         )
         .await
         .unwrap_or_default();
@@ -515,7 +537,6 @@ pub async fn update_channel(
     submit_event(builder, &state).await?;
 
     let events = query_relay(&state, &[channel_metadata_filter(&[&input.channel_id])]).await?;
-
     events
         .first()
         .map(nostr_convert::channel_detail_from_event)

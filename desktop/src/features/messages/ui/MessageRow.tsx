@@ -1,6 +1,7 @@
 import { useFeatureEnabled } from "@/shared/features";
 import { parseBridgeStatusCard } from "@/features/messages/lib/bridgeStatusCard";
 import { AgentStatusChip } from "./AgentStatusChip";
+import { ForwardedToAgentLine } from "@/features/forward-agent/ForwardedToAgentLine";
 import * as React from "react";
 import { AlertTriangle } from "lucide-react";
 import {
@@ -701,6 +702,7 @@ export const MessageRow = React.memo(
     const messageBodyNode = (
       <>
         <SentFromThreadLine channelId={channelId} tags={message.tags} />
+        <ForwardedToAgentLine channelId={channelId} messageId={message.id} />
         {renderBody()}
         {continuationMetadataNode}
         <MessageReactions
