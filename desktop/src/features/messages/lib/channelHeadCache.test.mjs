@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+import { offlineScopeKey } from "@/shared/api/offlineCache";
 import assert from "node:assert/strict";
 import { after, afterEach, before, mock, test } from "node:test";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -87,14 +89,57 @@ function bounds() {
 function install(entries, { loadDelayMs = 0 } = {}) {
   channelWindowCalls = 0;
   channelWindowEvents = [replacement, bounds()];
+  relayClient.connectionStateEmitter.set("connected");
+  globalThis.isTauri = true;
   window.localStorage.clear();
+  window.localStorage.setItem("buzz-offline-cache-v1", "on");
+  window.__TAURI_INTERNALS__ = {};
   window.__TAURI_INTERNALS__ = {
-    invoke: async (command) => {
-      if (command === "channel_head_cache_load") {
+    invoke: async (command, args) => {
+      if (command === "offline_cache_epoch") return 0;
+      if (command === "get_identity") return { pubkey: "f".repeat(64) };
+      if (command === "offline_cache_decrypt") return args.ciphertext;
+      if (command === "offline_cache_encrypt") return args.plaintext;
+      if (command === "offline_cache_list") {
         if (loadDelayMs > 0) {
           await new Promise((resolve) => setTimeout(resolve, loadDelayMs));
         }
-        return entries;
+        return entries.map((entry) => {
+          const scope = offlineScopeKey({
+            pubkey: "f".repeat(64),
+            relayUrl: "wss://relay",
+          });
+          const plaintext = JSON.stringify({
+            scope,
+            kind: "head",
+            id: entry.channelId,
+            savedAt: entry.savedAt,
+            payload: entry.events,
+          });
+          const ciphertext = JSON.stringify([
+            JSON.stringify({
+              version: 2,
+              bundle: "fixture",
+              scope,
+              kind: "head",
+              id: entry.channelId,
+              savedAt: entry.savedAt,
+              index: 0,
+              count: 1,
+              digest: createHash("sha256").update(plaintext).digest("hex"),
+              text: plaintext,
+            }),
+          ]);
+          return {
+            scope,
+            kind: "head",
+            id: entry.channelId,
+            savedAt: entry.savedAt,
+            lastVisitedAt: entry.lastVisitedAt,
+            bytes: new TextEncoder().encode(ciphertext).length,
+            ciphertext,
+          };
+        });
       }
       if (command === "get_channel_window") {
         channelWindowCalls += 1;

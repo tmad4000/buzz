@@ -1,3 +1,4 @@
+import { offlineNeedsConnection } from "@/shared/api/offlineConnection";
 import { invoke } from "@tauri-apps/api/core";
 import { emit, listen } from "@tauri-apps/api/event";
 import * as React from "react";
@@ -628,6 +629,7 @@ export function HuddleProvider({
       memberPubkeys: string[],
       channelName?: string,
     ) => {
+      if (offlineNeedsConnection()) throw new Error("Needs a connection");
       if (busyRef.current) return;
       busyRef.current = true;
 
@@ -708,6 +710,7 @@ export function HuddleProvider({
       ephemeralChannelId: string,
       huddleThreadEventId?: string,
     ) => {
+      if (offlineNeedsConnection()) throw new Error("Needs a connection");
       if (busyRef.current) return;
       busyRef.current = true;
       tokenRef.current += 1;

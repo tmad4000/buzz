@@ -1,4 +1,8 @@
 import { ForwardToAgentAction } from "@/features/forward-agent/ForwardToAgentAction";
+import {
+  useDeviceOffline,
+  offlineNeedsConnection,
+} from "@/shared/api/offlineConnection";
 import { setMessagePin } from "@/features/messages/pins/service";
 import {
   BellOff,
@@ -121,6 +125,7 @@ function MoreActionsMenu({
   isFollowingThread?: boolean;
   isUnread?: boolean;
 }) {
+  const offline = useDeviceOffline();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
   const [isReportDialogOpen, setIsReportDialogOpen] = React.useState(false);
   // Transfer focus ownership only after the menu has finished closing.
@@ -191,6 +196,8 @@ function MoreActionsMenu({
           {onEdit ? (
             <DropdownMenuItem
               data-testid={`edit-message-${message.id}`}
+              disabled={offline}
+              title={offline ? "Needs a connection" : undefined}
               onSelect={() => {
                 pendingEditRef.current = () => onEdit(message);
               }}
@@ -203,6 +210,8 @@ function MoreActionsMenu({
           {onMarkRead || onMarkUnread ? (
             <DropdownMenuItem
               data-testid={`mark-read-toggle-${message.id}`}
+              disabled={offline}
+              title={offline ? "Needs a connection" : undefined}
               onClick={() => {
                 if (isUnread) {
                   onMarkRead?.(message);
@@ -272,6 +281,8 @@ function MoreActionsMenu({
             <DropdownMenuItem
               aria-label="Send to channel"
               data-testid={`send-to-channel-${message.id}`}
+              disabled={offline}
+              title={offline ? "Needs a connection" : undefined}
               onClick={() => {
                 void onSendToChannel(message)
                   .then(() => toast.success("Sent to channel"))
@@ -310,6 +321,8 @@ function MoreActionsMenu({
           {canReport ? (
             <DropdownMenuItem
               data-testid={`report-message-${message.id}`}
+              disabled={offline}
+              title={offline ? "Needs a connection" : undefined}
               onClick={() => {
                 setIsReportDialogOpen(true);
               }}
@@ -323,6 +336,8 @@ function MoreActionsMenu({
             <DropdownMenuItem
               className="text-destructive focus:text-destructive"
               data-testid={`delete-message-${message.id}`}
+              disabled={offline}
+              title={offline ? "Needs a connection" : undefined}
               onClick={() => {
                 setIsDeleteDialogOpen(true);
               }}
@@ -365,8 +380,10 @@ function QuickReactionButton({
   customEmojiUrl,
   emoji,
   onSelect,
+  disabled = false,
 }: {
   customEmojiUrl?: string;
+  disabled?: boolean;
   emoji: string;
   onSelect: (emoji: string) => void;
 }) {
@@ -380,7 +397,8 @@ function QuickReactionButton({
           aria-label={`React with ${displayName}`}
           className="flex h-8 w-8 items-center justify-center rounded-full text-base leading-none text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring"
           onClick={() => onSelect(emoji)}
-          title={displayName}
+          disabled={disabled}
+          title={disabled ? "Needs a connection" : displayName}
           type="button"
         >
           {mediaUrl ? (
@@ -397,7 +415,9 @@ function QuickReactionButton({
           )}
         </button>
       </TooltipTrigger>
-      <TooltipContent>{displayName}</TooltipContent>
+      <TooltipContent>
+        {disabled ? "Needs a connection" : displayName}
+      </TooltipContent>
     </Tooltip>
   );
 }
@@ -454,6 +474,7 @@ export const MessageActionBar = React.memo(function MessageActionBar({
   /** Resolves the mention identities carried by "Copy message". */
   profiles?: UserProfileLookup;
 }) {
+  const offline = useDeviceOffline();
   const [isReactionPickerOpen, setIsReactionPickerOpen] = React.useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = React.useState(false);
   const [isForwardOpen, setIsForwardOpen] = React.useState(false);
@@ -494,7 +515,7 @@ export const MessageActionBar = React.memo(function MessageActionBar({
   );
   const handleReactionSelection = React.useCallback(
     (emoji: string, closePicker = false) => {
-      if (!onReactionSelect) {
+      if (!onReactionSelect || offlineNeedsConnection()) {
         return;
       }
 
@@ -540,6 +561,7 @@ export const MessageActionBar = React.memo(function MessageActionBar({
             <div className="hidden items-center gap-0.5 sm:flex">
               {quickReactionItems.map(({ customEmojiUrl, emoji }) => (
                 <QuickReactionButton
+                  disabled={offline}
                   customEmojiUrl={customEmojiUrl}
                   emoji={emoji}
                   key={emoji}
@@ -559,6 +581,8 @@ export const MessageActionBar = React.memo(function MessageActionBar({
                   <PopoverTrigger asChild>
                     <Button
                       aria-label="Open reactions"
+                      disabled={offline}
+                      title={offline ? "Needs a connection" : undefined}
                       className={ACTION_BUTTON_CLASS}
                       data-testid={`react-message-${message.id}`}
                       size="sm"
@@ -569,7 +593,9 @@ export const MessageActionBar = React.memo(function MessageActionBar({
                     </Button>
                   </PopoverTrigger>
                 </TooltipTrigger>
-                <TooltipContent>React</TooltipContent>
+                <TooltipContent>
+                  {offline ? "Needs a connection" : "React"}
+                </TooltipContent>
               </Tooltip>
               <PopoverContent
                 align="end"

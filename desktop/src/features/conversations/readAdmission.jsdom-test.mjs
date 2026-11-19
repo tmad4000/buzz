@@ -3,7 +3,7 @@ import test from "node:test";
 import React, { act } from "react";
 import { createRoot } from "react-dom/client";
 import { AppShellProvider } from "@/app/AppShellContext";
-import { ConversationViewContext } from "./ConversationViewContext.tsx";
+import { ConversationViewContext, ConversationLiveContext } from "./ConversationViewContext.tsx";
 import { useChannelOpenReadState } from "@/features/channels/ui/useChannelOpenReadState";
 
 // Exercises the production mount effect, including inbox override writes.
@@ -29,7 +29,7 @@ test("background mount/arrival, compact-hidden views and hidden documents cannot
   const container = document.createElement("div");
   document.body.append(container);
   const root = createRoot(container);
-  const render = (focused, visible, at = "2026-11-16T00:00:00Z") =>
+  const render = (focused, visible, at = "2026-11-16T00:00:00Z", live = true) =>
     act(() =>
       root.render(
         React.createElement(
@@ -38,7 +38,7 @@ test("background mount/arrival, compact-hidden views and hidden documents cannot
           React.createElement(
             ConversationViewContext.Provider,
             { value: { viewInstanceId: "b", focused, visible } },
-            React.createElement(Host, { at }),
+            React.createElement(ConversationLiveContext.Provider, { value: live }, React.createElement(Host, { at })),
           ),
         ),
       ),
@@ -48,6 +48,8 @@ test("background mount/arrival, compact-hidden views and hidden documents cannot
     await render(false, true, "2026-11-16T00:01:00Z");
     await render(true, false);
     assert.deepEqual(writes, []);
+    await render(true, true, "2026-11-16T00:00:00Z", false);
+    assert.deepEqual(writes, [], "cached reading must not advance read state");
     await render(true, true);
     assert.equal(writes.filter(([kind]) => kind === "read").length, 1);
     writes.length = 0;

@@ -1,3 +1,8 @@
+import { beginOfflineThreadRead } from "./lib/offlineThreadAuthority";
+import { offlineNeedsConnection } from "@/shared/api/offlineConnection";
+import { OfflineReadUnavailableError } from "@/shared/api/offlineRead";
+import { hydrateOpenedThread } from "./lib/offlineQueryCache";
+import { channelHeadCacheScope } from "./lib/channelHeadCache";
 import { boundedInlineThreadRead as boundedThreadReplyRead } from "./lib/inlineThreadFetch";
 import {
   type QueryClient,
@@ -52,6 +57,20 @@ export async function loadThreadReplies(
   signal?: AbortSignal,
 ): Promise<RelayEvent[]> {
   const queryKey = threadRepliesKey(channelId, rootId);
+  const completeOfflineRead = beginOfflineThreadRead(
+    queryClient,
+    queryKey,
+    signal,
+  );
+  const scope = channelHeadCacheScope(queryClient);
+  if (scope)
+    await hydrateOpenedThread(queryClient, scope, channelId, rootId).catch(
+      (error) => console.warn("Offline thread hydration failed", error),
+    );
+  if (fetcher === getThreadReplies && offlineNeedsConnection())
+    throw new OfflineReadUnavailableError(
+      "Replies load when you're back online",
+    );
   const cacheAtStart = queryClient.getQueryData<RelayEvent[]>(queryKey) ?? [];
   const idsAtStart = new Set(cacheAtStart.map((event) => event.id));
   const replies: RelayEvent[] = [];
@@ -90,6 +109,7 @@ export async function loadThreadReplies(
       ) {
         throw new ThreadExpectedEventMissingError(expectedEventId);
       }
+      completeOfflineRead(result);
       return result;
     }
     cursor = response.nextCursor;
@@ -176,7 +196,9 @@ export function useThreadReplies(
     // A read that hit the relay's statement deadline is not retried:
     // each retry would re-run the same slow server-side query.
     retry: (failureCount, error) =>
-      failureCount < 3 && !isQueryDeadlineError(error),
+      failureCount < 3 &&
+      !isQueryDeadlineError(error) &&
+      !(error instanceof OfflineReadUnavailableError),
     retryDelay: (attempt) => Math.min(1_000 * 2 ** attempt, 30_000),
   });
 

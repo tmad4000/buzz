@@ -1,5 +1,9 @@
 import { AgentRuntimeMenu } from "@/features/agent-runtime/AgentRuntimeMenu";
 import {
+  useDeviceOffline,
+  offlineNeedsConnection,
+} from "@/shared/api/offlineConnection";
+import {
   Archive,
   Bell,
   BellOff,
@@ -26,6 +30,7 @@ import type { ChannelSection } from "@/features/sidebar/lib/useChannelSections";
 import {
   ContextMenuIconSlot,
   deferMenuAction,
+  deferConnectedMenuAction,
 } from "@/features/sidebar/ui/sidebarMenuHelpers";
 import { StatusEmoji } from "@/features/user-status/ui/StatusEmoji";
 import type { Channel } from "@/shared/api/types";
@@ -54,11 +59,15 @@ function MoveToSectionSubmenu({
   onUnassignChannel: (channelId: string) => void;
   onCreateSectionForChannel: (channelId: string) => void;
 }) {
+  const offline = useDeviceOffline();
   const currentSectionId = assignments[channelId];
 
   return (
     <ContextMenuSub>
-      <ContextMenuSubTrigger>
+      <ContextMenuSubTrigger
+        disabled={offline}
+        title={offline ? "Needs a connection" : undefined}
+      >
         <ContextMenuIconSlot />
         <span>Move to section</span>
       </ContextMenuSubTrigger>
@@ -67,7 +76,9 @@ function MoveToSectionSubmenu({
           <ContextMenuItem
             key={section.id}
             onSelect={() =>
-              deferMenuAction(() => onAssignChannel(channelId, section.id))
+              deferConnectedMenuAction(() =>
+                onAssignChannel(channelId, section.id),
+              )
             }
           >
             <ContextMenuIconSlot>
@@ -83,7 +94,7 @@ function MoveToSectionSubmenu({
         {sections.length > 0 ? <ContextMenuSeparator /> : null}
         <ContextMenuItem
           onSelect={() =>
-            deferMenuAction(() => onCreateSectionForChannel(channelId))
+            deferConnectedMenuAction(() => onCreateSectionForChannel(channelId))
           }
         >
           <ContextMenuIconSlot>
@@ -93,7 +104,9 @@ function MoveToSectionSubmenu({
         </ContextMenuItem>
         {currentSectionId ? (
           <ContextMenuItem
-            onSelect={() => deferMenuAction(() => onUnassignChannel(channelId))}
+            onSelect={() =>
+              deferConnectedMenuAction(() => onUnassignChannel(channelId))
+            }
           >
             <ContextMenuIconSlot />
             <span>Remove from section</span>
@@ -200,6 +213,7 @@ export function ChannelContextMenuItems({
     channel.channelType !== "dm" && Boolean(onDeleteChannel);
   const membersQuery = useChannelMembersQuery(channel.id, canLoadOwnerActions);
   const currentPubkey = useIdentityQuery().data?.pubkey;
+  const offline = useDeviceOffline();
   const archiveChannel = useArchiveChannelMutation(channel.id);
   const {
     canDeleteChannel,
@@ -251,8 +265,11 @@ export function ChannelContextMenuItems({
       {showReadToggle ? <ContextMenuSeparator /> : null}
       {hasProjectedUnread && onMarkChannelRead ? (
         <ContextMenuItem
+          disabled={offline}
+          title={offline ? "Needs a connection" : undefined}
           onSelect={() =>
             deferMenuAction(() => {
+              if (offlineNeedsConnection()) return;
               for (const itemId of channelUnreadOverrideIds) {
                 feedItemState.undoUnread(itemId);
               }
@@ -328,6 +345,8 @@ export function ChannelContextMenuItems({
       {onLeaveChannel ? (
         <ContextMenuItem
           className="text-destructive focus:text-destructive"
+          disabled={offline}
+          title={offline ? "Needs a connection" : undefined}
           onSelect={() => deferMenuAction(() => onLeaveChannel(channel))}
         >
           <ContextMenuIconSlot>
@@ -354,7 +373,8 @@ export function ChannelContextMenuItems({
       {canManageChannel ? (
         <ContextMenuItem
           data-testid={`archive-channel-${channel.name}`}
-          disabled={archiveChannel.isPending}
+          disabled={offline || archiveChannel.isPending}
+          title={offline ? "Needs a connection" : undefined}
           onSelect={() => deferMenuAction(() => archiveChannel.mutate())}
         >
           <ContextMenuIconSlot>
@@ -367,6 +387,8 @@ export function ChannelContextMenuItems({
         <ContextMenuItem
           className="text-destructive focus:text-destructive"
           data-testid={`delete-channel-${channel.name}`}
+          disabled={offline}
+          title={offline ? "Needs a connection" : undefined}
           onSelect={() => deferMenuAction(() => onDeleteChannel?.(channel))}
         >
           <ContextMenuIconSlot>

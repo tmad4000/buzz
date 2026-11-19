@@ -254,7 +254,11 @@ pub(crate) async fn channel_head_cache_load(
     app: AppHandle,
 ) -> Result<Vec<ChannelHeadEntry>, String> {
     let path = db_path(&app)?;
-    run_blocking(move || load_from_path(&path, &scope, limit)).await
+    run_blocking(move || {
+        let _guard = crate::offline_cache::legacy_guard()?;
+        load_from_path(&path, &scope, limit)
+    })
+    .await
 }
 
 /// Stores one raw channel-window response, dropping payloads above one MiB.
@@ -269,6 +273,7 @@ pub(crate) async fn channel_head_cache_store(
     let path = db_path(&app)?;
     let write_lock = Arc::clone(&store.write_lock);
     run_blocking(move || {
+        let _legacy = crate::offline_cache::legacy_guard()?;
         let _guard = write_lock.lock().map_err(|error| error.to_string())?;
         store_at(
             &path,
@@ -291,6 +296,7 @@ pub(crate) async fn channel_head_cache_clear(
     let path = db_path(&app)?;
     let write_lock = Arc::clone(&store.write_lock);
     run_blocking(move || {
+        let _legacy = crate::offline_cache::legacy_guard()?;
         let _guard = write_lock.lock().map_err(|error| error.to_string())?;
         let conn = open_db(&path)?;
         conn.execute("DELETE FROM channel_head WHERE scope=?1", [scope.key()])

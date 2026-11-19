@@ -1,3 +1,4 @@
+import { offlineCacheEnabled } from "@/shared/api/offlineCache";
 import { normalizeRelayUrl } from "@/features/profile/lib/selfProfileStorage";
 import type {
   UserProfileSummary,
@@ -58,6 +59,7 @@ function parseCachedUserLabel(value: unknown): CachedUserLabel | null {
 
 function readCache(relayUrl: string): UserLabelCache | null {
   try {
+    if (offlineCacheEnabled()) { window.localStorage.removeItem(userLabelCacheKey(relayUrl)); return null; }
     const raw = window.localStorage.getItem(userLabelCacheKey(relayUrl));
     if (!raw) return null;
     const parsed = JSON.parse(raw) as unknown;
@@ -130,6 +132,7 @@ export function writeCachedUserLabels(
   missing: string[] = [],
 ): void {
   try {
+    if (offlineCacheEnabled()) { window.localStorage.removeItem(userLabelCacheKey(relayUrl)); return; }
     const now = Date.now();
     const merged = { ...(readCache(relayUrl)?.profiles ?? {}) };
     for (const [pubkey, profile] of Object.entries(profiles)) {

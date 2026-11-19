@@ -160,3 +160,20 @@ test("list surface renders the panel's list branch", async () => {
     "the list surface must render the panel's list branch",
   );
 });
+
+test("offline uncached replies show availability rather than an authoritative empty branch", async () => {
+  window.localStorage.setItem("buzz-offline-cache-v1", "on");
+  try {
+    const view = await renderRegion({ isPending: true });
+    assert.match(
+      view.container.textContent,
+      /Replies load when you're back online/,
+    );
+    assert.doesNotMatch(
+      view.container.textContent,
+      /No replies in this branch yet/,
+    );
+  } finally {
+    window.localStorage.removeItem("buzz-offline-cache-v1");
+  }
+});

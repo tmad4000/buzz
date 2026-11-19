@@ -1,3 +1,4 @@
+import { OfflineStorageSettings } from "./OfflineStorageSettings";
 import { Check, ChevronDown, Copy, Pencil } from "lucide-react";
 import {
   AnimatePresence,
@@ -862,6 +863,7 @@ export function ProfileSettingsCard({
         </div>
       </div>
 
+      <OfflineStorageSettings />
       <SignOutSection />
     </section>
   );

@@ -1,3 +1,4 @@
+import { clearOfflineForLogout } from "./offlineCache";
 import { invokeTauri } from "@/shared/api/tauri";
 import type { Identity, IdentityStorage } from "@/shared/api/types";
 
@@ -52,6 +53,7 @@ export async function persistCurrentIdentity(): Promise<Identity> {
  * state until the process exits and only handle errors (e.g. display a toast).
  */
 export async function signOut(): Promise<void> {
+  await clearOfflineForLogout();
   await invokeTauri("sign_out");
 }
 

@@ -1,0 +1,119 @@
+[localStorageQuota] write failed after cache eviction: buzz-channels.v1:wss://relay.example.com:abcdef Error: quota exceeded
+    at window.localStorage.setItem (file:///home/dev/agent-worktrees/buzz-offline-p1-20261118/desktop/src/features/channels/channelSnapshot.test.mjs:296:11)
+    at setLocalStorageItemWithRecovery (file:///home/dev/agent-worktrees/buzz-offline-p1-20261118/desktop/src/shared/lib/localStorageQuota.ts:153:25)
+    at writeChannelSnapshot (file:///home/dev/agent-worktrees/buzz-offline-p1-20261118/desktop/src/features/channels/channelSnapshot.ts:256:5)
+    at file:///home/dev/agent-worktrees/buzz-offline-p1-20261118/desktop/src/features/channels/channelSnapshot.test.mjs:300:7
+    at getActual (node:assert:611:5)
+    at strict.doesNotThrow (node:assert:779:32)
+    at TestContext.<anonymous> (file:///home/dev/agent-worktrees/buzz-offline-p1-20261118/desktop/src/features/channels/channelSnapshot.test.mjs:299:12)
+    at Test.runInAsyncScope (node:async_hooks:227:14)
+    at Test.run (node:internal/test_runner/test:1201:25)
+    at async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+✔ channelSnapshotKey: normalizes trailing slash and case (9.76454ms)
+✔ read after write returns the complete list and matching hash (12.6483ms)
+✔ inspection distinguishes absent from invalid snapshots (0.63682ms)
+✔ inspection memoizes parsing for repeated reads of the same document (2.794029ms)
+✔ inspection tolerates denied storage without retrying the read (2.0803ms)
+✔ write replaces list and hash in lockstep (5.155739ms)
+✔ read for an unknown relay returns null (0.399061ms)
+✔ read rejects malformed JSON (0.490499ms)
+✔ read rejects a legacy channel-only snapshot (5.21392ms)
+✔ read rejects a snapshot whose hash and list were partially changed (2.518001ms)
+✔ read rejects a v2 snapshot with a missing hash (0.42359ms)
+✔ read rejects a snapshot owned by another identity (0.31549ms)
+✔ same-relay identities retain independent snapshots (4.12836ms)
+✔ remove clears every identity snapshot for that relay (0.5866ms)
+✔ cache write evicts disposable entries and retries at quota (1.17071ms)
+✔ write is tolerant of storage failures (25.24112ms)
+✔ mount fetches cold and prefetched channels but consumes hydrated data (506.826934ms)
+✔ hydrates stale data and consumes its mount gate once (26.9141ms)
+✔ authoritative refresh deletes a vanished hydrated row (23.612149ms)
+Ignoring invalid persisted channel head bad Error: Channel window response must contain exactly one bounds event.
+    at parseChannelWindowResponse (file:///home/dev/agent-worktrees/buzz-offline-p1-20261118/desktop/src/features/messages/lib/channelWindowResponse.ts:111:11)
+    at seedChannelHeads (file:///home/dev/agent-worktrees/buzz-offline-p1-20261118/desktop/src/features/messages/lib/channelHeadCache.ts:90:20)
+    at async TestContext.<anonymous> (file:///home/dev/agent-worktrees/buzz-offline-p1-20261118/desktop/src/features/messages/lib/channelHeadCache.test.mjs:255:3)
+    at async Test.run (node:internal/test_runner/test:1208:7)
+    at async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+✔ drops malformed entries independently (23.91169ms)
+✔ a channel mounted during a slow cache load still takes the hydrated path (217.954127ms)
+✔ a bounds-only persisted head is not hydrated (74.827069ms)
+✔ a hydrated channel still revalidates when live subscription setup fails (82.038019ms)
+✔ a live subscription that settles before a slow cache load still revalidates (218.701978ms)
+✔ a cold channel with an immediate live subscription fetches the window once (68.73919ms)
+✔ folded head reparses with bounded rows, committed live events, aux and reply summaries (5.22145ms)
+✔ terminal error renders the retry card, never the empty card (1591.34076ms)
+✔ Retry button invokes the supplied refetch callback (34.66321ms)
+✔ genuine empty surface renders the empty card, not the error card (25.949779ms)
+✔ pending surface paints nothing (37.51444ms)
+✔ skeleton surface renders the panel's skeleton branch (35.313209ms)
+✔ list surface renders the panel's list branch (23.07088ms)
+✔ offline uncached replies show availability rather than an authoritative empty branch (30.13169ms)
+✔ loadThreadReplies throws ThreadExpectedEventMissingError when expected event is absent (909.230939ms)
+✔ loadThreadReplies resolves normally when expected event is present (5.83373ms)
+✔ loadThreadReplies returns fetched replies when target is in exhaustedTargets (7.27973ms)
+✔ loadThreadReplies resolves normally with no expectedEventId (2.73974ms)
+✔ loadThreadReplies aggregates events across multiple pages (5.36492ms)
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+✔ useThreadReplies resolves to data after exhausting missing-event retries (478.222983ms)
+✔ useThreadReplies null-to-target change retries on missing-target page and lands target data (1054.273627ms)
+✔ useThreadReplies cancels stale in-flight cold fetch when target arrives (90.788359ms)
+✔ thread replies trust the relay-provided aux closure (13.516999ms)
+✔ reads cached labels as safe stale profile summaries (455.112104ms)
+✔ keeps previous full profiles ahead of persisted label placeholders (12.74649ms)
+✔ writes merge with existing labels and remain bounded (113.461659ms)
+✔ removes a stale label when the fresh profile clears all names (6.547479ms)
+✔ removes stale labels for profiles the relay reports missing (5.51728ms)
+✔ removes only the selected relay cache (5.2434ms)
+✔ ignores malformed cache payloads (6.410799ms)
+✔ UI1 deferred assignment/create/removal and delayed Huddle start recheck connection at actual mutation (339.316206ms)
+✔ R4 full-scope opt-in migration runs while locked and preserves unrelated storage; OFF is inert (10.88393ms)
+✔ off by default; all payloads encrypted with actual NIP44, Unicode chunks and scope binding (370.707045ms)
+✔ clear fences encryption in flight and oversized JSON is never persisted (17.42467ms)
+✔ production eviction policy bounds each unit and total encrypted bytes (13.66767ms)
+✔ production bridge cipher pins every chunk to the scoped account during a signer switch (15.62442ms)
+✔ native clear waits for an already-dispatched write so late completion cannot refill cache (10.99569ms)
+✔ unwired window.nostr NIP44 seam requires a host account lease and rejects wrong/switched owners (5.67402ms)
+✔ blocked IndexedDB upgrades fail promptly, close late results and allow retry (12.68015ms)
+✔ production IndexedDB adapter upgrades indexes and fences encryption across another tab's clear (37.33077ms)
+✔ production profile snapshot listener persists labels without cached owner/agent authority (179.426148ms)
+✔ late encryption cannot overwrite a newer successful snapshot of the same unit (9.184319ms)
+✔ R1 hydration touch queued before clear cannot recreate a cleared native row (5.652509ms)
+✔ R3 actual NIP44 binds every chunk header and rejects cross-record cross-relay splice, reorder, duplicate and omission (242.942578ms)
+✔ logout drains dispatched native writes and prevents later writers before restart (12.13316ms)
+ℹ tests 64
+ℹ suites 0
+ℹ pass 64
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 7636.189147

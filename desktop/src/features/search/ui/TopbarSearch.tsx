@@ -1,3 +1,7 @@
+import {
+  useDeviceOffline,
+  offlineNeedsConnection,
+} from "@/shared/api/offlineConnection";
 import { Search } from "lucide-react";
 import * as React from "react";
 import { resolveUserLabel } from "@/features/profile/lib/identity";
@@ -390,6 +394,7 @@ export function TopbarSearch({
   suggestionChannels,
   variant = "bar",
 }: TopbarSearchProps) {
+  const offline = useDeviceOffline();
   const [isOpen, setIsOpen] = React.useState(false);
   const [scopeChannelId, setScopeChannelId] = React.useState<string | null>(
     null,
@@ -515,6 +520,7 @@ export function TopbarSearch({
 
   const openSearchDialog = React.useCallback(
     (nextScopeChannelId: string | null = null) => {
+      if (offlineNeedsConnection()) return;
       setScopeChannelId(nextScopeChannelId);
       setSelectedMenuIndex(0);
       openNextFrame(() => setIsOpen(true));
@@ -931,10 +937,11 @@ export function TopbarSearch({
               ? "group/search flex size-6 items-center justify-center rounded p-1 text-sidebar-foreground/50 transition-colors hover:bg-sidebar-border/35 hover:text-sidebar-foreground focus-visible:bg-sidebar-border/35 focus-visible:text-sidebar-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-sidebar-ring"
               : "group/search flex h-8 w-full items-center gap-2 rounded-md bg-sidebar-border/35 px-2 text-left text-sm text-sidebar-foreground/55 transition-colors duration-150 ease-out hover:bg-sidebar-border/35 hover:text-sidebar-foreground focus-visible:bg-sidebar-border/35 focus-visible:text-sidebar-foreground focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-sidebar-ring"
           }
+          disabled={offline}
           data-testid="open-search"
           onClick={() => openSearchDialog(null)}
           ref={triggerRef}
-          title="Search everything"
+          title={offline ? "Needs a connection" : "Search everything"}
           type="button"
         >
           <Search

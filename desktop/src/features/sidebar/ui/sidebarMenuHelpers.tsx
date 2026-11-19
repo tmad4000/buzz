@@ -1,3 +1,4 @@
+import { offlineNeedsConnection } from "@/shared/api/offlineConnection";
 import type * as React from "react";
 
 const SIDEBAR_CONTEXT_ICON_SLOT_CLASS =
@@ -11,6 +12,13 @@ const SIDEBAR_CONTEXT_ICON_SLOT_CLASS =
  */
 export function deferMenuAction(action: () => void) {
   globalThis.setTimeout(action, 0);
+}
+
+/** Connectivity is checked at deferred execution, including already-open menus. */
+export function deferConnectedMenuAction(action: () => void) {
+  deferMenuAction(() => {
+    if (!offlineNeedsConnection()) action();
+  });
 }
 
 /**

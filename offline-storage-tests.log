@@ -1,0 +1,46 @@
+TAP version 13
+# Subtest: off by default; all payloads encrypted with actual NIP44, Unicode chunks and scope binding
+ok 1 - off by default; all payloads encrypted with actual NIP44, Unicode chunks and scope binding
+  ---
+  duration_ms: 98.759458
+  type: 'test'
+  ...
+# Subtest: clear fences encryption in flight and oversized JSON is never persisted
+ok 2 - clear fences encryption in flight and oversized JSON is never persisted
+  ---
+  duration_ms: 8.811659
+  type: 'test'
+  ...
+# Subtest: production eviction policy bounds each unit and total encrypted bytes
+ok 3 - production eviction policy bounds each unit and total encrypted bytes
+  ---
+  duration_ms: 2.60948
+  type: 'test'
+  ...
+# Subtest: production bridge cipher pins every chunk to the scoped account during a signer switch
+ok 4 - production bridge cipher pins every chunk to the scoped account during a signer switch
+  ---
+  duration_ms: 3.9453
+  type: 'test'
+  ...
+# Subtest: native clear waits for an already-dispatched write so late completion cannot refill cache
+ok 5 - native clear waits for an already-dispatched write so late completion cannot refill cache
+  ---
+  duration_ms: 4.96557
+  type: 'test'
+  ...
+# Subtest: production IndexedDB adapter upgrades indexes and fences encryption across another tab's clear
+ok 6 - production IndexedDB adapter upgrades indexes and fences encryption across another tab's clear
+  ---
+  duration_ms: 13.79508
+  type: 'test'
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 6
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2024.127965

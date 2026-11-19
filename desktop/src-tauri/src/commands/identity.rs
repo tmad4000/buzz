@@ -598,6 +598,11 @@ pub async fn sign_out(app: tauri::AppHandle) -> Result<(), String> {
         eprintln!("buzz-desktop sign-out: agent shutdown: {e}");
     }
 
+    // Drain cache-owner jobs and reject queued/new writers before reset/restart.
+    tauri::async_runtime::spawn_blocking(crate::offline_cache::suspend)
+        .await
+        .map_err(|e| e.to_string())??;
+
     // Write the reset sentinel — destruction happens on next boot.
     let data_dir = app
         .path()

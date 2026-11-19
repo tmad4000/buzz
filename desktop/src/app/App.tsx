@@ -1,3 +1,8 @@
+import { prepareOfflineCache } from "@/shared/api/offlineCache";
+import {
+  hydrateOfflineQueries,
+  persistOfflineQueries,
+} from "@/features/messages/lib/offlineQueryCache";
 import { isTauri } from "@tauri-apps/api/core";
 import { emit } from "@tauri-apps/api/event";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -241,11 +246,21 @@ function CommunityQueryProvider({
     if (pubkey && relayUrl) {
       seedProjectSnapshot(client, { pubkey, relayUrl });
       void hydrateChannelHeads(client, { pubkey, relayUrl });
+      void hydrateOfflineQueries(client, { pubkey, relayUrl }).catch((error) =>
+        console.warn("Offline hydration failed", error),
+      );
     }
     return client;
   });
 
   useEffect(() => setAvatarProfileSyncQueryClient(queryClient), [queryClient]);
+  useEffect(
+    () =>
+      pubkey && relayUrl
+        ? persistOfflineQueries(queryClient, { pubkey, relayUrl })
+        : undefined,
+    [queryClient, pubkey, relayUrl],
+  );
   useEffect(() => refreshRostersOnMembershipChange(queryClient), [queryClient]);
 
   useEffect(() => {
@@ -806,6 +821,11 @@ function MachineBootstrap({ sharedIdentity }: { sharedIdentity: boolean }) {
 }
 
 export function App() {
+  useEffect(() => {
+    void prepareOfflineCache().catch((error) =>
+      console.warn("Offline cache migration failed", error),
+    );
+  }, []);
   useReloadShortcut();
   useCloseWindowShortcut();
   useInitialRenderReady();

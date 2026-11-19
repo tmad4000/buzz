@@ -487,6 +487,9 @@ export class RelayClient {
   }
 
   /** Current connection state — synchronous read. */
+  /** Monotonic transport generation; snapshots cannot authorize reading across reconnects. */
+  getConnectionGeneration(): number { return this.connectionGeneration; }
+
   getConnectionState(): ConnectionState {
     return this.connectionStateEmitter.get();
   }

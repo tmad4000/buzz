@@ -1,3 +1,4 @@
+import { offlineNeedsConnection } from "@/shared/api/offlineConnection";
 import * as React from "react";
 import {
   useLiveChannelUpdates,
@@ -328,6 +329,7 @@ export function useUnreadChannels(
         topLevelOnly?: boolean;
       } = {},
     ) => {
+      if (offlineNeedsConnection()) return;
       if (
         !preserveForcedUnread &&
         Object.hasOwn(forcedUnreadRef.current, channelId)
@@ -914,6 +916,7 @@ export function useUnreadChannels(
   unreadChannelIdsRef.current = unreadChannelIds;
 
   const markAllChannelsRead = React.useCallback(() => {
+    if (offlineNeedsConnection()) return;
     const marked = new Map<string, number>();
     for (const channelId of unreadChannelIdsRef.current) {
       delete forcedUnreadRef.current[channelId];
