@@ -9,6 +9,8 @@ const reactURL = new URL(
   import.meta.url,
 ).href;
 const modules = {
+  "@/shared/features":
+    "export const useFeatureEnabled=()=>globalThis.__panelAgentReplyUx === true;",
   "./MessageComposer": "export const MessageComposer=()=>null;",
   "./MessageThreadRow":
     'export const MessageThreadRow=({message})=>React.createElement("div",{"data-message-id":message.id,"data-testid":"message-row"},React.createElement("div",{"data-testid":"message-body"},message.body),React.createElement("button",{"data-reply-action":message.id},"Reply"));',
@@ -326,5 +328,96 @@ test("focused panel restores branch/root disclosure focus for local and synchron
   } finally {
     await act(() => root.unmount());
     dom.window.close();
+  }
+});
+
+test("deep sidebar retains existing parent context when experiment is off and avoids duplicate context when on", async () => {
+  const dom = new JSDOM('<div id="root"></div>', {
+    url: "http://localhost",
+    pretendToBeVisual: true,
+  });
+  Object.assign(globalThis, {
+    window: dom.window,
+    document: dom.window.document,
+    localStorage: dom.window.localStorage,
+    HTMLElement: dom.window.HTMLElement,
+    IS_REACT_ACT_ENVIRONMENT: true,
+    CSS: { escape: (value) => value },
+    __panelAgentReplyUx: false,
+  });
+  const { threadExpansionKey } = await import(
+    "../lib/threadExpansionStorage.ts"
+  );
+  const { MessageThreadPanel } = await import("./MessageThreadPanel.tsx");
+  const { buildThreadPanelData } = await import("../lib/threadPanel.ts");
+  const ids = ["root", "branch", "deep", "leaf"];
+  const messages = ids.map((id, index) => ({
+    id,
+    parentId: ids[index - 1] ?? null,
+    rootId: "root",
+    createdAt: 1000 + index,
+    depth: index,
+    body: id,
+    author: index === 2 ? "Jacob" : "Nora",
+    time: "now",
+  }));
+  const expanded = new Set(ids);
+  localStorage.setItem(
+    threadExpansionKey(null, "me", "legacy-context-channel", "root"),
+    JSON.stringify(ids.map((id) => [id, true])),
+  );
+  const projection = buildThreadPanelData(messages, "root", null, expanded);
+  const props = {
+    channel: null,
+    channelId: "legacy-context-channel",
+    channelName: "test",
+    currentPubkey: "me",
+    isSending: false,
+    isFocusMode: false,
+    isSinglePanelView: false,
+    onCancelReply: () => {},
+    onClose: () => {},
+    onExpandReplies: () => {},
+    onScrollTargetResolved: () => {},
+    onSelectReplyTarget: () => {},
+    onSend: async () => {},
+    replyTargetMessage: null,
+    scrollTargetId: null,
+    threadHead: projection.threadHead,
+    threadReplies: projection.visibleReplies,
+    allThreadMessages: messages,
+    threadTypingPubkeys: [],
+    activityAccessoryVisible: false,
+    widthPx: 380,
+  };
+  const root = createRoot(document.getElementById("root"));
+  const render = () =>
+    act(() => root.render(React.createElement(MessageThreadPanel, props)));
+  try {
+    await render();
+    assert.ok(
+      document.querySelector('[data-message-id="leaf"]'),
+      "deep leaf is actually rendered in the sidebar",
+    );
+    assert.equal(
+      document.querySelector('[data-testid="sidebar-reply-context"]')
+        .textContent,
+      "Replying to Jacob",
+    );
+    globalThis.__panelAgentReplyUx = true;
+    await render();
+    assert.equal(
+      document.querySelector('[data-testid="sidebar-reply-context"]'),
+      null,
+      "new quote owns context when experiment is enabled",
+    );
+    assert.ok(
+      document.querySelector('[data-message-id="leaf"]'),
+      "toggling context preserves deep message",
+    );
+  } finally {
+    await act(() => root.unmount());
+    dom.window.close();
+    delete globalThis.__panelAgentReplyUx;
   }
 });

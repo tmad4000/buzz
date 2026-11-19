@@ -1,3 +1,4 @@
+import { useFeatureEnabled } from "@/shared/features";
 import { useThreadReplyRenderItems } from "./useThreadReplyRenderItems";
 import { useAppShell } from "@/app/AppShellContext";
 import { useSidebarOpening } from "./useSidebarOpening";
@@ -89,6 +90,7 @@ type MessageThreadPanelProps = ThreadPanelLayoutProps & {
   onMarkUnread?: (message: TimelineMessage) => void;
   onMarkRead?: (message: TimelineMessage) => void;
   onExpandReplies: (message: TimelineMessage) => void;
+  onJumpToThreadMessage?: (rootId: string, messageId: string) => void;
   onScrollTargetResolved: () => void;
   onScrollTargetSettled?: (messageId: string) => void;
   scrollTargetHighlights?: boolean;
@@ -192,6 +194,7 @@ export function MessageThreadPanel({
   onMarkUnread,
   onMarkRead,
   onExpandReplies,
+  onJumpToThreadMessage,
   onScrollTargetResolved,
   onScrollTargetSettled,
   onSelectReplyTarget,
@@ -229,6 +232,7 @@ export function MessageThreadPanel({
   autoSendDraftKey = null,
   onAutoSubmitComplete,
 }: MessageThreadPanelProps) {
+  const agentReplyUx = useFeatureEnabled("agentReplyUx");
   const threadBodyRef = React.useRef<HTMLDivElement>(null);
   const threadContentRef = React.useRef<HTMLDivElement>(null);
   const threadComposerWrapperRef = React.useRef<HTMLDivElement>(null);
@@ -504,6 +508,7 @@ export function MessageThreadPanel({
     });
 
   const {
+    highlightedMessageId,
     isAtBottom,
     newMessageCount,
     onScroll,
@@ -855,7 +860,9 @@ export function MessageThreadPanel({
                           </button>
                         ) : null}
                         {showUnreadDivider ? <UnreadDivider /> : null}
-                        {isSidebar && entry.message.depth > 2 ? (
+                        {isSidebar &&
+                        !agentReplyUx &&
+                        entry.message.depth > 2 ? (
                           <div
                             className="min-w-0 pt-2 text-xs text-muted-foreground"
                             style={{
@@ -872,6 +879,11 @@ export function MessageThreadPanel({
                           </div>
                         ) : null}
                         <MessageThreadRow
+                          parentMessages={sidebar.index.messageById}
+                          onJumpToThreadMessage={onJumpToThreadMessage}
+                          highlighted={
+                            entry.message.id === highlightedMessageId
+                          }
                           channelId={channelId}
                           currentPubkey={currentPubkey}
                           collapseDepthGuideActions={collapseDepthGuideActions}

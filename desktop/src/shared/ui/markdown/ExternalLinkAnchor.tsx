@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { cn } from "@/shared/lib/cn";
 import { copyTextToClipboard } from "@/shared/lib/clipboard";
 
+import { isPaseoAgentLink } from "./paseoAgentLink";
 import { MaskedLinkTooltip } from "./MaskedLinkTooltip";
 import {
   MediaContextMenu,
@@ -46,6 +47,14 @@ export function ExternalLinkAnchor({
         isLinearLink ? "linear-link" : "text-primary hover:text-primary/80",
       )}
       href={href}
+      onClick={(event) => {
+        anchorProps.onClick?.(event);
+        if (event.defaultPrevented || !href || !isPaseoAgentLink(href)) return;
+        event.preventDefault();
+        void openUrl(href).catch(() =>
+          toast.error("Failed to open Paseo agent"),
+        );
+      }}
       onContextMenuCapture={(event) => {
         if (!href) return;
         event.preventDefault();
