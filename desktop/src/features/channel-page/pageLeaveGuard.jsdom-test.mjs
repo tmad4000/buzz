@@ -24,9 +24,9 @@ registerHooks({
         "const f=globalThis.leaveFixture;export const relayClient={subscribeLive:async()=>()=>{},fetchEvents:async q=>q.ids?f.events.filter(e=>q.ids.includes(e.id)):[],publishEvent:async e=>{f.events.push(e);await f.gate}}",
       "page-leave:sign":
         'const f=globalThis.leaveFixture;export async function signRelayEvent(e){return {...e,id:(++f.sequence).toString(16).padStart(64,"0"),pubkey:"alice",created_at:e.createdAt}}' +
-        'export async function invokeTauri(command){throw new Error("Unexpected Page fixture IPC: "+command)}' +
-        'export async function createAuthEvent(){throw new Error("Unexpected Page fixture authentication")}' +
-        'export async function getRelayWsUrl(){throw new Error("Unexpected Page fixture relay lookup")}',
+        'export async function invokeTauri(command){f.unexpectedCalls.push("invokeTauri:"+command);throw new Error("Unexpected Page fixture IPC: "+command)}' +
+        'export async function createAuthEvent(){f.unexpectedCalls.push("createAuthEvent");throw new Error("Unexpected Page fixture authentication")}' +
+        'export async function getRelayWsUrl(){f.unexpectedCalls.push("getRelayWsUrl");throw new Error("Unexpected Page fixture relay lookup")}',
       "page-leave:members":
         'export async function getChannelMembers(){return [{pubkey:"alice"}]}',
       "page-leave:profile":
@@ -48,7 +48,12 @@ test("background Page veto targets only its own view, protects saves, and unregi
     HTMLElement: dom.window.HTMLElement,
     IS_REACT_ACT_ENVIRONMENT: true,
     leaveReact: React,
-    leaveFixture: { events: [], sequence: 0, gate: Promise.resolve() },
+    leaveFixture: {
+      events: [],
+      sequence: 0,
+      gate: Promise.resolve(),
+      unexpectedCalls: [],
+    },
   });
   const { useChannelPageSurface } = await import("./useChannelPageSurface.tsx");
   const { ConversationViewContext } = await import(
@@ -182,5 +187,6 @@ test("background Page veto targets only its own view, protects saves, and unregi
   assert.equal(guards.get("b")(), true, "A cleanup preserves B registration");
   await act(async () => root.unmount());
   assert.equal(guards.size, 0);
+  assert.deepEqual(globalThis.leaveFixture.unexpectedCalls, []);
   dom.window.close();
 });
