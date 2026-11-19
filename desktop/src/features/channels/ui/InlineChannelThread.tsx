@@ -18,6 +18,7 @@ import {
 } from "@/features/messages/lib/unreadSidebar";
 import { THREAD_REPLY_ROW_MARGIN_INLINE_REM } from "@/features/messages/lib/threadTreeLayout";
 import type { TimelineMessage } from "@/features/messages/types";
+import type { ReplyFocusRequest } from "@/features/messages/lib/useReplyComposerFocus";
 import { MessageComposer } from "@/features/messages/ui/MessageComposer";
 import type { MessageComposerProps } from "@/features/messages/ui/MessageComposer.types";
 import { MessageThreadRow } from "@/features/messages/ui/MessageThreadRow";
@@ -161,7 +162,8 @@ function ScopedInlineThread(props: Props & { storageKey: string }) {
     data.thread.remembered,
     snapshot,
   ]);
-  const [focusReply, setFocusReply] = React.useState(false);
+  const [replyFocusRequest, setReplyFocusRequest] =
+    React.useState<ReplyFocusRequest>();
   const toggle = () => {
     const next = !expanded;
     const persisted = saveThreadExpansion(
@@ -170,19 +172,11 @@ function ScopedInlineThread(props: Props & { storageKey: string }) {
     );
     setChoice(next);
     setStorageFailed(!persisted);
-    setFocusReply(next && summary.replyCount === 0);
+    setReplyFocusRequest(
+      next && summary.replyCount === 0 ? { pending: true } : undefined,
+    );
     if (next) data.thread.setExpanded(root.id, true);
   };
-  React.useEffect(() => {
-    if (!expanded || !focusReply) return;
-    const editor = contentRef.current?.querySelector<HTMLElement>(
-      '[data-testid="message-input"]',
-    );
-    if (editor?.isContentEditable) {
-      editor.focus();
-      setFocusReply(false);
-    }
-  }, [expanded, focusReply]);
   return (
     <>
       <div ref={controlsRef} className="flex items-center gap-1">
@@ -227,7 +221,7 @@ function ScopedInlineThread(props: Props & { storageKey: string }) {
           <InlineThreadContent
             {...props}
             data={data}
-            focusReply={focusReply}
+            replyFocusRequest={replyFocusRequest}
             scope={auto.scope}
             previewTarget={
               choice === undefined ? auto.answerTargets.get(root.id) : undefined
@@ -253,13 +247,13 @@ function InlineThreadContent({
   data,
   scope,
   previewTarget,
-  focusReply,
+  replyFocusRequest,
 }: Props & {
   storageKey: string;
   data: ReturnType<typeof useInlineThreadData>;
   scope: string;
   previewTarget?: string;
-  focusReply: boolean;
+  replyFocusRequest?: ReplyFocusRequest;
 }) {
   const { query, thread, combinedProfiles, canonicalRoot } = data;
   const nestedRoutingEntries = React.useMemo(
@@ -269,6 +263,8 @@ function InlineThreadContent({
   const [replyTarget, setReplyTarget] = React.useState<TimelineMessage | null>(
     null,
   );
+  const [nestedReplyFocus, setNestedReplyFocus] =
+    React.useState<ReplyFocusRequest>();
   const mobile = useIsMobile();
   const [extra, setExtra] = React.useState(0);
   const [showAll, setShowAll] = React.useState(false);
@@ -351,7 +347,10 @@ function InlineThreadContent({
                 message={sidebarVisualMessage(message)}
                 profiles={combinedProfiles}
                 showDepthGuides={false}
-                onReply={setReplyTarget}
+                onReply={(message) => {
+                  setReplyTarget(message);
+                  setNestedReplyFocus({ pending: true });
+                }}
                 onToggleReaction={onToggleReaction}
               />
               {hasChildren ? (
@@ -435,7 +434,8 @@ function InlineThreadContent({
         </p>
       ) : null}
       <MessageComposer
-        autoFocus={focusReply}
+        autoFocus={false}
+        replyFocusRequest={nestedReplyFocus ?? replyFocusRequest}
         compactWhenEmpty
         accessibleLabel={`Reply in thread to ${root.author}`}
         channelId={channel.id}

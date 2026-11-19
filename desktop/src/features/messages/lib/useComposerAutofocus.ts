@@ -1,3 +1,4 @@
+import type { Editor } from "@tiptap/core";
 import * as React from "react";
 import { ConversationViewContext } from "@/features/conversations/ConversationViewContext";
 
@@ -55,4 +56,25 @@ export function useComposerAutofocus(
     }
     focus();
   }, [draftKey, focus]);
+}
+
+/** Explicit takeover restores focus only in its foreground conversation. */
+export function useComposerTakeoverFocus(
+  editor: Editor | null,
+  focus: () => void,
+  presentation: { takeFocus: () => boolean } | null,
+  canFocusConversation: boolean,
+) {
+  React.useLayoutEffect(() => {
+    if (
+      !canFocusConversation ||
+      document.visibilityState !== "visible" ||
+      !document.hasFocus()
+    ) {
+      presentation?.takeFocus();
+      return;
+    }
+    if (!editor || editor.isDestroyed || !editor.view.dom.isConnected) return;
+    if (presentation?.takeFocus()) focus();
+  }, [presentation, editor, focus, canFocusConversation]);
 }

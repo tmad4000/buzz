@@ -159,6 +159,7 @@ export const ChannelPane = React.memo(function ChannelPane({
   onOpenThread,
   onResetThreadPanelWidth,
   onSelectThreadReplyTarget,
+  threadReplyFocusRequest,
   onSendMessage,
   onSendToChannel,
   onSendVideoReviewComment,
@@ -661,9 +662,7 @@ export const ChannelPane = React.memo(function ChannelPane({
   const timelineReplyHandler =
     activeChannel?.archivedAt || isHuddleTranscript
       ? undefined
-      : flatTimeline
-        ? timelineView.openReply
-        : onOpenThread;
+      : (timelineView.openReply ?? onOpenThread);
   return (
     <div
       className="relative flex min-h-0 min-w-0 flex-1 flex-row overflow-hidden"
@@ -1007,6 +1006,7 @@ export const ChannelPane = React.memo(function ChannelPane({
                 onExpandReplies={onExpandThreadReplies}
                 onJumpToThreadMessage={onJumpToThreadMessage}
                 onSelectReplyTarget={onSelectThreadReplyTarget}
+                replyFocusRequest={threadReplyFocusRequest}
                 onSend={onSendThreadReply}
                 onSendToChannel={
                   isComposerDisabled ? undefined : onSendToChannel

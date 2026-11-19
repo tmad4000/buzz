@@ -57,6 +57,7 @@ import { useFetchOlderMessages } from "@/features/messages/useFetchOlderMessages
 import { useIndependentThreadPanel } from "@/features/messages/useIndependentThreadPanel";
 import { useThreadReplies } from "@/features/messages/useThreadReplies";
 import { useChannelTyping } from "@/features/messages/useChannelTyping";
+import type { ReplyFocusRequest } from "@/features/messages/lib/useReplyComposerFocus";
 import type { TimelineMessage } from "@/features/messages/types";
 import { useUsersBatchQuery } from "@/features/profile/hooks";
 import { useRelaySelfQuery } from "@/features/moderation/hooks";
@@ -849,19 +850,30 @@ export function ChannelScreen({
     if (mode === "timeline") handleCloseThread();
     view.changeMode(mode);
   }, [handleCloseThread, requireThreadEditResolution, view.changeMode]);
+  const [replyFocus, setReplyFocus] = React.useState<(ReplyFocusRequest & {
+    channelId: string | null; rootId: string;
+  }) | null>(null);
+  const threadReplyFocusRequest = replyFocus && replyFocus.channelId === activeChannelId && replyFocus.rootId === effectiveOpenThreadHeadId
+    ? replyFocus : undefined;
+  React.useEffect(() => {
+    if (replyFocus && !threadReplyFocusRequest) setReplyFocus(null);
+  }, [replyFocus, threadReplyFocusRequest]);
   const openTimelineReply = React.useCallback((message: TimelineMessage) => {
     if (!requireThreadEditResolution()) return;
-    view.changeMode("threads");
+    if (flatTimeline) view.changeMode("threads");
     handleCloseAgentSession();
     setChannelManagementOpen(false);
     setProfilePanelPubkey(null);
     const rootId = message.rootId ?? message.parentId ?? message.id;
+    setReplyFocus({ channelId: activeChannelId, rootId, pending: true });
     setOptimisticOpenThreadHeadId(rootId);
     setOpenThreadHeadId(rootId);
     setThreadReplyTargetId(message.id);
-    setThreadScrollTargetId(message.id);
-    setExpandedThreadReplyIds(getThreadRouteTarget(message, timelineMessageById)?.expandedReplyIds ?? new Set());
-  }, [handleCloseAgentSession, requireThreadEditResolution, setChannelManagementOpen, setOpenThreadHeadId, setProfilePanelPubkey, timelineMessageById, view.changeMode]);
+    setThreadScrollTargetId(flatTimeline ? message.id : null);
+    setEditTargetId(null);
+    if (flatTimeline || effectiveOpenThreadHeadId !== rootId)
+      setExpandedThreadReplyIds(getThreadRouteTarget(message, timelineMessageById)?.expandedReplyIds ?? new Set());
+  }, [activeChannelId, effectiveOpenThreadHeadId, flatTimeline, handleCloseAgentSession, requireThreadEditResolution, setChannelManagementOpen, setOpenThreadHeadId, setProfilePanelPubkey, timelineMessageById, view.changeMode]);
   const timelineView = React.useMemo(() => ({ mode: view.mode, changeMode: changeChannelView, messagesById: timelineMessageById, loadingReplies: threadRepliesLoading, openReply: openTimelineReply }), [view.mode, changeChannelView, timelineMessageById, threadRepliesLoading, openTimelineReply]);
   return (
     <TimelineViewContext.Provider value={timelineView}>
@@ -1040,7 +1052,12 @@ export function ChannelScreen({
                     setThreadScrollTargetId(messageId);
                   }}
                   onOpenThread={handleOpenThreadAndCloseAgentSession}
-                  onSelectThreadReplyTarget={handleSelectThreadReplyTarget}
+                  threadReplyFocusRequest={threadReplyFocusRequest}
+                  onSelectThreadReplyTarget={(message) => {
+                    if (!effectiveOpenThreadHeadId || !requireThreadEditResolution()) return;
+                    handleSelectThreadReplyTarget(message);
+                    setReplyFocus({ channelId: activeChannelId, rootId: effectiveOpenThreadHeadId, pending: true });
+                  }}
                   onSendMessage={handleSendMessage}
                   onSendToChannel={handleSendToChannel}
                   onSendVideoReviewComment={effectiveSendVideoReviewComment}
