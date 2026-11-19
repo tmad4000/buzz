@@ -10,6 +10,7 @@ import {
   DraftEditorPresentationContext,
 } from "@/features/conversations/ConversationDraftEditors";
 import { DraftEditorCoordinator } from "@/features/conversations/draftEditorCoordinator";
+import { resolveNestedRoutingTarget } from "../lib/threadRouting.ts";
 import { resolveSentDraftKey } from "./draftSubmitKey.ts";
 
 // Extract the actual callback, not a hand-written replica. Production host tests
@@ -90,6 +91,9 @@ test("chosen-thread submit synchronously locks real ownership and stale callback
     assert.equal(old.canEdit(), true);
     const scope = {
       durableOutbox: false,
+      threadRoutingScope: undefined,
+      threadRoutingEntries: undefined,
+      resolveNestedRoutingTarget,
       presentationRef: {
         current: {
           ...old,

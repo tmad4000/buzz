@@ -130,6 +130,8 @@ export type MessageComposerProps = {
     rootId: string,
   ) => ((messageId?: string) => void) | undefined;
   threadRoutingEntries?: readonly import("../lib/threadPanel").MainTimelineEntry[];
+  /** A nested picker only accepts descendants of this head and preserves its canonical root. */
+  threadRoutingScope?: import("../lib/threadRouting").ThreadRoutingScope;
   typingParentEventId?: string | null;
   typingRootEventId?: string | null;
 };

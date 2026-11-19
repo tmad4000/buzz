@@ -142,9 +142,11 @@ test("explicit keyboard routing, cancel and new-message fallback preserve inline
     },
     { root, other, pubkey: TEST_IDENTITIES.bob.pubkey },
   );
-  const main = page
-    .getByTestId("message-composer")
-    .filter({ has: page.getByTestId("send-to-thread") });
+  const main = page.getByTestId("message-composer").filter({
+    has: page.locator(
+      '[data-testid="send-to-thread"]:not([data-thread-routing-head])',
+    ),
+  });
   const editor = main.getByTestId("message-input");
   const count = async () => (await published(page)).length;
   const lastSend = async () => {
@@ -215,7 +217,10 @@ test("explicit keyboard routing, cancel and new-message fallback preserve inline
     `[data-testid="inline-thread"][data-thread-head-id="${root}"]`,
   );
   await expect(inline).toContainText("Signed release rollback checklist");
-  await expect(inline.getByTestId("send-to-thread")).toHaveCount(0);
+  await expect(inline.getByTestId("send-to-thread")).toHaveAttribute(
+    "data-thread-routing-head",
+    root,
+  );
   await page.screenshot({
     path: `${shots}/routed-inline-and-independent-panel.png`,
   });
@@ -276,9 +281,11 @@ test("channel navigation dismisses picker and uses only destination channel's ro
   await installMockBridge(page);
   await page.goto("/");
   await page.getByTestId("channel-general").click();
-  const main = page
-    .getByTestId("message-composer")
-    .filter({ has: page.getByTestId("send-to-thread") });
+  const main = page.getByTestId("message-composer").filter({
+    has: page.locator(
+      '[data-testid="send-to-thread"]:not([data-thread-routing-head])',
+    ),
+  });
   await expect
     .poll(() =>
       page.evaluate(() =>
@@ -370,9 +377,11 @@ test("DM routing stays scoped and failed durable admission keeps draft for expli
     },
     { root, pubkey: TEST_IDENTITIES.bob.pubkey },
   );
-  const main = page
-    .getByTestId("message-composer")
-    .filter({ has: page.getByTestId("send-to-thread") });
+  const main = page.getByTestId("message-composer").filter({
+    has: page.locator(
+      '[data-testid="send-to-thread"]:not([data-thread-routing-head])',
+    ),
+  });
   const editor = main.getByTestId("message-input");
   const admission = await failNextAdmission(page);
   try {
@@ -475,9 +484,11 @@ test("DM committed publish failure keeps the queued reply and explicit Retry del
     },
     { root, pubkey: TEST_IDENTITIES.bob.pubkey },
   );
-  const main = page
-    .getByTestId("message-composer")
-    .filter({ has: page.getByTestId("send-to-thread") });
+  const main = page.getByTestId("message-composer").filter({
+    has: page.locator(
+      '[data-testid="send-to-thread"]:not([data-thread-routing-head])',
+    ),
+  });
   const editor = main.getByTestId("message-input");
   await editor.fill("Committed DM reply remains queued");
   await main.getByTestId("send-to-thread").click();
