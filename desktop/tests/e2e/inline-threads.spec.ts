@@ -879,11 +879,29 @@ test("inline replies, scoped sends, saved expansion and side panel coexist", asy
       .getByRole("article", { name: "Queued message" })
       .filter({ hasText: "Inline reply stays with the release plan" }),
   ).toHaveCount(0);
-  await expect(
-    inline(root.id)
-      .getByTestId("message-row")
-      .filter({ hasText: "Inline reply stays with the release plan" }),
-  ).toHaveCount(1);
+  const acceptedIds = () =>
+    page.evaluate(() =>
+      (window.__BUZZ_E2E_COMMAND_PAYLOADS__ ?? [])
+        .filter((call) => call.command === "publish_queued_message")
+        .map(
+          (call) =>
+            (call.payload as { event: { id: string; content: string } }).event,
+        )
+        .filter(
+          (event) =>
+            event.content === "Inline reply stays with the release plan",
+        )
+        .map((event) => event.id),
+    );
+  await expect.poll(acceptedIds).toHaveLength(1);
+  const [acceptedId] = await acceptedIds();
+  if (!acceptedId) throw new Error("Missing native accepted event identity");
+  expect(acceptedId).toMatch(/^[a-f0-9]{64}$/);
+  const acceptedRow = inline(root.id)
+    .getByTestId("message-row")
+    .filter({ hasText: "Inline reply stays with the release plan" });
+  await expect(acceptedRow).toHaveCount(1);
+  await expect(acceptedRow).toHaveAttribute("data-message-id", acceptedId);
   const childRow = inline(root.id).locator(`[data-message-id="${child.id}"]`);
   await childRow.scrollIntoViewIfNeeded();
   await expect
@@ -904,6 +922,7 @@ test("inline replies, scoped sends, saved expansion and side panel coexist", asy
             rect.width,
             rect.height,
             scroller.scrollTop,
+            Number(scroller.dataset.virtuaEstimateCallCount),
           ]);
         }
         return samples.every((sample) =>
