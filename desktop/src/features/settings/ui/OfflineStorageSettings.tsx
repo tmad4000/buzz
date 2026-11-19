@@ -17,7 +17,7 @@ export function OfflineStorageSettings() {
   const [enabled, setEnabled] = React.useState(offlineCacheEnabled);
   const [bytes, setBytes] = React.useState<number | null>(null);
   const [busy, setBusy] = React.useState(false);
-  const scope = async () => {
+  const scope = React.useCallback(async () => {
     if (!activeCommunity) throw new Error("Select a community first");
     const identity = await getIdentity();
     if (identity.locked || identity.lost)
@@ -26,7 +26,7 @@ export function OfflineStorageSettings() {
       pubkey: identity.pubkey,
       relayUrl: activeCommunity.relayUrl,
     };
-  };
+  }, [activeCommunity]);
   React.useEffect(() => {
     if (!enabled) {
       setBytes(null);
@@ -49,7 +49,7 @@ export function OfflineStorageSettings() {
     return () => {
       current = false;
     };
-  }, [activeCommunity, enabled]);
+  }, [scope, enabled]);
   const toggle = async (value: boolean) => {
     setBusy(true);
     try {

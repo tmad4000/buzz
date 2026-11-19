@@ -97,8 +97,18 @@ export function OfflineConversation({
     enabled: false,
   });
 
-  const live = React.useCallback(
-    () =>
+  const live = React.useCallback(() => {
+    // These render signals intentionally refresh the reader identity. Authority
+    // must still be reread from the current caches and connection at call time.
+    void [
+      snapshot.data,
+      liveFetch.data,
+      cachedThread,
+      threadRevision,
+      online,
+      relay,
+    ];
+    return (
       !enabled ||
       (navigator.onLine !== false &&
         relayClient.getConnectionState() === "connected" &&
@@ -112,19 +122,19 @@ export function OfflineConversation({
             (query) =>
               query.getObserversCount() > 0 &&
               !offlineThreadIsAuthoritative(client, query),
-          )),
-    [
-      enabled,
-      client,
-      channelId,
-      snapshot.data,
-      liveFetch.data,
-      cachedThread,
-      threadRevision,
-      online,
-      relay,
-    ],
-  );
+          ))
+    );
+  }, [
+    enabled,
+    client,
+    channelId,
+    snapshot.data,
+    liveFetch.data,
+    cachedThread,
+    threadRevision,
+    online,
+    relay,
+  ]);
   const cachedAt = useQuery<{ savedAt: number }>({
     queryKey: ["offline-cached-at", channelId],
     queryFn: () => ({ savedAt: 0 }),

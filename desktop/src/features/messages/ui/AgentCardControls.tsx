@@ -100,24 +100,24 @@ export function AgentCardControls({
   React.useSyncExternalStore(subscribeHolds, holdSnapshot);
   const hold = getHold(holdKey);
   const status = hold?.status ?? null;
-  const group = React.useRef<HTMLDivElement>(null);
+  const group = React.useRef<HTMLFieldSetElement>(null);
+  const cardSource = card?.source;
+  const cardState = card?.state;
+  const signerPubkey = identity?.pubkey;
+  const bodyRevision = message.bodyRevision;
   const invoker = React.useRef<HTMLButtonElement>(null);
   React.useEffect(() => {
-    if (enabled && card && identity?.pubkey && relayScope)
-      reconcileHold(
-        holdKey,
-        token,
-        card.source,
-        card.state,
-        message.bodyRevision,
-      );
+    if (enabled && cardSource && cardState && signerPubkey && relayScope)
+      reconcileHold(holdKey, token, cardSource, cardState, bodyRevision);
   }, [
     enabled,
     holdKey,
     token,
     relayScope,
-    message.bodyRevision?.eventId,
-    message.bodyRevision?.createdAt,
+    cardSource,
+    cardState,
+    signerPubkey,
+    bodyRevision,
   ]);
   if (
     !enabled ||
@@ -162,7 +162,12 @@ export function AgentCardControls({
     }
   };
   return (
-    <div ref={group} tabIndex={-1} role="group" aria-label="Agent controls">
+    <fieldset
+      ref={group}
+      tabIndex={-1}
+      aria-label="Agent controls"
+      className="m-0 min-w-0 border-0 p-0"
+    >
       <AlertDialog
         open={confirmation === key}
         onOpenChange={(open) => {
@@ -224,6 +229,6 @@ export function AgentCardControls({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </fieldset>
   );
 }

@@ -185,7 +185,8 @@ let migration: Promise<void> | undefined;
 /** Complete opt-in disposal, independent of account/signer availability. OFF is read-only. */
 export function prepareOfflineCache(): Promise<void> {
   if (!offlineCacheEnabled()) return Promise.resolve();
-  return (migration ??= (async () => {
+  if (migration) return migration;
+  migration = (async () => {
     const storage = window.localStorage;
     const keys = Array.from({ length: storage.length }, (_, index) =>
       storage.key(index),
@@ -203,7 +204,8 @@ export function prepareOfflineCache(): Promise<void> {
   })().catch((error) => {
     migration = undefined;
     throw error;
-  }));
+  });
+  return migration;
 }
 const generations = new Map<string, number>();
 const pendingWrites = new Map<string, symbol>();
@@ -211,7 +213,8 @@ let globalGeneration = 0;
 let logoutInProgress = false;
 let database: Promise<IDBDatabase> | undefined;
 function db(): Promise<IDBDatabase> {
-  return (database ??= new Promise((resolve, reject) => {
+  if (database) return database;
+  database = new Promise((resolve, reject) => {
     const request = indexedDB.open("buzz-offline-cache-v1", 3);
     let abandoned = false;
     request.onblocked = () => {
@@ -253,7 +256,8 @@ function db(): Promise<IDBDatabase> {
       database = undefined;
       reject(request.error);
     };
-  }));
+  });
+  return database;
 }
 /** Select evictions using the same ordering for every browser write. */
 export function offlineEvictions(rows: OfflineRecord[]): OfflineRecord[] {
@@ -264,7 +268,8 @@ export function offlineEvictions(rows: OfflineRecord[]): OfflineRecord[] {
   const evicted: OfflineRecord[] = [];
   let bytes = 0;
   for (const row of ordered) {
-    const count = (counts[row.kind] = (counts[row.kind] ?? 0) + 1);
+    const count = (counts[row.kind] ?? 0) + 1;
+    counts[row.kind] = count;
     if (
       count > offlineCaps[row.kind][0] ||
       bytes + row.bytes > OFFLINE_SCOPE_BYTES
