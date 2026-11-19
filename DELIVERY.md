@@ -61,3 +61,54 @@ Reviewer3857fd1d's NO-GO at oldd6d53c6d7 is retained: https://github.com/tmad400
 Also closes the concrete local-cache gap: the on-success edit patch mutates raw cached content before signed edit projection. It now marks localEditedContent; formatter treats this as unknown effective signer until an actual signed applied edit is available. Unknown edited TimelineMessage provenance also fails closed. This preserves owner edit permission and normal text; no signing identity, hook configuration or relay protocol changes.
 
 Final author checks for this follow-up:45model/unit+6DOM PASS; whole-desktop tsc exit0/no diagnostics; all bounded setsid+timeout+process-group cleanup. Exact source hashes recorded in validation/typecheck-receipt.json. Same3857 reviewer requested on the new source head. Quiet footer/count-neutral projection remainsOPEN; PR84 child remains frozen6ed4e6951 until parent disposition/restack.
+
+
+---
+
+# Preserved PR87 delivery receipt
+
+# Current producer contract follow-up
+
+Root explicitly requested comparison against075's current handoff, and a small separate PR for mismatches. Own worktree buzz-card-contract-20261118, branch agent-card-contract-20261118, stacked on reviewed PR67 head3a1e41ec74e6de8b261fbb7b4e6667333b8c0e8a. Neither PR67 nor frozen PR84 is modified.
+
+## Findings and change
+
+PR67 recognizes the exact normal four-line producer envelope and matching server/UUID URI, raw original bridge signer and current effective edit signer. Stale metadata remains explicit and nonbridge/missing effective signer falls back to ordinary text. Labels remain reported provenance, never proof of execution. Proposed tags are still an approved prospective compatibility path, not a claim that075 emits them.
+
+Two mismatches are corrected:
+- Equal-created_at edits on a bridge-authored original selected by input order. Retain the selected edit ID and choose lexicographically lowest ID at equal time, matching075. Higher timestamps still win. Nonbridge originals keep existing selection behavior; owner-authorized edits retain existing permissions and still cannot become trusted bridge reports.
+- A blank fifth line and oversized/control-character title/model/provider labels were accepted. Require the actual optional metadata grammar and producer label bounds160/80/40.
+
+PR67's top-level project/control forms deliberately remain ordinary text. PR84 supplies that separately documented compatibility parsing and Stop/Continue affordances. This follow-up does not reopen those paths or infer control authority from text. The bridge remains authoritative for role, private membership, generation and exact current turn. No wire generation or special card kind/tag exists in the live producer. Footer/count-neutral remains separate.
+
+## Evidence
+
+Read and hashed /home/dev/code/buzz-agent-reply-ux-contract-20261118:
+- CONTRACT.md 4dcfa406d0f295b75274c475b5b6bd607047eaa5c4c3274cfd2b2b4993bf6816
+- fixture.json 214c4d3b9ab23c7e7c4f05a5ff2cf34ccd1a73d4dced8bf95a8acdc955cd81e2
+- source-evidence.json ed27cb1463a2292ad9275e99c6148c8956658978ef53b5a304b3720782b95fbc
+- HANDOFF.json c140a94de926e5496cd87f7b8056d2c44ed240e8986a13d1d56a2219e30ee8c9
+
+Producer manifest pinned b74a4cc86f5da1d8c7dde14af81be6e4384796841079fbaf65fc379d7c81cd2e. Fixture copied unchanged as bridgeStatusCard.contract-fixture.json; synthetic UNSIGNED, no signature/readback proof. Tests exercise production formatter/parser, not relay signature validation.
+
+## Checks and delivery
+
+Nine focused model tests PASS: producer fixture original/stale body, equal-time tie both input orders, newer revision, deleted edit reversion, malformed label/blank line rejection and existing owner-edit provenance regressions. Log validation/contract-model.log. Whole-desktop tsc --noEmit PASS (exit0, no diagnostics); receipt validation/contract-typecheck.log. Runs use validation/run-bounded.py (setsid, timeout, process-group SIGKILL cleanup). No new dependencies or listener/native changes. No real Buzz post/control, browser, heavy build or deployment.
+
+Owner445 notified of additive formatter change. Separate draft PR and independent Sol review requested via root. Keep source-only/draft; no release acceptance claim.
+
+## Independent P2 label-parity correction
+
+Independent PR87 review at16dd2c440: NO-GO P2, preserved at https://github.com/tmad4000/buzz/pull/87#issuecomment-6971566742 and /home/dev/agent-worktrees/buzz-pr87-review-20261118/REVIEW-SOL.md. Encoded UTF-16 bounds rejected real81-asterisk output and admitted U+0085. Tie ordering, unsigned fixture and signer regressions passed. This correction supersedes that label validator only; no current independent GO claimed.
+
+Decode only the producer's exact Markdown escape set, validate decoded code-point bounds160/80/40, and reject its Unicode category-C characters. Display decoded labels instead of backslash escapes. Preserve sanitization order: trim before truncation, allowing a trailing space at an exact truncation boundary; empty sanitized output can be genuine render() output. Header parsing accepts Unicode line/paragraph separators which the producer retains, while actual newline remains a body delimiter. Malformed escapes and unsanitized near misses stay plain text.
+
+The observed producer Python Unicode database is15.0.0, whereas localNode uses17.0. Pin producer category-C ranges in generated bridgeProducerUnicodeC.json, avoiding host/browser Unicode-version drift. The small stdlib-only generator is checked in and refuses a different Unicode version; no new dependency. Binary range lookup also rejects characters newly assigned by newer JS tables that the producer still sanitizes. Source/fixtures are synthetic public labels, not signatures or live event proof.
+
+Nine synthetic body cases generated by importing ONLY pure render()/label() from the read-only producer module are checked in as bridgeStatusCard.label-fixtures.json. No metadata resolution, network, relay writes or listener edits. Producer source hash and Unicode version are in that fixture. Cases cover81/160asterisks, astral limits, all escaped punctuation, Unicode sanitization, retained line/paragraph separators, empty sanitized labels, truncation whitespace and joiner replacement. Raw near misses use actual code points including U+0085, private-use, surrogate, format and unassigned/newer-Unicode characters.
+
+Applied already-tracked075 prospective proposal clarification while this follow-up is open: originEventId means ONLY the signed originating Jacob Nostr message ID, never a NeedsYou request UUID/revision/operation/receipt. Waiting/done/ack tagged classification requires explicit Root source; absent/listener/watchdog cannot classify those states. STATUS-CARD-TAGS.md labels this unimplemented classification-only proposal, not a producer approval/activation or authority for role/lifecycle/control/counters. Current live producer stays unchanged and untagged; legacy contract is complete. Structured footer/count-neutral/NeedsYou adapter remains DEFERRED.
+
+Final checks PASS:11 focused formatter/parser model tests,1 production compact-card DOM test,whole-desktop tsc --noEmit exit0/no diagnostics. Logs validation/label-parity-model.log,label-parity-dom.log,label-parity-typecheck.log and structured label-parity-receipt.json. All tests/typecheck and pure fixture/table generation bounded with setsid/timeouts/process-group cleanup. No heavy/native/browser jobs or real Buzz actions.
+
+Ready for same independent PR87 reviewer through root; keep draft/frozen after push. PR67, PR84 and PR88 untouched.
