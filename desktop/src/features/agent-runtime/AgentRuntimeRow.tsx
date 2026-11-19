@@ -9,7 +9,7 @@ export function AgentRuntimeHost({ pubkey }: { pubkey?: string }) {
   return data ? (
     <span
       data-runtime-route
-      className="min-w-0 max-w-[55%] rounded bg-muted px-1 text-[10px] leading-tight text-muted-foreground"
+      className="min-w-0 max-w-[55%] rounded bg-muted px-1 text-2xs leading-tight text-muted-foreground"
       title="Self-reported runtime host"
     >
       <span className="font-mono">{data.card.host.toUpperCase()}</span>
