@@ -7,7 +7,11 @@ import {
 } from "./openThreadPins";
 
 type Register = { pin: OpenThreadPin | null; rank: number };
-type Snapshot = { pins: OpenThreadPin[]; sessionOnly: boolean };
+type Snapshot = {
+  pins: OpenThreadPin[];
+  sessionOnly: boolean;
+  dismissedSuggestions: ReadonlySet<string>;
+};
 const owners = new Map<string, PinStore>();
 const MAX_REGISTERS = 1000;
 const MAX_STORAGE_KEYS = 10000;
@@ -18,16 +22,26 @@ const MAX_STORAGE_KEYS = 10000;
  */
 class PinStore {
   private readonly prefix: string;
+  private readonly dismissPrefix: string;
+  private storedDismissals = new Set<string>();
+  private durableKeys = new Set<string>();
+  private durableReady = false;
+  private readonly volatileDismissals = new Set<string>();
   private readonly key: string;
   private readonly listeners = new Set<() => void>();
   private readonly volatile = new Map<string, Register>();
-  private snapshot: Snapshot = { pins: [], sessionOnly: false };
+  private snapshot: Snapshot = {
+    pins: [],
+    sessionOnly: false,
+    dismissedSuggestions: new Set(),
+  };
   private registers = new Map<string, Register>();
   private signature = "";
   private capacityFailure = false;
   constructor(key: string) {
     this.key = key;
     this.prefix = `${key}:pin.v2:`;
+    this.dismissPrefix = `${key}:busyDismissed.v1:`;
     this.refresh();
   }
   getSnapshot = () => this.snapshot;
@@ -35,7 +49,8 @@ class PinStore {
     if (
       event.key === null ||
       event.key === this.key ||
-      event.key.startsWith(this.prefix)
+      event.key.startsWith(this.prefix) ||
+      event.key.startsWith(this.dismissPrefix)
     )
       this.refresh();
   };
@@ -59,13 +74,30 @@ class PinStore {
     parseOpenThreadPins(localStorage.getItem(this.key)).forEach((pin, rank) => {
       if (!pin.id.startsWith("optimistic-")) result.set(pin.id, { pin, rank });
     });
-    if (localStorage.length > MAX_STORAGE_KEYS)
+    const keyCount = localStorage.length;
+    if (keyCount > MAX_STORAGE_KEYS)
       throw new Error("Preference storage is too large");
-    let records = 0;
-    for (let index = 0; index < localStorage.length; index++) {
+    const durableKeys = new Set<string>();
+    const dismissed = new Set<string>();
+    // Allocation is capped at1000; bounded reads still preserve all existing
+    // records if older clients or concurrent tabs have exceeded that budget.
+    for (let index = 0; index < keyCount; index++) {
       const name = localStorage.key(index);
-      if (!name?.startsWith(this.prefix)) continue;
-      if (++records > MAX_REGISTERS) throw new Error("Pin history is full");
+      if (!name) continue;
+      if (name.startsWith(this.dismissPrefix)) {
+        durableKeys.add(name);
+        const id = decodeURIComponent(name.slice(this.dismissPrefix.length));
+        if (
+          id &&
+          id.length <= 128 &&
+          !id.startsWith("optimistic-") &&
+          localStorage.getItem(name) === "true"
+        )
+          dismissed.add(id);
+        continue;
+      }
+      if (!name.startsWith(this.prefix)) continue;
+      durableKeys.add(name);
       const id = decodeURIComponent(name.slice(this.prefix.length));
       try {
         const value = JSON.parse(localStorage.getItem(name) ?? "null");
@@ -85,13 +117,20 @@ class PinStore {
         /* Invalid preference records do not become references. */
       }
     }
+    this.durableKeys = durableKeys;
+    this.storedDismissals = dismissed;
     return result;
   }
   private refresh = () => {
-    let sessionOnly = this.volatile.size > 0 || this.capacityFailure;
+    let sessionOnly =
+      this.volatile.size > 0 ||
+      this.volatileDismissals.size > 0 ||
+      this.capacityFailure;
     try {
       this.registers = this.read();
+      this.durableReady = true;
     } catch {
+      this.durableReady = false;
       sessionOnly = true;
     }
     for (const [id, record] of this.volatile) this.registers.set(id, record);
@@ -102,20 +141,30 @@ class PinStore {
       )
       .sort((a, b) => a.rank - b.rank || a.pin.id.localeCompare(b.pin.id))
       .map((record) => record.pin);
-    const signature = JSON.stringify([pins, sessionOnly]);
+    const dismissedSuggestions = new Set([
+      ...this.storedDismissals,
+      ...this.volatileDismissals,
+    ]);
+    const signature = JSON.stringify([
+      pins,
+      sessionOnly,
+      [...dismissedSuggestions].sort(),
+    ]);
     if (signature === this.signature) return;
     this.signature = signature;
-    this.snapshot = { pins, sessionOnly };
+    this.snapshot = { pins, sessionOnly, dismissedSuggestions };
     for (const listener of this.listeners) listener();
   };
   private write(id: string, record: Register) {
     try {
-      if (!this.registers.has(id) && this.registers.size >= MAX_REGISTERS)
-        throw new Error("Pin history is full");
-      localStorage.setItem(
-        `${this.prefix}${encodeURIComponent(id)}`,
-        JSON.stringify(record),
-      );
+      const key = `${this.prefix}${encodeURIComponent(id)}`;
+      if (
+        !this.durableReady ||
+        (!this.durableKeys.has(key) && this.durableKeys.size >= MAX_REGISTERS)
+      )
+        throw new Error("Pin history is full or unavailable");
+      // Volatile and v1-seeded identities are not allocated durable slots.
+      localStorage.setItem(key, JSON.stringify(record));
       this.volatile.delete(id);
     } catch {
       if (this.volatile.has(id) || this.volatile.size < MAX_REGISTERS) {
@@ -155,7 +204,31 @@ class PinStore {
   };
   remove = (id: string) => {
     this.refresh();
-    this.write(id, { pin: null, rank: this.registers.get(id)?.rank ?? 0 });
+    this.write(id, {
+      pin: null,
+      rank: this.registers.get(id)?.rank ?? 0,
+    });
+  };
+  dismissSuggestion = (id: string) => {
+    if (!id || id.length > 128 || id.startsWith("optimistic-")) return;
+    this.refresh();
+    try {
+      const key = `${this.dismissPrefix}${encodeURIComponent(id)}`;
+      if (
+        !this.durableReady ||
+        (!this.durableKeys.has(key) && this.durableKeys.size >= MAX_REGISTERS)
+      )
+        throw new Error("Pin preferences are full or unavailable");
+      // Separate from pin membership so a concurrent tab's pin cannot be undone
+      // by dismissal (and a pin/remove write cannot forget a dismissal).
+      localStorage.setItem(key, "true");
+      this.volatileDismissals.delete(id);
+    } catch {
+      if (this.volatileDismissals.size < MAX_REGISTERS)
+        this.volatileDismissals.add(id);
+      else this.capacityFailure = true;
+    }
+    this.refresh();
   };
 }
 
@@ -173,5 +246,10 @@ export function useOpenThreadPins(key: string) {
     store.getSnapshot,
     store.getSnapshot,
   );
-  return { ...snapshot, addPin: store.add, removePin: store.remove };
+  return {
+    ...snapshot,
+    addPin: store.add,
+    removePin: store.remove,
+    dismissSuggestion: store.dismissSuggestion,
+  };
 }

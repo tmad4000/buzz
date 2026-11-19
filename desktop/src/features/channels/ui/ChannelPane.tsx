@@ -883,6 +883,7 @@ export const ChannelPane = React.memo(function ChannelPane({
                     <OpenThreadsBar
                       key={barKey}
                       storageKey={barKey}
+                      threadSummaries={threadSummaries}
                       entries={mainTimelineEntries}
                       currentThread={threadHeadMessage}
                       onOpen={onOpenThread}
