@@ -230,6 +230,8 @@ test("reviewer P1 reproduction: latest owner-signed Done body never inherits the
   const format = (events) =>
     formatTimelineMessages(events, null, undefined, null, profiles)[0];
   const ownerEdited = format([original, edit]);
+  assert.deepEqual(format([original]).bodyRevision,{eventId:original.id,createdAt:original.created_at});
+  assert.deepEqual(ownerEdited.bodyRevision,{eventId:edit.id,createdAt:edit.created_at});
   assert.equal(ownerEdited.signerPubkey, bridge);
   assert.equal(
     ownerEdited.body,
@@ -274,6 +276,8 @@ test("reviewer P1 reproduction: latest owner-signed Done body never inherits the
     content: doneBody,
     localEditedContent: true,
   };
+  assert.equal(format([localPatch]).bodyRevision,undefined);
+  assert.deepEqual(format([localPatch,bridgeEdit]).bodyRevision,{eventId:bridgeEdit.id,createdAt:bridgeEdit.created_at});
   assert.equal(
     parseBridgeStatusCard(format([localPatch])),
     null,
