@@ -1,6 +1,8 @@
 import { ChevronDown } from "lucide-react";
 
+import { HOME_FEED_LIMIT } from "@/features/home/hooks";
 import type { InboxFilter } from "@/features/home/lib/inbox";
+import type { InboxFilterCounts } from "@/features/home/lib/inboxViewHelpers";
 import { cn } from "@/shared/lib/cn";
 import {
   DropdownMenu,
@@ -10,6 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 
 const INBOX_FILTER_OPTIONS: Array<{
   label: string;
@@ -30,6 +33,7 @@ const TRIGGER_CLASS =
 
 type InboxFilterMenuProps = {
   activeDraftCount: number;
+  countsByFilter: InboxFilterCounts;
   dueReminderCount: number;
   filter: InboxFilter;
   onFilterChange: (value: InboxFilter) => void;
@@ -38,6 +42,7 @@ type InboxFilterMenuProps = {
 
 export function InboxFilterMenu({
   activeDraftCount,
+  countsByFilter,
   dueReminderCount,
   filter,
   onFilterChange,
@@ -55,51 +60,68 @@ export function InboxFilterMenu({
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          aria-label={`Filter inbox: ${activeFilter?.label ?? "All"}${statusLabel ? `. ${statusLabel}` : ""}`}
-          className={cn(TRIGGER_CLASS)}
-          data-testid="inbox-filter-trigger"
-          type="button"
-        >
-          <span>{activeFilter?.label ?? "All"}</span>
-          <ChevronDown className="text-muted-foreground" />
-        </button>
-      </DropdownMenuTrigger>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <DropdownMenuTrigger asChild>
+            <button
+              aria-label={`Filter inbox: ${activeFilter?.label ?? "All"}${statusLabel ? `. ${statusLabel}` : ""}`}
+              className={cn(TRIGGER_CLASS)}
+              data-testid="inbox-filter-trigger"
+              type="button"
+            >
+              <span>{activeFilter?.label ?? "All"}</span>
+              <ChevronDown className="text-muted-foreground" />
+            </button>
+          </DropdownMenuTrigger>
+        </TooltipTrigger>
+        <TooltipContent>
+          Counts cover the {HOME_FEED_LIMIT} most recent items per feed bucket
+        </TooltipContent>
+      </Tooltip>
       <DropdownMenuContent align="start" className="w-52">
         <DropdownMenuRadioGroup
           onValueChange={(value) => onFilterChange(value as InboxFilter)}
           value={filter}
         >
-          {INBOX_FILTER_OPTIONS.map((option) => (
-            <div key={option.value}>
-              {option.value === "reminders" ? (
-                <DropdownMenuSeparator className="my-2 bg-border/60" />
-              ) : null}
-              <DropdownMenuRadioItem value={option.value}>
-                <span className="flex flex-1 items-center gap-2">
-                  <span>{option.label}</span>
-                  <span className="ml-auto flex items-center gap-1.5">
-                    {option.value === "reminders" && reminderCount > 0 ? (
-                      <span
-                        className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-2xs font-semibold leading-none text-primary-foreground"
-                        data-testid="inbox-reminder-badge-option"
-                      >
-                        {reminderCount}
-                      </span>
-                    ) : option.value === "drafts" && activeDraftCount > 0 ? (
-                      <span
-                        className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-2xs font-semibold leading-none text-primary-foreground"
-                        data-testid="inbox-draft-badge-option"
-                      >
-                        {activeDraftCount}
-                      </span>
-                    ) : null}
+          {INBOX_FILTER_OPTIONS.map((option) => {
+            const count = countsByFilter[option.value];
+            const showCount =
+              count && (count !== "0" || filter === option.value);
+
+            return (
+              <div key={option.value}>
+                {option.value === "reminders" ? (
+                  <DropdownMenuSeparator className="my-2 bg-border/60" />
+                ) : null}
+                <DropdownMenuRadioItem value={option.value}>
+                  <span className="flex flex-1 items-center gap-2">
+                    <span>{option.label}</span>
+                    <span className="ml-auto flex items-center gap-1.5">
+                      {option.value === "reminders" && reminderCount > 0 ? (
+                        <span
+                          className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-2xs font-semibold leading-none text-primary-foreground"
+                          data-testid="inbox-reminder-badge-option"
+                        >
+                          {reminderCount}
+                        </span>
+                      ) : option.value === "drafts" && activeDraftCount > 0 ? (
+                        <span
+                          className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-2xs font-semibold leading-none text-primary-foreground"
+                          data-testid="inbox-draft-badge-option"
+                        >
+                          {activeDraftCount}
+                        </span>
+                      ) : showCount ? (
+                        <span className="text-xs tabular-nums text-muted-foreground">
+                          {count}
+                        </span>
+                      ) : null}
+                    </span>
                   </span>
-                </span>
-              </DropdownMenuRadioItem>
-            </div>
-          ))}
+                </DropdownMenuRadioItem>
+              </div>
+            );
+          })}
         </DropdownMenuRadioGroup>
       </DropdownMenuContent>
     </DropdownMenu>

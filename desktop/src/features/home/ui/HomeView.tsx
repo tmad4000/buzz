@@ -7,8 +7,10 @@ import { useKnownAgentPubkeys } from "@/features/agents/useKnownAgentPubkeys";
 import { useChannelsQuery } from "@/features/channels/hooks";
 import { RightAuxiliaryPane } from "@/features/channels/ui/RightAuxiliaryPane";
 import { ChannelManagementSheet } from "@/features/channels/ui/ChannelManagementSheet";
+import { HOME_FEED_LIMIT } from "@/features/home/hooks";
 import {
   type InboxFilter,
+  type InboxItem,
   type InboxReply,
   buildInboxItems,
   findInboxItemByEventId,
@@ -19,8 +21,8 @@ import { useInboxSelectionAnchor } from "@/features/home/useInboxSelectionAnchor
 import { useInboxEditMessage } from "@/features/home/useInboxEditMessage";
 import { useOwnedAgentPubkeys } from "@/features/home/useOwnedAgentPubkeys";
 import {
+  buildInboxFilterResults,
   filterInboxItems,
-  matchesInboxFilter,
 } from "@/features/home/lib/inboxViewHelpers";
 import { resolveInboxFilterSelection } from "@/features/home/lib/inboxSelection";
 import { useHomeInboxReadState } from "@/features/home/useHomeInboxReadState";
@@ -84,6 +86,7 @@ const INBOX_SEARCH_KEYS = [
 ] as const;
 
 const INBOX_UNREAD_ONLY_STORAGE_KEY = "buzz.desktop.inbox-unread-only";
+const EMPTY_INBOX_ITEMS: InboxItem[] = [];
 
 type HomeViewProps = {
   feed?: HomeFeedResponse;
@@ -439,22 +442,27 @@ export function HomeView({
   const selectedConversationId =
     selectedItemFromAll?.conversationId ?? latchedConversationId;
 
-  const filteredItems = React.useMemo(() => {
-    return inboxItems.filter(
-      (item) =>
-        matchesInboxFilter(item, filter, ownedAgentPubkeys) &&
-        (!unreadOnly ||
-          !effectiveDoneSet.has(item.id) ||
-          item.conversationId === selectedConversationId),
-    );
-  }, [
-    effectiveDoneSet,
-    filter,
-    inboxItems,
-    ownedAgentPubkeys,
-    selectedConversationId,
-    unreadOnly,
-  ]);
+  const { rowsByFilter, countsByFilter } = React.useMemo(
+    () =>
+      buildInboxFilterResults({
+        items: inboxItems,
+        feed: feed?.feed,
+        limit: HOME_FEED_LIMIT,
+        ownedAgentPubkeys,
+        unreadOnly,
+        effectiveDoneSet,
+        selectedConversationId,
+      }),
+    [
+      effectiveDoneSet,
+      feed?.feed,
+      inboxItems,
+      ownedAgentPubkeys,
+      selectedConversationId,
+      unreadOnly,
+    ],
+  );
+  const filteredItems = rowsByFilter[filter] ?? EMPTY_INBOX_ITEMS;
   // A filter change may only retain detail for a conversation that remains
   // visible. The filter handler selects the next valid row in the same update,
   // so the detail pane never renders a stale conversation between states.
@@ -555,13 +563,7 @@ export function HomeView({
 
   const handleFilterChange = React.useCallback(
     (nextFilter: InboxFilter) => {
-      const nextItems = inboxItems.filter(
-        (item) =>
-          matchesInboxFilter(item, nextFilter, ownedAgentPubkeys) &&
-          (!unreadOnly ||
-            !effectiveDoneSet.has(item.id) ||
-            item.conversationId === selectedConversationId),
-      );
+      const nextItems = rowsByFilter[nextFilter] ?? EMPTY_INBOX_ITEMS;
       const selection = resolveInboxFilterSelection({
         isNarrow: isNarrowHomeViewport,
         items: nextItems,
@@ -590,14 +592,11 @@ export function HomeView({
     },
     [
       applyInboxSearchPatch,
-      effectiveDoneSet,
-      inboxItems,
       isNarrowHomeViewport,
-      ownedAgentPubkeys,
+      rowsByFilter,
       selectedConversationId,
       setSelectedDraftKey,
       setSelectedReminderId,
-      unreadOnly,
     ],
   );
 
@@ -715,6 +714,7 @@ export function HomeView({
               activeReminderEventIds={activeReminderEventIds}
               agentPubkeys={inboxAgentPubkeys}
               activeDraftCount={activeDraftCount}
+              countsByFilter={countsByFilter}
               draftItems={draftItems}
               doneSet={effectiveDoneSet}
               dueReminderCount={dueReminderCount}

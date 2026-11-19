@@ -4,6 +4,7 @@ import test from "node:test";
 import { formatTimelineMessages } from "../../messages/lib/formatTimelineMessages.ts";
 import { getConfigNudgeAuthorPubkey } from "../../messages/ui/configNudgeAuthPubkey.ts";
 import {
+  buildInboxFilterResults,
   filterInboxItems,
   getContextMessageDepth,
   getReactionTargetId,
@@ -14,6 +15,123 @@ import {
   toInboxContextMessage,
   toTimelineMessage,
 } from "./inboxViewHelpers.ts";
+
+const owner = "a".repeat(64);
+const groupedMention = {
+  id: "latest",
+  conversationId: "root",
+  categories: ["mention", "needs_action"],
+  item: { id: "latest", kind: 9, pubkey: owner, tags: [] },
+  groupItems: [
+    {
+      id: "root",
+      kind: 1618,
+      tags: [["a", `30617:${owner}:buzz`]],
+    },
+    { id: "reply", kind: 9, tags: [["e", "root", "", "reply"]] },
+  ],
+};
+const readMention = {
+  id: "read",
+  conversationId: "other",
+  categories: ["mention"],
+  item: { id: "read", kind: 9, pubkey: "b".repeat(64), tags: [] },
+  groupItems: [],
+};
+const countInputs = {
+  items: [
+    groupedMention,
+    readMention,
+    { ...readMention, id: "ambient", categories: ["activity"] },
+  ],
+  limit: 50,
+  ownedAgentPubkeys: new Set([owner]),
+  effectiveDoneSet: new Set(["latest", "read"]),
+  unreadOnly: false,
+  selectedConversationId: "root",
+};
+
+test("Inbox counts overlapping filters independently on grouped visible rows", () => {
+  const { countsByFilter, rowsByFilter } = buildInboxFilterResults(countInputs);
+
+  assert.deepEqual(countsByFilter, {
+    all: "2",
+    project: "1",
+    mention: "2",
+    thread: "1",
+    needs_action: "1",
+    agent_activity: "1",
+  });
+  assert.deepEqual(rowsByFilter.mention, [groupedMention, readMention]);
+  assert.deepEqual(rowsByFilter.thread, [groupedMention]);
+});
+
+test("Inbox unread counts retain the selected read conversation", () => {
+  const inputs = { ...countInputs, unreadOnly: true };
+  const selected = buildInboxFilterResults(inputs);
+  assert.deepEqual(selected.rowsByFilter.mention, [groupedMention]);
+  assert.equal(selected.countsByFilter.mention, "1");
+
+  const deselected = buildInboxFilterResults({
+    ...inputs,
+    selectedConversationId: null,
+  });
+  assert.deepEqual(deselected.rowsByFilter.mention, []);
+  assert.equal(deselected.countsByFilter.mention, "0");
+});
+
+test("Inbox plus suffix tracks raw bucket saturation before grouping or unread filtering", () => {
+  const emptyFeed = {
+    mentions: [],
+    needsAction: [],
+    activity: [],
+    agentActivity: [],
+  };
+  const fullBucket = Array(50).fill(groupedMention.item);
+  const inputs = { ...countInputs, unreadOnly: true };
+  const cases = [
+    ["mentions", "1+", "1"],
+    ["needsAction", "1", "1+"],
+    ["activity", "1", "1"],
+    ["agentActivity", "1", "1"],
+  ];
+  for (const [bucket, mention, needsAction] of cases) {
+    const { countsByFilter } = buildInboxFilterResults({
+      ...inputs,
+      feed: { ...emptyFeed, [bucket]: fullBucket },
+    });
+    assert.deepEqual(
+      countsByFilter,
+      {
+        all: "1+",
+        project: "1+",
+        mention,
+        thread: "1+",
+        needs_action: needsAction,
+        agent_activity: "1+",
+      },
+      bucket,
+    );
+  }
+  const { countsByFilter } = buildInboxFilterResults({
+    ...inputs,
+    feed: { ...emptyFeed, mentions: fullBucket.slice(1) },
+  });
+  assert.equal(countsByFilter.mention, "1");
+  assert.equal(countsByFilter.all, "1");
+
+  const distinctMentions = Array.from({ length: 50 }, (_, index) => ({
+    ...readMention,
+    id: `mention-${index}`,
+    conversationId: `mention-${index}`,
+  }));
+  const saturated = buildInboxFilterResults({
+    ...inputs,
+    items: distinctMentions,
+    feed: { ...emptyFeed, mentions: fullBucket },
+  });
+  assert.equal(saturated.countsByFilter.mention, "50+");
+});
 
 test("Inbox uses the dedicated reminder list instead of feed reminder rows", () => {
   const message = { item: { kind: 9 } };

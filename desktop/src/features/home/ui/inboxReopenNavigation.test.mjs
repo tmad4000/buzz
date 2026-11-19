@@ -382,6 +382,7 @@ async function mountInbox(options = {}) {
       null,
       React.createElement(InboxListPane, {
         activeDraftCount: 0,
+        countsByFilter: {},
         draftItems: [],
         doneSet: new Set(),
         filter: "all",
