@@ -21,11 +21,13 @@ function load(name, mocks) {
     require: (s) =>
       s in mocks
         ? mocks[s]
-        : s === "@/features/agent-queue/AgentQueueView"
-          ? { AgentQueuePanel: () => null, AgentQueueRow: () => null }
-          : s === "./RuntimeRouteAge"
-            ? { RuntimeRouteAge: () => null }
-            : require(s),
+        : s === "@/features/agent-fleet/FleetStatusButton"
+          ? { FleetIndicatorPreference: () => null }
+          : s === "@/features/agent-queue/AgentQueueView"
+            ? { AgentQueuePanel: () => null, AgentQueueRow: () => null }
+            : s === "./RuntimeRouteAge"
+              ? { RuntimeRouteAge: () => null }
+              : require(s),
     Date,
   });
   return module.exports;

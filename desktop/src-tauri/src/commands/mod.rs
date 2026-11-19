@@ -1,3 +1,5 @@
+mod agent_fleet;
+pub use agent_fleet::decrypt_agent_fleet_event;
 mod agent_queue;
 pub use agent_queue::decrypt_agent_queue_event;
 pub mod admin;

@@ -420,8 +420,9 @@ export class RelayClient {
     onReady?: (readiness: LiveSubscriptionReadiness) => void,
     readinessTimeoutMs?: number,
     signal?: AbortSignal,
+    reconnectPolicy?: "original-filter",
   ) {
-    return this.subscribe(filter, onEvent, onReady, readinessTimeoutMs, signal);
+    return this.subscribe(filter, onEvent, onReady, readinessTimeoutMs, signal, undefined, reconnectPolicy);
   }
   /** Prioritize an interactive live consumer without changing its replay filter or pacing. */
   async subscribeInteractive(
@@ -622,6 +623,7 @@ export class RelayClient {
     readinessTimeoutMs = 250,
     signal?: AbortSignal,
     priority?: "interactive",
+    reconnectPolicy?: "original-filter",
   ) {
     const epoch = this.sessionEpoch;
     const sessionSignal = this.liveSessionAbort.signal;
@@ -639,6 +641,7 @@ export class RelayClient {
       mode: "live",
       filter,
       priority,
+      reconnectPolicy,
       onEvent,
       onRemoved,
     };

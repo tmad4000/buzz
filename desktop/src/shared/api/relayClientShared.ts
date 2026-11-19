@@ -79,6 +79,8 @@ type LiveSubscription = {
   resolveReady?: (readiness: LiveSubscriptionReadiness) => void;
   /** Release readiness/cancellation listeners when this entry is retired. */
   onRemoved?: () => void;
+  /** Opt-in replaceable snapshots replay their original narrow filter, never an untrusted event cursor. */
+  reconnectPolicy?: "original-filter";
   lastSeenCreatedAt?: number;
   /**
    * Lower bound of a reconnect backfill window that has not yet completed.

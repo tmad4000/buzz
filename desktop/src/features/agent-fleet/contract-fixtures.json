@@ -1,0 +1,988 @@
+{
+  "v": 1,
+  "syntheticUnsigned": true,
+  "effectsIssued": false,
+  "productionAuthenticationClaimed": false,
+  "classification": [
+    {
+      "name": "permission-beats-running",
+      "input": {
+        "status": "running",
+        "pendingPermissions": 1
+      },
+      "daemon": "needsPermission",
+      "wire": "needsPermission"
+    },
+    {
+      "name": "affirmative-attention-permission",
+      "input": {
+        "status": "running",
+        "requiresAttention": true,
+        "attentionReason": "permission"
+      },
+      "daemon": "needsPermission",
+      "wire": "needsPermission"
+    },
+    {
+      "name": "stale-permission-reason-does-not-win",
+      "input": {
+        "status": "running",
+        "requiresAttention": false,
+        "attentionReason": "permission"
+      },
+      "daemon": "running",
+      "wire": "running"
+    },
+    {
+      "name": "idle-current-error",
+      "input": {
+        "status": "idle",
+        "requiresAttention": true,
+        "attentionReason": "error"
+      },
+      "daemon": "blocked",
+      "wire": "blocked"
+    },
+    {
+      "name": "lifecycle-error",
+      "input": {
+        "status": "error"
+      },
+      "daemon": "blocked",
+      "wire": "blocked"
+    },
+    {
+      "name": "running-after-old-error",
+      "input": {
+        "status": "running",
+        "requiresAttention": true,
+        "attentionReason": "error"
+      },
+      "daemon": "running",
+      "wire": "running"
+    },
+    {
+      "name": "finished-attention-stays-idle",
+      "input": {
+        "status": "idle",
+        "requiresAttention": true,
+        "attentionReason": "finished"
+      },
+      "daemon": "idle",
+      "wire": "idle"
+    },
+    {
+      "name": "initializing-is-not-idle",
+      "input": {
+        "status": "initializing"
+      },
+      "daemon": "initializing",
+      "wire": "unknown"
+    },
+    {
+      "name": "future-status-unknown",
+      "input": {
+        "status": "future"
+      },
+      "daemon": "unknown",
+      "wire": "unknown"
+    },
+    {
+      "name": "stored-running-excluded",
+      "input": {
+        "status": "running",
+        "loaded": false
+      },
+      "daemon": null,
+      "wire": null
+    },
+    {
+      "name": "internal-excluded",
+      "input": {
+        "status": "running",
+        "internal": true
+      },
+      "daemon": null,
+      "wire": null
+    },
+    {
+      "name": "closed-excluded",
+      "input": {
+        "status": "closed"
+      },
+      "daemon": null,
+      "wire": null
+    },
+    {
+      "name": "unplaced-loaded-included",
+      "input": {
+        "status": "running",
+        "placed": false
+      },
+      "daemon": "running",
+      "wire": "running"
+    },
+    {
+      "name": "missing-permission-proof-running-is-unknown",
+      "input": {
+        "status": "running",
+        "pendingPermissions": null,
+        "sourceEvidenceQualified": false
+      },
+      "daemon": "unknown",
+      "wire": "unknown",
+      "explanation": "Current permission count/collection cannot be validated; false attention alone cannot exclude higher-precedence permission."
+    },
+    {
+      "name": "malformed-permission-proof-idle-is-unknown",
+      "input": {
+        "status": "idle",
+        "pendingPermissions": "invalid",
+        "sourceEvidenceQualified": false
+      },
+      "daemon": "unknown",
+      "wire": "unknown",
+      "explanation": "Malformed current priority proof must not become numeric0 or idle."
+    },
+    {
+      "name": "missing-attention-proof-cannot-prove-running",
+      "input": {
+        "status": "running",
+        "requiresAttention": null,
+        "attentionReason": null,
+        "sourceEvidenceQualified": false
+      },
+      "daemon": "unknown",
+      "wire": "unknown",
+      "explanation": "Without enough current priority evidence, running is not asserted by a missing-field fallback."
+    }
+  ],
+  "validPayloads": [
+    {
+      "name": "complete-root-running",
+      "payload": {
+        "v": 1,
+        "serverId": "srv_KIFHQ_zsBnI2",
+        "observedAt": 1795046400,
+        "verifiedAt": 1795046400,
+        "availability": "ok",
+        "coverage": {
+          "seen": 2,
+          "total": 2,
+          "complete": true
+        },
+        "gcp": {
+          "running": 1,
+          "idle": 1,
+          "blocked": 0,
+          "needsPermission": 0,
+          "unknown": 0
+        },
+        "root": {
+          "agentId": "d3caa262-cdcd-454d-9d42-0cd05ac69156",
+          "state": "running",
+          "queue": {
+            "availability": "unavailable",
+            "depth": null,
+            "observedAt": null,
+            "verifiedAt": null,
+            "sourceEventId": null
+          }
+        },
+        "otherHosts": {
+          "m4": "unknown",
+          "m5": "unknown"
+        }
+      }
+    },
+    {
+      "name": "partial-root-known-outside-counted-prefix",
+      "payload": {
+        "v": 1,
+        "serverId": "srv_KIFHQ_zsBnI2",
+        "observedAt": 1795046400,
+        "verifiedAt": 1795046400,
+        "availability": "partial",
+        "coverage": {
+          "seen": 1,
+          "total": null,
+          "complete": false
+        },
+        "gcp": {
+          "running": 0,
+          "idle": 1,
+          "blocked": 0,
+          "needsPermission": 0,
+          "unknown": 0
+        },
+        "root": {
+          "agentId": "d3caa262-cdcd-454d-9d42-0cd05ac69156",
+          "state": "running",
+          "queue": {
+            "availability": "unavailable",
+            "depth": null,
+            "observedAt": null,
+            "verifiedAt": null,
+            "sourceEventId": null
+          }
+        },
+        "otherHosts": {
+          "m4": "unknown",
+          "m5": "unknown"
+        }
+      }
+    },
+    {
+      "name": "failed-attempt-does-not-renew-old-success",
+      "payload": {
+        "v": 1,
+        "serverId": "srv_KIFHQ_zsBnI2",
+        "observedAt": 1795046580,
+        "verifiedAt": 1795046400,
+        "availability": "unavailable",
+        "coverage": {
+          "seen": 0,
+          "total": null,
+          "complete": false
+        },
+        "gcp": {
+          "running": null,
+          "idle": null,
+          "blocked": null,
+          "needsPermission": null,
+          "unknown": null
+        },
+        "root": {
+          "agentId": "d3caa262-cdcd-454d-9d42-0cd05ac69156",
+          "state": "unknown",
+          "queue": {
+            "availability": "unavailable",
+            "depth": null,
+            "observedAt": null,
+            "verifiedAt": null,
+            "sourceEventId": null
+          }
+        },
+        "otherHosts": {
+          "m4": "unknown",
+          "m5": "unknown"
+        }
+      }
+    },
+    {
+      "name": "fresh-fleet-queue-exactly120s",
+      "payload": {
+        "v": 1,
+        "serverId": "srv_KIFHQ_zsBnI2",
+        "observedAt": 1795046400,
+        "verifiedAt": 1795046400,
+        "availability": "ok",
+        "coverage": {
+          "seen": 2,
+          "total": 2,
+          "complete": true
+        },
+        "gcp": {
+          "running": 1,
+          "idle": 1,
+          "blocked": 0,
+          "needsPermission": 0,
+          "unknown": 0
+        },
+        "root": {
+          "agentId": "d3caa262-cdcd-454d-9d42-0cd05ac69156",
+          "state": "running",
+          "queue": {
+            "availability": "ok",
+            "depth": 3,
+            "observedAt": 1795046280,
+            "verifiedAt": 1795046280,
+            "sourceEventId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "otherHosts": {
+          "m4": "unknown",
+          "m5": "unknown"
+        }
+      }
+    },
+    {
+      "name": "fresh-fleet-queue121s-old-preserves-clock-not-depth",
+      "payload": {
+        "v": 1,
+        "serverId": "srv_KIFHQ_zsBnI2",
+        "observedAt": 1795046400,
+        "verifiedAt": 1795046400,
+        "availability": "ok",
+        "coverage": {
+          "seen": 2,
+          "total": 2,
+          "complete": true
+        },
+        "gcp": {
+          "running": 1,
+          "idle": 1,
+          "blocked": 0,
+          "needsPermission": 0,
+          "unknown": 0
+        },
+        "root": {
+          "agentId": "d3caa262-cdcd-454d-9d42-0cd05ac69156",
+          "state": "running",
+          "queue": {
+            "availability": "unavailable",
+            "depth": null,
+            "observedAt": 1795046279,
+            "verifiedAt": 1795046279,
+            "sourceEventId": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          }
+        },
+        "otherHosts": {
+          "m4": "unknown",
+          "m5": "unknown"
+        }
+      }
+    },
+    {
+      "name": "exact-source-never-verified-queue",
+      "payload": {
+        "v": 1,
+        "serverId": "srv_KIFHQ_zsBnI2",
+        "observedAt": 1795046400,
+        "verifiedAt": 1795046400,
+        "availability": "ok",
+        "coverage": {
+          "seen": 2,
+          "total": 2,
+          "complete": true
+        },
+        "gcp": {
+          "running": 1,
+          "idle": 1,
+          "blocked": 0,
+          "needsPermission": 0,
+          "unknown": 0
+        },
+        "root": {
+          "agentId": "d3caa262-cdcd-454d-9d42-0cd05ac69156",
+          "state": "running",
+          "queue": {
+            "availability": "unavailable",
+            "depth": null,
+            "observedAt": 1795046398,
+            "verifiedAt": null,
+            "sourceEventId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+          }
+        },
+        "otherHosts": {
+          "m4": "unknown",
+          "m5": "unknown"
+        }
+      }
+    },
+    {
+      "name": "unknown-prevents-all-idle",
+      "payload": {
+        "v": 1,
+        "serverId": "srv_KIFHQ_zsBnI2",
+        "observedAt": 1795046400,
+        "verifiedAt": 1795046400,
+        "availability": "ok",
+        "coverage": {
+          "seen": 2,
+          "total": 2,
+          "complete": true
+        },
+        "gcp": {
+          "running": 0,
+          "idle": 1,
+          "blocked": 0,
+          "needsPermission": 0,
+          "unknown": 1
+        },
+        "root": {
+          "agentId": "d3caa262-cdcd-454d-9d42-0cd05ac69156",
+          "state": "unknown",
+          "queue": {
+            "availability": "unavailable",
+            "depth": null,
+            "observedAt": null,
+            "verifiedAt": null,
+            "sourceEventId": null
+          }
+        },
+        "otherHosts": {
+          "m4": "unknown",
+          "m5": "unknown"
+        }
+      }
+    },
+    {
+      "name": "explicit-qualified-complete-zero-root-absent",
+      "payload": {
+        "v": 1,
+        "serverId": "srv_KIFHQ_zsBnI2",
+        "observedAt": 1795046400,
+        "verifiedAt": 1795046400,
+        "availability": "ok",
+        "coverage": {
+          "seen": 0,
+          "total": 0,
+          "complete": true
+        },
+        "gcp": {
+          "running": 0,
+          "idle": 0,
+          "blocked": 0,
+          "needsPermission": 0,
+          "unknown": 0
+        },
+        "root": {
+          "agentId": "d3caa262-cdcd-454d-9d42-0cd05ac69156",
+          "state": "unknown",
+          "queue": {
+            "availability": "unavailable",
+            "depth": null,
+            "observedAt": null,
+            "verifiedAt": null,
+            "sourceEventId": null
+          }
+        },
+        "otherHosts": {
+          "m4": "unknown",
+          "m5": "unknown"
+        }
+      }
+    },
+    {
+      "name": "approved-9999-prefix-root-running-outside-prefix",
+      "payload": {
+        "v": 1,
+        "serverId": "srv_KIFHQ_zsBnI2",
+        "observedAt": 1795046400,
+        "verifiedAt": 1795046400,
+        "availability": "partial",
+        "coverage": {
+          "seen": 9999,
+          "total": null,
+          "complete": false
+        },
+        "gcp": {
+          "running": 0,
+          "idle": 9999,
+          "blocked": 0,
+          "needsPermission": 0,
+          "unknown": 0
+        },
+        "root": {
+          "agentId": "d3caa262-cdcd-454d-9d42-0cd05ac69156",
+          "state": "running",
+          "queue": {
+            "availability": "unavailable",
+            "depth": null,
+            "observedAt": null,
+            "verifiedAt": null,
+            "sourceEventId": null
+          }
+        },
+        "otherHosts": {
+          "m4": "unknown",
+          "m5": "unknown"
+        }
+      }
+    }
+  ],
+  "invalidPayloads": [
+    {
+      "name": "unknown-field",
+      "payload": {
+        "v": 1,
+        "serverId": "srv_KIFHQ_zsBnI2",
+        "observedAt": 1795046400,
+        "verifiedAt": 1795046400,
+        "availability": "ok",
+        "coverage": {
+          "seen": 2,
+          "total": 2,
+          "complete": true
+        },
+        "gcp": {
+          "running": 1,
+          "idle": 1,
+          "blocked": 0,
+          "needsPermission": 0,
+          "unknown": 0
+        },
+        "root": {
+          "agentId": "d3caa262-cdcd-454d-9d42-0cd05ac69156",
+          "state": "running",
+          "queue": {
+            "availability": "unavailable",
+            "depth": null,
+            "observedAt": null,
+            "verifiedAt": null,
+            "sourceEventId": null
+          }
+        },
+        "otherHosts": {
+          "m4": "unknown",
+          "m5": "unknown"
+        },
+        "extra": "reject"
+      },
+      "valid": false
+    },
+    {
+      "name": "sum-mismatch",
+      "payload": {
+        "v": 1,
+        "serverId": "srv_KIFHQ_zsBnI2",
+        "observedAt": 1795046400,
+        "verifiedAt": 1795046400,
+        "availability": "ok",
+        "coverage": {
+          "seen": 2,
+          "total": 2,
+          "complete": true
+        },
+        "gcp": {
+          "running": 2,
+          "idle": 1,
+          "blocked": 0,
+          "needsPermission": 0,
+          "unknown": 0
+        },
+        "root": {
+          "agentId": "d3caa262-cdcd-454d-9d42-0cd05ac69156",
+          "state": "running",
+          "queue": {
+            "availability": "unavailable",
+            "depth": null,
+            "observedAt": null,
+            "verifiedAt": null,
+            "sourceEventId": null
+          }
+        },
+        "otherHosts": {
+          "m4": "unknown",
+          "m5": "unknown"
+        }
+      },
+      "valid": false
+    },
+    {
+      "name": "partial-cannot-claim-total",
+      "payload": {
+        "v": 1,
+        "serverId": "srv_KIFHQ_zsBnI2",
+        "observedAt": 1795046400,
+        "verifiedAt": 1795046400,
+        "availability": "partial",
+        "coverage": {
+          "seen": 2,
+          "total": 2,
+          "complete": true
+        },
+        "gcp": {
+          "running": 1,
+          "idle": 1,
+          "blocked": 0,
+          "needsPermission": 0,
+          "unknown": 0
+        },
+        "root": {
+          "agentId": "d3caa262-cdcd-454d-9d42-0cd05ac69156",
+          "state": "running",
+          "queue": {
+            "availability": "unavailable",
+            "depth": null,
+            "observedAt": null,
+            "verifiedAt": null,
+            "sourceEventId": null
+          }
+        },
+        "otherHosts": {
+          "m4": "unknown",
+          "m5": "unknown"
+        }
+      },
+      "valid": false
+    },
+    {
+      "name": "unavailable-cannot-retain-count",
+      "payload": {
+        "v": 1,
+        "serverId": "srv_KIFHQ_zsBnI2",
+        "observedAt": 1795046400,
+        "verifiedAt": 1795046400,
+        "availability": "unavailable",
+        "coverage": {
+          "seen": 2,
+          "total": 2,
+          "complete": true
+        },
+        "gcp": {
+          "running": 1,
+          "idle": 1,
+          "blocked": 0,
+          "needsPermission": 0,
+          "unknown": 0
+        },
+        "root": {
+          "agentId": "d3caa262-cdcd-454d-9d42-0cd05ac69156",
+          "state": "running",
+          "queue": {
+            "availability": "unavailable",
+            "depth": null,
+            "observedAt": null,
+            "verifiedAt": null,
+            "sourceEventId": null
+          }
+        },
+        "otherHosts": {
+          "m4": "unknown",
+          "m5": "unknown"
+        }
+      },
+      "valid": false
+    },
+    {
+      "name": "boolean-is-not-integer",
+      "payload": {
+        "v": 1,
+        "serverId": "srv_KIFHQ_zsBnI2",
+        "observedAt": 1795046400,
+        "verifiedAt": 1795046400,
+        "availability": "ok",
+        "coverage": {
+          "seen": 2,
+          "total": 2,
+          "complete": true
+        },
+        "gcp": {
+          "running": true,
+          "idle": 1,
+          "blocked": 0,
+          "needsPermission": 0,
+          "unknown": 0
+        },
+        "root": {
+          "agentId": "d3caa262-cdcd-454d-9d42-0cd05ac69156",
+          "state": "running",
+          "queue": {
+            "availability": "unavailable",
+            "depth": null,
+            "observedAt": null,
+            "verifiedAt": null,
+            "sourceEventId": null
+          }
+        },
+        "otherHosts": {
+          "m4": "unknown",
+          "m5": "unknown"
+        }
+      },
+      "valid": false
+    },
+    {
+      "name": "queue-source-required-for-clock",
+      "payload": {
+        "v": 1,
+        "serverId": "srv_KIFHQ_zsBnI2",
+        "observedAt": 1795046400,
+        "verifiedAt": 1795046400,
+        "availability": "ok",
+        "coverage": {
+          "seen": 2,
+          "total": 2,
+          "complete": true
+        },
+        "gcp": {
+          "running": 1,
+          "idle": 1,
+          "blocked": 0,
+          "needsPermission": 0,
+          "unknown": 0
+        },
+        "root": {
+          "agentId": "d3caa262-cdcd-454d-9d42-0cd05ac69156",
+          "state": "running",
+          "queue": {
+            "availability": "unavailable",
+            "depth": null,
+            "observedAt": 1795046400,
+            "verifiedAt": null,
+            "sourceEventId": null
+          }
+        },
+        "otherHosts": {
+          "m4": "unknown",
+          "m5": "unknown"
+        }
+      },
+      "valid": false
+    },
+    {
+      "name": "future-root-enum",
+      "payload": {
+        "v": 1,
+        "serverId": "srv_KIFHQ_zsBnI2",
+        "observedAt": 1795046400,
+        "verifiedAt": 1795046400,
+        "availability": "ok",
+        "coverage": {
+          "seen": 2,
+          "total": 2,
+          "complete": true
+        },
+        "gcp": {
+          "running": 1,
+          "idle": 1,
+          "blocked": 0,
+          "needsPermission": 0,
+          "unknown": 0
+        },
+        "root": {
+          "agentId": "d3caa262-cdcd-454d-9d42-0cd05ac69156",
+          "state": "initializing",
+          "queue": {
+            "availability": "unavailable",
+            "depth": null,
+            "observedAt": null,
+            "verifiedAt": null,
+            "sourceEventId": null
+          }
+        },
+        "otherHosts": {
+          "m4": "unknown",
+          "m5": "unknown"
+        }
+      },
+      "valid": false
+    },
+    {
+      "name": "future-field-does-not-extend-enum",
+      "payload": {
+        "v": 1,
+        "serverId": "srv_KIFHQ_zsBnI2",
+        "observedAt": 1795046400,
+        "verifiedAt": 1795046400,
+        "availability": "ok",
+        "coverage": {
+          "seen": 2,
+          "total": 2,
+          "complete": true
+        },
+        "gcp": {
+          "running": 1,
+          "idle": 1,
+          "blocked": 0,
+          "needsPermission": 0,
+          "unknown": 0,
+          "initializing": 0
+        },
+        "root": {
+          "agentId": "d3caa262-cdcd-454d-9d42-0cd05ac69156",
+          "state": "running",
+          "queue": {
+            "availability": "unavailable",
+            "depth": null,
+            "observedAt": null,
+            "verifiedAt": null,
+            "sourceEventId": null
+          }
+        },
+        "otherHosts": {
+          "m4": "unknown",
+          "m5": "unknown"
+        }
+      },
+      "valid": false
+    },
+    {
+      "name": "partial-prefix10000-exceeds-reserved-root-cap",
+      "payload": {
+        "v": 1,
+        "serverId": "srv_KIFHQ_zsBnI2",
+        "observedAt": 1795046400,
+        "verifiedAt": 1795046400,
+        "availability": "partial",
+        "coverage": {
+          "seen": 10000,
+          "total": null,
+          "complete": false
+        },
+        "gcp": {
+          "running": 0,
+          "idle": 10000,
+          "blocked": 0,
+          "needsPermission": 0,
+          "unknown": 0
+        },
+        "root": {
+          "agentId": "d3caa262-cdcd-454d-9d42-0cd05ac69156",
+          "state": "running",
+          "queue": {
+            "availability": "unavailable",
+            "depth": null,
+            "observedAt": null,
+            "verifiedAt": null,
+            "sourceEventId": null
+          }
+        },
+        "otherHosts": {
+          "m4": "unknown",
+          "m5": "unknown"
+        }
+      },
+      "valid": false
+    },
+    {
+      "name": "complete-root-running-without-running-count",
+      "payload": {
+        "v": 1,
+        "serverId": "srv_KIFHQ_zsBnI2",
+        "observedAt": 1795046400,
+        "verifiedAt": 1795046400,
+        "availability": "ok",
+        "coverage": {
+          "seen": 2,
+          "total": 2,
+          "complete": true
+        },
+        "gcp": {
+          "running": 0,
+          "idle": 2,
+          "blocked": 0,
+          "needsPermission": 0,
+          "unknown": 0
+        },
+        "root": {
+          "agentId": "d3caa262-cdcd-454d-9d42-0cd05ac69156",
+          "state": "running",
+          "queue": {
+            "availability": "unavailable",
+            "depth": null,
+            "observedAt": null,
+            "verifiedAt": null,
+            "sourceEventId": null
+          }
+        },
+        "otherHosts": {
+          "m4": "unknown",
+          "m5": "unknown"
+        }
+      },
+      "valid": false
+    },
+    {
+      "name": "queue-source-id-uppercase-rejected",
+      "payload": {
+        "v": 1,
+        "serverId": "srv_KIFHQ_zsBnI2",
+        "observedAt": 1795046400,
+        "verifiedAt": 1795046400,
+        "availability": "ok",
+        "coverage": {
+          "seen": 2,
+          "total": 2,
+          "complete": true
+        },
+        "gcp": {
+          "running": 1,
+          "idle": 1,
+          "blocked": 0,
+          "needsPermission": 0,
+          "unknown": 0
+        },
+        "root": {
+          "agentId": "d3caa262-cdcd-454d-9d42-0cd05ac69156",
+          "state": "running",
+          "queue": {
+            "availability": "unavailable",
+            "depth": null,
+            "observedAt": 1795046400,
+            "verifiedAt": null,
+            "sourceEventId": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+          }
+        },
+        "otherHosts": {
+          "m4": "unknown",
+          "m5": "unknown"
+        }
+      },
+      "valid": false
+    }
+  ],
+  "clockCases": [
+    {
+      "age": 120,
+      "stale": false
+    },
+    {
+      "age": 121,
+      "stale": true
+    },
+    {
+      "age": -60,
+      "stale": false,
+      "clampedAge": 0
+    },
+    {
+      "name": "absolute-future-bound-does-not-stack",
+      "clientNow": 1795046400,
+      "eventCreatedAt": 1795046460,
+      "fleetObservedAt": 1795046520,
+      "valid": false
+    }
+  ],
+  "notes": [
+    "Fixtures are design/source examples only; not real daemon, signature, native or publisher proof",
+    "Daemon retains SIX source buckets; initializing projects into private wire unknown",
+    "Partial Root may be outside counted prefix; never force its bucket into partial counts",
+    "Docrevision2 adds explicit empty/prefix/root/absolute clock/sourcequalification examples; no new runtime/schema/crypto proof"
+  ],
+  "documentRevision": 2,
+  "sourceProjectionExamples": [
+    {
+      "name": "source-initializing-folds-unknown",
+      "sourceCounts": {
+        "running": 1,
+        "idle": 0,
+        "blocked": 0,
+        "needsPermission": 0,
+        "initializing": 2,
+        "unknown": 3
+      },
+      "privateCounts": {
+        "running": 1,
+        "idle": 0,
+        "blocked": 0,
+        "needsPermission": 0,
+        "unknown": 5
+      },
+      "sourceRootState": "initializing",
+      "privateRootState": "unknown",
+      "seen": 6
+    },
+    {
+      "name": "unsupported-or-malformed-source-frame",
+      "sourceResponse": "access_denied|unsupported|malformed|unproven-empty",
+      "privateAvailability": "unavailable",
+      "counts": null,
+      "rootState": "unknown",
+      "queueAllNull": true,
+      "qualifiesNewVerifiedAt": false
+    }
+  ],
+  "classificationBaseline": {
+    "status": "idle",
+    "loaded": true,
+    "internal": false,
+    "pendingPermissions": 0,
+    "requiresAttention": false,
+    "attentionReason": null,
+    "sourceEvidenceQualified": true
+  },
+  "classificationInputSemantics": "Each classification.input overlays this abstract fully qualified baseline. Abstract evidence labels are NOT a serialized SDK schema, reader fallback or permission to assume production defaults. Missing/malformed proof is represented explicitly and maps unknown."
+}
