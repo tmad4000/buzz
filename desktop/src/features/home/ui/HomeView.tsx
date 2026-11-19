@@ -1,3 +1,4 @@
+import { withInboxAttentionCounts } from "../lib/inboxAttentionCounts";
 import * as React from "react";
 import { RefreshCcw } from "lucide-react";
 
@@ -245,6 +246,8 @@ export function HomeView({
   } = useResizableInboxListWidth();
   const {
     clearChannelUnreadSource,
+    getThreadReplyObservedAt,
+    threadReplySeenReady,
     getChannelReadAt,
     getThreadReadAt,
     getMessageReadAt,
@@ -380,7 +383,11 @@ export function HomeView({
       getThreadReadAt,
       profiles: feedProfiles,
     });
-    return filterInboxItems(items);
+    return withInboxAttentionCounts(
+      filterInboxItems(items), currentPubkey, getThreadReplyObservedAt,
+      threadReplySeenReady,
+      { getChannelReadAt, getThreadReadAt, getMessageReadAt, seenFeedIdSet: doneSet },
+    );
   }, [
     channels,
     currentPubkey,
@@ -389,6 +396,9 @@ export function HomeView({
     getChannelReadAt,
     getMessageReadAt,
     getThreadReadAt,
+    getThreadReplyObservedAt,
+    threadReplySeenReady,
+    doneSet,
     readStateVersion,
   ]);
   const { effectiveDoneSet, markItemRead, markItemUnread } =

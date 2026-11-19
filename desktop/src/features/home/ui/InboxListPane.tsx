@@ -269,6 +269,7 @@ export function InboxListPane({
   selectedReminderId,
   unreadOnly,
 }: InboxListPaneProps) {
+  const [showActivityCounts, setShowActivityCounts] = React.useState(false);
   const isReminders = filter === "reminders";
   const isDrafts = filter === "drafts";
   const isMixedInboxView = filter === "all";
@@ -439,6 +440,9 @@ export function InboxListPane({
                   {item.timestampLabel}
                 </span>
               </div>
+              {showActivityCounts && item.attentionCounts ? <p className="mt-1 text-xs text-muted-foreground" data-testid="inbox-attention-counts" title="Counts cover loaded Inbox feed messages only. New since read uses read progress; unread replies use exact body observation. These overlap and must not be added.">
+                {item.attentionCounts.newSinceRead} new since last read · {item.attentionCounts.unseenReplies === null ? "Unread replies syncing" : `${item.attentionCounts.unseenReplies} unread replies`} · loaded
+              </p> : null}
               <InboxLabel
                 isActionRequired={item.isActionRequired}
                 isDone={isDone}
@@ -642,6 +646,10 @@ export function InboxListPane({
                       id="inbox-unread-only-switch"
                       onCheckedChange={onUnreadOnlyChange}
                     />
+                  </div>
+                  <div className="flex items-center justify-between gap-3 px-2 py-2">
+                    <label htmlFor="inbox-activity-counts-switch">Show activity counts</label>
+                    <Switch id="inbox-activity-counts-switch" checked={showActivityCounts} onCheckedChange={setShowActivityCounts} disabled={isReminders || isDrafts} />
                   </div>
                   <Separator className="my-1 bg-muted" />
                   <button

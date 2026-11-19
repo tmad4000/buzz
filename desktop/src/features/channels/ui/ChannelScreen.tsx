@@ -4,7 +4,7 @@ import { useUnseenThreadReplies } from "./useUnseenThreadReplies";
 import { UnseenRepliesButton } from "./UnseenRepliesButton";
 import { useChannelPageSurface } from "@/features/channel-page/useChannelPageSurface";
 import * as React from "react";
-import { TimelineViewContext, useChannelViewMode } from "./TimelineViewContext";
+import { TimelineViewContext, useChannelViewMode, type ChannelViewMode } from "./TimelineViewContext";
 import { buildContextParents } from "@/features/channels/readState/contextParentRegistry";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAppShell } from "@/app/AppShellContext";
@@ -844,7 +844,7 @@ export function ChannelScreen({
     ],
   );
   const timelineMessageById = React.useMemo(() => new Map(timelineMessages.map((message) => [message.id, message])), [timelineMessages]);
-  const changeChannelView = React.useCallback((mode: "threads" | "timeline") => {
+  const changeChannelView = React.useCallback((mode: ChannelViewMode) => {
     if (!requireThreadEditResolution()) return;
     if (mode === "timeline") handleCloseThread();
     view.changeMode(mode);

@@ -35,6 +35,7 @@ export type InboxFilter =
   | "drafts";
 
 export type InboxItem = {
+  attentionCounts?: import("./inboxAttentionCounts").InboxAttentionCounts;
   avatarUrl: string | null;
   /**
    * Stable conversation identity: the NIP-10 root for messages, or a
