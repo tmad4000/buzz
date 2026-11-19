@@ -872,8 +872,65 @@ test("inline replies, scoped sends, saved expansion and side panel coexist", asy
         ?.parentEventId;
     });
   await expect.poll(lastParent).toBe(root.id);
-  await inline(root.id).locator(`[data-message-id="${child.id}"]`).hover();
-  await inline(root.id).getByTestId(`reply-message-${child.id}`).click();
+  // The accepted queue card drains asynchronously and changes the virtual row
+  // height. Establish its settled pointer surface before the next interaction.
+  await expect(
+    inline(root.id)
+      .getByRole("article", { name: "Queued message" })
+      .filter({ hasText: "Inline reply stays with the release plan" }),
+  ).toHaveCount(0);
+  await expect(
+    inline(root.id)
+      .getByTestId("message-row")
+      .filter({ hasText: "Inline reply stays with the release plan" }),
+  ).toHaveCount(1);
+  const childRow = inline(root.id).locator(`[data-message-id="${child.id}"]`);
+  await childRow.scrollIntoViewIfNeeded();
+  await expect
+    .poll(() =>
+      childRow.evaluate(async (element) => {
+        const scroller = element.closest('[data-testid="message-timeline"]');
+        if (!(scroller instanceof HTMLElement))
+          throw new Error("Missing owning timeline");
+        const samples = [];
+        for (let frame = 0; frame < 8; frame++) {
+          await new Promise<void>((resolve) =>
+            requestAnimationFrame(() => resolve()),
+          );
+          const rect = element.getBoundingClientRect();
+          samples.push([
+            rect.x,
+            rect.y,
+            rect.width,
+            rect.height,
+            scroller.scrollTop,
+          ]);
+        }
+        return samples.every((sample) =>
+          sample.every(
+            (value, index) => Math.abs(value - samples[0][index]) < 0.5,
+          ),
+        );
+      }),
+    )
+    .toBe(true);
+  await childRow.hover();
+  await expect(
+    inline(root.id).getByTestId(`message-action-bar-${child.id}`),
+  ).toHaveCSS("opacity", "1");
+  const childReply = inline(root.id).getByTestId(`reply-message-${child.id}`);
+  // A settled obstruction is a product failure, not permission to force a click.
+  expect(
+    await childReply.evaluate((element) => {
+      const rect = element.getBoundingClientRect();
+      const hit = document.elementFromPoint(
+        rect.x + rect.width / 2,
+        rect.y + rect.height / 2,
+      );
+      return hit !== null && element.contains(hit);
+    }),
+  ).toBe(true);
+  await childReply.click();
   await box.fill("A nested reply keeps its actual parent");
   await inline(root.id).getByTestId("send-message").click();
   await expect.poll(lastParent).toBe(child.id);
