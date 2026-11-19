@@ -23,7 +23,10 @@ registerHooks({
       "page-leave:relay":
         "const f=globalThis.leaveFixture;export const relayClient={subscribeLive:async()=>()=>{},fetchEvents:async q=>q.ids?f.events.filter(e=>q.ids.includes(e.id)):[],publishEvent:async e=>{f.events.push(e);await f.gate}}",
       "page-leave:sign":
-        'const f=globalThis.leaveFixture;export async function signRelayEvent(e){return {...e,id:(++f.sequence).toString(16).padStart(64,"0"),pubkey:"alice",created_at:e.createdAt}}',
+        'const f=globalThis.leaveFixture;export async function signRelayEvent(e){return {...e,id:(++f.sequence).toString(16).padStart(64,"0"),pubkey:"alice",created_at:e.createdAt}}' +
+        'export async function invokeTauri(command){throw new Error("Unexpected Page fixture IPC: "+command)}' +
+        'export async function createAuthEvent(){throw new Error("Unexpected Page fixture authentication")}' +
+        'export async function getRelayWsUrl(){throw new Error("Unexpected Page fixture relay lookup")}',
       "page-leave:members":
         'export async function getChannelMembers(){return [{pubkey:"alice"}]}',
       "page-leave:profile":
