@@ -1,0 +1,23 @@
+✔ compact card exposes exact agent link, signed original text, and in-place report edits (93.026179ms)
+✔ thread row keeps native quote jump, accessible first line and body identity across pending/ack and quote removal (137.708908ms)
+✔ quote presentation remains off when experiment is disabled (27.26423ms)
+✔ explicit expansion survives navigation and a fresh hook instance; collapse wins over new unread (148.219158ms)
+✔ thread, channel, community and identity choices are isolated; seen read branches stay closed (35.297499ms)
+✔ unknown unread state isn't saved as read; deep link waits for messages and permits later toggles (28.53131ms)
+✔ partial ancestry waits for the full path; pending read state doesn't initialize defaults (16.71673ms)
+✔ a suspended scope render cannot redirect the committed thread's toggle (33.586169ms)
+✔ own defaults do not mistake historical hydration for a send; pending reveal survives ack/read and later collapse wins (21.72189ms)
+✔ explicit navigation reveals only this view and preserves saved collapsed ancestry (42.03883ms)
+✔ durable intent exposes only its originating view, once through pending/ACK/refetch and later manual collapse (26.96365ms)
+✔ fast durable ACK before first paint still reveals; identical text has distinct intent identities (14.67034ms)
+✔ manual collapse after capture wins even before durable admission; unknown ancestry waits and unrelated toggles don't cancel (13.02721ms)
+✔ unrelated view/history cannot acquire an intent and retired captured origin cannot reveal a new scope (10.33473ms)
+✔ repeated exact-parent targets reveal open, closed and collapsed destinations without toggling them shut (62.801069ms)
+ℹ tests 15
+ℹ suites 0
+ℹ pass 15
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3111.047961

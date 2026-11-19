@@ -141,3 +141,18 @@ test("allowed owning-pane jump closes the covering Page before opening the paren
   assert.equal(h.state.replyTarget, "newer-draft-target");
   assert.equal(h.state.draft, "Keep this exact newer draft");
 });
+
+test("repeated exact-parent reveals keep open, closed and collapsed destinations open without toggle/composer actions", () => {
+  for(const initial of ["open","closed","collapsed"]) {
+    const h=owner({currentRoot:initial==="closed"?null:"root"});
+    h.jump("root","parent");
+    h.jump("root","parent");
+    assert.deepEqual(h.calls.filter(([name])=>name==="setOpenThreadHeadId"),
+      [["setOpenThreadHeadId","root"],["setOpenThreadHeadId","root"]]);
+    assert.deepEqual(h.calls.filter(([name])=>name==="setThreadScrollTargetId"),
+      [["setThreadScrollTargetId","parent"],["setThreadScrollTargetId","parent"]]);
+    assert.equal(h.state.draft,"Keep this exact newer draft");
+    if(initial!=="closed") assert.equal(h.state.replyTarget,"newer-draft-target");
+    assert.equal(h.calls.some(([name])=>["toggle","onReply","markRead"].includes(name)),false);
+  }
+});
