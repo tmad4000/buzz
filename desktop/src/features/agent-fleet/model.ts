@@ -87,7 +87,8 @@ export function authenticatedFleet(e: RelayEvent, _now: number): boolean {
         t.length <= 8 &&
         t.every((s) => typeof s === "string" && s.length <= 256),
     ) ||
-    !e.tags.some((t) => t[0] === "d" && t[1] === FLEET_D)
+    !e.tags.some((t) => t[0] === "d" && t[1] === FLEET_D) ||
+    !e.tags.some((t) => t[0] === "p" && t[1] === FLEET_RECIPIENT)
   )
     return false;
   try {
@@ -124,10 +125,11 @@ export function fleetEnvelope(e: RelayEvent, now: number) {
     return false;
   }
 }
-/** Second validation after narrow native decrypt, against frozen f8ed wire bytes. */
+/** Second validation after narrow native decrypt, against frozen 36b445 clarified wire bytes. */
 export function parseFleet(
   input: unknown,
   eventCreatedAt: number,
+  now = Math.floor(Date.now() / 1000),
 ): FleetSnapshot {
   if (
     new TextEncoder().encode(JSON.stringify(input)).length > 4096 ||
@@ -150,6 +152,8 @@ export function parseFleet(
     q.serverId !== FLEET_SERVER ||
     !time(q.observedAt) ||
     q.observedAt > eventCreatedAt + 60 ||
+    eventCreatedAt > now + 60 ||
+    q.observedAt > now + 60 ||
     !(
       q.verifiedAt === null ||
       (time(q.verifiedAt) && q.verifiedAt <= q.observedAt)
@@ -190,6 +194,7 @@ export function parseFleet(
     !/^[a-f0-9]{64}$/.test(queue.sourceEventId) ||
     !time(queue.observedAt) ||
     queue.observedAt > q.observedAt + 60 ||
+    queue.observedAt > now + 60 ||
     !(
       queue.verifiedAt === null ||
       (time(queue.verifiedAt) && queue.verifiedAt <= queue.observedAt)

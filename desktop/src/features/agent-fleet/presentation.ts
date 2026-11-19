@@ -67,15 +67,15 @@ export function fleetPresentation(
       : "queue unknown";
   const parts = [
     partial
-      ? `GCP: at least ${counts.running} observed working · partial`
+      ? "GCP: coverage incomplete"
       : `GCP: ${counts.running} ${counts.unknown > 0 ? "confirmed working" : "agents working"}`,
     rootLabel,
     queueLabel,
   ];
-  if (counts.needsPermission)
+  if (!partial && counts.needsPermission)
     parts.push(`${counts.needsPermission} awaiting permission`);
-  if (counts.blocked) parts.push(`${counts.blocked} blocked`);
-  if (counts.unknown) parts.push(`${counts.unknown} states unknown`);
+  if (!partial && counts.blocked) parts.push(`${counts.blocked} blocked`);
+  if (!partial && counts.unknown) parts.push(`${counts.unknown} states unknown`);
   return {
     tone: warning
       ? ("attention" as const)

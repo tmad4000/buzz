@@ -121,6 +121,40 @@
       },
       "daemon": "running",
       "wire": "running"
+    },
+    {
+      "name": "missing-permission-proof-running-is-unknown",
+      "input": {
+        "status": "running",
+        "pendingPermissions": null,
+        "sourceEvidenceQualified": false
+      },
+      "daemon": "unknown",
+      "wire": "unknown",
+      "explanation": "Current permission count/collection cannot be validated; false attention alone cannot exclude higher-precedence permission."
+    },
+    {
+      "name": "malformed-permission-proof-idle-is-unknown",
+      "input": {
+        "status": "idle",
+        "pendingPermissions": "invalid",
+        "sourceEvidenceQualified": false
+      },
+      "daemon": "unknown",
+      "wire": "unknown",
+      "explanation": "Malformed current priority proof must not become numeric0 or idle."
+    },
+    {
+      "name": "missing-attention-proof-cannot-prove-running",
+      "input": {
+        "status": "running",
+        "requiresAttention": null,
+        "attentionReason": null,
+        "sourceEvidenceQualified": false
+      },
+      "daemon": "unknown",
+      "wire": "unknown",
+      "explanation": "Without enough current priority evidence, running is not asserted by a missing-field fallback."
     }
   ],
   "validPayloads": [
@@ -369,6 +403,80 @@
         "root": {
           "agentId": "d3caa262-cdcd-454d-9d42-0cd05ac69156",
           "state": "unknown",
+          "queue": {
+            "availability": "unavailable",
+            "depth": null,
+            "observedAt": null,
+            "verifiedAt": null,
+            "sourceEventId": null
+          }
+        },
+        "otherHosts": {
+          "m4": "unknown",
+          "m5": "unknown"
+        }
+      }
+    },
+    {
+      "name": "explicit-qualified-complete-zero-root-absent",
+      "payload": {
+        "v": 1,
+        "serverId": "srv_KIFHQ_zsBnI2",
+        "observedAt": 1795046400,
+        "verifiedAt": 1795046400,
+        "availability": "ok",
+        "coverage": {
+          "seen": 0,
+          "total": 0,
+          "complete": true
+        },
+        "gcp": {
+          "running": 0,
+          "idle": 0,
+          "blocked": 0,
+          "needsPermission": 0,
+          "unknown": 0
+        },
+        "root": {
+          "agentId": "d3caa262-cdcd-454d-9d42-0cd05ac69156",
+          "state": "unknown",
+          "queue": {
+            "availability": "unavailable",
+            "depth": null,
+            "observedAt": null,
+            "verifiedAt": null,
+            "sourceEventId": null
+          }
+        },
+        "otherHosts": {
+          "m4": "unknown",
+          "m5": "unknown"
+        }
+      }
+    },
+    {
+      "name": "approved-9999-prefix-root-running-outside-prefix",
+      "payload": {
+        "v": 1,
+        "serverId": "srv_KIFHQ_zsBnI2",
+        "observedAt": 1795046400,
+        "verifiedAt": 1795046400,
+        "availability": "partial",
+        "coverage": {
+          "seen": 9999,
+          "total": null,
+          "complete": false
+        },
+        "gcp": {
+          "running": 0,
+          "idle": 9999,
+          "blocked": 0,
+          "needsPermission": 0,
+          "unknown": 0
+        },
+        "root": {
+          "agentId": "d3caa262-cdcd-454d-9d42-0cd05ac69156",
+          "state": "running",
           "queue": {
             "availability": "unavailable",
             "depth": null,
@@ -690,6 +798,120 @@
         }
       },
       "valid": false
+    },
+    {
+      "name": "partial-prefix10000-exceeds-reserved-root-cap",
+      "payload": {
+        "v": 1,
+        "serverId": "srv_KIFHQ_zsBnI2",
+        "observedAt": 1795046400,
+        "verifiedAt": 1795046400,
+        "availability": "partial",
+        "coverage": {
+          "seen": 10000,
+          "total": null,
+          "complete": false
+        },
+        "gcp": {
+          "running": 0,
+          "idle": 10000,
+          "blocked": 0,
+          "needsPermission": 0,
+          "unknown": 0
+        },
+        "root": {
+          "agentId": "d3caa262-cdcd-454d-9d42-0cd05ac69156",
+          "state": "running",
+          "queue": {
+            "availability": "unavailable",
+            "depth": null,
+            "observedAt": null,
+            "verifiedAt": null,
+            "sourceEventId": null
+          }
+        },
+        "otherHosts": {
+          "m4": "unknown",
+          "m5": "unknown"
+        }
+      },
+      "valid": false
+    },
+    {
+      "name": "complete-root-running-without-running-count",
+      "payload": {
+        "v": 1,
+        "serverId": "srv_KIFHQ_zsBnI2",
+        "observedAt": 1795046400,
+        "verifiedAt": 1795046400,
+        "availability": "ok",
+        "coverage": {
+          "seen": 2,
+          "total": 2,
+          "complete": true
+        },
+        "gcp": {
+          "running": 0,
+          "idle": 2,
+          "blocked": 0,
+          "needsPermission": 0,
+          "unknown": 0
+        },
+        "root": {
+          "agentId": "d3caa262-cdcd-454d-9d42-0cd05ac69156",
+          "state": "running",
+          "queue": {
+            "availability": "unavailable",
+            "depth": null,
+            "observedAt": null,
+            "verifiedAt": null,
+            "sourceEventId": null
+          }
+        },
+        "otherHosts": {
+          "m4": "unknown",
+          "m5": "unknown"
+        }
+      },
+      "valid": false
+    },
+    {
+      "name": "queue-source-id-uppercase-rejected",
+      "payload": {
+        "v": 1,
+        "serverId": "srv_KIFHQ_zsBnI2",
+        "observedAt": 1795046400,
+        "verifiedAt": 1795046400,
+        "availability": "ok",
+        "coverage": {
+          "seen": 2,
+          "total": 2,
+          "complete": true
+        },
+        "gcp": {
+          "running": 1,
+          "idle": 1,
+          "blocked": 0,
+          "needsPermission": 0,
+          "unknown": 0
+        },
+        "root": {
+          "agentId": "d3caa262-cdcd-454d-9d42-0cd05ac69156",
+          "state": "running",
+          "queue": {
+            "availability": "unavailable",
+            "depth": null,
+            "observedAt": 1795046400,
+            "verifiedAt": null,
+            "sourceEventId": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+          }
+        },
+        "otherHosts": {
+          "m4": "unknown",
+          "m5": "unknown"
+        }
+      },
+      "valid": false
     }
   ],
   "clockCases": [
@@ -705,11 +927,62 @@
       "age": -60,
       "stale": false,
       "clampedAge": 0
+    },
+    {
+      "name": "absolute-future-bound-does-not-stack",
+      "clientNow": 1795046400,
+      "eventCreatedAt": 1795046460,
+      "fleetObservedAt": 1795046520,
+      "valid": false
     }
   ],
   "notes": [
     "Fixtures are design/source examples only; not real daemon, signature, native or publisher proof",
     "Daemon retains SIX source buckets; initializing projects into private wire unknown",
-    "Partial Root may be outside counted prefix; never force its bucket into partial counts"
-  ]
+    "Partial Root may be outside counted prefix; never force its bucket into partial counts",
+    "Docrevision2 adds explicit empty/prefix/root/absolute clock/sourcequalification examples; no new runtime/schema/crypto proof"
+  ],
+  "documentRevision": 2,
+  "sourceProjectionExamples": [
+    {
+      "name": "source-initializing-folds-unknown",
+      "sourceCounts": {
+        "running": 1,
+        "idle": 0,
+        "blocked": 0,
+        "needsPermission": 0,
+        "initializing": 2,
+        "unknown": 3
+      },
+      "privateCounts": {
+        "running": 1,
+        "idle": 0,
+        "blocked": 0,
+        "needsPermission": 0,
+        "unknown": 5
+      },
+      "sourceRootState": "initializing",
+      "privateRootState": "unknown",
+      "seen": 6
+    },
+    {
+      "name": "unsupported-or-malformed-source-frame",
+      "sourceResponse": "access_denied|unsupported|malformed|unproven-empty",
+      "privateAvailability": "unavailable",
+      "counts": null,
+      "rootState": "unknown",
+      "queueAllNull": true,
+      "qualifiesNewVerifiedAt": false
+    }
+  ],
+  "classificationBaseline": {
+    "status": "idle",
+    "loaded": true,
+    "internal": false,
+    "pendingPermissions": 0,
+    "requiresAttention": false,
+    "attentionReason": null,
+    "sourceEvidenceQualified": true
+  },
+  "classificationInputSemantics": "Each classification.input overlays this abstract fully qualified baseline. Abstract evidence labels are NOT a serialized SDK schema, reader fallback or permission to assume production defaults. Missing/malformed proof is represented explicitly and maps unknown."
 }

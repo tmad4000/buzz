@@ -62,7 +62,7 @@ export function createFleetReader(io: FleetIO) {
             continue;
           emit({
             status: "ready",
-            snapshot: parseFleet(raw, event.created_at),
+            snapshot: parseFleet(raw, event.created_at, io.now()),
           });
         } catch {
           if (epoch === generation && winner?.id === event.id) fail();

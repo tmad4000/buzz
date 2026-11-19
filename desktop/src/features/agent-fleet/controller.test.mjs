@@ -158,7 +158,7 @@ test("global action opens existing Root queue/profile or existing Agents fallbac
     assert.equal(mod.FleetStatusButton({ onOpenAgents: assert.fail }), null);
   }
 });
-test("frozen valid vectors project partial lower bounds and expire only queue at receive time", () => {
+test("frozen valid vectors hide partial counts and expire only queue at receive time", () => {
   const mod = load(new URL("./FleetStatusButton.tsx", import.meta.url), {
     "@/shared/context/ProfilePanelContext": {},
     sonner: {},
@@ -172,7 +172,7 @@ test("frozen valid vectors project partial lower bounds and expire only queue at
     mod.fleetObservation(partial),
     partial.observedAt,
   );
-  assert.match(view.label, /at least 0 observed working · partial/);
+  assert.match(view.label, /GCP: coverage incomplete/);
   assert.match(view.label, /root busy/);
   assert.equal(view.pulse, true);
   assert.equal(view.tone, "working");

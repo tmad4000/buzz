@@ -55,3 +55,16 @@ test("120 second freshness is strict and independent of attempted publication or
   assert.match(fleetPresentation(q, now).label, /unavailable/);
   assert.equal(fleetPresentation(undefined, now).pulse, false);
 });
+
+test("partial counts are hidden while independent Root/queue and amber evidence remain", () => {
+  const q = ready();
+  q.availability="partial";
+  q.counts.blocked=2;
+  const view=fleetPresentation(q,now);
+  assert.equal(view.tone,"attention");
+  assert.match(view.label,/coverage incomplete · root busy · 3 queued/);
+  assert.doesNotMatch(view.label,/4 agents|2 blocked|at least/);
+  q.counts={running:0,idle:4,blocked:0,needsPermission:0,unknown:0};
+  q.root.state="unknown";
+  assert.equal(fleetPresentation(q,now).tone,"unknown");
+});

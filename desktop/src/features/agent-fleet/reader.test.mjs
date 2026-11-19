@@ -202,3 +202,52 @@ test("readiness/transport failure retains authenticated bad-event watermark and 
   assert.equal(h.calls, 1);
   off();
 });
+
+test("real signature auth excludes missing/wrong recipients before watermark, but in-scope malformed content retains authority", async () => {
+  // Substitute ONLY the public trust anchor in an isolated copy of production model.ts.
+  // Real production authentication/signature verification runs; no bridge private key is used.
+  const fs = await import("node:fs/promises");
+  const os = await import("node:os");
+  const path = await import("node:path");
+  const { pathToFileURL } = await import("node:url");
+  const { finalizeEvent, generateSecretKey, getPublicKey } = await import("nostr-tools/pure");
+  const { FLEET_D, FLEET_RECIPIENT } = await import("./model.ts");
+  const secret = generateSecretKey();
+  const folder = await fs.mkdtemp(path.join(os.tmpdir(), "fleet-auth-order-"));
+  try {
+    const original = await fs.readFile(new URL("./model.ts", import.meta.url), "utf8");
+    const source = original.replace("FLEET_BRIDGE = QUEUE_BRIDGE", `FLEET_BRIDGE = ${JSON.stringify(getPublicKey(secret))}`)
+      .replace('"nostr-tools/pure"', JSON.stringify(import.meta.resolve("nostr-tools/pure")));
+    assert.notEqual(source, original);
+    const file = path.join(folder, "model.ts");
+    await fs.writeFile(file, source);
+    const { authenticatedFleet } = await import(pathToFileURL(file).href);
+    const sign = (at, tags, content = "Ag==") => finalizeEvent({kind:30078, created_at:at, tags, content}, secret);
+    const tags = [["d", FLEET_D], ["p", FLEET_RECIPIENT]];
+    const foreign = [sign(clock+30, [["d",FLEET_D]]), sign(clock+40, [["d",FLEET_D],["p","a".repeat(64)]])];
+    for (const before of [true, false]) {
+      let accept, calls = 0;
+      const reader = createFleetReader({now:()=>clock, authenticate:authenticatedFleet,
+        decrypt:async()=>{calls++;return snapshot();},
+        subscribe:async(fn)=>{accept=fn;return async()=>{};}});
+      const off = reader.subscribe(()=>{});
+      if (before) for (const e of foreign) accept(e);
+      accept(sign(clock, tags));
+      await flush();
+      assert.equal(reader.getSnapshot().status,"ready");
+      if (!before) for (const e of foreign) accept(e);
+      await flush();
+      assert.equal(reader.getSnapshot().status,"ready");
+      accept(sign(clock+1,tags));
+      await flush();
+      assert.equal(calls,2); // higher-clock foreign cards did not fence out Jacob's card
+      accept(sign(clock+2,tags,"not ciphertext"));
+      await flush();
+      assert.equal(reader.getSnapshot().status,"error");
+      accept(sign(clock+1,tags));
+      await flush();
+      assert.equal(calls,2); // authenticated IN-SCOPE malformed newest still owns watermark
+      off();
+    }
+  } finally { await fs.rm(folder,{recursive:true,force:true}); }
+});

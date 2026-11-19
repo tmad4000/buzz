@@ -71,3 +71,16 @@ fn strict_limits_required_nullable_fields_and_clock_bounds() {
 fn other_active_identity_cannot_use_the_narrow_receiver() {
     assert!(decrypt(&Keys::generate(), "{}").is_err());
 }
+
+#[test]
+fn absolute_receiver_clock_rejects_chained_future_timestamps() {
+    let data = fixtures();
+    let mut v = data["validPayloads"][0]["payload"].clone();
+    let now = v["observedAt"].as_u64().unwrap();
+    v["observedAt"] = (now + 61).into();
+    v["verifiedAt"] = (now + 61).into();
+    assert!(parse_snapshot_at(&v.to_string(), now + 60, now).is_err());
+    let mut v = data["validPayloads"][0]["payload"].clone();
+    v["root"]["queue"] = serde_json::json!({"availability":"ok","depth":1,"observedAt":now+61,"verifiedAt":now+61,"sourceEventId":"a".repeat(64)});
+    assert!(parse_snapshot_at(&v.to_string(), now, now).is_err());
+}

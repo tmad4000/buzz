@@ -33,7 +33,7 @@ const event = (at = base().observedAt) => ({
 test("frozen schema/fixture exact hashes remain unchanged and synthetic vectors claim no authentication/effects", () => {
   assert.equal(
     createHash("sha256").update(raw).digest("hex"),
-    "ff5e033cf8af0db25044eaf8790239354a21d478a95f5d67e121ad2454418483",
+    "ee8e39145806ef8bf2ece43fe07b8b7374d1ea2f04e8f8a87d96c5616eef689a",
   );
   const design = fs.readFileSync(
     new URL(
@@ -43,7 +43,7 @@ test("frozen schema/fixture exact hashes remain unchanged and synthetic vectors 
   );
   assert.equal(
     createHash("sha256").update(design).digest("hex"),
-    "f8edff4578e56ec626bf7b053812de0c99ca88d6b9284e14a63ba65c0fb8a194",
+    "36b445a236130673078bcdfff840003a1fa2a929c5711c3374c622b4fc8fc293",
   );
   assert.equal(vectors.syntheticUnsigned, true);
   assert.equal(vectors.effectsIssued, false);
@@ -146,4 +146,17 @@ test("exact envelope scope/version/clock limits, fixed narrow history filter and
     limit: 1,
   });
   assert.equal(newerFleet({ ...e, id: "0".repeat(64) }, e), true);
+});
+
+test("absolute receiver clock rejects chained future observation and queue clocks", () => {
+  const q = base(), now = q.observedAt;
+  q.observedAt = now + 61;
+  q.verifiedAt = q.observedAt;
+  assert.throws(() => parseFleet(q, now+60, now));
+  const queue = base();
+  queue.root.queue = {availability:"ok",depth:1,observedAt:now+61,verifiedAt:now+61,sourceEventId:"a".repeat(64)};
+  assert.throws(() => parseFleet(queue, now, now));
+  queue.root.queue.observedAt = now+60;
+  queue.root.queue.verifiedAt = now+60;
+  assert.ok(parseFleet(queue,now,now));
 });

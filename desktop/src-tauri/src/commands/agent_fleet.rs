@@ -85,7 +85,10 @@ fn scope(state: &AppState, relay: &str, recipient: &str) -> Result<Keys, String>
     Ok(keys)
 }
 fn parse_snapshot(plaintext: &str, event_created_at: u64) -> Result<Snapshot, String> {
-    if plaintext.len() > 4096 {
+    parse_snapshot_at(plaintext, event_created_at, Timestamp::now().as_u64())
+}
+fn parse_snapshot_at(plaintext: &str, event_created_at: u64, now: u64) -> Result<Snapshot, String> {
+    if plaintext.len() > 4096 || event_created_at > now.saturating_add(60) {
         return Err(INVALID.into());
     }
     // Typed parse rejects duplicate/unknown fields; exact checks require even nullable fields.
@@ -127,6 +130,7 @@ fn parse_snapshot(plaintext: &str, event_created_at: u64) -> Result<Snapshot, St
         || q.root.agent_id != ROOT
         || q.other_hosts.m4 != "unknown"
         || q.other_hosts.m5 != "unknown"
+        || q.observed_at > now.saturating_add(60)
         || q.observed_at > MAX_TIME
         || q.observed_at > event_created_at.saturating_add(60)
         || q.verified_at.is_some_and(|t| t > q.observed_at)
@@ -153,6 +157,7 @@ fn parse_snapshot(plaintext: &str, event_created_at: u64) -> Result<Snapshot, St
                     .bytes()
                     .all(|c| c.is_ascii_digit() || (b'a'..=b'f').contains(&c))
                 || at > MAX_TIME
+                || at > now.saturating_add(60)
                 || at > q.observed_at.saturating_add(60)
                 || queue.verified_at.is_some_and(|t| t > at)
             {
