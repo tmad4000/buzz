@@ -13,7 +13,11 @@ import {
   useChannelLinks,
   type ChannelSuggestion,
 } from "@/features/messages/lib/useChannelLinks";
-import { useComposerAutofocus } from "@/features/messages/lib/useComposerAutofocus";
+import { useReplyComposerFocus } from "@/features/messages/lib/useReplyComposerFocus";
+import {
+  useComposerAutofocus,
+  useComposerTakeoverFocus,
+} from "@/features/messages/lib/useComposerAutofocus";
 import { useDrafts } from "@/features/messages/lib/useDrafts";
 import { resolveSentDraftKey } from "@/features/messages/ui/draftSubmitKey";
 import {
@@ -108,6 +112,7 @@ function MessageComposerImpl({
   profiles,
   recentMentionPubkeys,
   replyTarget = null,
+  replyFocusRequest,
   mediaController,
   showBackgroundUploadProgress = true,
   showOutboxRows = true,
@@ -475,35 +480,26 @@ function MessageComposerImpl({
       setSpoileredAttachmentUrls(restoredSpoileredAttachmentUrls);
     }
   }, [editTarget?.id]);
-  React.useEffect(() => {
-    if (!replyTarget || composerDisabled) return;
-    richText.focusPreserve();
-  }, [composerDisabled, replyTarget, richText.focusPreserve]);
   const canFocusConversation =
     conversationView === null ||
     (conversationView.focused && conversationView.visible);
-  // Explicit Take over may focus the restored editor; ordinary pane mounts do not.
-  React.useLayoutEffect(() => {
-    if (
-      !canFocusConversation ||
-      document.visibilityState !== "visible" ||
-      !document.hasFocus()
-    ) {
-      presentation?.takeFocus();
-      return;
-    }
-    if (
-      !richText.editor ||
-      richText.editor.isDestroyed ||
-      !richText.editor.view.dom.isConnected
-    )
-      return;
-    if (presentation?.takeFocus()) richText.focus();
-  }, [presentation, richText.editor, richText.focus, canFocusConversation]);
+  useReplyComposerFocus(
+    richText,
+    replyTarget,
+    replyFocusRequest,
+    !composerDisabled,
+    canFocusConversation,
+  );
+  useComposerTakeoverFocus(
+    richText.editor,
+    richText.focus,
+    presentation,
+    canFocusConversation,
+  );
   useComposerAutofocus(
     richText.focus,
     effectiveDraftKey,
-    composerDisabled || !autoFocus,
+    composerDisabled || !autoFocus || Boolean(replyFocusRequest?.pending),
   );
   const applyAutocompleteEdit = React.useCallback(
     (edit: AutocompleteEdit) => {

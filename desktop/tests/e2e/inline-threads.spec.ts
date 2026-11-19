@@ -1062,3 +1062,109 @@ test("inline channel rows retain search match and active result highlighting", a
     .toBe(true);
   await page.screenshot({ path: `${shots}/inline-search.png` });
 });
+
+for (const reducedMotion of ["no-preference", "reduce"] as const) {
+  test(`Reply reveals and focuses an off-screen composer (${reducedMotion})`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.emulateMedia({ reducedMotion });
+    await installMockBridge(page);
+    await page.addInitScript(() => {
+      const scroll = Element.prototype.scrollIntoView;
+      Element.prototype.scrollIntoView = function (
+        this: Element,
+        options?: boolean | ScrollIntoViewOptions,
+      ) {
+        if (
+          this.getAttribute("data-testid") === "message-input" &&
+          options &&
+          typeof options === "object" &&
+          options.behavior
+        ) {
+          this.setAttribute("data-reply-scroll-behavior", options.behavior);
+        }
+        scroll.call(this, options);
+      };
+    });
+    await page.goto("/");
+    await page.getByTestId("channel-general").click();
+    await waitForMockChannelHeadReady(
+      page,
+      "general",
+      "9a1657ac-f7aa-5db0-b632-d8bbeb6dfb50",
+    );
+
+    const root = "a1".repeat(32);
+    const child = "a2".repeat(32);
+    await page.evaluate(
+      ({ root, child }) => {
+        const emit = window.__BUZZ_E2E_EMIT_MOCK_MESSAGE__;
+        if (!emit) throw new Error("Missing mock emitter");
+        const createdAt = Math.floor(Date.now() / 1000);
+        emit({
+          id: root,
+          channelName: "general",
+          createdAt,
+          content: "Reply viewport thread",
+        });
+        emit({
+          id: child,
+          channelName: "general",
+          createdAt: createdAt + 1,
+          parentEventId: root,
+          content: "Early reply target",
+        });
+        for (let i = 0; i < 7; i++) {
+          emit({
+            channelName: "general",
+            parentEventId: root,
+            createdAt: createdAt + 2 + i,
+            content: Array.from(
+              { length: 6 },
+              (_, j) => `Reply ${i}, paragraph ${j}`,
+            ).join("\n\n"),
+          });
+        }
+      },
+      { root, child },
+    );
+
+    const summary = page.locator(
+      `[data-testid="message-thread-summary"][data-thread-head-id="${root}"]`,
+    );
+    if ((await summary.getAttribute("aria-expanded")) !== "true") {
+      await summary.click();
+    }
+    const inline = page.locator(
+      `[data-testid="inline-thread"][data-thread-head-id="${root}"]`,
+    );
+    const editor = inline.getByTestId("message-input");
+    const target = inline.locator(`[data-message-id="${child}"]`);
+    await target.scrollIntoViewIfNeeded();
+    await target.hover();
+    await expect(target).toBeInViewport();
+    await expect(editor).not.toBeInViewport();
+    await expect(editor).not.toBeFocused();
+
+    await inline.getByTestId(`reply-message-${child}`).click();
+    await expect(inline.getByTestId("reply-target")).toContainText(
+      "Early reply target",
+    );
+    await expect(editor).toHaveAttribute(
+      "data-reply-scroll-behavior",
+      reducedMotion === "reduce" ? "instant" : "smooth",
+    );
+    await expect(editor).toBeInViewport({ ratio: 0.9 });
+    await expect(editor).toBeFocused();
+
+    const rootRow = page.locator(`[data-message-id="${root}"]`);
+    await rootRow.hover();
+    await rootRow.getByTestId(`reply-message-${root}`).click();
+    const panelEditor = page
+      .getByTestId("message-thread-panel")
+      .getByTestId("message-input");
+    await expect(panelEditor).toBeInViewport({ ratio: 0.9 });
+    await expect(panelEditor).toBeFocused();
+  });
+}

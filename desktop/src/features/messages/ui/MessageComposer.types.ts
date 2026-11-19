@@ -114,6 +114,7 @@ export type MessageComposerProps = {
   profiles?: UserProfileLookup;
   /** Explicit mention pubkeys from the loaded channel window, newest first. */
   recentMentionPubkeys?: readonly string[];
+  replyFocusRequest?: import("../lib/useReplyComposerFocus").ReplyFocusRequest;
   replyTarget?: {
     author: string;
     body: string;

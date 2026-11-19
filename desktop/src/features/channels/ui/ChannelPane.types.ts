@@ -128,6 +128,7 @@ export type ChannelPaneProps = {
     options?: ProfilePanelOpenOptions,
   ) => void;
   onOpenThread: (message: TimelineMessage) => void;
+  threadReplyFocusRequest?: MessageComposerProps["replyFocusRequest"];
   onResetThreadPanelWidth: () => void;
   onSelectThreadReplyTarget: (message: TimelineMessage) => void;
   onSendMessage: (

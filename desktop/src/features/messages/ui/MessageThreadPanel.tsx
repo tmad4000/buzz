@@ -98,6 +98,7 @@ type MessageThreadPanelProps = ThreadPanelLayoutProps & {
   searchMessageId?: string | null;
   searchQuery?: string;
   onSelectReplyTarget: (message: TimelineMessage) => void;
+  replyFocusRequest?: import("../lib/useReplyComposerFocus").ReplyFocusRequest;
   onSend: (
     content: string,
     mentionPubkeys: string[],
@@ -199,6 +200,7 @@ export function MessageThreadPanel({
   onScrollTargetResolved,
   onScrollTargetSettled,
   onSelectReplyTarget,
+  replyFocusRequest,
   onSend,
   onSendToChannel,
   onToggleReaction,
@@ -262,11 +264,7 @@ export function MessageThreadPanel({
 
   const composerReplyTarget =
     replyTargetMessage && threadHead && replyTargetMessage.id !== threadHead.id
-      ? {
-          author: replyTargetMessage.author,
-          body: replyTargetMessage.body,
-          id: replyTargetMessage.id,
-        }
+      ? replyTargetMessage
       : null;
 
   const [pendingJump, setPendingJump] = React.useState<{
@@ -1141,6 +1139,7 @@ export function MessageThreadPanel({
               profiles={profiles}
               recentMentionPubkeys={recentMentionPubkeys}
               replyTarget={composerReplyTarget}
+              replyFocusRequest={replyFocusRequest}
               typingParentEventId={threadHead.id}
               typingRootEventId={threadHead.rootId}
             />
