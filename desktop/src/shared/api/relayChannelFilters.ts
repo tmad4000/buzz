@@ -2,6 +2,7 @@ import {
   CHANNEL_AUX_EVENT_KINDS,
   CHANNEL_EVENT_KINDS,
   CHANNEL_TIMELINE_CONTENT_KINDS,
+  KIND_CHANNEL_THREAD_SUMMARY,
   KIND_DELETION,
   KIND_NIP29_DELETE_EVENT,
   KIND_REACTION,
@@ -39,6 +40,22 @@ export function buildChannelFilter(
   }
 
   return filter;
+}
+
+/** Channel window-store live filter, including summary overlays without history replay. */
+export function buildChannelLiveFilter(
+  channelId: string,
+  since: number,
+): RelaySubscriptionFilter {
+  // 39005 rides only this window-store subscription — CHANNEL_EVENT_KINDS'
+  // other consumers (unread tracking, cache merges) must never see
+  // summary overlays.
+  return {
+    kinds: [...CHANNEL_EVENT_KINDS, KIND_CHANNEL_THREAD_SUMMARY],
+    "#h": [channelId],
+    limit: 1000,
+    since,
+  };
 }
 
 /**
