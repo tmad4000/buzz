@@ -1,6 +1,7 @@
 import type { MessageComposerProps } from "@/features/messages/ui/MessageComposer.types";
 import * as React from "react";
 import { toast } from "sonner";
+import { registerAppRestartGuard } from "@/shared/lib/appRestartGuard";
 
 import type {
   useDeleteMessageMutation,
@@ -76,6 +77,9 @@ export function useChannelPaneHandlers({
   const threadReplyTargetIdRef = React.useRef(threadReplyTargetId);
   threadReplyTargetIdRef.current = threadReplyTargetId;
 
+  const pendingEditSaves = React.useRef(0);
+  const editMutationPending = React.useRef(editMessageMutation.isPending);
+  editMutationPending.current = editMessageMutation.isPending;
   const editTargetIdRef = React.useRef(editTargetId);
   editTargetIdRef.current = editTargetId;
   const editTargetIsThreadReplyRef = React.useRef(editTargetIsThreadReply);
@@ -128,6 +132,23 @@ export function useChannelPaneHandlers({
     toast.info("Finish or cancel your edit before leaving the thread.");
     return false;
   }, []);
+
+  // Restart leaves the whole app, not only the thread. Main-timeline edits
+  // must veto too, including a save that outlives its currently selected editor.
+  const requireRestartEditResolution = React.useCallback(() => {
+    if (
+      editTargetIdRef.current === null &&
+      !editMutationPending.current &&
+      pendingEditSaves.current === 0
+    )
+      return true;
+    toast.info("Finish or cancel your message edit before restarting.");
+    return false;
+  }, []);
+  React.useLayoutEffect(
+    () => registerAppRestartGuard(requireRestartEditResolution),
+    [requireRestartEditResolution],
+  );
 
   const handleCloseThread = React.useCallback(() => {
     if (!requireThreadEditResolution()) {
@@ -199,13 +220,18 @@ export function useChannelPaneHandlers({
         return;
       }
 
-      await editMessageMutation.mutateAsync({
-        eventId,
-        content,
-        mediaTags,
-        mentionPubkeys,
-      });
-      setEditTargetId((current) => (current === eventId ? null : current));
+      pendingEditSaves.current++;
+      try {
+        await editMessageMutation.mutateAsync({
+          eventId,
+          content,
+          mediaTags,
+          mentionPubkeys,
+        });
+        setEditTargetId((current) => (current === eventId ? null : current));
+      } finally {
+        pendingEditSaves.current--;
+      }
     },
     [
       editMessageMutation.mutateAsync,
