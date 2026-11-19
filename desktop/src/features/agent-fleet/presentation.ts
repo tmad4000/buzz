@@ -1,6 +1,8 @@
 /** UI projection only. The encrypted wire schema is agreed separately with the producer. */
 export type FleetObservation = {
-  availability: "ok" | "unavailable";
+  availability: "ok" | "partial" | "unavailable";
+  observedAt?: number;
+  complete?: boolean;
   verifiedAt: number | null;
   counts?: {
     running: number;
@@ -22,18 +24,28 @@ export function fleetPresentation(
   observation: FleetObservation | undefined,
   now: number,
 ) {
-  const unavailable = !observation || observation.availability !== "ok";
-  const stale = !!observation && !fresh(observation.verifiedAt, now);
+  const unavailable =
+    !observation || observation.availability === "unavailable";
+  const stale =
+    !!observation &&
+    observation.verifiedAt !== null &&
+    !fresh(observation.verifiedAt, now);
   if (unavailable || stale || !observation.counts) {
     return {
       tone: "unknown" as const,
       pulse: false,
-      label: stale ? "GCP agent status stale" : "GCP agent status unknown",
+      label:
+        observation?.availability === "unavailable"
+          ? `GCP agent status unavailable${stale ? " · stale" : ""}`
+          : stale
+            ? "GCP agent status stale"
+            : "GCP agent status unknown",
       detail: "M4/M5 unknown",
       verifiedAt: observation?.verifiedAt ?? null,
     };
   }
   const counts = observation.counts;
+  const partial = observation.availability === "partial";
   const root = observation.root;
   const rootState =
     root && fresh(root.stateVerifiedAt, now) ? root.state : "unknown";
@@ -54,7 +66,9 @@ export function fleetPresentation(
       ? `${root.queueDepth} queued`
       : "queue unknown";
   const parts = [
-    `GCP: ${counts.running} ${counts.unknown > 0 ? "confirmed working" : "agents working"}`,
+    partial
+      ? `GCP: at least ${counts.running} observed working · partial`
+      : `GCP: ${counts.running} ${counts.unknown > 0 ? "confirmed working" : "agents working"}`,
     rootLabel,
     queueLabel,
   ];
@@ -65,12 +79,12 @@ export function fleetPresentation(
   return {
     tone: warning
       ? ("attention" as const)
-      : counts.running > 0
+      : counts.running > 0 || rootState === "running"
         ? ("working" as const)
-        : counts.unknown > 0
+        : counts.unknown > 0 || partial
           ? ("unknown" as const)
           : ("idle" as const),
-    pulse: counts.running > 0 && !warning,
+    pulse: (counts.running > 0 || rootState === "running") && !warning,
     label: parts.join(" · "),
     detail: "M4/M5 unknown",
     verifiedAt: observation.verifiedAt,

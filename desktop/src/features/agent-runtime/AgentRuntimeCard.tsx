@@ -1,3 +1,4 @@
+import { FleetIndicatorPreference } from "@/features/agent-fleet/FleetStatusButton";
 import { AgentQueuePanel } from "@/features/agent-queue/AgentQueueView";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { toast } from "sonner";
@@ -135,6 +136,7 @@ export function AgentRuntimeCard({ pubkey }: { pubkey: string }) {
         </div>
       ) : null}
       <AgentQueuePanel pubkey={pubkey} />
+      <FleetIndicatorPreference pubkey={pubkey} />
     </section>
   );
 }

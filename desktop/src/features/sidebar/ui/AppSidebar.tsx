@@ -508,6 +508,7 @@ export function AppSidebar({
         data-testid="app-sidebar-scroll-anchor"
       >
         <AppSidebarPinnedHeader
+          onOpenAgents={onSelectAgents}
           channelLabels={dmChannelLabels}
           currentPubkey={currentPubkey}
           currentChannelId={

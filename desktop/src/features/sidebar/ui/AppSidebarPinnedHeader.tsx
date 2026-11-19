@@ -1,3 +1,4 @@
+import { FleetStatusButton } from "@/features/agent-fleet/FleetStatusButton";
 import { Activity, Bot, Folders, Inbox, Zap } from "lucide-react";
 
 import { TopbarSearch } from "@/features/search/ui/TopbarSearch";
@@ -30,6 +31,7 @@ type AppSidebarPinnedHeaderProps = {
   onBrowseChannels?: () => void;
   onCreateAgent: () => void;
   onCreateChannel: () => void;
+  onOpenAgents: () => void;
   onOpenDm: (input: { pubkeys: string[] }) => Promise<void>;
   onOpenSearchResult: (hit: SearchHit, query: string) => void;
   onSelectChannel: (channelId: string) => void;
@@ -57,6 +59,7 @@ export function AppSidebarPinnedHeader({
   onBrowseChannels,
   onCreateAgent,
   onCreateChannel,
+  onOpenAgents,
   onOpenDm,
   onOpenSearchResult,
   onSelectChannel,
@@ -85,6 +88,7 @@ export function AppSidebarPinnedHeader({
         scopeFocusRequest={scopeSearchFocusRequest}
         suggestionChannels={suggestionChannels}
       />
+      <FleetStatusButton onOpenAgents={onOpenAgents} />
     </div>
   );
 }

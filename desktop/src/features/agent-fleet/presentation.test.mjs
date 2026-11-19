@@ -52,6 +52,6 @@ test("120 second freshness is strict and independent of attempted publication or
   q.root.stateVerifiedAt = now - 121;
   assert.match(fleetPresentation(q, now).label, /root state unknown/);
   q.availability = "unavailable";
-  assert.match(fleetPresentation(q, now).label, /unknown/);
+  assert.match(fleetPresentation(q, now).label, /unavailable/);
   assert.equal(fleetPresentation(undefined, now).pulse, false);
 });
