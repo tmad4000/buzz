@@ -110,7 +110,7 @@ const INBOX_FEED_FILTER_BUCKETS = {
   needs_action: "needsAction",
   agent_activity: null,
 } as const satisfies Record<
-  Exclude<InboxFilter, "reminders" | "drafts">,
+  Exclude<InboxFilter, "reminders" | "drafts" | "needs_you" | "answers">,
   keyof HomeFeed | null
 >;
 

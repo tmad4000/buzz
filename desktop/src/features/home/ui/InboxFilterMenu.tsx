@@ -19,6 +19,8 @@ const INBOX_FILTER_OPTIONS: Array<{
   value: InboxFilter;
 }> = [
   { value: "all", label: "All" },
+  { value: "needs_you", label: "Needs you" },
+  { value: "answers", label: "Answers" },
   { value: "project", label: "Projects" },
   { value: "mention", label: "Mentions" },
   { value: "thread", label: "Threads" },
@@ -48,7 +50,11 @@ export function InboxFilterMenu({
   onFilterChange,
   reminderCount,
 }: InboxFilterMenuProps) {
-  const activeFilter = INBOX_FILTER_OPTIONS.find(
+  const attentionEnabled = countsByFilter.needs_you !== undefined;
+  const options = INBOX_FILTER_OPTIONS.filter(({ value }) =>
+    attentionEnabled || (value !== "needs_you" && value !== "answers"),
+  );
+  const activeFilter = options.find(
     (option) => option.value === filter,
   );
   const statusLabel =
@@ -83,14 +89,14 @@ export function InboxFilterMenu({
           onValueChange={(value) => onFilterChange(value as InboxFilter)}
           value={filter}
         >
-          {INBOX_FILTER_OPTIONS.map((option) => {
+          {options.map((option) => {
             const count = countsByFilter[option.value];
             const showCount =
               count && (count !== "0" || filter === option.value);
 
             return (
               <div key={option.value}>
-                {option.value === "reminders" ? (
+                {option.value === "reminders" || (attentionEnabled && option.value === "project") ? (
                   <DropdownMenuSeparator className="my-2 bg-border/60" />
                 ) : null}
                 <DropdownMenuRadioItem value={option.value}>

@@ -7,6 +7,12 @@ import { useKnownAgentPubkeys } from "@/features/agents/useKnownAgentPubkeys";
 import { useChannelsQuery } from "@/features/channels/hooks";
 import { RightAuxiliaryPane } from "@/features/channels/ui/RightAuxiliaryPane";
 import { ChannelManagementSheet } from "@/features/channels/ui/ChannelManagementSheet";
+import {
+  buildInboxAttentionFilters,
+  formatInboxAttentionCount,
+  isInboxAttentionFilter,
+} from "@/features/home/lib/inboxAttentionFilters";
+import { useInboxStatusCards } from "@/features/home/useInboxStatusCards";
 import { HOME_FEED_LIMIT } from "@/features/home/hooks";
 import {
   type InboxFilter,
@@ -65,6 +71,8 @@ import { resolveUserLabel } from "@/features/profile/lib/identity";
 import { useRemindLater } from "@/features/reminders/ui/RemindMeLaterProvider";
 import { deleteMessage, sendChannelMessage } from "@/shared/api/tauri";
 import type { Channel, HomeFeedResponse } from "@/shared/api/types";
+import { isDue } from "@/features/reminders/lib/reminderFilters";
+import { useFeatureEnabled } from "@/shared/features";
 import { KIND_REACTION } from "@/shared/constants/kinds";
 import { topChromeInset } from "@/shared/layout/chromeLayout";
 import { cn } from "@/shared/lib/cn";
@@ -87,6 +95,9 @@ const INBOX_SEARCH_KEYS = [
 
 const INBOX_UNREAD_ONLY_STORAGE_KEY = "buzz.desktop.inbox-unread-only";
 const EMPTY_INBOX_ITEMS: InboxItem[] = [];
+// The native approval subscription has a separate 20-event bound.
+const NATIVE_APPROVAL_LIMIT = 20;
+const EMPTY_ANSWER_DONE_SET: ReadonlySet<string> = new Set();
 
 type HomeViewProps = {
   feed?: HomeFeedResponse;
@@ -132,10 +143,26 @@ export function HomeView({
   // background data loads must never trigger navigations.
   const { applyPatch: applyInboxSearchPatch, values: inboxSearchValues } =
     useHistorySearchState(INBOX_SEARCH_KEYS);
-  const isReminders = filter === "reminders";
-  const isDrafts = filter === "drafts";
+  const inboxV2 = useFeatureEnabled("inboxV2");
+  const activeFilter = !inboxV2 && isInboxAttentionFilter(filter) ? "all" : filter;
+  const needsYou = activeFilter === "needs_you";
+  const inAnswers = activeFilter === "answers";
+  const inAttentionView = needsYou || inAnswers;
+  const { data: attentionFeed, coverage: attentionCoverage } = useInboxStatusCards(
+    availableChannelIds,
+    currentPubkey,
+    inboxV2,
+  );
+  const attentionFeedResponse = React.useMemo(
+    () => feed && attentionFeed
+      ? { ...feed, feed: { ...feed.feed, activity: [...feed.feed.activity, ...attentionFeed.activity] } }
+      : feed,
+    [attentionFeed, feed],
+  );
+  const isReminders = activeFilter === "reminders";
+  const isDrafts = activeFilter === "drafts";
   const isMessagesMode = !isReminders && !isDrafts;
-  const allowMixedPersonalSelection = filter === "all";
+  const allowMixedPersonalSelection = activeFilter === "all" || needsYou;
   const {
     drafts: {
       activeCount: activeDraftCount,
@@ -159,6 +186,7 @@ export function HomeView({
     isNarrowHomeViewport,
     isReminders,
     viewportWidthPx: homeInboxWidthPx,
+    onlyDue: needsYou,
   });
   // `?item=` is Messages-mode-only machinery: a reminder never enters the
   // FeedItem selection model, so reload while in Reminders mode keeps a stale
@@ -266,7 +294,7 @@ export function HomeView({
     feedItemState;
   const { feedItems, activeLatchedItem, coldResolutionPending } =
     useInboxSelectionAnchor({
-      feed,
+      feed: inAttentionView ? attentionFeedResponse : feed,
       selectedEventId,
       availableChannelIds,
     });
@@ -404,32 +432,57 @@ export function HomeView({
     doneSet,
     readStateVersion,
   ]);
+  // Reuse the existing grouping and read-state model with an independent feed
+  // so discovery cannot add rows or change counts in the existing views.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: readStateVersion invalidates stable marker callbacks
+  const attentionItems = React.useMemo(
+    () => inboxV2 && attentionFeedResponse !== feed
+      ? filterInboxItems(buildInboxItems({
+          channels,
+          currentPubkey,
+          feed: attentionFeedResponse,
+          getChannelReadAt,
+          getMessageReadAt,
+          getThreadReadAt,
+          profiles: feedProfiles,
+        }))
+      : inboxItems,
+    [attentionFeedResponse, channels, currentPubkey, feed, feedProfiles, getChannelReadAt,
+      getMessageReadAt, getThreadReadAt, inboxItems, inboxV2, readStateVersion],
+  );
+  const readStateOptions = {
+    getChannelReadAt,
+    getThreadReadAt,
+    getMessageReadAt,
+    readStateVersion,
+    localDoneSet: doneSet,
+    localUnreadSet: unreadSet,
+    clearChannelUnreadSource,
+    markChannelRead,
+    markChannelUnread,
+    markMessageRead,
+    markThreadRead,
+    markDoneLocal: markDone,
+    markUnreadLocal: markUnread,
+    undoDoneLocal: undoDone,
+    undoUnreadLocal: undoUnread,
+  };
+  const inboxReadState = useHomeInboxReadState({ ...readStateOptions, items: inboxItems });
+  const attentionReadState = useHomeInboxReadState({ ...readStateOptions, items: attentionItems });
   const { effectiveDoneSet, markItemRead, markItemUnread } =
-    useHomeInboxReadState({
-      items: inboxItems,
-      getChannelReadAt,
-      getThreadReadAt,
-      getMessageReadAt,
-      readStateVersion,
-      localDoneSet: doneSet,
-      localUnreadSet: unreadSet,
-      clearChannelUnreadSource,
-      markChannelRead,
-      markChannelUnread,
-      markMessageRead,
-      markThreadRead,
-      markDoneLocal: markDone,
-      markUnreadLocal: markUnread,
-      undoDoneLocal: undoDone,
-      undoUnreadLocal: undoUnread,
-    });
+    inAttentionView ? attentionReadState : inboxReadState;
+  const currentItems = inAttentionView ? attentionItems : inboxItems;
+  const dueReminders = pendingReminders.filter(
+    (reminder) => isDue(reminder, Math.floor(Date.now() / 1_000)),
+  );
+
   // Resolve selection before filtering so unread-only can retain its active row.
   const selectedItemFromAll = React.useMemo(
     () =>
       selectedEventId
-        ? findInboxItemByEventId(inboxItems, selectedEventId)
+        ? findInboxItemByEventId(currentItems, selectedEventId)
         : null,
-    [inboxItems, selectedEventId],
+    [currentItems, selectedEventId],
   );
   // selectedConversationId: prefer the InboxItem-derived conversationId (stable
   // group key). Fall back to deriving it from the latched FeedItem when the
@@ -450,11 +503,11 @@ export function HomeView({
         limit: HOME_FEED_LIMIT,
         ownedAgentPubkeys,
         unreadOnly,
-        effectiveDoneSet,
+        effectiveDoneSet: inboxReadState.effectiveDoneSet,
         selectedConversationId,
       }),
     [
-      effectiveDoneSet,
+      inboxReadState.effectiveDoneSet,
       feed?.feed,
       inboxItems,
       ownedAgentPubkeys,
@@ -462,7 +515,50 @@ export function HomeView({
       unreadOnly,
     ],
   );
-  const filteredItems = rowsByFilter[filter] ?? EMPTY_INBOX_ITEMS;
+  const attention = inboxV2 ? buildInboxAttentionFilters({
+    items: attentionItems,
+    dueReminders,
+    snapshots: attentionFeed?.snapshots,
+    effectiveDoneSet: attentionReadState.effectiveDoneSet,
+    unreadOnly,
+    selectedConversationId,
+    getMessageReadAt,
+    getChannelReadAt,
+  }) : null;
+  const needsYouCapped = Boolean(attentionFeed?.cardsCapped) ||
+    (feed?.feed.mentions.length ?? 0) >= HOME_FEED_LIMIT ||
+    (feed?.feed.needsAction.length ?? 0) >= NATIVE_APPROVAL_LIMIT;
+  const allCounts = attention ? {
+    ...countsByFilter,
+    needs_you: formatInboxAttentionCount(attention.needsYouCount, needsYouCapped, attentionCoverage),
+    answers: formatInboxAttentionCount(attention.rowsByFilter.answers.length,
+      Boolean(attentionFeed?.cardsCapped || attentionFeed?.jobsCapped), attentionCoverage),
+  } : countsByFilter;
+  const attentionRows = attention?.rowsByFilter;
+  const statusByConversation = needsYou
+    ? attention?.statusByFilter.needs_you
+    : inAnswers
+      ? attention?.statusByFilter.answers
+      : undefined;
+  const filteredItems = (
+    needsYou ? attentionRows?.needs_you :
+    inAnswers ? attentionRows?.answers :
+    rowsByFilter[activeFilter]
+  ) ?? EMPTY_INBOX_ITEMS;
+  const handleMarkRead = (itemId: string) => {
+    markItemRead(itemId);
+    if (!inAnswers) return;
+    const row = findInboxItemByEventId(attentionItems, itemId);
+    for (const event of row?.groupItems ?? []) {
+      const status = attentionFeed?.snapshots.get(event.id);
+      if (status?.state === "done") {
+        markMessageRead(status.revisionId, status.revisionAt);
+      }
+    }
+    if (row?.conversationId === selectedConversationId) {
+      handleUserSelectItem(null);
+    }
+  };
   // A filter change may only retain detail for a conversation that remains
   // visible. The filter handler selects the next valid row in the same update,
   // so the detail pane never renders a stale conversation between states.
@@ -563,7 +659,11 @@ export function HomeView({
 
   const handleFilterChange = React.useCallback(
     (nextFilter: InboxFilter) => {
-      const nextItems = rowsByFilter[nextFilter] ?? EMPTY_INBOX_ITEMS;
+      const nextItems = (
+        nextFilter === "needs_you" ? attentionRows?.needs_you :
+        nextFilter === "answers" ? attentionRows?.answers :
+        rowsByFilter[nextFilter]
+      ) ?? EMPTY_INBOX_ITEMS;
       const selection = resolveInboxFilterSelection({
         isNarrow: isNarrowHomeViewport,
         items: nextItems,
@@ -592,6 +692,7 @@ export function HomeView({
     },
     [
       applyInboxSearchPatch,
+      attentionRows,
       isNarrowHomeViewport,
       rowsByFilter,
       selectedConversationId,
@@ -658,7 +759,7 @@ export function HomeView({
     isReminders: detailMode === "reminders",
     isSinglePanelAuxiliaryView,
     selectedDraft: selectedDraftItem !== null,
-    selectedEvent: selectedEventId !== null,
+    selectedEvent: inAttentionView ? selectedItem !== null : selectedEventId !== null,
     selectedReminder: selectedReminder !== null,
     threadPanelWidthPx,
   });
@@ -714,15 +815,17 @@ export function HomeView({
               activeReminderEventIds={activeReminderEventIds}
               agentPubkeys={inboxAgentPubkeys}
               activeDraftCount={activeDraftCount}
-              countsByFilter={countsByFilter}
+              countsByFilter={allCounts}
+              attentionCoverage={inAttentionView ? attentionCoverage : undefined}
+              statusByConversation={statusByConversation}
               draftItems={draftItems}
-              doneSet={effectiveDoneSet}
+              doneSet={inAnswers ? EMPTY_ANSWER_DONE_SET : effectiveDoneSet}
               dueReminderCount={dueReminderCount}
-              filter={filter}
+              filter={activeFilter}
               items={filteredItems}
               onDeleteDraft={handleDeleteDraft}
               onFilterChange={handleFilterChange}
-              onMarkRead={markItemRead}
+              onMarkRead={handleMarkRead}
               onMarkUnread={markItemUnread}
               onOpenDirect={handleOpenDirect}
               isReopenPending={isReopenPending}
@@ -740,7 +843,7 @@ export function HomeView({
                 });
               }}
               onSelect={(itemId) => {
-                const item = findInboxItemByEventId(inboxItems, itemId);
+                const item = findInboxItemByEventId(currentItems, itemId);
                 setUnreadBoundary(
                   item && !effectiveDoneSet.has(item.id)
                     ? {
@@ -752,7 +855,7 @@ export function HomeView({
                 setSelectedDraftKey(null);
                 setSelectedReminderId(null);
                 handleUserSelectItem(itemId);
-                markItemRead(itemId);
+                if (!inAnswers) markItemRead(itemId);
               }}
               onSelectDraft={(draftKey) => {
                 setUnreadBoundary(null);
@@ -768,7 +871,7 @@ export function HomeView({
               }}
               onUnreadOnlyChange={handleUnreadOnlyChange}
               reminderPubkey={currentPubkey}
-              reminders={pendingReminders}
+              reminders={needsYou ? dueReminders : pendingReminders}
               selectedConversationId={selectedConversationId}
               selectedDraftKey={selectedDraftKey}
               selectedReminderId={selectedReminderId}
@@ -817,6 +920,8 @@ export function HomeView({
               hasThreadContextLoadError={threadContext.hasLoadError}
               isThreadContextLoading={threadContext.isLoading}
               item={selectedItem}
+              attentionCard={selectedItem ? statusByConversation?.get(selectedItem.conversationId) : undefined}
+              onMarkAnswerRead={inAnswers && selectedItem ? () => handleMarkRead(selectedItem.id) : undefined}
               latchedDefaultParentId={latchedDefaultParentId}
               messages={contextMessages}
               profiles={feedProfiles}

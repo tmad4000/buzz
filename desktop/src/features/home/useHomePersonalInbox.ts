@@ -5,7 +5,7 @@ import {
   countDueReminders,
   useRemindersQuery,
 } from "@/features/reminders/hooks";
-import { groupReminders } from "@/features/reminders/lib/reminderFilters";
+import { groupReminders, isDue } from "@/features/reminders/lib/reminderFilters";
 
 type UseHomePersonalInboxOptions = {
   allowMixedSelection: boolean;
@@ -13,6 +13,7 @@ type UseHomePersonalInboxOptions = {
   isDrafts: boolean;
   isNarrowHomeViewport: boolean;
   isReminders: boolean;
+  onlyDue?: boolean;
   viewportWidthPx: number;
 };
 
@@ -22,6 +23,7 @@ export function useHomePersonalInbox({
   isDrafts,
   isNarrowHomeViewport,
   isReminders,
+  onlyDue = false,
   viewportWidthPx,
 }: UseHomePersonalInboxOptions) {
   const remindersQuery = useRemindersQuery(currentPubkey);
@@ -37,7 +39,10 @@ export function useHomePersonalInbox({
     null,
   );
   const selectedReminder =
-    pendingReminders.find((reminder) => reminder.id === selectedReminderId) ??
+    pendingReminders.find((reminder) =>
+      reminder.id === selectedReminderId &&
+      (!onlyDue || isDue(reminder, Math.floor(Date.now() / 1_000))),
+    ) ??
     null;
 
   React.useEffect(() => {
@@ -48,7 +53,7 @@ export function useHomePersonalInbox({
     }
     if (
       selectedReminderId !== null &&
-      !pendingReminders.some((reminder) => reminder.id === selectedReminderId)
+      selectedReminder === null
     ) {
       selectReminder(null);
       return;
