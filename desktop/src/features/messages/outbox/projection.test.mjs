@@ -259,3 +259,45 @@ test("independent inline/sidebar query echoes before ACK keep one client-owned i
   assert.equal(merged[0].content, accepted.content);
   assert.deepEqual(mergeOwnThreadLocalEvents([], [], "root", owner), []);
 });
+
+test("pending projection filters recovered preview tags without mutating durable record", () => {
+  const queued = row();
+  const content =
+    "<https://humanityinfrastructure.com> <https://x.com/kevinrose/status/123>";
+  const bad = [
+    "link-preview",
+    "snapshot",
+    "1",
+    "https://humanityinfrastructure.com/",
+    "Humanity",
+    "site",
+    "",
+    "",
+    "",
+    "",
+    "",
+  ];
+  const good = [...bad];
+  good[3] = "https://x.com/kevinrose/status/123";
+  queued.message.content = content;
+  queued.message.tags = [
+    bad,
+    good,
+    ["emoji", "wave", "https://relay.example/wave.png"],
+  ];
+  const original = JSON.stringify(queued);
+  const client = new QueryClient();
+  projectPendingOutboxRows(client, [queued]);
+  const pending = pendingOutboxEvent(queued);
+  assert.equal(pending.content, content);
+  assert.ok(!pending.tags.some((tag) => tag[3] === bad[3]));
+  assert.ok(pending.tags.some((tag) => tag[3] === good[3]));
+  assert.ok(pending.tags.some((tag) => tag[0] === "emoji"));
+  assert.equal(messages(client).length, 1);
+  assert.ok(
+    messages(client).every(
+      (message) => !message.tags.some((tag) => tag[3] === bad[3]),
+    ),
+  );
+  assert.equal(JSON.stringify(queued), original);
+});

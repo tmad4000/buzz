@@ -3,8 +3,11 @@ import test from "node:test";
 
 import {
   buildLinkPreviewSnapshotTag,
+  filterOutgoingLinkPreviewTags,
   parseLinkPreviewSnapshots,
 } from "./linkPreviewSnapshot.ts";
+
+import { extractSupportedLinkPreviews } from "./linkPreview.ts";
 
 const HASH = "a".repeat(64);
 const ORIGIN = "https://relay.example";
@@ -113,4 +116,36 @@ test("snapshot tags omit canonical URLs rejected by native validation", () => {
 test("messages without authored snapshots never create recipient previews", () => {
   assert.deepEqual(parseLinkPreviewSnapshots([], CONTENT, ORIGIN), []);
   assert.deepEqual(parseLinkPreviewSnapshots(undefined, CONTENT, ORIGIN), []);
+});
+
+test("outgoing canonical filter omits bare-host slash mismatch and preserves exact X URL", () => {
+  const bare = [...valid];
+  bare[3] = "https://humanityinfrastructure.com/";
+  const x = [...valid];
+  x[3] = "https://x.com/kevinrose/status/2122394902168473975";
+  const content = `<https://humanityinfrastructure.com> <${x[3]}>`;
+  const extracted = extractSupportedLinkPreviews(content);
+  assert.equal(
+    extracted.find(
+      (preview) => preview.provider === "humanityinfrastructure.com",
+    )?.href,
+    bare[3],
+  );
+  assert.equal(content.includes(bare[3]), false);
+  assert.deepEqual(filterOutgoingLinkPreviewTags([bare, x], content), [x]);
+  assert.deepEqual(filterOutgoingLinkPreviewTags([x, x], content), [x]);
+  assert.deepEqual(filterOutgoingLinkPreviewTags([x], `[label](${x[3]})`), [x]);
+  assert.deepEqual(
+    filterOutgoingLinkPreviewTags([["link-preview", "none"]], content),
+    [["link-preview", "none"]],
+  );
+  for (const canonical of [
+    "http://example.com",
+    "https://user:secret@example.com",
+    "https://example.com/#fragment",
+  ]) {
+    const bad = [...valid];
+    bad[3] = canonical;
+    assert.deepEqual(filterOutgoingLinkPreviewTags([bad], canonical), []);
+  }
 });

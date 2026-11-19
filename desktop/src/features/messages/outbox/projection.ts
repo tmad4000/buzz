@@ -1,3 +1,4 @@
+import { filterOutgoingLinkPreviewTags } from "@/shared/lib/linkPreviewSnapshot";
 import type { QueryClient } from "@tanstack/react-query";
 import type { RelayEvent } from "@/shared/api/types";
 import { buildReplyTags } from "../lib/threading";
@@ -59,7 +60,7 @@ export function pendingOutboxEvent(row: OutboxRecord): RelayEvent {
             ["p", m.signerPubkey],
             ...m.mentionPubkeys.map((pubkey) => ["p", pubkey]),
           ]),
-      ...m.tags.filter(
+      ...filterOutgoingLinkPreviewTags(m.tags, m.content.trim()).filter(
         (tag) => tag[0] !== "client_msg_id" && tag[0] !== "client_written_at",
       ),
       ["client_msg_id", row.id],

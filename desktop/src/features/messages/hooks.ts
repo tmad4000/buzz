@@ -1,3 +1,4 @@
+import { filterOutgoingLinkPreviewTags } from "@/shared/lib/linkPreviewSnapshot";
 import { useContext } from "react";
 import { OutboxContext } from "./outbox/OutboxProvider";
 import { enqueueOutbox } from "./outbox/runtime";
@@ -144,7 +145,7 @@ export function createOptimisticMessage(
     }
   }
 
-  for (const tag of mediaTags) {
+  for (const tag of filterOutgoingLinkPreviewTags(mediaTags, content.trim())) {
     tags.push(tag);
   }
   if (sentFromThreadRootId) {
@@ -552,8 +553,12 @@ export function useSendMessageMutation(
         mediaTags: imetaTags,
         emojiTags,
         mentionTags,
-        linkPreviewTags,
+        linkPreviewTags: preparedLinkPreviewTags,
       } = splitOutgoingTags(mediaTags);
+      const linkPreviewTags = filterOutgoingLinkPreviewTags(
+        preparedLinkPreviewTags,
+        content.trim(),
+      );
       const recipientPubkeys = messageMentionPubkeys(
         effectiveChannel,
         identity.pubkey,
@@ -599,7 +604,7 @@ export function useSendMessageMutation(
             rootEventId,
             mentionPubkeys: recipientPubkeys,
             tags: [
-              ...(mediaTags ?? []),
+              ...filterOutgoingLinkPreviewTags(mediaTags ?? [], content.trim()),
               ...(sentFromThreadTag ? [sentFromThreadTag] : []),
             ],
             relayUrl:
