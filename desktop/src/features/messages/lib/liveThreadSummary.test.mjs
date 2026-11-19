@@ -127,7 +127,8 @@ test("actual list selector uses live evidence while retaining frozen body member
       node.initializer.expression.getText(source) === "React.useMemo"
     ) {
       const callback = node.initializer.arguments[0].getText(source);
-      if (node.name.getText(source) === "sourceEntries") sourceSelector = callback;
+      if (node.name.getText(source) === "sourceEntries")
+        sourceSelector = callback;
       else selector = callback;
     }
     ts.forEachChild(node, visit);
