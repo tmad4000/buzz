@@ -82,6 +82,8 @@ export type MarkdownProps = {
   hardLineBreaks?: boolean;
   imetaByUrl?: ImetaLookup;
   interactive?: boolean;
+  /** Render and play source attachments and signed previews without message actions. */
+  readOnlyMedia?: boolean;
   /**
    * Render fenced code as scrollable code blocks even when `interactive` is
    * false. Non-interactive surfaces default to inlining code (compact

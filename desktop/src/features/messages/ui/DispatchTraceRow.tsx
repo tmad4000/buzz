@@ -1,6 +1,7 @@
 import { Markdown } from "@/shared/ui/markdown";
 import { parseImetaTags } from "@/shared/ui/markdown/parseImeta";
 import * as React from "react";
+import { hasLinkPreviewSuppression } from "../lib/formatTimelineMessages";
 import type { TimelineMessage } from "../types";
 
 /** This is not a MessageRow: no read observer, mention delivery, reactions or reply actions. */
@@ -47,10 +48,11 @@ export function DispatchTraceRow({
         >
           <Markdown
             content={message.body || "Attachment"}
-            interactive={false}
+            readOnlyMedia
             blockCode
             imetaByUrl={imeta}
             messageId={message.id}
+            linkPreviewsSuppressed={hasLinkPreviewSuppression(message.tags)}
             linkPreviewTags={message.tags}
           />
           {root && onOpen ? (

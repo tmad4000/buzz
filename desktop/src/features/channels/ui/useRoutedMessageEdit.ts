@@ -1,6 +1,7 @@
 import * as React from "react";
 import { toast } from "sonner";
 import { isThreadReply } from "@/features/messages/lib/threading";
+import type { MainTimelineEntry } from "@/features/messages/lib/threadPanel";
 import type { TimelineMessage } from "@/features/messages/types";
 import { KIND_SYSTEM_MESSAGE } from "@/shared/constants/kinds";
 
@@ -10,7 +11,7 @@ type Input = {
   currentPubkey?: string | null;
   editTarget: { id: string; isThreadReply: boolean } | null;
   isSinglePanelView: boolean;
-  mainMessages: TimelineMessage[];
+  mainEntries: readonly MainTimelineEntry[];
   onCloseThread: () => void;
   onEdit?: (message: TimelineMessage) => void;
   threadHeadMessage: TimelineMessage | null;
@@ -24,7 +25,7 @@ export function useRoutedMessageEdit({
   currentPubkey,
   editTarget,
   isSinglePanelView,
-  mainMessages,
+  mainEntries,
   onCloseThread,
   onEdit,
   threadHeadMessage,
@@ -98,9 +99,13 @@ export function useRoutedMessageEdit({
     [isSinglePanelView, onCloseThread, onEdit, useFocusThreadDrawer],
   );
   const handleEditLastOwnMainMessage = React.useCallback(() => {
-    const target = findLastOwnEditable(mainMessages);
+    const target = findLastOwnEditable(
+      mainEntries
+        .filter((entry) => !entry.dispatchTrace)
+        .map((entry) => entry.message),
+    );
     return target ? routeEdit(target) : false;
-  }, [findLastOwnEditable, mainMessages, routeEdit]);
+  }, [findLastOwnEditable, mainEntries, routeEdit]);
   const handleEditLastOwnThreadMessage = React.useCallback(() => {
     const target = findLastOwnEditable(
       threadHeadMessage

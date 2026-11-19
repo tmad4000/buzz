@@ -548,7 +548,7 @@ export const ChannelPane = React.memo(function ChannelPane({
     currentPubkey,
     editTarget,
     isSinglePanelView,
-    mainMessages: mainTimelineEntries.map((entry) => entry.message),
+    mainEntries: mainTimelineEntries,
     onCloseThread,
     onEdit,
     threadHeadMessage,
