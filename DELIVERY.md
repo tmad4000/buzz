@@ -455,3 +455,17 @@ All runs use `/home/dev/code/buzz-thread-activity-20261118/run-bounded.py`: chil
 - Draft PR70 is open; initial exact-head source NO-GO at53faad763 identified pending-root pin persistence and same-chat snapshot overwrites: https://github.com/tmad4000/buzz/pull/70#issuecomment-6966079471. Delta requests/verdicts now go to review coordinator a036208f-259f-46f1-9689-dba3d08e3805, reusing reviewer376919a0-3904-4505-9116-7dcf21ac6a42; no new review launch. Runtime/composed archive/attention integration and human acceptance stay with release owners.
 
 Owners notified: 36ce8949 order; 445b5cb9 thread/composer/seen; 2d576c28 count selectors; 9e03d4e scroll (source compatibility guidance incorporated); fd0be4cf composition. Archive exclusions must be applied by the composed pipeline before count projection; shown-archived bodies must never enter observation callbacks.
+
+---
+
+# Preserved PR100 source receipt
+
+# Last advertised route — small .9 follow-up
+
+Root requested explicit route-advertisement freshness on runtime rows/profiles, stacked on frozen PR81 7998e81a88134a03f578175c29eed20daecef5e0. Jacob's original Direct Agents ask distinguishes where an agent runs/how to resume it; a self-signed route is not presence or execution proof.
+
+Changes: shared Last advertised route label, relative age, STALE · stale, may be offline strictly after five minutes, retained Stale (over 24 h) strictly after24h. Existing visibility-aware shared minute clock, clamped future timestamps. Runtime rows have a bounded-width wrapped badge and additive auto/minimum row height when data-runtime-route exists; no runtime data leaves row height unchanged. No section names/order/Starred/assignments, producer, query/signature/opener, presence or PR81 edits. Sidebar owner36ce8949 received exact additive diff before PR. Existing device-local runtime-card switch remains default OFF.
+
+Tests: 11/11 focused runtime/model/UI PASS, including fake timers driving the actual useNow React shared clock, exact5min vs over5min, 2m age, over24h, future clamp, and row/profile timestamp bindings. TypeScript tsc --noEmit PASS. Processes start_new_session with60s/150s deadlines and process-group cleanup; logs /tmp/runtime-route-age-focused.log and /tmp/runtime-route-age-typecheck.log. git diff --check PASS. No dependency/install/browser/native/Cargo/Mac/live-publication activity. No native or authenticated UI acceptance claim.
+
+Review: draft stacked PR, independent Sol dispatch and .9 rollup through coordinator a036208f-259f-46f1-9689-dba3d08e3805. Native/human acceptance remains separately scoped.

@@ -1,3 +1,4 @@
+import { RuntimeRouteAge } from "./RuntimeRouteAge";
 import { useProfilePanel } from "@/shared/context/ProfilePanelContext";
 import { useAgentRuntime } from "./useAgentRuntime";
 import { OpenRuntimeSession } from "./AgentRuntimeCard";
@@ -7,10 +8,14 @@ export function AgentRuntimeHost({ pubkey }: { pubkey?: string }) {
   const { data } = useAgentRuntime(pubkey);
   return data ? (
     <span
-      className="rounded bg-muted px-1 font-mono text-[10px] text-muted-foreground"
+      data-runtime-route
+      className="min-w-0 max-w-[55%] rounded bg-muted px-1 text-[10px] leading-tight text-muted-foreground"
       title="Self-reported runtime host"
     >
-      {data.card.host.toUpperCase()}
+      <span className="font-mono">{data.card.host.toUpperCase()}</span>
+      <span className="block whitespace-normal">
+        <RuntimeRouteAge attestedAt={data.attestedAt} />
+      </span>
     </span>
   ) : null;
 }
