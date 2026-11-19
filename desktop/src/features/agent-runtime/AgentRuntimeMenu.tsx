@@ -1,5 +1,4 @@
-import { openUrl } from "@tauri-apps/plugin-opener";
-import { toast } from "sonner";
+import { openPaseoAgent } from "@/shared/lib/openPaseoAgent";
 import { useKnownAgentPubkeys } from "@/features/agents/useKnownAgentPubkeys";
 import { useProfilePanel } from "@/shared/context/ProfilePanelContext";
 import { copyTextToClipboard } from "@/shared/lib/clipboard";
@@ -34,9 +33,7 @@ export function AgentRuntimeMenu({ channel }: { channel: Channel }) {
         <ContextMenuItem
           onSelect={() =>
             deferMenuAction(() => {
-              void openUrl(link).catch(() =>
-                toast.error("Failed to open Paseo"),
-              );
+              void openPaseoAgent(link);
             })
           }
         >

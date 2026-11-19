@@ -1,3 +1,4 @@
+import { openPaseoAgent } from "@/shared/lib/openPaseoAgent";
 import * as React from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { toast } from "sonner";
@@ -51,9 +52,7 @@ export function ExternalLinkAnchor({
         anchorProps.onClick?.(event);
         if (event.defaultPrevented || !href || !isPaseoAgentLink(href)) return;
         event.preventDefault();
-        void openUrl(href).catch(() =>
-          toast.error("Failed to open Paseo agent"),
-        );
+        void openPaseoAgent(href);
       }}
       onContextMenuCapture={(event) => {
         if (!href) return;
@@ -80,9 +79,11 @@ export function ExternalLinkAnchor({
               label: "Open link",
               onSelect: () => {
                 closeMenu();
-                void openUrl(href).catch(() => {
-                  toast.error("Failed to open link");
-                });
+                if (isPaseoAgentLink(href)) void openPaseoAgent(href);
+                else
+                  void openUrl(href).catch(() => {
+                    toast.error("Failed to open link");
+                  });
               },
             },
             {

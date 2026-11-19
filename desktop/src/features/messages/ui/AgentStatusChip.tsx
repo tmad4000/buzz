@@ -2,8 +2,7 @@ import type { TimelineMessage } from "../types";
 import { AgentCardControls } from "./AgentCardControls";
 import type { parseBridgeStatusCard } from "@/features/messages/lib/bridgeStatusCard";
 import { copyTextToClipboard } from "@/shared/lib/clipboard";
-import { openUrl } from "@tauri-apps/plugin-opener";
-import { toast } from "sonner";
+import { openPaseoAgent } from "@/shared/lib/openPaseoAgent";
 
 type Card = NonNullable<ReturnType<typeof parseBridgeStatusCard>>;
 
@@ -37,13 +36,7 @@ export function AgentStatusChip({
             type="button"
             className="min-h-11 shrink-0 rounded px-1 underline focus-visible:outline-2 focus-visible:outline-primary"
             aria-label={`Open agent ${card.title}`}
-            onClick={() =>
-              void openUrl(card.href).catch(() =>
-                toast.error(
-                  "Could not open Paseo. Copy the agent and server IDs from details.",
-                ),
-              )
-            }
+            onClick={() => void openPaseoAgent(card.href)}
           >
             Open agent ↗
           </button>

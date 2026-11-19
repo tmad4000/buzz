@@ -64,7 +64,9 @@ test("compact card exposes exact agent link, signed original text, and in-place 
       details.open = true;
     });
     await act(() => link.click());
-    assert.deepEqual(globalThis.__openedAgent, [href]);
+    assert.deepEqual(globalThis.__openedAgent, [
+      href.replace("paseo:", "paseo-fork:"),
+    ]);
     const summary = container.querySelector("summary");
     await render(originalBody.replace("⏳ Working", "✅ Done"));
     assert.equal(container.querySelector("summary"), summary);

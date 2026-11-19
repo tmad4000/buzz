@@ -23,7 +23,12 @@ function load(name, mocks) {
         ? mocks[s]
         : s === "./RuntimeRouteAge"
           ? { RuntimeRouteAge: () => null }
-          : require(s),
+          : s === "@/shared/lib/openPaseoAgent"
+            ? {
+                openPaseoAgent: (value) =>
+                  mocks["@tauri-apps/plugin-opener"].openUrl(value),
+              }
+            : require(s),
     Date,
   });
   return module.exports;
