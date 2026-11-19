@@ -129,7 +129,6 @@ export function AgentRuntimeCard({ pubkey }: { pubkey: string }) {
             <br />
             Self-signed · self-reported{" "}
             {new Date(data.attestedAt * 1000).toLocaleString()}
-
             {query.isError ? " · Refresh failed" : ""}
           </p>
         </div>

@@ -581,24 +581,29 @@ test("unrelated view/history cannot acquire an intent and retired captured origi
 });
 
 test("repeated exact-parent targets reveal open, closed and collapsed destinations without toggling them shut", async () => {
-  for (const initial of ["open","closed","collapsed"]) {
+  for (const initial of ["open", "closed", "collapsed"]) {
     localStorage.clear();
     const app = mount();
-    const props = {...base,isUnread:()=>false};
+    const props = { ...base, isUnread: () => false };
     try {
       await app.render(props);
       await act(() => {
-        latest.setExpanded("root", initial!=="closed");
-        latest.setExpanded("branch", initial==="open");
+        latest.setExpanded("root", initial !== "closed");
+        latest.setExpanded("branch", initial === "open");
       });
-      for(let click=0;click<2;click++) {
-        await app.render({...props,scrollTargetId:"leaf"});
-        assert.ok(latest.expanded.has("root"),initial);
-        assert.ok(latest.expanded.has("branch"),initial);
-        assert.ok(latest.entries.some(({message})=>message.id==="leaf"),initial);
+      for (let click = 0; click < 2; click++) {
+        await app.render({ ...props, scrollTargetId: "leaf" });
+        assert.ok(latest.expanded.has("root"), initial);
+        assert.ok(latest.expanded.has("branch"), initial);
+        assert.ok(
+          latest.entries.some(({ message }) => message.id === "leaf"),
+          initial,
+        );
         // Normal resolved-target receipt permits another explicit click.
-        await app.render({...props,scrollTargetId:null});
+        await app.render({ ...props, scrollTargetId: null });
       }
-    } finally {await app.close();}
+    } finally {
+      await app.close();
+    }
   }
 });

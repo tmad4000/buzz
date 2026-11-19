@@ -104,7 +104,11 @@ export function ProgressiveImage({
       data-progressive-image-frame=""
       style={frameStyle}
     >
-      {offline && unavailable ? <span className="flex h-full items-center justify-center text-sm text-muted-foreground">Available when online</span> : null}
+      {offline && unavailable ? (
+        <span className="flex h-full items-center justify-center text-sm text-muted-foreground">
+          Available when online
+        </span>
+      ) : null}
       {thumbnailSrc ? (
         <img
           alt=""
@@ -141,7 +145,10 @@ export function ProgressiveImage({
           style={style}
           width={width}
           onError={() => setUnavailable(true)}
-          onLoad={(event) => { setUnavailable(false); void handleFullLoad(event.currentTarget); }}
+          onLoad={(event) => {
+            setUnavailable(false);
+            void handleFullLoad(event.currentTarget);
+          }}
         />
       ) : null}
     </span>

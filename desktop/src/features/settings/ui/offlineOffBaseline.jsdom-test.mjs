@@ -118,7 +118,6 @@ test("R5 flag OFF preserves legacy load/store/hydration and opening Storage has 
   }
 });
 
-
 test("R5 OFF cold navigation dispatches relay without a second legacy cache read", async () => {
   const { useChannelMessagesQuery } = await import("@/features/messages/hooks");
   window.localStorage.clear();
@@ -133,23 +132,45 @@ test("R5 OFF cold navigation dispatches relay without a second legacy cache read
       if (command === "get_media_proxy_port") return 7777;
       if (command === "channel_head_cache_load") {
         if (args.limit === 12) return [];
-        return new Promise((resolve) => { releaseUnexpectedLoad = resolve; });
+        return new Promise((resolve) => {
+          releaseUnexpectedLoad = resolve;
+        });
       }
       if (command === "get_channel_window") return [];
     },
   };
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
   await hydrateChannelHeads(client, { pubkey: "alice", relayUrl: "wss://one" });
   const channel = { id: "cold", channelType: "stream" };
-  function Probe() { useChannelMessagesQuery(channel); return null; }
+  function Probe() {
+    useChannelMessagesQuery(channel);
+    return null;
+  }
   const root = createRoot(document.createElement("div"));
   try {
     await act(async () => {
-      root.render(React.createElement(QueryClientProvider, { client }, React.createElement(Probe)));
+      root.render(
+        React.createElement(
+          QueryClientProvider,
+          { client },
+          React.createElement(Probe),
+        ),
+      );
       await new Promise((resolve) => setTimeout(resolve, 30));
     });
-    assert.deepEqual(calls.filter(([cmd]) => cmd === "channel_head_cache_load").map(([, args]) => args.limit), [12]);
-    assert.equal(calls.filter(([cmd]) => cmd === "get_channel_window").length, 1, "relay fetch must not wait on lazy disk IPC while OFF");
+    assert.deepEqual(
+      calls
+        .filter(([cmd]) => cmd === "channel_head_cache_load")
+        .map(([, args]) => args.limit),
+      [12],
+    );
+    assert.equal(
+      calls.filter(([cmd]) => cmd === "get_channel_window").length,
+      1,
+      "relay fetch must not wait on lazy disk IPC while OFF",
+    );
   } finally {
     releaseUnexpectedLoad?.([]);
     await act(() => root.unmount());

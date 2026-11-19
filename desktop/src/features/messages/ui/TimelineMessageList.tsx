@@ -1,5 +1,8 @@
 import { useTimelineView } from "@/features/channels/ui/TimelineViewContext";
-import { orderThreadsByActivity, threadActivityKey } from "../lib/threadActivityOrder";
+import {
+  orderThreadsByActivity,
+  threadActivityKey,
+} from "../lib/threadActivityOrder";
 import { buildFlatTimelineEntries } from "../lib/flatTimeline";
 import type { ThreadSummaryRenderer } from "./TimelineMessageRow";
 import * as React from "react";
@@ -199,23 +202,31 @@ export const TimelineMessageList = React.memo(function TimelineMessageList({
           )),
     [mainEntries, messages, mode, profiles, threadSummaries, summaryMessages],
   );
-  const activityOrder = mode === "activity" && !hideDayDividers && channelType !== "forum";
+  const activityOrder =
+    mode === "activity" && !hideDayDividers && channelType !== "forum";
   const committedOrder = React.useRef<{ scope: string; ids: string[] }>({
-    scope: "", ids: [],
+    scope: "",
+    ids: [],
   });
   const orderScope = `${currentPubkey}:${channelId}:${mode}`;
   const entries = React.useMemo(
-    () => activityOrder
-      ? orderThreadsByActivity(
-          sourceEntries,
-          committedOrder.current.scope === orderScope ? committedOrder.current.ids : [],
-          holdActivityOrder,
-        )
-      : sourceEntries,
+    () =>
+      activityOrder
+        ? orderThreadsByActivity(
+            sourceEntries,
+            committedOrder.current.scope === orderScope
+              ? committedOrder.current.ids
+              : [],
+            holdActivityOrder,
+          )
+        : sourceEntries,
     [sourceEntries, activityOrder, orderScope, holdActivityOrder],
   );
   React.useLayoutEffect(() => {
-    committedOrder.current = { scope: orderScope, ids: entries.map(threadActivityKey) };
+    committedOrder.current = {
+      scope: orderScope,
+      ids: entries.map(threadActivityKey),
+    };
   }, [entries, orderScope]);
   // Activity roots are not chronological; a post-time New divider/date grouping
   // would claim a false read frontier and repeated backward date boundaries.
@@ -248,15 +259,15 @@ export const TimelineMessageList = React.memo(function TimelineMessageList({
 
   // The flattened item stream, memoized on the entries and the unread boundary
   // (the unread divider is its own item, so it shifts subsequent rows).
-  const itemsResult = React.useMemo(
-    () => {
-      const result = buildTimelineItems(entries, activityOrder ? null : firstUnreadMessageId);
-      return activityOrder
-        ? { items: result.items.filter(item => item.kind !== "day-divider") }
-        : result;
-    },
-    [entries, firstUnreadMessageId, activityOrder],
-  );
+  const itemsResult = React.useMemo(() => {
+    const result = buildTimelineItems(
+      entries,
+      activityOrder ? null : firstUnreadMessageId,
+    );
+    return activityOrder
+      ? { items: result.items.filter((item) => item.kind !== "day-divider") }
+      : result;
+  }, [entries, firstUnreadMessageId, activityOrder]);
   const dayGroups = React.useMemo(
     () => buildTimelineDayGroups(itemsResult.items),
     [itemsResult.items],

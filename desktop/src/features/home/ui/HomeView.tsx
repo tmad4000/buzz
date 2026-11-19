@@ -387,9 +387,16 @@ export function HomeView({
       profiles: feedProfiles,
     });
     return withInboxAttentionCounts(
-      filterInboxItems(items), currentPubkey, getThreadReplyObservedAt,
+      filterInboxItems(items),
+      currentPubkey,
+      getThreadReplyObservedAt,
       threadReplySeenReady,
-      { getChannelReadAt, getThreadReadAt, getMessageReadAt, seenFeedIdSet: doneSet },
+      {
+        getChannelReadAt,
+        getThreadReadAt,
+        getMessageReadAt,
+        seenFeedIdSet: doneSet,
+      },
     );
   }, [
     channels,

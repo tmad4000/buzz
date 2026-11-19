@@ -655,7 +655,11 @@ export const ChannelPane = React.memo(function ChannelPane({
     useSplitAuxiliaryPane,
   });
   const { activeCommunity: barCommunity } = useCommunities();
-  const barKey = openThreadPinsKey(barCommunity?.relayUrl ?? "", currentPubkey ?? "", activeChannelId ?? "");
+  const barKey = openThreadPinsKey(
+    barCommunity?.relayUrl ?? "",
+    currentPubkey ?? "",
+    activeChannelId ?? "",
+  );
   const timelineView = useTimelineView();
   const flatTimeline = timelineView.mode === "timeline" && !isHuddleTranscript;
   const timelineReplyHandler =
@@ -765,16 +769,20 @@ export const ChannelPane = React.memo(function ChannelPane({
                 ownerProfiles={ownerProfiles}
                 unfollowThreadById={unfollowThreadById}
                 emptyDescription={
-                  offline ? "Connect to load this conversation. Cached messages are shown when available." : activeChannel?.channelType === "forum"
-                    ? "Select a stream or DM to load real message history in this first integration pass."
-                    : "Messages and sub-replies will appear here once the relay has history for this channel."
+                  offline
+                    ? "Connect to load this conversation. Cached messages are shown when available."
+                    : activeChannel?.channelType === "forum"
+                      ? "Select a stream or DM to load real message history in this first integration pass."
+                      : "Messages and sub-replies will appear here once the relay has history for this channel."
                 }
                 emptyTitle={
-                  offline ? "Not available offline" : activeChannel
-                    ? activeChannel.channelType === "forum"
-                      ? "Forum channels are next"
-                      : "No messages yet"
-                    : "No channel selected"
+                  offline
+                    ? "Not available offline"
+                    : activeChannel
+                      ? activeChannel.channelType === "forum"
+                        ? "Forum channels are next"
+                        : "No messages yet"
+                      : "No channel selected"
                 }
                 isError={isTimelineError}
                 isLoading={isHuddleTranscript ? false : isTimelineLoading}

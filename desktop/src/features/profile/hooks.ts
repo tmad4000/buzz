@@ -355,7 +355,14 @@ export function useUsersBatchQuery(
     // freshly resolved.
     queryFn: async () => {
       const offlineScope = channelHeadCacheScope(queryClient);
-      if (offlineScope) await hydrateOfflineProfiles(queryClient, offlineScope, normalizedPubkeys).catch(error => console.warn("Offline profile hydration failed", error));
+      if (offlineScope)
+        await hydrateOfflineProfiles(
+          queryClient,
+          offlineScope,
+          normalizedPubkeys,
+        ).catch((error) =>
+          console.warn("Offline profile hydration failed", error),
+        );
       const now = Date.now();
       const profiles: UsersBatchResponse["profiles"] = {};
       const missing: string[] = [];

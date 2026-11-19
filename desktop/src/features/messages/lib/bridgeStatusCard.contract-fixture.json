@@ -26,10 +26,7 @@
     "kind": 9,
     "pubkey": "38ba46f41d56ff5c71cfbfb856d00b209e6216a218260d2a30c4f1b712bdd1cb",
     "tags": [
-      [
-        "h",
-        "ad66b837-7232-4fa0-b41f-cbc49d415b0b"
-      ],
+      ["h", "ad66b837-7232-4fa0-b41f-cbc49d415b0b"],
       [
         "e",
         "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
@@ -52,10 +49,7 @@
       "kind": 40003,
       "pubkey": "38ba46f41d56ff5c71cfbfb856d00b209e6216a218260d2a30c4f1b712bdd1cb",
       "tags": [
-        [
-          "h",
-          "ad66b837-7232-4fa0-b41f-cbc49d415b0b"
-        ],
+        ["h", "ad66b837-7232-4fa0-b41f-cbc49d415b0b"],
         [
           "e",
           "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
@@ -69,10 +63,7 @@
       "kind": 40003,
       "pubkey": "38ba46f41d56ff5c71cfbfb856d00b209e6216a218260d2a30c4f1b712bdd1cb",
       "tags": [
-        [
-          "h",
-          "ad66b837-7232-4fa0-b41f-cbc49d415b0b"
-        ],
+        ["h", "ad66b837-7232-4fa0-b41f-cbc49d415b0b"],
         [
           "e",
           "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"

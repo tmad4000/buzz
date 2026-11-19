@@ -3,7 +3,10 @@ import test from "node:test";
 import React, { act } from "react";
 import { createRoot } from "react-dom/client";
 import { AppShellProvider } from "@/app/AppShellContext";
-import { ConversationViewContext, ConversationLiveContext } from "./ConversationViewContext.tsx";
+import {
+  ConversationViewContext,
+  ConversationLiveContext,
+} from "./ConversationViewContext.tsx";
 import { useChannelOpenReadState } from "@/features/channels/ui/useChannelOpenReadState";
 
 // Exercises the production mount effect, including inbox override writes.
@@ -38,7 +41,11 @@ test("background mount/arrival, compact-hidden views and hidden documents cannot
           React.createElement(
             ConversationViewContext.Provider,
             { value: { viewInstanceId: "b", focused, visible } },
-            React.createElement(ConversationLiveContext.Provider, { value: live }, React.createElement(Host, { at })),
+            React.createElement(
+              ConversationLiveContext.Provider,
+              { value: live },
+              React.createElement(Host, { at }),
+            ),
           ),
         ),
       ),

@@ -64,7 +64,14 @@ test("thread row keeps native quote jump, accessible first line and body identit
     ],
   };
   const parents = new Map([
-    ["parent", { id: "parent", tags: [["h","channel"]], body: "Parent <first> line\nSecond line" }],
+    [
+      "parent",
+      {
+        id: "parent",
+        tags: [["h", "channel"]],
+        body: "Parent <first> line\nSecond line",
+      },
+    ],
   ]);
   const render = (value, map = parents, onJumpToThreadMessage) =>
     act(() =>
@@ -96,7 +103,10 @@ test("thread row keeps native quote jump, accessible first line and body identit
     assert.equal(body.dataset.messageId, "accepted");
     // Repeated scoped route jumps are force-reveals, never toggle calls.
     await act(() => document.querySelector("button").click());
-    assert.deepEqual(calls[1], ["channel", {messageId:"parent",threadRootId:"root",force:true}]);
+    assert.deepEqual(calls[1], [
+      "channel",
+      { messageId: "parent", threadRootId: "root", force: true },
+    ]);
     calls.pop();
     const ownerCalls = [];
     await render(
@@ -106,7 +116,10 @@ test("thread row keeps native quote jump, accessible first line and body identit
     );
     await act(() => document.querySelector("button").click());
     await act(() => document.querySelector("button").click());
-    assert.deepEqual(ownerCalls, [["root", "parent"], ["root", "parent"]]);
+    assert.deepEqual(ownerCalls, [
+      ["root", "parent"],
+      ["root", "parent"],
+    ]);
     assert.equal(
       calls.length,
       1,
@@ -165,7 +178,10 @@ test("quote presentation remains off when experiment is disabled", async () => {
             ],
           },
           parentMessages: new Map([
-            ["parent", { id: "parent", tags: [["h","channel"]], body: "Question" }],
+            [
+              "parent",
+              { id: "parent", tags: [["h", "channel"]], body: "Question" },
+            ],
           ]),
         }),
       ),

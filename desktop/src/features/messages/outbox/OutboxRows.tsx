@@ -86,7 +86,9 @@ function PendingMessage({ row }: { row: OutboxRecord }) {
                 ? "Could not send"
                 : row.state === "sending"
                   ? "Sending…"
-                  : offline ? "Will send when online" : "Waiting to send…"}
+                  : offline
+                    ? "Will send when online"
+                    : "Waiting to send…"}
         </span>
         {row.error ? (
           <span className="min-w-0 truncate" title={row.error}>

@@ -1,4 +1,6 @@
-import producerUnicode from "./bridgeProducerUnicodeC.json" with { type: "json" };
+import producerUnicode from "./bridgeProducerUnicodeC.json" with {
+  type: "json",
+};
 import { isPaseoAgentLink } from "@/shared/ui/markdown/paseoAgentLink";
 import type { TimelineMessage } from "@/features/messages/types";
 
@@ -28,7 +30,8 @@ const PRODUCER_ESCAPES = new Set("\\`*_{}[]()<>#!|");
 // Pin the producer's excluded categories rather than trusting host regex tables.
 function producerExcludes(char: string): boolean {
   const codepoint = char.codePointAt(0)!;
-  let low = 0, high = producerUnicode.ranges.length - 1;
+  let low = 0,
+    high = producerUnicode.ranges.length - 1;
   while (low <= high) {
     const middle = (low + high) >>> 1;
     const [start, end] = producerUnicode.ranges[middle];
@@ -52,8 +55,12 @@ function decodeProducerLabel(encoded: string, maximum: number): string | null {
   }
   const length = Array.from(decoded).length;
   // Truncating an already-trimmed long label may leave trailing whitespace.
-  if (length > maximum || decoded.trimStart() !== decoded ||
-      (length < maximum && decoded.trimEnd() !== decoded)) return null;
+  if (
+    length > maximum ||
+    decoded.trimStart() !== decoded ||
+    (length < maximum && decoded.trimEnd() !== decoded)
+  )
+    return null;
   return decoded;
 }
 
@@ -92,7 +99,9 @@ export function parseBridgeStatusCard(message: TimelineMessage) {
       lines[3],
     )?.[1];
   if (!source) return null;
-  const header = /^([\s\S]*?) — ([\s\S]*) · ([\s\S]*) \(([\s\S]*)\)$/.exec(lines[0]);
+  const header = /^([\s\S]*?) — ([\s\S]*) · ([\s\S]*) \(([\s\S]*)\)$/.exec(
+    lines[0],
+  );
   if (!header) return null;
   const control =
     /^(🛑 Stopped by Jacob|Already idle when Jacob asked to stop|Interruption acknowledged; new activity exists|Continuation queued by Jacob) at ((?:[01]\d|2[0-3]):[0-5]\d UTC)$/.exec(
@@ -109,7 +118,7 @@ export function parseBridgeStatusCard(message: TimelineMessage) {
   const decoded = [160, 80, 40].map((limit, index) =>
     decodeProducerLabel(header[index + 2], limit),
   );
-  if (decoded.some(label => label === null)) return null;
+  if (decoded.some((label) => label === null)) return null;
   if (
     (header[1] === "❓ Needs Jacob" ||
       header[1] === "✅ Done" ||
@@ -205,12 +214,16 @@ function parseTaggedCard(tags: string[][]) {
   )
     return null;
   // Prospective classification only: obligations/completion reports require Root.
-  if (["waiting", "done", "ack"].includes(status[1]) && sourceTag?.[1] !== "root")
+  if (
+    ["waiting", "done", "ack"].includes(status[1]) &&
+    sourceTag?.[1] !== "root"
+  )
     return null;
   const title = agent[3] ?? `Agent ${agent[1].slice(0, 8)}`;
   if (
     !title.trim() ||
-    Array.from(title).length > 160 || Array.from(title).some(producerExcludes)
+    Array.from(title).length > 160 ||
+    Array.from(title).some(producerExcludes)
   )
     return null;
   return {

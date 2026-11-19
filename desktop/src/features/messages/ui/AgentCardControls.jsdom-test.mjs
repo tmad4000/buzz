@@ -33,11 +33,11 @@ registerHooks({
 const { AgentCardControls } = await import("./AgentCardControls.tsx");
 beforeEach(() => localStorage.removeItem("buzz.agent-control-holds.v1"));
 const agent = "9e03d4e0-1234-4567-8901-234567890abc";
-const revisionTime = Math.floor(Date.now()/1000)+60; // synthetic signed fixture times
+const revisionTime = Math.floor(Date.now() / 1000) + 60; // synthetic signed fixture times
 const base = {
   id: "a".repeat(64),
   kind: 9,
-  bodyRevision: {eventId:"a".repeat(64),createdAt:revisionTime},
+  bodyRevision: { eventId: "a".repeat(64), createdAt: revisionTime },
   parentId: "b".repeat(64),
   signerPubkey:
     "38ba46f41d56ff5c71cfbfb856d00b209e6216a218260d2a30c4f1b712bdd1cb",
@@ -103,7 +103,7 @@ test("Stop requires confirmation, publishes exact card reply once, and waits for
     await f.render({
       ...base,
       body: body("🛑 Stopped by Jacob at 03:18 UTC", "jacob"),
-      bodyRevision: {eventId:"c".repeat(64),createdAt:revisionTime+1},
+      bodyRevision: { eventId: "c".repeat(64), createdAt: revisionTime + 1 },
     });
     await act(() => button("Continue").click());
     assert.equal(globalThis.__controlSends[1].args.content, "continue");
@@ -217,18 +217,30 @@ test("Cancel and Escape restore focus to the actual Stop trigger", async () => {
     await act(() => button("Keep working").click());
     assert.equal(document.activeElement?.textContent, "Stop…");
     await act(() => button("Stop…").click());
-    await act(() => document.dispatchEvent(new KeyboardEvent("keydown", {key:"Escape", bubbles:true})));
+    await act(() =>
+      document.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+      ),
+    );
     assert.equal(document.activeElement?.textContent, "Stop…");
-  } finally { await f.close(); }
+  } finally {
+    await f.close();
+  }
 });
 test("Uncertain intent survives display edits, remount, and a second view", async () => {
   let f = setup();
-  const stopped = {...base, body:body("🛑 Stopped by Jacob at 03:18 UTC", "jacob")};
+  const stopped = {
+    ...base,
+    body: body("🛑 Stopped by Jacob at 03:18 UTC", "jacob"),
+  };
   try {
     globalThis.__controlError = true;
     await f.render(stopped);
     await act(() => button("Continue").click());
-    await f.render({...stopped, body:stopped.body.replace("Worker", "Renamed")});
+    await f.render({
+      ...stopped,
+      body: stopped.body.replace("Worker", "Renamed"),
+    });
     assert.equal(button("Continue").disabled, true);
     await f.close();
     f = setup();
@@ -238,31 +250,55 @@ test("Uncertain intent survives display edits, remount, and a second view", asyn
     try {
       await second.render(stopped);
       assert.equal(second.element.querySelector("button").disabled, true);
-    } finally { await second.close(); }
-    await f.render({...base, body:body("Continuation queued by Jacob at 03:19 UTC", "jacob"),bodyRevision:{eventId:"d".repeat(64),createdAt:revisionTime+2}});
+    } finally {
+      await second.close();
+    }
+    await f.render({
+      ...base,
+      body: body("Continuation queued by Jacob at 03:19 UTC", "jacob"),
+      bodyRevision: { eventId: "d".repeat(64), createdAt: revisionTime + 2 },
+    });
     assert.equal(button("Stop…").disabled, false);
-  } finally { await f.close(); }
+  } finally {
+    await f.close();
+  }
 });
 
 test("older or unversioned control report in another view cannot clear a newer ambiguous Continue", async () => {
-  const current=setup();
-  const stopped={...base,body:body("🛑 Stopped by Jacob at 03:18 UTC","jacob"),bodyRevision:{eventId:"c".repeat(64),createdAt:revisionTime+1}};
+  const current = setup();
+  const stopped = {
+    ...base,
+    body: body("🛑 Stopped by Jacob at 03:18 UTC", "jacob"),
+    bodyRevision: { eventId: "c".repeat(64), createdAt: revisionTime + 1 },
+  };
   try {
-    globalThis.__controlError=true;
+    globalThis.__controlError = true;
     await current.render(stopped);
-    await act(()=>button("Continue").click());
-    for(const revision of [
-      {eventId:"b".repeat(64),createdAt:revisionTime},
-      {eventId:"b".repeat(64),createdAt:revisionTime+1},
+    await act(() => button("Continue").click());
+    for (const revision of [
+      { eventId: "b".repeat(64), createdAt: revisionTime },
+      { eventId: "b".repeat(64), createdAt: revisionTime + 1 },
       undefined,
     ]) {
-      const stale=setup();
+      const stale = setup();
       try {
-        await stale.render({...base,body:body("Continuation queued by Jacob at 03:17 UTC","jacob"),bodyRevision:revision});
-        assert.equal(current.element.querySelector("button").disabled,true);
-      } finally {await stale.close();}
+        await stale.render({
+          ...base,
+          body: body("Continuation queued by Jacob at 03:17 UTC", "jacob"),
+          bodyRevision: revision,
+        });
+        assert.equal(current.element.querySelector("button").disabled, true);
+      } finally {
+        await stale.close();
+      }
     }
-    await current.render({...stopped,body:body("Continuation queued by Jacob at 03:19 UTC","jacob"),bodyRevision:{eventId:"d".repeat(64),createdAt:revisionTime+2}});
-    assert.equal(current.element.querySelector("button").disabled,false);
-  } finally {await current.close();}
+    await current.render({
+      ...stopped,
+      body: body("Continuation queued by Jacob at 03:19 UTC", "jacob"),
+      bodyRevision: { eventId: "d".repeat(64), createdAt: revisionTime + 2 },
+    });
+    assert.equal(current.element.querySelector("button").disabled, false);
+  } finally {
+    await current.close();
+  }
 });

@@ -7,7 +7,10 @@ import {
 } from "../lib/agentCardControl";
 import { useIdentityQuery } from "@/shared/api/hooks";
 import { getRelayHttpUrl } from "@/shared/api/tauri";
-import { loadActiveCommunityId, loadCommunities } from "@/features/communities/communityStorage";
+import {
+  loadActiveCommunityId,
+  loadCommunities,
+} from "@/features/communities/communityStorage";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,7 +24,15 @@ import {
 } from "@/shared/ui/alert-dialog";
 
 import { parseBridgeStatusCard } from "../lib/bridgeStatusCard";
-import { claimHold, controlRelayScope, getHold, holdSnapshot, reconcileHold, subscribeHolds, updateHold } from "../lib/agentControlHolds";
+import {
+  claimHold,
+  controlRelayScope,
+  getHold,
+  holdSnapshot,
+  reconcileHold,
+  subscribeHolds,
+  updateHold,
+} from "../lib/agentControlHolds";
 
 /** Publishes a request only. Lifecycle state always comes from a signed bridge edit. */
 export function AgentCardControls({
@@ -67,10 +78,25 @@ export function AgentCardControls({
   const currentKey = React.useRef(key);
   currentKey.current = key;
   const [confirmation, setConfirmation] = React.useState<string | null>(null);
-  const relayScope = controlRelayScope(loadCommunities().find(c => c.id === communityId)?.relayUrl);
+  const relayScope = controlRelayScope(
+    loadCommunities().find((c) => c.id === communityId)?.relayUrl,
+  );
   const card = parseBridgeStatusCard(message);
-  const holdKey = JSON.stringify([communityId, relayScope, identity?.pubkey, channelId, message.id, card?.serverId, card?.agentId]);
-  const token = JSON.stringify([card?.source, card?.state, card?.source === "jacob" ? card.label : null, card?.resumeAvailable]);
+  const holdKey = JSON.stringify([
+    communityId,
+    relayScope,
+    identity?.pubkey,
+    channelId,
+    message.id,
+    card?.serverId,
+    card?.agentId,
+  ]);
+  const token = JSON.stringify([
+    card?.source,
+    card?.state,
+    card?.source === "jacob" ? card.label : null,
+    card?.resumeAvailable,
+  ]);
   React.useSyncExternalStore(subscribeHolds, holdSnapshot);
   const hold = getHold(holdKey);
   const status = hold?.status ?? null;
@@ -78,21 +104,44 @@ export function AgentCardControls({
   const invoker = React.useRef<HTMLButtonElement>(null);
   React.useEffect(() => {
     if (enabled && card && identity?.pubkey && relayScope)
-      reconcileHold(holdKey, token, card.source, card.state, message.bodyRevision);
-  }, [enabled, holdKey, token, relayScope, message.bodyRevision?.eventId, message.bodyRevision?.createdAt]);
-  if (!enabled || !target || !communityId || !relayScope || activeCommunityId !== communityId)
+      reconcileHold(
+        holdKey,
+        token,
+        card.source,
+        card.state,
+        message.bodyRevision,
+      );
+  }, [
+    enabled,
+    holdKey,
+    token,
+    relayScope,
+    message.bodyRevision?.eventId,
+    message.bodyRevision?.createdAt,
+  ]);
+  if (
+    !enabled ||
+    !target ||
+    !communityId ||
+    !relayScope ||
+    activeCommunityId !== communityId
+  )
     return null;
   const submit = async () => {
     if (
       !live.current ||
-
       status ||
       currentKey.current !== key ||
       loadActiveCommunityId() !== communityId
     )
       return;
     setConfirmation(null);
-    const attemptId = claimHold(holdKey, target.command, token, message.bodyRevision);
+    const attemptId = claimHold(
+      holdKey,
+      target.command,
+      token,
+      message.bodyRevision,
+    );
     if (!attemptId) return;
     let publishing = false;
     try {
@@ -116,29 +165,49 @@ export function AgentCardControls({
     <div ref={group} tabIndex={-1} role="group" aria-label="Agent controls">
       <AlertDialog
         open={confirmation === key}
-        onOpenChange={(open) => { if (!open) setConfirmation(null); }}
+        onOpenChange={(open) => {
+          if (!open) setConfirmation(null);
+        }}
       >
         {target.command === "stop" ? (
           <AlertDialogTrigger asChild>
-            <button ref={invoker} type="button" disabled={status !== null}
+            <button
+              ref={invoker}
+              type="button"
+              disabled={status !== null}
               className="min-h-11 rounded px-2 text-xs font-medium hover:bg-muted"
-              onClick={() => setConfirmation(key)}>Stop…</button>
+              onClick={() => setConfirmation(key)}
+            >
+              Stop…
+            </button>
           </AlertDialogTrigger>
         ) : (
-          <button type="button" className="min-h-11 rounded px-2 text-xs font-medium hover:bg-muted"
-            disabled={status !== null} onClick={() => void submit()}>Continue</button>
+          <button
+            type="button"
+            className="min-h-11 rounded px-2 text-xs font-medium hover:bg-muted"
+            disabled={status !== null}
+            onClick={() => void submit()}
+          >
+            Continue
+          </button>
         )}
-        {status ? <span role="status" className="text-xs text-muted-foreground">
-          {status === "sending" ? "Request pending. Waiting for the bridge to update this card."
-            : status === "sent" ? "Request sent. Waiting for the bridge to update this card."
-            : "Delivery unconfirmed. Check this card before sending another request."}
-        </span> : null}
-        <AlertDialogContent onCloseAutoFocus={(event) => {
-          if (!invoker.current || invoker.current.disabled) {
-            event.preventDefault();
-            group.current?.focus();
-          }
-        }}>
+        {status ? (
+          <span role="status" className="text-xs text-muted-foreground">
+            {status === "sending"
+              ? "Request pending. Waiting for the bridge to update this card."
+              : status === "sent"
+                ? "Request sent. Waiting for the bridge to update this card."
+                : "Delivery unconfirmed. Check this card before sending another request."}
+          </span>
+        ) : null}
+        <AlertDialogContent
+          onCloseAutoFocus={(event) => {
+            if (!invoker.current || invoker.current.disabled) {
+              event.preventDefault();
+              group.current?.focus();
+            }
+          }}
+        >
           <AlertDialogHeader>
             <AlertDialogTitle>Stop this agent’s current turn?</AlertDialogTitle>
             <AlertDialogDescription>
