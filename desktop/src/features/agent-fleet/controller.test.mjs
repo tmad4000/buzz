@@ -117,6 +117,7 @@ test("hook IO is one exact fleet subscription and narrow fixed recipient command
     JSON.stringify(model.fleetFilter()),
   );
   assert.equal(subscriptions[0][4], signal);
+  assert.equal(subscriptions[0][5], "original-filter");
   assert.equal(native[0][0], "decrypt_agent_fleet_event");
   assert.equal(native[0][1].expectedRelayOrigin, model.FLEET_RELAY);
   assert.equal(native[0][1].expectedRecipient, model.FLEET_RECIPIENT);

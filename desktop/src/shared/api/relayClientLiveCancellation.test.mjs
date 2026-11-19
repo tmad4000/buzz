@@ -406,3 +406,42 @@ test("a failed reconnect attempt still rejects setup rather than claiming a succ
   assert.equal(frames("REQ").length, 1);
   assert.equal(timers.size, 0);
 });
+
+test("fleet opt-in reconnect restores exact narrow filter despite rejected future event; ordinary cursor unchanged", async () => {
+  const { fleetFilter, authenticatedFleet } = await import("@/features/agent-fleet/model.ts");
+  const { finalizeEvent, generateSecretKey } = await import("nostr-tools/pure");
+  const client = new RelayClient();
+  client.wsId=7;
+  clients.push(client);
+  const filter = fleetFilter();
+  const seen=[];
+  const pending=client.subscribeLive(filter,(e)=>seen.push({id:e.id, admitted:authenticatedFleet(e,0)}),undefined,250,undefined,"original-filter");
+  await flush();
+  const subId=frames("REQ")[0].frame[1];
+  await deliver(client,["EOSE",subId]);
+  const off=await pending;
+  const future=finalizeEvent({kind:30078,created_at:9999999999,tags:[["d","fleet-status-v1"],["p","a".repeat(64)]],content:"Ag=="},generateSecretKey());
+  await deliver(client,["EVENT",subId,future]);
+  await tickTo(100);
+  assert.deepEqual(seen,[{id:future.id,admitted:false}]);
+  const subscription=client.subscriptions.get(subId);
+  assert.equal(subscription.lastSeenCreatedAt,undefined);
+  // Even an old poisoned cursor cannot affect the explicit replay policy.
+  subscription.lastSeenCreatedAt=future.created_at;
+  await client.replayLiveSubscriptions();
+  assert.deepEqual(frames("REQ").at(-1).frame,["REQ",subId,filter]);
+  assert.equal(frames("REQ").at(-1).frame[2].since,undefined);
+  await deliver(client,["EVENT",subId,{...future,id:"b".repeat(64),created_at:0}]);
+  await tickTo(200);
+  assert.equal(seen.at(-1).id,"b".repeat(64)); // current-clock delivery is not excluded by future since
+  await off();
+  const regular=client.subscribeLive(filter,()=>{});
+  await tickTo(500);
+  const regularId=frames("REQ").at(-1).frame[1];
+  await deliver(client,["EOSE",regularId]);
+  const regularOff=await regular;
+  await deliver(client,["EVENT",regularId,future]);
+  await tickTo(600);
+  assert.equal(client.subscriptions.get(regularId).lastSeenCreatedAt,future.created_at);
+  await regularOff();
+});

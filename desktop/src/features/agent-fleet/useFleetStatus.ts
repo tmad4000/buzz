@@ -9,7 +9,7 @@ import { useFleetEnabled } from "./preference";
 const reader = createFleetReader({
   now: () => Math.floor(Date.now() / 1000),
   subscribe: (event, ready, signal) =>
-    relayClient.subscribeLive(fleetFilter(), event, ready, 5000, signal),
+    relayClient.subscribeLive(fleetFilter(), event, ready, 5000, signal, "original-filter"),
   decrypt: (event) =>
     invokeTauri<unknown>("decrypt_agent_fleet_event", {
       eventJson: JSON.stringify(event),

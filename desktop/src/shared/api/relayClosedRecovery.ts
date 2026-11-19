@@ -218,10 +218,12 @@ export function prepareSubscriptionEvent(
   }
   subscription.closedRetryAttempt = 0;
   clearClosedRetry(subscription);
-  subscription.lastSeenCreatedAt = Math.max(
-    subscription.lastSeenCreatedAt ?? 0,
-    event.created_at,
-  );
+  if (subscription.reconnectPolicy !== "original-filter") {
+    subscription.lastSeenCreatedAt = Math.max(
+      subscription.lastSeenCreatedAt ?? 0,
+      event.created_at,
+    );
+  }
   return true;
 }
 

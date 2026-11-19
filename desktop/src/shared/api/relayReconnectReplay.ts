@@ -231,6 +231,7 @@ export async function replayLiveSubscriptions({
     .map(([subId, subscription]) => {
       const channelId = subscription.filter["#h"]?.[0];
       const shouldPageReplay =
+        subscription.reconnectPolicy !== "original-filter" &&
         channelId !== undefined &&
         shouldPageReconnectReplay(subscription.filter);
       const cursorSince =
@@ -255,7 +256,7 @@ export async function replayLiveSubscriptions({
       // bound explicitly. Otherwise a from-now subscription can replay older
       // rows and surface stale unread or notification activity on reconnect.
       const replaySince =
-        replayFloor === undefined
+        subscription.reconnectPolicy === "original-filter" || replayFloor === undefined
           ? undefined
           : Math.max(replayFloor, subscription.filter.since ?? 0);
       const willRepair = shouldPageReplay && replaySince !== undefined;
