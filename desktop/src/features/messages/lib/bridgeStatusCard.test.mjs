@@ -156,6 +156,7 @@ test("production formatter applies only bridge-signed status snapshots and prese
       (m) => m.id === original.id,
     );
   const updated = format(edit);
+  assert.deepEqual(updated.bodyRevision,{eventId:edit.id,createdAt:edit.created_at});
   assert.equal(parseBridgeStatusCard(updated).label, "✅ Reported done");
   assert.equal(parseBridgeStatusCard(updated).originEventId, originEventId);
   assert.equal(updated.parentId, originEventId);
@@ -346,5 +347,17 @@ test("prospective classification keeps originating Nostr event distinct and Root
     const card=parseBridgeStatusCard({...message,tags:machineTags(state)});
     assert.equal(card.originEventId,originEventId);
     assert.equal("requestId" in card,false);
+  }
+});
+
+test("bridge body revision selection uses lowest event ID for equal signed created_at in either input order", async () => {
+  const {formatTimelineMessages}=await import("./formatTimelineMessages.ts");
+  const original={id:"f".repeat(64),kind:9,pubkey:message.signerPubkey,created_at:1,content:body(),tags:[["h","channel"],["e","b".repeat(64),"","reply"]]};
+  const low={id:"1".repeat(64),kind:40003,pubkey:message.signerPubkey,created_at:2,content:body("✅ Done"),tags:[["e",original.id],["h","channel"]]};
+  const high={...low,id:"e".repeat(64),content:body()};
+  for(const edits of [[low,high],[high,low]]) {
+    const projected=formatTimelineMessages([original,...edits],null)[0];
+    assert.equal(projected.body,low.content);
+    assert.deepEqual(projected.bodyRevision,{eventId:low.id,createdAt:low.created_at});
   }
 });

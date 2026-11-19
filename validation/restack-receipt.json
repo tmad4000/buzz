@@ -1,0 +1,26 @@
+{
+  "at": "2026-11-18T07:08:15.277602+00:00",
+  "parent": "3a1e41ec74e6de8b261fbb7b4e6667333b8c0e8a",
+  "sourceHead": "c788a2cbfada80990935819aef792537eadeff37",
+  "mergeBase": "3a1e41ec74e6de8b261fbb7b4e6667333b8c0e8a",
+  "stack": "parent already present via normal merge f8c21ea63; no source rewrite",
+  "modelTests": {
+    "pass": 15,
+    "fail": 0,
+    "timeoutSeconds": 60
+  },
+  "domTests": {
+    "pass": 10,
+    "fail": 0,
+    "timeoutSeconds": 60
+  },
+  "wholeDesktopTypecheck": {
+    "exitCode": 0,
+    "diagnostics": 0,
+    "timeoutSeconds": 90
+  },
+  "isolation": "setsid plus process-group SIGKILL cleanup",
+  "sourceDeltaChanged": false,
+  "realControlPublication": false,
+  "independentRecheck": "pending be986 via root"
+}
