@@ -62,14 +62,23 @@ export function SidebarUpdateCompactCard({
     });
   }, [installAndRelaunch]);
 
-  const pending = isUpdatePending || status.state === "installing";
+  const pending =
+    isUpdatePending ||
+    status.state === "downloading" ||
+    status.state === "installing";
+  const message =
+    status.state === "available" || status.state === "ready"
+      ? status.message
+      : undefined;
 
   return (
     <SidebarCompactActionCard
-      actionAriaLabel="Update now"
+      actionAriaLabel="Restart to update"
       actionDisabled={pending}
       actionTestId={actionTestId}
-      description={pending ? "Updating" : "Click to update"}
+      description={
+        pending ? "Updating" : (message ?? "Click to restart and update")
+      }
       dismissLabel="Dismiss update notification"
       icon={
         pending ? (
@@ -82,7 +91,7 @@ export function SidebarUpdateCompactCard({
       onAction={handleUpdate}
       onDismiss={onDismiss}
       testId={testId}
-      title="Ready to update!"
+      title="Restart to update"
     />
   );
 }

@@ -105,9 +105,12 @@ export function UpdateChecker() {
                 className="text-sm font-normal text-muted-foreground"
                 data-settings-subcopy
               >
-                Preparing update...
+                {status.message ?? `Update available — v${status.version}`}
               </p>
             </div>
+            <Button size="sm" onClick={installAndRelaunch}>
+              Restart to update
+            </Button>
           </SettingsOptionRow>
         )}
 
@@ -144,11 +147,12 @@ export function UpdateChecker() {
                 className="text-sm font-normal text-muted-foreground"
                 data-settings-subcopy
               >
-                Update downloaded. Click to apply.
+                {status.message ??
+                  "Update installed. Restart when your edits are saved."}
               </p>
             </div>
             <Button size="sm" onClick={installAndRelaunch}>
-              Update Now
+              Restart to update
             </Button>
           </SettingsOptionRow>
         )}

@@ -28,7 +28,7 @@ const variants: Record<
 > = {
   available: {
     Icon: RefreshCcw,
-    label: "Update available",
+    label: "Restart to update",
     badgeColor: "bg-primary",
   },
   downloading: {
@@ -87,9 +87,11 @@ export function UpdateIndicator({
   const visibleLabel =
     status.state === "manual-required" ? "Update available" : label;
   const isActionable =
-    status.state === "ready" || status.state === "manual-required";
+    status.state === "available" ||
+    status.state === "ready" ||
+    status.state === "manual-required";
   const handleClick =
-    status.state === "ready"
+    status.state === "ready" || status.state === "available"
       ? installAndRelaunch
       : status.state === "manual-required"
         ? () => {

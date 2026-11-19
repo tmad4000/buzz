@@ -59,6 +59,7 @@ test("background Page veto targets only its own view, protects saves, and unregi
   const { ConversationViewContext } = await import(
     "../conversations/ConversationViewContext.tsx"
   );
+  const { allowAppRestart } = await import("@/shared/lib/appRestartGuard");
   const guards = new Map(),
     surfaces = new Map();
   const register = (id) => (guard) => {
@@ -132,6 +133,13 @@ test("background Page veto targets only its own view, protects saves, and unregi
     true,
     "focused B is not blocked by background A",
   );
+  await act(async () =>
+    assert.equal(
+      allowAppRestart(),
+      false,
+      "background dirty Page blocks restart",
+    ),
+  );
   assert.match(scope("a").textContent, /Save or cancel/);
   assert.doesNotMatch(scope("b").textContent, /Save or cancel/);
   await act(async () => surfaces.get("a").closePage());
@@ -160,6 +168,13 @@ test("background Page veto targets only its own view, protects saves, and unregi
     "saving veto preserves sibling focus",
   );
   assert.equal(guards.get("b")(), true);
+  await act(async () =>
+    assert.equal(
+      allowAppRestart(),
+      false,
+      "in-flight Page save blocks restart",
+    ),
+  );
   await act(async () => {
     release();
     await new Promise((resolve) => setTimeout(resolve, 20));
@@ -187,6 +202,11 @@ test("background Page veto targets only its own view, protects saves, and unregi
   assert.equal(guards.get("b")(), true, "A cleanup preserves B registration");
   await act(async () => root.unmount());
   assert.equal(guards.size, 0);
+  assert.equal(
+    allowAppRestart(),
+    true,
+    "Page teardown releases restart guards",
+  );
   assert.deepEqual(globalThis.leaveFixture.unexpectedCalls, []);
   dom.window.close();
 });

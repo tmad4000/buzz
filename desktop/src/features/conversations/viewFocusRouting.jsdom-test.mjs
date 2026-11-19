@@ -61,3 +61,41 @@ test("only the focused visible view guards navigation and pane composers never s
   }
   assert.equal(allowNavigation({ kind: "history", direction: "back" }), true);
 });
+
+test("restart consults the unfocused mounted pane without changing focused navigation behavior", async () => {
+  const { allowAppRestart } = await import("@/shared/lib/appRestartGuard");
+  function Host({ dirty }) {
+    useNavigationGuard(() => !dirty);
+    return null;
+  }
+  const root = createRoot(document.createElement("div"));
+  try {
+    await act(() =>
+      root.render(
+        [false, true].map((dirty, i) =>
+          React.createElement(
+            ConversationViewContext.Provider,
+            {
+              key: i,
+              value: {
+                viewInstanceId: String(i),
+                focused: i === 0,
+                visible: true,
+              },
+            },
+            React.createElement(Host, { dirty }),
+          ),
+        ),
+      ),
+    );
+    assert.equal(allowNavigation({ kind: "history", direction: "back" }), true);
+    assert.equal(
+      allowAppRestart(),
+      false,
+      "unfocused dirty editor must veto whole-app restart",
+    );
+  } finally {
+    await act(() => root.unmount());
+  }
+  assert.equal(allowAppRestart(), true, "unmount removes only its guards");
+});

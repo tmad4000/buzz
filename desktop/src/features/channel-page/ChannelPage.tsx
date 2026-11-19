@@ -1,3 +1,4 @@
+import { registerAppRestartGuard } from "@/shared/lib/appRestartGuard";
 import type { PageLeaveGuardRegistrar } from "./pageLeaveGuard";
 import { usePageAuthors } from "./usePageAuthors";
 import * as React from "react";
@@ -63,9 +64,13 @@ export function ChannelPage({
   React.useLayoutEffect(() => {
     mounted.current = true;
     const unregister = registerLeaveGuard?.(requirePageEditResolution);
+    const unregisterRestart = registerAppRestartGuard(
+      requirePageEditResolution,
+    );
     return () => {
       mounted.current = false;
       unregister?.();
+      unregisterRestart();
     };
   }, [registerLeaveGuard, requirePageEditResolution]);
   // biome-ignore lint/correctness/useExhaustiveDependencies: channelId is the editor reset boundary.
