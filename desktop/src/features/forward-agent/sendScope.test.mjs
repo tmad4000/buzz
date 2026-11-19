@@ -3,6 +3,7 @@ import fs from "node:fs";
 import test from "node:test";
 import vm from "node:vm";
 import ts from "typescript";
+import { filterOutgoingLinkPreviewTags } from "@/shared/lib/linkPreviewSnapshot.ts";
 import { messageMentionPubkeys } from "@/features/messages/lib/messageMentionPubkeys.ts";
 const source = fs.readFileSync(
   new URL("../messages/hooks.ts", import.meta.url),
@@ -46,6 +47,7 @@ function mutation() {
       }),
     },
     "@/features/messages/lib/messageMentionPubkeys": { messageMentionPubkeys },
+    "@/shared/lib/linkPreviewSnapshot": { filterOutgoingLinkPreviewTags },
     "@/features/messages/lib/messageQueryKeys": {
       channelMessagesKey: (id) => ["channel-messages", id],
       channelWindowKey: (id) => ["channel-window", id],

@@ -120,7 +120,9 @@ test("actual list selector uses live evidence while retaining frozen body member
   const visit = (node) => {
     if (
       ts.isVariableDeclaration(node) &&
-      node.name.getText(source) === "entries" &&
+      // PR70 orders sourceEntries separately; this contract exercises the live
+      // summary projection over frozen bodies, before that ordering step.
+      node.name.getText(source) === "sourceEntries" &&
       node.initializer &&
       ts.isCallExpression(node.initializer) &&
       node.initializer.expression.getText(source) === "React.useMemo"
