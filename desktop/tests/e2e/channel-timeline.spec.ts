@@ -52,10 +52,10 @@ test("Timeline flattens replies chronologically, receives live events, sends top
   await expect(order).toHaveValue("threads");
   await expect(
     order.getByRole("option", {
-      name: "Threads by latest activity (coming soon)",
+      name: "Latest activity",
       exact: true,
     }),
-  ).toHaveJSProperty("disabled", true);
+  ).toHaveJSProperty("disabled", false);
   await expect(
     timeline.getByText("Timeline root topic", { exact: true }),
   ).toBeVisible();
@@ -63,6 +63,24 @@ test("Timeline flattens replies chronologically, receives live events, sends top
     path: testInfo.outputPath("threads-post-time.png"),
     fullPage: true,
   });
+  // The existing root's replies are newer than the other root's latest activity.
+  await order.selectOption("activity");
+  await expect(order).toHaveValue("activity");
+  await expect
+    .poll(() =>
+      timeline
+        .getByTestId("message-row")
+        .evaluateAll(
+          (rows, ids) =>
+            rows
+              .map((row) => row.getAttribute("data-message-id"))
+              .filter((id) => id === ids.root || id === ids.other),
+          ids,
+        ),
+    )
+    .toEqual([ids.other, ids.root]);
+  await order.selectOption("threads");
+  await expect(order).toHaveValue("threads");
   await order.selectOption("timeline");
   await expect(order).toHaveValue("timeline");
   await expect(
