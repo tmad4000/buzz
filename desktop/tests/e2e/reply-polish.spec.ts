@@ -1,6 +1,14 @@
+import { readFileSync } from "node:fs";
 import { waitForMockChannelHeadReady } from "../helpers/channelHeadReady";
 import { expect, test } from "@playwright/test";
 import { installMockBridge, TEST_IDENTITIES } from "../helpers/bridge";
+
+const { version: expectedVersion } = JSON.parse(
+  readFileSync(
+    new URL("../../src-tauri/tauri.conf.json", import.meta.url),
+    "utf8",
+  ),
+) as { version: string };
 
 test("production inline composer keeps one editor across compact, draft, popup and send states", async ({
   page,
@@ -114,7 +122,8 @@ test("header full version and read-only provenance survive narrow/zoom layouts",
   );
   await page.goto("/");
   const stamp = page.getByTestId("header-version");
-  await expect(stamp).toContainText("v0.5.28-ideaflow.7");
+  expect(expectedVersion).not.toBe("");
+  await expect(stamp).toContainText(`v${expectedVersion}`);
   await stamp.click();
   await expect(page.getByTestId("header-provenance")).toContainText(
     "not installation time",
