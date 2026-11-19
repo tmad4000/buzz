@@ -75,6 +75,15 @@ test("native parent quote survives folds and jumps to the highlighted parent in 
     exact: true,
   });
   await expect(coveringPage).toBeVisible();
+  // Changed precondition: Page is modal, so dismiss it through its guarded
+  // Escape path before clicking the covered channel. Callback-driven Page
+  // closure ordering remains covered by ThreadParentJump.test.mjs.
+  const channel = page.getByTestId("channel-drop-zone");
+  await expect(channel).toHaveJSProperty("inert", true);
+  await page.keyboard.press("Escape");
+  await expect(coveringPage).toHaveCount(0);
+  await expect(page.getByTestId("focus-thread-drawer-overlay")).toHaveCount(0);
+  await expect(channel).toHaveJSProperty("inert", false);
   await chip.click();
   await expect(coveringPage).toHaveCount(0);
   const panel = page.getByTestId("message-thread-panel");

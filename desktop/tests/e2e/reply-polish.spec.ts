@@ -338,9 +338,12 @@ test("routed accepted reply confirmation opens exact collapsed target and Back p
     .locator(`button[aria-expanded="true"][data-thread-head-id="${root}"]`)
     .click();
   await panel.getByRole("button", { name: "Close panel", exact: true }).click();
+  // Nested thread composers also own routing controls; select the main dock.
   const main = page
-    .getByTestId("message-composer")
-    .filter({ has: page.getByTestId("send-to-thread") });
+    .getByTestId("channel-composer-overlay")
+    .getByTestId("message-composer");
+  await expect(main).toHaveCount(1);
+  await expect(main.getByTestId("message-input")).toHaveCount(1);
   await main
     .getByTestId("message-input")
     .fill("Captured confirmation accepted reply");
