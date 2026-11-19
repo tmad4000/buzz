@@ -23,11 +23,13 @@ export const VideoReviewMarkdownContext = React.createContext<
 export function MarkdownVideoPlayer({
   alt,
   entry,
+  readOnly = false,
   resolvedSrc,
   src,
 }: {
   alt?: string;
   entry?: ImetaEntry;
+  readOnly?: boolean;
   resolvedSrc: string;
   src?: string;
 }) {
@@ -58,6 +60,21 @@ export function MarkdownVideoPlayer({
         : undefined,
     [alt, entry?.filename, videoReviewContext],
   );
+
+  if (readOnly) {
+    return (
+      // biome-ignore lint/a11y/useMediaCaption: user-uploaded video, no captions available
+      <video
+        aria-label={entry?.filename || alt || "Video attachment"}
+        className="max-h-64 max-w-full rounded-xl"
+        controls
+        playsInline
+        poster={resolvedPoster}
+        preload="metadata"
+        src={resolvedSrc}
+      />
+    );
+  }
 
   return (
     <VideoPlayer

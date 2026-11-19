@@ -166,6 +166,7 @@ const SYSTEM_GROUP_HEIGHT = 80;
  * refining once the row paints.
  */
 export function estimateTimelineItemHeight(item: TimelineItem): number {
+  if (item.kind === "message" && item.entry.dispatchTrace) return 32;
   return item.kind === "message"
     ? estimateRowHeight(item.entry.message, {
         isContinuation: item.isContinuation,

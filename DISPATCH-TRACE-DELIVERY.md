@@ -1,0 +1,15 @@
+# §6A dispatch trace source slice
+
+Owner af293993, sole send-to-thread builder. Branch `feat/thread-dispatch-trace-20261119` in `/home/dev/agent-worktrees/thread-dispatch-trace-20261119`, provisional dependency base PR96 exact `0e8184320f912e68b0ab440e48585816907bb473`. Frozen PR96/104 and Phase1 worktree/bindings are unchanged. This source-only draft is outside frozen .9, default ON when eventually composed; no release admission or integration claimed.
+
+Root's latest top-priority override authorizes source and lightweight nice10 units now, §6A then reference-only §6B Answers & Updates. No heavy GCP job, TSC, Vite/browser, cargo/native compilation, dependency copying/install, live Buzz/relay/listener write, merge/deploy/activation occurred. Shared lane remains reserved until .9 qualifies and a nonblocking flock can be acquired under an exact grant. Source formatting uses existing owner tooling only.
+
+Validation so far: 8 lightweight production helper/IPC/queued-edit tests PASS, 1 edit-overlay regression explicitly SKIPPED because this new worktree has no installed nostr-tools dependency; no installs were attempted. First expanded run honestly failed that dependency setup before the explicit skip was added; preserved `unit-api-edit.log`. Current log and birth/PID cleanup receipt: `/home/dev/code/thread-dispatch-trace-20261119/light-final.log` and `light-final-release.json` (under1s, child absent, exit0). Rust converter validation tests are ADDED but NOT executed. Rustfmt, changed-file Biome (exit0, two unchanged optional-chain warnings), diff and differential file-size checks PASS; full TypeScript, mounted UI, native and browser workflow acceptance remain pending.
+
+Dedicated native optional origin argument is necessary because arbitrary tags are intentionally rejected by the old imeta-only channel. Its validator only admits `[origin,current-channel,main]` on a kind9 reply and appends before signing/prepareOnly. It preserves expected relay/signer fences and the current durable send pipeline. No new kind/relay counter/listener contract for A. Queued-body edits retain the original dispatch origin and cannot create or move it. No receipt/event writes occur on expanding a trace.
+
+§6B is blocked on exact shared signed dual-scope reference/projection contract (coordinator067 / Build13 /075). Root's strict first usecase forbids Build13's old kind9 BODY mirror fallback: one canonical source ID displayed in P2 and Answers & Updates, fresh source+target reader/writer authority and no duplicate unread/mention. Contract request and ETA sent to067: A reviewable ~90–150min, reviewed target~2–3h subject to independent reviewer availability; B~3–5h after exact dependency confirmation, blocked time excluded. No duplicate builder, no075 edits.
+
+Git hooks that would launch ungranted repository-wide/native jobs are not run in this source-only slot; the scoped source checks above are the entire author validation, not full CI.
+
+Review route: one exact-head independent Sol via a036. Keep DRAFT; source disposition cannot substitute for the unrun native/UI/full-layout/live relay/human/release gates.

@@ -108,6 +108,7 @@ type MessageTimelineProps = {
   onMarkRead?: (message: TimelineMessage) => void;
   onReply?: (message: TimelineMessage) => void;
   onOpenThread?: (message: TimelineMessage) => void;
+  onOpenDispatch?: (root: TimelineMessage, sourceId: string) => void;
   renderThreadSummary?: ThreadSummaryRenderer;
   isSendingVideoReviewComment?: boolean;
   onSendVideoReviewComment?: (
@@ -210,6 +211,7 @@ const MessageTimelineBase = React.forwardRef<
     onMarkRead,
     onReply,
     onOpenThread,
+    onOpenDispatch,
     renderThreadSummary,
     channelName,
     channelType,
@@ -720,6 +722,7 @@ const MessageTimelineBase = React.forwardRef<
       onMarkRead={onMarkRead}
       onReply={onReply}
       onOpenThread={onOpenThread}
+      onOpenDispatch={onOpenDispatch}
       renderThreadSummary={renderThreadSummary}
       isSendingVideoReviewComment={isSendingVideoReviewComment}
       onSendVideoReviewComment={onSendVideoReviewComment}

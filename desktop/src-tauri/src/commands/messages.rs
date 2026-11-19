@@ -1,6 +1,7 @@
 use nostr::{Event, EventId, Keys, PublicKey};
 use tauri::{AppHandle, State};
 
+mod dispatch_origin;
 mod forum;
 
 use forum::{
@@ -420,6 +421,7 @@ pub async fn send_channel_message(
     mention_tags: Option<Vec<Vec<String>>>,
     link_preview_tags: Option<Vec<Vec<String>>>,
     sent_from_thread_tag: Option<Vec<String>>,
+    dispatch_origin_tag: Option<Vec<String>>,
     mention_pubkeys: Option<Vec<String>>,
     kind: Option<u32>,
     expected_relay_url: Option<String>,
@@ -520,6 +522,18 @@ pub async fn send_channel_message(
                 &relay_base,
             )?
         }
+    };
+
+    let origin = dispatch_origin::validated_origin(
+        dispatch_origin_tag.as_deref(),
+        &channel_uuid.to_string(),
+        parent_event_id.is_some(),
+        kind_num,
+    )?;
+    let builder = if let Some(origin) = origin {
+        builder.tags([origin])
+    } else {
+        builder
     };
 
     // `created_at` is the signed event's own second, not a post-publication

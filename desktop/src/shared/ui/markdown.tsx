@@ -6,18 +6,14 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 
 import { useAppNavigation } from "@/app/navigation/useAppNavigation";
 import { requestOpenSnapshotImport } from "@/features/agents/openSnapshotImportFromUrlEvent";
-import { parseChannelLink } from "@/features/messages/lib/channelLink";
 import { isAudioAttachment } from "@/features/messages/lib/audioAttachment";
 import {
   parseMessageLink,
-  resolveMessageLinkRenderTarget,
   type ParsedMessageLink,
 } from "@/features/messages/lib/messageLink";
-import { renderAudioMessageAttachment } from "@/features/messages/ui/AudioMessageAttachment";
 import { useChannelNavigation } from "@/shared/context/ChannelNavigationContext";
 import { cn } from "@/shared/lib/cn";
 import { parseEntityLink } from "@/shared/lib/entityLink";
-import { parseSupportedLinkPreview } from "@/shared/lib/linkPreview";
 import { rewriteRelayUrl } from "@/shared/lib/mediaUrl";
 import { useRelayOrigin } from "@/shared/lib/useRelayOrigin";
 import { AttachmentGroup } from "@/shared/ui/attachment";
@@ -41,6 +37,7 @@ import {
   isImageOnlyParagraph,
   markdownPropsAreEqual,
 } from "./markdownUtils";
+import { createMarkdownAnchor } from "./markdown/createMarkdownAnchor";
 import { ImageMosaic } from "./markdown/ImageMosaic";
 import { copyImageToClipboard, downloadImage } from "./markdown/imageActions";
 import { ImageGalleryStatus } from "./markdown/ImageGalleryStatus";
@@ -52,11 +49,7 @@ import {
   SyntaxHighlightedCode,
 } from "./markdown/CodeBlock";
 import { EntityLinkAnchor, useOpenEntityLink } from "./markdown/entityLinks";
-import { ExternalLinkAnchor } from "./markdown/ExternalLinkAnchor";
-import { FileCard } from "./markdown/FileCard";
 import {
-  AuthoredDeepLinkAnchor,
-  ChannelDeepLinkAnchor,
   MarkdownChannelDeepLink,
   MarkdownChannelReference,
 } from "./markdown/ChannelDeepLink";
@@ -68,7 +61,7 @@ import {
   type MediaContextMenuPosition,
   useDismissMediaContextMenu,
 } from "./markdown/MediaContextMenu";
-import { isRelayDownloadable, isVideoMedia } from "./markdown/mediaEntry";
+import { isVideoMedia } from "./markdown/mediaEntry";
 import {
   type ImageGalleryDirection,
   type ImageGalleryItem,
@@ -117,14 +110,11 @@ import {
   MarkdownRuntimeContext,
   useMarkdownRuntime,
 } from "./markdown/runtimeContext";
-import { AgentSnapshotCard } from "./markdown/AgentSnapshotCard";
-import { resolveFileCard, resolveSnapshotCard } from "./markdownFileCard";
 import type { MarkdownProps, MarkdownRuntime } from "./markdown/types";
 import { SpoilerInline } from "./markdown/SpoilerInline";
 import {
   imageReserveStyle,
   isInsideHiddenSpoiler,
-  getReactNodeText,
   rememberDecodedImageDimensions,
   useFrozenImageReserve,
   useStableArray,
@@ -1213,169 +1203,11 @@ export function createMarkdownComponents(
   interactive = true,
   mediaInset = false,
   blockCode = false,
+  readOnlyMedia = false,
 ): Components {
+  const showMedia = interactive || readOnlyMedia;
   const listItemClassName = "[&_p]:inline";
   const listClassName = "space-y-1 pl-6 marker:text-muted-foreground/80";
-
-  function MarkdownAnchor({
-    children,
-    href,
-    ...props
-  }: React.ComponentPropsWithoutRef<"a">) {
-    const {
-      channels,
-      imetaByUrl,
-      onOpenChannel,
-      onOpenEntityLink,
-      onOpenMessageLink,
-      onImportSnapshotFromUrl,
-      relayOrigin,
-      resolveChannelReferences,
-      snapshotSharedBy,
-    } = useMarkdownRuntime();
-    if (!interactive) {
-      return <span className="font-medium text-current">{children}</span>;
-    }
-    if (hasBlockMedia(React.Children.toArray(children))) {
-      return <>{children}</>;
-    }
-
-    const label = getReactNodeText(children);
-
-    const audioAttachment = renderAudioMessageAttachment(
-      href ? imetaByUrl?.get(href) : undefined,
-      href,
-      label,
-      href && isRelayDownloadable(href, relayOrigin ?? undefined)
-        ? href
-        : undefined,
-    );
-    if (audioAttachment) return audioAttachment;
-
-    // Classify verified agent/team snapshots before generic files.
-    const snapshotCard = resolveSnapshotCard(
-      href ? imetaByUrl?.get(href) : undefined,
-      href,
-      label,
-    );
-    if (snapshotCard) {
-      return (
-        <AgentSnapshotCard
-          displayName={snapshotCard.displayName}
-          href={snapshotCard.href}
-          filename={snapshotCard.filename}
-          sharedBy={snapshotSharedBy}
-          size={snapshotCard.size}
-          sha256={snapshotCard.sha256}
-          snapshotKind={snapshotCard.snapshotKind}
-          thumb={snapshotCard.thumb}
-          onImport={(fileBytes, fileName) => {
-            onImportSnapshotFromUrl?.(
-              fileBytes,
-              fileName,
-              snapshotCard.snapshotKind,
-            );
-          }}
-        />
-      );
-    }
-
-    // Render non-media imeta links as download cards; media uses `img`.
-    const card = resolveFileCard(
-      href ? imetaByUrl?.get(href) : undefined,
-      href,
-      label,
-    );
-    if (card) {
-      return (
-        <FileCard href={card.href} filename={card.filename} size={card.size} />
-      );
-    }
-
-    // Keep Buzz channel/message navigation in-app.
-    if (href) {
-      if (parseChannelLink(href).ok) {
-        return (
-          <ChannelDeepLinkAnchor
-            {...props}
-            href={href}
-            interactive={interactive}
-          >
-            {children}
-          </ChannelDeepLinkAnchor>
-        );
-      }
-      const messageLinkTarget = resolveMessageLinkRenderTarget({
-        href,
-        label,
-      });
-      if (messageLinkTarget.kind !== "none") {
-        if (messageLinkTarget.kind === "pill") {
-          return (
-            <MessageLinkPill
-              channels={channels}
-              interactive={interactive}
-              link={messageLinkTarget.link}
-              onOpenChannel={onOpenChannel}
-              onOpenMessageLink={onOpenMessageLink}
-              resolveChannelReference={resolveChannelReferences}
-            />
-          );
-        }
-
-        return (
-          <AuthoredDeepLinkAnchor
-            channelId={messageLinkTarget.link.channelId}
-            href={href}
-            interactive={interactive}
-            messageLink={messageLinkTarget.link}
-          >
-            {children}
-          </AuthoredDeepLinkAnchor>
-        );
-      }
-      // Malformed message deep links fall through to external handling.
-    }
-
-    // `buzz://pr|issue|repo|project?…` entity links navigate in-app;
-    // malformed ones fall through to the default anchor. The provider-backed
-    // component keeps metadata tooltips available for both raw chips and
-    // authored Markdown labels.
-    if (href) {
-      const entityAnchor = React.createElement(
-        EntityLinkAnchor,
-        {
-          href,
-          onOpenEntityLink,
-          relayOrigin,
-          interactive,
-          asChip: label === href,
-        },
-        children,
-      );
-      if (
-        parseEntityLink(href).ok ||
-        parseSupportedLinkPreview(href, relayOrigin)?.href.startsWith("buzz://")
-      )
-        return entityAnchor;
-    }
-
-    const supportedLinkPreview = href
-      ? parseSupportedLinkPreview(href, relayOrigin)
-      : null;
-    const isLinearLink = supportedLinkPreview?.kind === "linear-issue";
-
-    return (
-      <ExternalLinkAnchor
-        anchorProps={props}
-        href={href}
-        isLinearLink={isLinearLink}
-        label={label}
-      >
-        {children}
-      </ExternalLinkAnchor>
-    );
-  }
 
   return {
     spoiler: ({
@@ -1387,7 +1219,7 @@ export function createMarkdownComponents(
     }) => (
       <SpoilerInline
         block={props["data-block-spoiler"] != null}
-        interactive={interactive}
+        interactive={showMedia}
       >
         {children}
       </SpoilerInline>
@@ -1399,7 +1231,7 @@ export function createMarkdownComponents(
       }
       return <span {...props}>{children}</span>;
     },
-    a: MarkdownAnchor,
+    a: createMarkdownAnchor(interactive, showMedia),
     blockquote: ({ children }) => (
       <blockquote className="border-l-2 border-border pl-4 italic text-muted-foreground [&>*:first-child]:mt-0 [&>*+*]:mt-2">
         {children}
@@ -1475,7 +1307,7 @@ export function createMarkdownComponents(
       const { imetaByUrl } = useMarkdownRuntime();
       const entry = src ? imetaByUrl?.get(src) : undefined;
       const isVideo = src ? isVideoMedia(src, entry?.m) : false;
-      if (!interactive) {
+      if (!showMedia) {
         const fallbackLabel = isVideo ? "Video attachment" : "Image attachment";
         return <span>{alt?.trim() || fallbackLabel}</span>;
       }
@@ -1493,6 +1325,7 @@ export function createMarkdownComponents(
               key={src ?? resolvedSrc}
               alt={alt}
               entry={entry}
+              readOnly={readOnlyMedia}
               resolvedSrc={resolvedSrc}
               src={src}
             />
@@ -1660,12 +1493,18 @@ function getMarkdownComponents(
   leadingInlineContent: boolean,
   mediaInset: boolean,
   blockCode: boolean,
+  readOnlyMedia: boolean,
 ): MarkdownComponentSet {
-  const variant = `${MARKDOWN_COMPONENT_SCHEMA_VERSION}:${interactive ? "i" : ""}${leadingInlineContent ? "l" : ""}${mediaInset ? "m" : ""}${blockCode ? "c" : ""}`;
+  const variant = `${MARKDOWN_COMPONENT_SCHEMA_VERSION}:${interactive ? "i" : ""}${leadingInlineContent ? "l" : ""}${mediaInset ? "m" : ""}${blockCode ? "c" : ""}${readOnlyMedia ? "r" : ""}`;
   let entry = markdownComponentsByVariant.get(variant);
   if (!entry) {
     entry = {
-      components: createMarkdownComponents(interactive, mediaInset, blockCode),
+      components: createMarkdownComponents(
+        interactive,
+        mediaInset,
+        blockCode,
+        readOnlyMedia,
+      ),
       variant,
     };
     markdownComponentsByVariant.set(variant, entry);
@@ -1681,7 +1520,8 @@ function MarkdownInner({
   customEmoji,
   hardLineBreaks = true,
   imetaByUrl,
-  interactive = true,
+  interactive: allowMessageActions = true,
+  readOnlyMedia = false,
   blockCode = false,
   agentMentionPubkeysByName,
   leadingInlineContent,
@@ -1696,6 +1536,7 @@ function MarkdownInner({
   snapshotSharedBy,
   videoReviewContext,
 }: MarkdownProps) {
+  const interactive = allowMessageActions && !readOnlyMedia;
   const { channels: rawChannels } = useChannelNavigation();
   const channels = useStableArray(rawChannels);
   const { goChannel, goAgents } = useAppNavigation();
@@ -1721,7 +1562,7 @@ function MarkdownInner({
   const relayOrigin = useRelayOrigin();
   const resolvedLinkPreviews = useMessageLinkPreviews({
     content,
-    interactive,
+    interactive: interactive || readOnlyMedia,
     linkPreviewTags,
     linkPreviewsSuppressed,
     relayOrigin,
@@ -1790,6 +1631,7 @@ function MarkdownInner({
     hasLeadingInlineContent,
     mediaInset,
     blockCode,
+    readOnlyMedia,
   );
   const markdownNode =
     configNudge === null
@@ -1842,7 +1684,9 @@ function MarkdownInner({
           <LinkPreviewList
             ImageLightbox={LinkPreviewImageLightbox}
             key={messageId}
-            onRemoveForEveryone={onRemoveLinkPreviewsForEveryone}
+            onRemoveForEveryone={
+              readOnlyMedia ? undefined : onRemoveLinkPreviewsForEveryone
+            }
             previews={resolvedLinkPreviews}
           />
         </VideoReviewMarkdownContext.Provider>

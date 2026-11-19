@@ -1,3 +1,4 @@
+import { partitionDispatchOriginTags } from "./lib/dispatchTrace";
 import { useContext } from "react";
 import { OutboxContext } from "./outbox/OutboxProvider";
 import { enqueueOutbox } from "./outbox/runtime";
@@ -548,12 +549,14 @@ export function useSendMessageMutation(
       // emoji). Split it so each kind goes to its own validated Tauri arg —
       // emoji tags must NOT ride the imeta-only `media` channel (that gate
       // rejects any non-imeta prefix, which silently dropped emoji sends).
+      const { dispatchOriginTag, otherTags } =
+        partitionDispatchOriginTags(mediaTags);
       const {
         mediaTags: imetaTags,
         emojiTags,
         mentionTags,
         linkPreviewTags,
-      } = splitOutgoingTags(mediaTags);
+      } = splitOutgoingTags(otherTags);
       const recipientPubkeys = messageMentionPubkeys(
         effectiveChannel,
         identity.pubkey,
@@ -621,7 +624,8 @@ export function useSendMessageMutation(
         parentEventId ||
         imetaTags.length > 0 ||
         emojiTags.length > 0 ||
-        linkPreviewTags.length > 0
+        linkPreviewTags.length > 0 ||
+        dispatchOriginTag !== undefined
       ) {
         const cachedMessages =
           queryClient.getQueryData<RelayEvent[]>(
@@ -654,6 +658,10 @@ export function useSendMessageMutation(
           undefined,
           undefined,
           suppliedRootEventId,
+          undefined,
+          undefined,
+          undefined,
+          dispatchOriginTag,
         );
 
         // Build tags matching relay-emitted shape: h, author p, mention ps, reply es, imeta, emoji.
@@ -692,6 +700,7 @@ export function useSendMessageMutation(
             ...emojiTags,
             ...mentionTags,
             ...linkPreviewTags,
+            ...(dispatchOriginTag ? [dispatchOriginTag] : []),
             ...(sentFromThreadTag ? [sentFromThreadTag] : []),
           ],
           content: content.trim(),

@@ -1,3 +1,4 @@
+import { withDispatchTraces } from "@/features/messages/lib/dispatchTrace";
 import * as React from "react";
 import { buildFlatTimelineEntries } from "@/features/messages/lib/flatTimeline";
 import { useTimelineView } from "./TimelineViewContext";
@@ -41,13 +42,24 @@ export function useChannelPaneMessages({
     () =>
       isHuddleTranscript || mode === "timeline"
         ? buildFlatTimelineEntries(visibleMessages)
-        : buildMainTimelineEntries(
+        : withDispatchTraces(
+            buildMainTimelineEntries(
+              visibleMessages,
+              new Set(),
+              threadSummaries,
+              profiles,
+            ),
             visibleMessages,
-            new Set(),
-            threadSummaries,
-            profiles,
+            activeChannel?.id,
           ),
-    [isHuddleTranscript, mode, profiles, threadSummaries, visibleMessages],
+    [
+      activeChannel?.id,
+      isHuddleTranscript,
+      mode,
+      profiles,
+      threadSummaries,
+      visibleMessages,
+    ],
   );
 
   const recentMentionPubkeys = React.useMemo(

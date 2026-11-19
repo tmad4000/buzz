@@ -828,6 +828,7 @@ export function useMentionSendFlow({
       pendingImeta,
       queuedAttachments = [],
       linkPreviewTags = [],
+      semanticTags = [],
       preparedLinkPreviews = null,
       sentDraftKey,
       recoveryDraftKey,
@@ -935,6 +936,7 @@ export function useMentionSendFlow({
           addressedAgentPubkeys,
         );
         const outgoingTags = [
+          ...semanticTags,
           ...buildCustomEmojiTags(trimmed, customEmoji),
           ...linkPreviewTags,
         ];

@@ -103,6 +103,8 @@ export type PendingNonMemberMentionSend = {
 };
 
 export type SendMessageWithMentionFlowInput = {
+  /** Immutable signed dispatch provenance, kept through mentions/media/outbox. */
+  semanticTags?: string[][];
   onPublished?: (messageId?: string) => void;
   addressedAgentPubkeys?: readonly string[];
   capturedChannelId: string | null;

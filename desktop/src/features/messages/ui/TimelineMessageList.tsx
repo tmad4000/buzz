@@ -1,3 +1,4 @@
+import { DispatchTraceRow } from "./DispatchTraceRow";
 import { useTimelineView } from "@/features/channels/ui/TimelineViewContext";
 import { buildFlatTimelineEntries } from "../lib/flatTimeline";
 import type { ThreadSummaryRenderer } from "./TimelineMessageRow";
@@ -81,6 +82,7 @@ type TimelineMessageListProps = {
   onMarkRead?: (message: TimelineMessage) => void;
   onReply?: (message: TimelineMessage) => void;
   onOpenThread?: (message: TimelineMessage) => void;
+  onOpenDispatch?: (root: TimelineMessage, sourceId: string) => void;
   renderThreadSummary?: ThreadSummaryRenderer;
   isSendingVideoReviewComment?: boolean;
   onSendVideoReviewComment?: (
@@ -157,6 +159,7 @@ export const TimelineMessageList = React.memo(function TimelineMessageList({
   onMarkRead,
   onReply,
   onOpenThread,
+  onOpenDispatch,
   renderThreadSummary,
   isSendingVideoReviewComment = false,
   onSendVideoReviewComment,
@@ -263,6 +266,14 @@ export const TimelineMessageList = React.memo(function TimelineMessageList({
             />
           );
         case "message":
+          if (item.entry.dispatchTrace)
+            return (
+              <DispatchTraceRow
+                message={item.entry.message}
+                root={item.entry.dispatchTrace.root}
+                onOpen={onOpenDispatch}
+              />
+            );
           return (
             <MessageRowItem
               channelId={channelId}
@@ -334,6 +345,7 @@ export const TimelineMessageList = React.memo(function TimelineMessageList({
       onMarkUnread,
       onReply,
       onOpenThread,
+      onOpenDispatch,
       renderThreadSummary,
       onToggleReaction,
       profiles,
@@ -400,6 +412,7 @@ export const TimelineMessageList = React.memo(function TimelineMessageList({
 });
 
 function timelineItemMessageIds(item: TimelineNonDayItem): string[] {
+  if (item.kind === "message" && item.entry.dispatchTrace) return [];
   if (item.kind === "system-group") {
     return item.entries.map((entry) => entry.message.id);
   }

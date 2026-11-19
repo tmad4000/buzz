@@ -27,6 +27,8 @@ export type TimelineThreadSummary = {
 };
 
 export type MainTimelineEntry = {
+  /** Presentation only: a derived main-channel trace of this same source event. */
+  dispatchTrace?: { root: TimelineMessage | null };
   message: TimelineMessage;
   summary: TimelineThreadSummary | null;
 };

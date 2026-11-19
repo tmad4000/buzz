@@ -19,6 +19,7 @@ export async function sendChannelMessage(
   prepareOnly?: boolean,
   clientMessageId?: string,
   intendedCreatedAt?: number,
+  dispatchOriginTag?: string[],
 ): Promise<SendChannelMessageResult> {
   const response = await invokeTauri<RawSendChannelMessageResult>(
     "send_channel_message",
@@ -35,6 +36,7 @@ export async function sendChannelMessage(
       mentionTags: mentionTags ?? null,
       linkPreviewTags,
       sentFromThreadTag: sentFromThreadTag ?? null,
+      dispatchOriginTag: dispatchOriginTag ?? null,
       mentionPubkeys: mentionPubkeys ?? null,
       kind: kind ?? null,
       // Tenant scope captured by the caller before its first await; the

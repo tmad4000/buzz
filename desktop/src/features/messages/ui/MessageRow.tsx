@@ -1,3 +1,4 @@
+import { DispatchOriginLine } from "./DispatchOriginLine";
 import * as React from "react";
 import { AlertTriangle } from "lucide-react";
 import {
@@ -686,6 +687,7 @@ export const MessageRow = React.memo(
     const messageBodyNode = (
       <>
         <SentFromThreadLine channelId={channelId} tags={message.tags} />
+        <DispatchOriginLine message={message} channelId={channelId} />
         {renderBody()}
         {continuationMetadataNode}
         <MessageReactions
