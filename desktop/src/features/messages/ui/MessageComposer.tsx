@@ -74,6 +74,7 @@ import { prepareBackgroundLinkPreviews } from "@/features/messages/lib/linkPrevi
 import { useComposerLinkPreviews } from "./useComposerLinkPreviews";
 import { useAddressedAgentMentionRestore } from "./useAddressedAgentMentionRestore";
 import { scheduleSettleGatedAutoSubmit } from "./messageComposerAutoSubmit";
+import { dispatchOriginTags } from "../lib/dispatchTrace";
 import { resolveNestedRoutingTarget } from "../lib/threadRouting";
 import { SendToThreadPicker } from "./SendToThreadPicker";
 import type { MessageComposerProps } from "./MessageComposer.types";
@@ -734,6 +735,7 @@ function MessageComposerImpl({
           onPublished,
           addressedAgentPubkeys: persistentAudience.pubkeys,
           capturedChannelId: channelId,
+          semanticTags: dispatchOriginTags(channelId, id, !!threadRoutingScope),
           capturedThreadContext,
           pendingImeta: currentPendingImeta,
           queuedAttachments: currentQueuedAttachments,

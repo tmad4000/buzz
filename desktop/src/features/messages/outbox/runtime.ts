@@ -1,3 +1,7 @@
+import {
+  partitionDispatchOriginTags,
+  retainDispatchOriginForEdit,
+} from "../lib/dispatchTrace";
 import { prepareOutboxAgents } from "./agentDelivery";
 import { revalidateAgentMentionPubkeys } from "../lib/agentMentionRevalidation";
 import { listManagedAgents } from "@/shared/api/tauri";
@@ -135,8 +139,11 @@ const engine = new OutboxEngine(
         ),
       );
       const outgoing = buildOutgoingMessage(m.content, uploaded, spoilers);
+      const { dispatchOriginTag, otherTags } = partitionDispatchOriginTags(
+        m.tags,
+      );
       const tags = splitOutgoingTags([
-        ...m.tags.filter((tag) => tag[0] !== "buzz:sent-from-thread"),
+        ...otherTags.filter((tag) => tag[0] !== "buzz:sent-from-thread"),
         ...(outgoing.mediaTags ?? []),
       ]);
       const sentFromThreadTag = m.tags.find(
@@ -159,6 +166,7 @@ const engine = new OutboxEngine(
         true,
         row.id,
         row.intendedAt,
+        dispatchOriginTag,
       );
       if (!result.signedEvent)
         throw new Error("Publisher did not prepare a signed event.");
@@ -417,7 +425,7 @@ export async function editOutbox(
     ...row.message,
     content,
     tags: [
-      ...tags,
+      ...retainDispatchOriginForEdit(row.message.tags, tags),
       ...row.message.tags.filter((tag) => tag[0] === "buzz:sent-from-thread"),
     ],
     mentionPubkeys,

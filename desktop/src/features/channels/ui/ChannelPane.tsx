@@ -1,3 +1,5 @@
+import { withDispatchTraces } from "@/features/messages/lib/dispatchTrace";
+import { DispatchedLog } from "@/features/messages/ui/DispatchedLog";
 import { useRoutedSendReturn } from "./useRoutedSendReturn";
 import { useTimelineView } from "./TimelineViewContext";
 import { ChannelTimelineProviders } from "./ChannelTimelineProviders";
@@ -435,6 +437,10 @@ export const ChannelPane = React.memo(function ChannelPane({
       profiles,
       threadSummaries,
     });
+  const dispatchEntries = React.useMemo(
+    () => withDispatchTraces([], visibleMessages, activeChannel?.id),
+    [visibleMessages, activeChannel?.id],
+  );
   useRenderScopedReactionHydration({
     activeChannel,
     mainTimelineEntries,
@@ -781,6 +787,7 @@ export const ChannelPane = React.memo(function ChannelPane({
                 onMarkUnread={onMarkUnread}
                 onMarkRead={onMarkRead}
                 onReply={timelineReplyHandler}
+                onOpenDispatch={onOpenSentReply}
                 onOpenThread={
                   isHuddleTranscript || flatTimeline ? undefined : onOpenThread
                 }
@@ -890,6 +897,12 @@ export const ChannelPane = React.memo(function ChannelPane({
                         : undefined
                     }
                     onSend={handleSendMessage}
+                    toolbarExtraActions={
+                      <DispatchedLog
+                        entries={dispatchEntries}
+                        onOpen={onOpenSentReply}
+                      />
+                    }
                     threadRoutingEntries={mainTimelineEntries}
                     onCaptureRoutedSend={routedSend.captureSend}
                     {...{ profiles, recentMentionPubkeys: recentMentions }}

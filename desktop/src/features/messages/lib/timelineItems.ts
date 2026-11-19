@@ -216,12 +216,27 @@ export function buildTimelineItems(
       });
     }
 
-    if (shouldRenderUnreadDivider(i, message.id, firstUnreadMessageId)) {
+    if (
+      !entry.dispatchTrace &&
+      shouldRenderUnreadDivider(i, message.id, firstUnreadMessageId)
+    ) {
       previousGroupEntry = null;
       previousMessageItemIndex = null;
       items.push({ kind: "unread-divider", key: `unread-${renderKey}` });
     }
 
+    if (entry.dispatchTrace) {
+      previousGroupEntry = null;
+      previousMessageItemIndex = null;
+      items.push({
+        kind: "message",
+        key: renderKey,
+        entry,
+        isContinuation: false,
+        isFollowedByContinuation: false,
+      });
+      continue;
+    }
     const kind = message.kind === KIND_SYSTEM_MESSAGE ? "system" : "message";
     if (kind === "system") {
       previousGroupEntry = null;
