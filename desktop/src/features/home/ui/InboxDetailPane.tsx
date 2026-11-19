@@ -14,6 +14,8 @@ import type {
   InboxItem,
   InboxReply,
 } from "@/features/home/lib/inbox";
+import type { InboxStatusCard } from "@/features/home/lib/inboxStatusCards";
+import { ExternalLinkAnchor } from "@/shared/ui/markdown/ExternalLinkAnchor";
 import { getProjectInboxReference } from "@/features/home/lib/projectInbox";
 import { ProjectInboxDetail } from "@/features/home/ui/ProjectInboxDetail";
 import { ChannelMembersBar } from "@/features/channels/ui/ChannelMembersBar";
@@ -75,6 +77,8 @@ const EMPTY_REPLIES: InboxReply[] = [];
 
 type InboxDetailPaneProps = {
   agentPubkeys?: ReadonlySet<string>;
+  attentionCard?: InboxStatusCard;
+  onMarkAnswerRead?: () => void;
   canDelete: boolean;
   canOpenChannel: boolean;
   canReply: boolean;
@@ -165,6 +169,8 @@ export function InboxDetailPane(props: InboxDetailPaneProps) {
 
 function InboxMessageDetailPane({
   agentPubkeys,
+  attentionCard,
+  onMarkAnswerRead,
   canDelete,
   canOpenChannel,
   canReply,
@@ -529,6 +535,9 @@ function InboxMessageDetailPane({
     onEditTargetChange(null);
     focusComposer();
   };
+  const statusReplyTarget = attentionCard?.state === "waiting"
+    ? displayMessages.find((message) => message.id === attentionCard.originEventId)
+    : undefined;
   const handleSelectEditTarget = (message: InboxDisplayMessage) => {
     onEditTargetChange((currentEditTargetId) =>
       currentEditTargetId === message.id ? null : message.id,
@@ -706,6 +715,39 @@ function InboxMessageDetailPane({
           ref={scrollContainerRef}
         >
           <div ref={contentRef}>
+            {attentionCard || onMarkAnswerRead ? (
+              <div className="mx-4 my-2 flex flex-wrap items-center gap-2 rounded-md bg-muted/50 px-3 py-2 text-xs">
+                {attentionCard ? (
+                  <>
+                    <span className="font-medium">{attentionCard.title}</span>
+                    <ExternalLinkAnchor
+                      anchorProps={{}}
+                      href={attentionCard.href}
+                      isLinearLink={false}
+                      label="Open agent"
+                    >
+                      Open agent
+                    </ExternalLinkAnchor>
+                  </>
+                ) : null}
+                {canReply && statusReplyTarget ? (
+                  <Button size="sm" variant="outline" type="button"
+                    onClick={() => {
+                      setReplyTargetId(statusReplyTarget.id);
+                      onEditTargetChange(null);
+                      focusComposer();
+                    }}
+                  >
+                    Reply
+                  </Button>
+                ) : null}
+                {onMarkAnswerRead ? (
+                  <Button size="sm" variant="outline" type="button" onClick={onMarkAnswerRead}>
+                    Mark read
+                  </Button>
+                ) : null}
+              </div>
+            ) : null}
             {isThreadContextLoading && displayMessages.length <= 1 ? (
               <div
                 className="mx-4 mb-2 flex items-center gap-2 rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground"

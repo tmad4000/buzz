@@ -37,6 +37,13 @@
       "description": "Compact reported agent status cards and exact parent links in expanded inline threads",
       "platforms": ["desktop"],
       "defaultEnabled": false
+    },
+    {
+      "id": "inboxV2",
+      "name": "Inbox v2",
+      "description": "Needs you and Answers filters in Inbox",
+      "platforms": ["desktop"],
+      "defaultEnabled": false
     }
   ]
 }
