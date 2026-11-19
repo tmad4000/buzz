@@ -18,7 +18,7 @@ export function routeAge(attestedAt: number, nowMs: number) {
 export function RuntimeRouteAge({ attestedAt }: { attestedAt: number }) {
   const age = routeAge(attestedAt, useNow(60_000));
   return (
-    <span className="text-2xs font-normal text-muted-foreground">
+    <span className="text-badge font-normal text-muted-foreground">
       Last advertised route · {age.relative}
       {age.stale ? " · STALE · stale, may be offline" : ""}
       {age.old ? " · Stale (over 24 h)" : ""}
