@@ -18,7 +18,7 @@ function load(name, mocks) {
   vm.runInNewContext(js, {
     module,
     exports: module.exports,
-    require: (s) => (s in mocks ? mocks[s] : s === "./RuntimeRouteAge" ? { RuntimeRouteAge: () => null } : require(s)),
+    require: (s) => (s in mocks ? mocks[s] : s === "./RuntimeRouteAge" ? { RuntimeRouteAge: () => null } : s === "@/shared/lib/openPaseoAgent" ? { openPaseoAgent: (value) => mocks["@tauri-apps/plugin-opener"].openUrl(value) } : require(s)),
     Date,
   });
   return module.exports;

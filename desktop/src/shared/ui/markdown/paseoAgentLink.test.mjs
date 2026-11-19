@@ -20,6 +20,8 @@ test("actual Markdown transform preserves canonical local and remote session hre
     const value = `paseo://h/${server}/agent/${id}`;
     assert.equal(isPaseoAgentLink(value), true);
     assert.equal(buzzDeepLinkUrlTransform(value, "href"), value);
+    const fork = value.replace("paseo:", "paseo-fork:");
+    assert.equal(buzzDeepLinkUrlTransform(fork, "href"), fork);
     assert.equal(
       buzzDeepLinkUrlTransform(value, "src"),
       defaultUrlTransform(value),
@@ -31,6 +33,7 @@ test("arbitrary schemes, other Paseo actions and malformed routes stay sanitized
   for (const value of [
     "javascript:alert(1)",
     "paseo://settings",
+    "paseo-fork://settings",
     "paseo://h/srv_KIFHQ_zsBnI2/agent/new",
     `${link}\n`,
     `${link}?action=send`,
@@ -76,6 +79,8 @@ function anchor(props, openUrl) {
       if (name === "react")
         return { useState: () => [null, () => {}], useCallback: (f) => f };
       if (name === "@tauri-apps/plugin-opener") return { openUrl };
+      if (name === "@/shared/lib/openPaseoAgent")
+        return { openPaseoAgent: openUrl };
       if (name === "sonner") return { toast: { error: () => {} } };
       if (name === "./MediaContextMenu")
         return { useDismissMediaContextMenu: () => {} };
@@ -157,7 +162,7 @@ test("native capability only grants the main window's canonical agent route", ()
   const permission = capability.permissions[0];
   assert.equal(permission.identifier, "opener:allow-open-url");
   const servers = ["srv_KIFHQ_zsBnI2", "srv_uvq8mbWTDr9Y", "srv_xmGYpGqxNnXR"];
-  assert.equal(permission.allow.length, 3);
+  assert.equal(permission.allow.length, 6);
   for (const [index, entry] of permission.allow.entries()) {
     // Native glob has no variable-length wildcard: only fixed hosts and 32 hex slots.
     assert.equal(entry.url.includes("*"), false);
@@ -165,7 +170,10 @@ test("native capability only grants the main window's canonical agent route", ()
     const uuidGlob = [8, 4, 4, 4, 12]
       .map((n) => "[0-9a-f]".repeat(n))
       .join("-");
-    assert.equal(entry.url, `paseo://h/${servers[index]}/agent/${uuidGlob}`);
+    assert.equal(
+      entry.url,
+      `${index < 3 ? "paseo" : "paseo-fork"}://h/${servers[index % 3]}/agent/${uuidGlob}`,
+    );
   }
   const defaults = JSON.parse(
     fs.readFileSync(new URL("default.json", directory), "utf8"),

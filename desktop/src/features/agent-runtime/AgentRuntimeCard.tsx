@@ -1,4 +1,4 @@
-import { openUrl } from "@tauri-apps/plugin-opener";
+import { openPaseoAgent } from "@/shared/lib/openPaseoAgent";
 import { toast } from "sonner";
 import { copyTextToClipboard } from "@/shared/lib/clipboard";
 import { RuntimeRouteAge } from "./RuntimeRouteAge";
@@ -15,7 +15,7 @@ export function OpenRuntimeSession({ session }: { session: RuntimeSession }) {
       onPointerDown={(e) => e.stopPropagation()}
       onKeyDown={(e) => e.stopPropagation()}
       onClick={() => {
-        void openUrl(link).catch(() => toast.error("Failed to open Paseo"));
+        void openPaseoAgent(link);
       }}
     >
       Open in Paseo ↗
@@ -129,7 +129,6 @@ export function AgentRuntimeCard({ pubkey }: { pubkey: string }) {
             <br />
             Self-signed · self-reported{" "}
             {new Date(data.attestedAt * 1000).toLocaleString()}
-
             {query.isError ? " · Refresh failed" : ""}
           </p>
         </div>
