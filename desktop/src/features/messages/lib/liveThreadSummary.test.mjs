@@ -116,23 +116,26 @@ test("actual list selector uses live evidence while retaining frozen body member
     true,
     ts.ScriptKind.TSX,
   );
+  let sourceSelector;
   let selector;
   const visit = (node) => {
     if (
       ts.isVariableDeclaration(node) &&
-      // PR70 orders sourceEntries separately; this contract exercises the live
-      // summary projection over frozen bodies, before that ordering step.
-      node.name.getText(source) === "sourceEntries" &&
+      ["sourceEntries", "entries"].includes(node.name.getText(source)) &&
       node.initializer &&
       ts.isCallExpression(node.initializer) &&
       node.initializer.expression.getText(source) === "React.useMemo"
-    )
-      selector = node.initializer.arguments[0].getText(source);
+    ) {
+      const callback = node.initializer.arguments[0].getText(source);
+      if (node.name.getText(source) === "sourceEntries") sourceSelector = callback;
+      else selector = callback;
+    }
     ts.forEachChild(node, visit);
   };
   visit(source);
+  assert.ok(sourceSelector);
   assert.ok(selector);
-  const select = new Function(
+  const selectSource = new Function(
     "mainEntries",
     "mode",
     "messages",
@@ -141,10 +144,17 @@ test("actual list selector uses live evidence while retaining frozen body member
     "summaryMessages",
     "buildFlatTimelineEntries",
     "buildMainTimelineEntries",
+    ts.transpile(`return (${sourceSelector})();`, {
+      target: ts.ScriptTarget.ES2022,
+    }),
+  );
+  const select = new Function(
+    "sourceEntries",
+    "activityOrder",
     ts.transpile(`return (${selector})();`, { target: ts.ScriptTarget.ES2022 }),
   );
   const rendered = [root, first];
-  const entries = select(
+  const sourceEntries = selectSource(
     undefined,
     "threads",
     rendered,
@@ -156,6 +166,8 @@ test("actual list selector uses live evidence while retaining frozen body member
     },
     buildMainTimelineEntries,
   );
+  // Threads mode disables activity ordering; run the final production selector.
+  const entries = select(sourceEntries, false);
   assert.deepEqual(
     entries.map((entry) => entry.message.id),
     [root.id],
