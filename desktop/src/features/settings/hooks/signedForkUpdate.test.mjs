@@ -125,3 +125,49 @@ test("rejected channel metadata closes the native resource instead of offering i
   assert.equal(await f.discoverSignedForkUpdate(current), null);
   assert.equal(f.calls.at(-1), "close");
 });
+
+test("configured signed .10.1 proof is offered by the .10 client, never as a downgrade or wrong-tag asset", () => {
+  const { isNewerSignedForkCandidate: valid } = load();
+  const proof = candidate();
+  proof.currentVersion = "0.5.28-ideaflow.10";
+  proof.version = proof.rawJson.version = "0.5.28-ideaflow.10.1";
+  proof.rawJson.platforms["darwin-aarch64"].url =
+    "https://github.com/tmad4000/buzz/releases/download/buzz-ideaflow-v0.5.28-ideaflow.10.1/Buzz.app.tar.gz";
+  assert.equal(valid(proof, "0.5.28-ideaflow.10"), true);
+  proof.currentVersion = "0.5.28-ideaflow.10.1";
+  assert.equal(valid(proof, "0.5.28-ideaflow.10.1"), false);
+  proof.currentVersion = "0.5.28-ideaflow.10";
+  proof.rawJson.platforms["darwin-aarch64"].url =
+    "https://github.com/tmad4000/buzz/releases/download/buzz-ideaflow-v0.5.28-ideaflow.10/Buzz.app.tar.gz";
+  assert.equal(valid(proof, "0.5.28-ideaflow.10"), false);
+});
+
+test("native candidate does not coerce a version object or admit malformed/equal/older proof versions", () => {
+  const { isNewerSignedForkCandidate: valid } = load();
+  let coerced = false;
+  const object = {
+    toString() {
+      coerced = true;
+      return "0.5.28-ideaflow.10.1";
+    },
+  };
+  const value = candidate();
+  value.version = value.rawJson.version = object;
+  assert.equal(valid(value, current), false);
+  assert.equal(valid(candidate(), object), false);
+  assert.equal(coerced, false);
+  for (const version of [
+    "0.5.28-ideaflow.10.1\n",
+    "0.5.28-ideaflow.10.01",
+    "0.5.28-ideaflow.10.1.2",
+    "0.5.28-ideaflow.10.beta",
+    "0.5.28-ideaflow.10.9007199254740993",
+  ]) {
+    const invalid = candidate();
+    invalid.version = invalid.rawJson.version = version;
+    assert.equal(valid(invalid, current), false);
+  }
+  const older = candidate();
+  older.currentVersion = "0.5.28-ideaflow.10.1";
+  assert.equal(valid(older, "0.5.28-ideaflow.10.1"), false);
+});

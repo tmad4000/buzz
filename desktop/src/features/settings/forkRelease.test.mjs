@@ -75,3 +75,81 @@ test("only exact version-matching arm64/x64 fork ZIPs are eligible on Mac", () =
       null,
     );
 });
+
+test("version-only .10.1 proof release orders after .10 without admitting arbitrary prerelease channels", () => {
+  assert.deepEqual(
+    forkVersion("buzz-ideaflow-v0.5.28-ideaflow.10"),
+    [0, 5, 28, 10, 0],
+  );
+  assert.deepEqual(
+    forkVersion("buzz-ideaflow-v0.5.28-ideaflow.10.1"),
+    [0, 5, 28, 10, 1],
+  );
+  for (const suffix of [
+    "10.0",
+    "10.01",
+    "10.1.2",
+    "10.beta",
+    "10.9007199254740993",
+  ]) {
+    assert.equal(forkVersion(`buzz-ideaflow-v0.5.28-ideaflow.${suffix}`), null);
+  }
+  const proof = release("buzz-ideaflow-v0.5.28-ideaflow.10.1");
+  assert.equal(
+    newerForkRelease([proof], "0.5.28-ideaflow.10", "MacIntel").version,
+    "0.5.28-ideaflow.10.1",
+  );
+  assert.equal(
+    newerForkRelease([proof], "0.5.28-ideaflow.10.1", "MacIntel"),
+    null,
+  );
+  assert.equal(
+    newerForkRelease(
+      [release("buzz-ideaflow-v0.5.28-ideaflow.10")],
+      "0.5.28-ideaflow.10.1",
+      "MacIntel",
+    ),
+    null,
+  );
+  assert.equal(
+    newerForkRelease(
+      [release("buzz-ideaflow-v0.5.28-ideaflow.11")],
+      "0.5.28-ideaflow.10.1",
+      "MacIntel",
+    ).version,
+    "0.5.28-ideaflow.11",
+  );
+});
+
+test("fork grammar is anchored, canonical decimal and non-coercing", () => {
+  let coerced = false;
+  const object = {
+    toString() {
+      coerced = true;
+      return "buzz-ideaflow-v0.5.28-ideaflow.10.1";
+    },
+  };
+  for (const value of [
+    object,
+    null,
+    10,
+    undefined,
+    ["buzz-ideaflow-v0.5.28-ideaflow.10.1"],
+  ]) {
+    assert.equal(forkVersion(value), null);
+  }
+  assert.equal(coerced, false);
+  for (const value of [
+    "buzz-ideaflow-v0.5.28-ideaflow.10.1\n",
+    "buzz-ideaflow-v0.5.28-ideaflow.10.1 ",
+    " buzz-ideaflow-v0.5.28-ideaflow.10.1",
+    "buzz-ideaflow-v00.5.28-ideaflow.10.1",
+    "buzz-ideaflow-v0.05.28-ideaflow.10.1",
+    "buzz-ideaflow-v0.5.28-ideaflow.010.1",
+    "buzz-ideaflow-v9007199254740993.5.28-ideaflow.10.1",
+    "buzz-ideaflow-v0.5.28-ideaflow.10.1+unapproved",
+  ])
+    assert.equal(forkVersion(value), null);
+  assert.equal(newerForkRelease([], object), null);
+  assert.equal(coerced, false);
+});

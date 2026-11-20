@@ -2,12 +2,16 @@ export const FORK_RELEASE_FEED =
   "https://api.github.com/repos/tmad4000/buzz/releases?per_page=100";
 export const FORK_RELEASES_URL = "https://github.com/tmad4000/buzz/releases";
 
-/** Only numbered Ideaflow builds belong to this release channel. */
+/** Numbered Ideaflow builds, with an optional version-only proof revision. */
 export function forkVersion(tag: string): number[] | null {
-  const match = /^buzz-ideaflow-v(\d+)\.(\d+)\.(\d+)-ideaflow\.(\d+)$/.exec(
-    tag,
-  );
-  return match ? match.slice(1).map(Number) : null;
+  if (typeof tag !== "string") return null;
+  const match =
+    /^buzz-ideaflow-v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)-ideaflow\.(0|[1-9]\d*)(?:\.([1-9]\d*))?$/.exec(
+      tag,
+    );
+  if (!match || match[0] !== tag) return null;
+  const parts = match.slice(1).map((part) => Number(part ?? 0));
+  return parts.every(Number.isSafeInteger) ? parts : null;
 }
 
 /** Ignore upstream tags, drafts, source-only releases and unrelated links. */
@@ -16,10 +20,11 @@ export function newerForkRelease(
   current: string,
   platform = "all",
 ): { version: string; releaseUrl: string } | null {
+  if (typeof current !== "string" || typeof platform !== "string") return null;
   const installed = forkVersion(`buzz-ideaflow-v${current}`);
   if (!installed) return null;
   const compare = (a: number[], b: number[]) => {
-    for (let i = 0; i < 4; i++) if (a[i] !== b[i]) return a[i] - b[i];
+    for (let i = 0; i < 5; i++) if (a[i] !== b[i]) return a[i] - b[i];
     return 0;
   };
   const installer = /mac/i.test(platform)

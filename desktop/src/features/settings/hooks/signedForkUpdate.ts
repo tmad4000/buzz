@@ -8,6 +8,13 @@ export function isNewerSignedForkCandidate(
   update: Pick<Update, "version" | "currentVersion" | "rawJson">,
   current: string,
 ): boolean {
+  if (
+    !update ||
+    typeof current !== "string" ||
+    typeof update.version !== "string" ||
+    typeof update.currentVersion !== "string"
+  )
+    return false;
   const from = forkVersion(`buzz-ideaflow-v${current}`);
   const to = forkVersion(`buzz-ideaflow-v${update.version}`);
   if (
