@@ -47,6 +47,7 @@ import { rewriteRelayUrl } from "@/shared/lib/mediaUrl";
 import { KIND_HUDDLE_STARTED } from "@/shared/constants/kinds";
 import { Button } from "@/shared/ui/button";
 import { HashArrowIn } from "@/shared/ui/icons";
+import type { MessageBodyAction } from "./MessageBodyDisclosure";
 import { DeleteMessageConfirmDialog } from "./DeleteMessageConfirmDialog";
 import {
   DropdownMenu,
@@ -90,6 +91,7 @@ function canCopyMessageLink(
 }
 
 function MoreActionsMenu({
+  bodyAction,
   channelId,
   message,
   onDelete,
@@ -106,6 +108,7 @@ function MoreActionsMenu({
   isUnread,
   profiles,
 }: {
+  bodyAction?: MessageBodyAction;
   /** Channel UUID for the "Copy link" action. When null/undefined, the
    *  Copy link entry is hidden (e.g. inbox preview rows that don't have it). */
   channelId?: string | null;
@@ -263,6 +266,16 @@ function MoreActionsMenu({
             >
               <Copy className="h-4 w-4" />
               Copy message
+            </DropdownMenuItem>
+          ) : null}
+
+          {bodyAction ? (
+            <DropdownMenuItem
+              aria-controls={bodyAction.bodyId}
+              aria-expanded={!bodyAction.collapsed}
+              onSelect={bodyAction.toggle}
+            >
+              {bodyAction.collapsed ? "Expand message" : "Collapse message"}
             </DropdownMenuItem>
           ) : null}
 
@@ -427,6 +440,7 @@ function isCustomEmojiShortcode(emoji: string) {
 }
 
 export const MessageActionBar = React.memo(function MessageActionBar({
+  bodyAction,
   channelId,
   message,
   ref,
@@ -447,6 +461,7 @@ export const MessageActionBar = React.memo(function MessageActionBar({
   isUnread,
   profiles,
 }: {
+  bodyAction?: MessageBodyAction;
   /** Channel UUID — required for the "Copy link" action; when omitted the
    *  action is hidden (callers like the home inbox that lack the context). */
   channelId?: string | null;
@@ -548,6 +563,8 @@ export const MessageActionBar = React.memo(function MessageActionBar({
         "opacity-100 sm:pointer-events-none sm:opacity-0",
         "sm:group-hover/message:pointer-events-auto sm:group-hover/message:opacity-100",
         "sm:group-focus-within/message:pointer-events-auto sm:group-focus-within/message:opacity-100",
+        bodyAction &&
+          "[@media(hover:none)]:pointer-events-auto [@media(hover:none)]:opacity-100",
         isReactionPickerOpen || isDropdownOpen || isForwardOpen
           ? "sm:pointer-events-auto sm:opacity-100"
           : "",
@@ -681,6 +698,7 @@ export const MessageActionBar = React.memo(function MessageActionBar({
 
           {hasMoreMenuActions ? (
             <MoreActionsMenu
+              bodyAction={bodyAction}
               channelId={channelId}
               message={message}
               onDelete={onDelete}

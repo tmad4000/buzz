@@ -1,5 +1,6 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { installMockBridge, TEST_IDENTITIES } from "../helpers/bridge";
+import { waitForMockChannelHeadReady } from "../helpers/channelHeadReady";
 
 test("Timeline flattens replies chronologically, receives live events, sends top-level, and opens exact thread replies", async ({
   page,
@@ -324,4 +325,166 @@ test("Timeline pages reply subtrees with bounded reads, keeps partial history ho
       .getByTestId("message-timeline")
       .getByText("Paged reply 3:0", { exact: true }),
   ).toBeVisible();
+});
+
+const GENERAL_ID = "9a1657ac-f7aa-5db0-b632-d8bbeb6dfb50";
+const COLLAPSE_FIXTURE = {
+  root: "ca".repeat(32),
+  reply: "cb".repeat(32),
+  nested: "cc".repeat(32),
+  shortBody: "Short topic with all of its replies",
+  longBody: `## Paseo follow-up\n\n${"Verification evidence is attached below. ".repeat(25)}\n\n**Exact original ending.**`,
+};
+
+async function openCollapseFixture(page: Page) {
+  await page.getByTestId("channel-general").click();
+  await waitForMockChannelHeadReady(page, "general", GENERAL_ID);
+  await page.evaluate(
+    ({ fixture, pubkey }) => {
+      const emit = window.__BUZZ_E2E_EMIT_MOCK_MESSAGE__;
+      if (!emit) throw new Error("Missing mock message emitter");
+      const createdAt = Math.floor(Date.now() / 1000) + 20;
+      emit({
+        channelName: "general",
+        id: fixture.root,
+        content: fixture.shortBody,
+        createdAt,
+        pubkey,
+      });
+      emit({
+        channelName: "general",
+        id: fixture.reply,
+        parentEventId: fixture.root,
+        content: fixture.longBody,
+        createdAt: createdAt + 1,
+        pubkey,
+      });
+      emit({
+        channelName: "general",
+        id: fixture.nested,
+        parentEventId: fixture.reply,
+        content: "The nested follow-up remains visible.",
+        createdAt: createdAt + 2,
+        pubkey,
+      });
+    },
+    { fixture: COLLAPSE_FIXTURE, pubkey: TEST_IDENTITIES.bob.pubkey },
+  );
+}
+
+async function controlledMessageBody(row: Locator, toggle: Locator) {
+  const target = await toggle.getAttribute("aria-controls");
+  if (!target) throw new Error("Missing message body disclosure target");
+  return row.locator(`[id=${JSON.stringify(target)}]`);
+}
+
+test("Timeline clamps a long message, restores expanded state, and copies the exact Markdown", async ({
+  page,
+}) => {
+  await installMockBridge(page, undefined, { seedPreviewFeatures: false });
+  await page.goto("/");
+  await openCollapseFixture(page);
+  const order = page.getByRole("combobox", { name: "Order", exact: true });
+  await order.selectOption("timeline");
+
+  const timeline = page.getByTestId("message-timeline");
+  const reply = timeline.locator(
+    `[data-message-id="${COLLAPSE_FIXTURE.reply}"][data-testid="message-row"]`,
+  );
+  const showMore = reply.getByRole("button", { name: "Show more" });
+  await expect(showMore).toHaveAttribute("aria-expanded", "false");
+  const content = await controlledMessageBody(reply, showMore);
+  await expect(content).toHaveJSProperty("inert", true);
+  await expect(content).toHaveCSS("overflow", "hidden");
+  await expect(content).not.toHaveCSS("mask-image", "none");
+  await expect
+    .poll(() =>
+      content.evaluate((node) => node.scrollHeight > node.clientHeight),
+    )
+    .toBe(true);
+
+  await reply.hover();
+  const actions = reply.getByTestId(`more-actions-${COLLAPSE_FIXTURE.reply}`);
+  await actions.click();
+  await page
+    .getByRole("menuitem", { name: "Copy message", exact: true })
+    .click();
+  await expect
+    .poll(() => page.evaluate(() => window.__BUZZ_E2E_LAST_CLIPBOARD__?.text))
+    .toBe(COLLAPSE_FIXTURE.longBody);
+
+  await showMore.focus();
+  await page.keyboard.press("Enter");
+  const showLess = reply.getByRole("button", { name: "Show less" });
+  await expect(showLess).toBeFocused();
+  await expect(showLess).toHaveAttribute("aria-expanded", "true");
+  await expect(content).toHaveJSProperty("inert", false);
+  await expect(
+    content.getByText("Exact original ending.", { exact: true }),
+  ).toBeVisible();
+
+  await page.reload();
+  await openCollapseFixture(page);
+  await order.selectOption("timeline");
+  await expect(showLess).toHaveAttribute("aria-expanded", "true");
+  await expect(
+    reply.getByText("Exact original ending.", { exact: true }),
+  ).toBeVisible();
+});
+
+test.describe("message disclosure on touch", () => {
+  test.use({ hasTouch: true, viewport: { width: 1000, height: 850 } });
+
+  test("short and long thread bodies disclose independently of nested reply links and drafts", async ({
+    page,
+  }) => {
+    await installMockBridge(page, undefined, { seedPreviewFeatures: false });
+    await page.goto("/");
+    await openCollapseFixture(page);
+    const timeline = page.getByTestId("message-timeline");
+    const root = timeline.locator(
+      `[data-message-id="${COLLAPSE_FIXTURE.root}"][data-testid="message-row"]`,
+    );
+
+    await root.getByTestId(`more-actions-${COLLAPSE_FIXTURE.root}`).tap();
+    await page
+      .getByRole("menuitem", { name: "Collapse message", exact: true })
+      .tap();
+    const showRoot = root.getByRole("button", { name: "Show more" });
+    await expect(showRoot).toHaveAttribute("aria-expanded", "false");
+    const rootBody = await controlledMessageBody(root, showRoot);
+    await expect(rootBody).toBeHidden();
+
+    await timeline
+      .locator(
+        `[data-testid="open-thread-side-panel"][data-thread-head-id="${COLLAPSE_FIXTURE.root}"]`,
+      )
+      .tap();
+    const panel = page.getByTestId("message-thread-panel");
+    const reply = panel.locator(
+      `[data-message-id="${COLLAPSE_FIXTURE.reply}"][data-testid="message-row"]`,
+    );
+    const chip = panel.locator(
+      `[data-testid="thread-parent-quote"][data-parent-message-id="${COLLAPSE_FIXTURE.reply}"]`,
+    );
+    const editor = panel.getByTestId("message-input");
+    await editor.fill("Keep this sidebar draft");
+    const showMore = reply.getByRole("button", { name: "Show more" });
+    await expect(showMore).toHaveAttribute("aria-expanded", "false");
+    const body = await controlledMessageBody(reply, showMore);
+    await expect(chip).toBeVisible();
+    await expect(
+      panel.getByText("The nested follow-up remains visible.", { exact: true }),
+    ).toBeVisible();
+    await showMore.tap();
+    await expect(body).toHaveJSProperty("inert", false);
+    await expect(
+      body.getByText("Exact original ending.", { exact: true }),
+    ).toBeVisible();
+    await expect(chip).toBeVisible();
+    await expect(editor).toHaveText("Keep this sidebar draft");
+    await chip.tap();
+    await expect(reply).toHaveClass(/route-target-highlight-fade/);
+    await expect(editor).toHaveText("Keep this sidebar draft");
+  });
 });

@@ -1,3 +1,4 @@
+import { useCommunities } from "@/features/communities/useCommunities";
 import { useResultAction } from "@/features/results/ResultActions";
 import { useFeatureEnabled } from "@/shared/features";
 import { parseBridgeStatusCard } from "@/features/messages/lib/bridgeStatusCard";
@@ -51,6 +52,10 @@ import { resolveMentionProps } from "@/shared/lib/resolveMentionNames";
 import type { VideoReviewContext } from "@/shared/ui/VideoPlayer";
 import { VideoReviewCommentMarkdown } from "@/shared/ui/VideoReviewCommentMarkdown";
 import { MessageActionBar } from "./MessageActionBar";
+import {
+  MessageBodyDisclosure,
+  useMessageBodyDisclosure,
+} from "./MessageBodyDisclosure";
 import { editMessage } from "@/shared/api/tauri";
 import { hasLinkPreviewSuppression } from "@/features/messages/lib/formatTimelineMessages";
 import { toast } from "sonner";
@@ -397,6 +402,27 @@ export const MessageRow = React.memo(
     const agentReplyUx = useFeatureEnabled("agentReplyUx");
     const resultCard = useResultAction(message, channelId ?? undefined);
     const statusCard = agentReplyUx ? parseBridgeStatusCard(message) : null;
+    const hasStructuredBody =
+      statusCard ||
+      message.kind === KIND_STREAM_MESSAGE_DIFF ||
+      message.kind === KIND_HUDDLE_STARTED;
+    const waveMessage = hasStructuredBody
+      ? null
+      : parseWaveMessageContent(message.body);
+    const { activeCommunity } = useCommunities();
+    const bodyDisclosure = useMessageBodyDisclosure({
+      communityId: activeCommunity?.id,
+      viewer: currentPubkey,
+      channelId,
+      messageId: message.id,
+      body:
+        message.pending ||
+        hasStructuredBody ||
+        waveMessage ||
+        !message.body.trim()
+          ? null
+          : message.body,
+    });
     const renderBody = () => {
       if (statusCard) {
         return (
@@ -441,7 +467,6 @@ export const MessageRow = React.memo(
             />
           );
         default: {
-          const waveMessage = parseWaveMessageContent(message.body);
           if (waveMessage) {
             return (
               <WaveMessageAttachment
@@ -604,6 +629,7 @@ export const MessageRow = React.memo(
         )}
       >
         <MessageActionBar
+          bodyAction={bodyDisclosure.action ?? undefined}
           channelId={channelId}
           ref={actionRailMeasureRef}
           isFollowingThread={isFollowingThread}
@@ -726,7 +752,9 @@ export const MessageRow = React.memo(
       <>
         <SentFromThreadLine channelId={channelId} tags={message.tags} />
         <ForwardedToAgentLine channelId={channelId} messageId={message.id} />
-        {renderBody()}
+        <MessageBodyDisclosure disclosure={bodyDisclosure}>
+          {renderBody()}
+        </MessageBodyDisclosure>
         {resultCard ? <div className="mt-2 min-w-0">{resultCard}</div> : null}
         {continuationMetadataNode}
         <MessageReactions
