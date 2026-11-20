@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { routeFixture } from "./route.ts";
-import { createFixtureSession } from "./session.ts";
+import { createFixtureSession, quickPrefix } from "./session.ts";
 
 const base = {
   model: "auto",
@@ -202,4 +202,11 @@ test("Quick-line shares the thread without consuming its separate draft choice",
   assert.equal(session.getSnapshot().turns[0].quickLine, true);
   assert.equal(session.getSnapshot().turns[0].handoff, undefined);
   session.prepare(false);
+});
+
+test("a not-yet-initialized composer draft does not activate Quick", () => {
+  assert.equal(quickPrefix(), "");
+  assert.equal(quickPrefix(null), "");
+  assert.equal(quickPrefix(""), "");
+  assert.equal(quickPrefix("  q: Question"), "q: ");
 });

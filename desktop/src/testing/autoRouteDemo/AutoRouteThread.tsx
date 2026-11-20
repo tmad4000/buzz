@@ -107,7 +107,7 @@ function QuickToggle({
   );
 }
 
-export function FixtureComposerControls({ draft }: { draft: string }) {
+export function FixtureComposerControls({ draft }: { draft?: string | null }) {
   const { quick, preparing, verified } = useFixture();
   const prefix = quickPrefix(draft);
   if (!verified) return null;

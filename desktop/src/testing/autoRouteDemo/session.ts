@@ -22,8 +22,8 @@ type Turn = {
   handoff?: Handoff;
 };
 
-export function quickPrefix(text: string) {
-  return /^(?:\?|q:)\s*/i.exec(text.trimStart())?.[0] ?? "";
+export function quickPrefix(text?: string | null) {
+  return /^(?:\?|q:)\s*/i.exec((text ?? "").trimStart())?.[0] ?? "";
 }
 
 export function createFixtureSession(fixture: FixtureCase) {
