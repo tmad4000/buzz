@@ -32,6 +32,13 @@
       "platforms": ["desktop"]
     },
     {
+      "id": "sidebarUnreadBadges",
+      "name": "Sidebar unread badges",
+      "description": "Show unread counts and mention highlights in the sidebar",
+      "platforms": ["desktop"],
+      "defaultEnabled": true
+    },
+    {
       "id": "agentReplyUx",
       "name": "Agent reply context",
       "description": "Compact reported agent status cards and exact parent links in expanded inline threads",

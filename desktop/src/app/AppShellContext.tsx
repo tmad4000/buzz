@@ -3,6 +3,7 @@ import type { ForcedUnreadSource } from "@/features/channels/forcedUnreadStore";
 import type { ThreadActivityItem } from "@/features/channels/useUnreadChannels";
 import type { FeedItemState } from "@/features/home/useFeedItemState";
 import type { FeedItem } from "@/shared/api/types";
+import type { SidebarUnreadCount } from "@/features/sidebar/lib/sidebarUnreadBadge";
 import type { SettingsSection } from "@/features/settings/ui/SettingsPanels";
 
 const EMPTY_SET = new Set<string>();
@@ -82,6 +83,10 @@ type AppShellContextValue = {
   // Lets isolated component tests retain the legacy hasUnread fallback while
   // the mounted shell uses the split projections above.
   hasSidebarUnreadProjections: boolean;
+  sidebarUnreadBadgeState?: {
+    counts: ReadonlyMap<string, SidebarUnreadCount>;
+    mentionedChannelIds?: ReadonlySet<string>;
+  };
   feedItemState: FeedItemState;
   // Open the Settings panel at the given section. Available on all surfaces
   // that render under AppShell (channel, home, projects, pulse, agents).

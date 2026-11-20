@@ -845,7 +845,6 @@ export function useUnreadChannels(
           if (!isForcedUnread) continue;
           unread.add(channel.id);
           topLevelUnread.add(channel.id);
-          if (channel.channelType === "dm") counts.set(channel.id, 1);
           unreadChannelNotificationCount += 1;
           continue;
         }

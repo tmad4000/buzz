@@ -78,6 +78,11 @@ import {
 import { useDueReminderBadgeCount } from "@/features/reminders/hooks";
 import { useReminderNotifications } from "@/features/reminders/useReminderNotifications";
 import { AppSidebar } from "@/features/sidebar/ui/AppSidebar";
+import {
+  getSidebarUnreadMentionChannelIds,
+  type SidebarUnreadCount,
+} from "@/features/sidebar/lib/sidebarUnreadBadge";
+import { useFeatureEnabled } from "@/shared/features";
 import { requestFocusedThreadClose } from "@/features/channels/focusedThreadCloseRequest";
 import { CommunityRail } from "@/features/sidebar/ui/CommunityRail";
 import { useChannelMutes } from "@/features/sidebar/lib/useChannelMutes";
@@ -453,6 +458,51 @@ export function AppShell() {
     threadActivityItems,
     mutedRootIds,
   });
+  const showSidebarUnreadBadges = useFeatureEnabled("sidebarUnreadBadges");
+  const sidebarUnreadCounts = React.useMemo(
+    () =>
+      showSidebarUnreadBadges
+        ? new Map(
+            Array.from(unreadChannelCounts, ([channelId, count]) => [
+              channelId,
+              { coverage: "partial", count } satisfies SidebarUnreadCount,
+            ]),
+          )
+        : undefined,
+    [showSidebarUnreadBadges, unreadChannelCounts],
+  );
+  const mentions = homeFeedQuery.data?.feed.mentions;
+  const mentionPubkey = identityQuery.data?.pubkey?.toLowerCase();
+  const sidebarUnreadMentions = React.useMemo(() => {
+    // The marker getters are stable; their contents advance with this version.
+    void readStateVersion;
+    if (
+      !showSidebarUnreadBadges ||
+      !threadReplySeenReady ||
+      !mentionPubkey ||
+      !mentions
+    ) {
+      return undefined;
+    }
+    return getSidebarUnreadMentionChannelIds({
+      mentions,
+      pubkey: mentionPubkey,
+      unreadIds: feedItemState.unreadSet,
+      doneIds: feedItemState.doneSet,
+      getChannelReadAt,
+      getOwnReadAt,
+    });
+  }, [
+    showSidebarUnreadBadges,
+    threadReplySeenReady,
+    mentionPubkey,
+    mentions,
+    readStateVersion,
+    feedItemState.unreadSet,
+    feedItemState.doneSet,
+    getChannelReadAt,
+    getOwnReadAt,
+  ]);
   const markAllChannelsRead = React.useCallback(() => {
     markAllReadSources({
       activeChannelId: activeChannel?.id ?? null,
@@ -767,6 +817,12 @@ export function AppShell() {
             unreadThreadChannelIds,
             topLevelUnreadChannelIds,
             hasSidebarUnreadProjections: true,
+            sidebarUnreadBadgeState: sidebarUnreadCounts
+              ? {
+                  counts: sidebarUnreadCounts,
+                  mentionedChannelIds: sidebarUnreadMentions,
+                }
+              : undefined,
             feedItemState,
             onOpenSettings: handleOpenSettings,
           }}

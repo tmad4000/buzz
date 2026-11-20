@@ -5,7 +5,7 @@ import {
 } from "@/features/messages/lib/threading";
 
 export function hasMentionForEvent(
-  event: RelayEvent,
+  event: Pick<RelayEvent, "tags">,
   currentPubkey: string,
 ): boolean {
   return (

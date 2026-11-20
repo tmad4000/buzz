@@ -2,7 +2,7 @@ import {
   AgentRuntimeHost,
   AgentRuntimeRowAction,
 } from "@/features/agent-runtime/AgentRuntimeRow";
-import type * as React from "react";
+import * as React from "react";
 import { BellOff, ChevronDown, CircleDot, X } from "lucide-react";
 
 import {
@@ -38,6 +38,7 @@ import {
 import { ChannelActivityPopover } from "@/features/sidebar/ui/ChannelActivityPopover";
 import { useAppShell } from "@/app/AppShellContext";
 import { UserNameIndicators } from "@/features/user-status/ui/UserNameIndicators";
+import { describeSidebarUnreadBadge } from "@/features/sidebar/lib/sidebarUnreadBadge";
 
 const SECTION_LABEL_BUTTON_CLASS =
   "group/section-label flex w-fit max-w-[calc(100%-3rem)] cursor-pointer appearance-none items-center gap-1 text-left transition-colors hover:text-sidebar-foreground focus-visible:text-sidebar-foreground";
@@ -100,6 +101,49 @@ function UnreadDotBadge({
       data-testid={`channel-unread-dot-${channelName}`}
     >
       <span className="sr-only">unread</span>
+    </span>
+  );
+}
+
+function SidebarUnreadBadge({
+  badge,
+  descriptionId,
+  isMention,
+  testId,
+  hasDmCloseAction,
+}: {
+  badge: NonNullable<ReturnType<typeof describeSidebarUnreadBadge>>;
+  descriptionId: string;
+  isMention: boolean;
+  testId: string;
+  hasDmCloseAction: boolean;
+}) {
+  return (
+    <span
+      className={cn(
+        "pointer-events-none ml-auto flex shrink-0 items-center justify-center",
+        badge.text || isMention
+          ? "h-5 min-w-5 gap-0.5 rounded-full px-1 text-2xs font-semibold leading-none tabular-nums"
+          : "size-2 rounded-full bg-sidebar-foreground/60",
+        isMention
+          ? "bg-primary text-primary-foreground"
+          : badge.text && "bg-sidebar-foreground/10 text-sidebar-foreground",
+        hasDmCloseAction &&
+          cn(
+            "absolute right-1 top-1/2 -translate-y-1/2 transition-opacity",
+            SIDEBAR_ROW_ACTION_REPLACED_BADGE_CLASS,
+          ),
+      )}
+      data-mention={isMention}
+      data-testid={testId}
+    >
+      <span aria-hidden="true">
+        {isMention ? "@" : null}
+        {badge.text}
+      </span>
+      <span id={descriptionId} hidden>
+        {badge.label}
+      </span>
     </span>
   );
 }
@@ -258,6 +302,7 @@ export function ChannelMenuButton({
   dmParticipants,
   presenceStatus,
   onSelectChannel,
+  hasDmCloseAction = false,
 }: {
   channel: Channel;
   label?: string;
@@ -268,6 +313,7 @@ export function ChannelMenuButton({
   dmParticipants?: SidebarDmParticipant[];
   presenceStatus?: PresenceStatus;
   onSelectChannel: (channelId: string) => void;
+  hasDmCloseAction?: boolean;
 }) {
   const agentParticipant =
     dmParticipants?.length === 1 &&
@@ -277,14 +323,34 @@ export function ChannelMenuButton({
       : undefined;
   const resolvedLabel = label ?? channel.name;
   const ephemeralDisplay = getEphemeralChannelDisplay(channel);
-  const { hasSidebarUnreadProjections, unreadThreadChannelIds } = useAppShell();
+  const {
+    hasSidebarUnreadProjections,
+    unreadThreadChannelIds,
+    sidebarUnreadBadgeState,
+  } = useAppShell();
   const hasThreadUnread =
     channel.channelType !== "dm" &&
     (hasSidebarUnreadProjections
       ? unreadThreadChannelIds.has(channel.id)
       : hasUnread);
+  const isDm = channel.channelType === "dm";
+  const unreadDescriptionId = React.useId();
+  const hasMention =
+    sidebarUnreadBadgeState?.mentionedChannelIds?.has(channel.id) ?? false;
+  const unreadBadge = sidebarUnreadBadgeState
+    ? describeSidebarUnreadBadge({
+        evidence: sidebarUnreadBadgeState.counts.get(channel.id),
+        hasUnread: hasUnread || hasThreadUnread,
+        hasMention,
+        suppressed: Boolean(isMuted) || (isDm && isActive),
+      })
+    : null;
   const showsEphemeralBadge =
-    Boolean(ephemeralDisplay) && !activeWorking && !isMuted && !hasThreadUnread;
+    Boolean(ephemeralDisplay) &&
+    !activeWorking &&
+    !isMuted &&
+    !hasThreadUnread &&
+    !unreadBadge;
   const inactiveContentOpacity = cn(
     !isActive && !hasUnread && !isMuted && "opacity-80",
     !isActive &&
@@ -304,6 +370,7 @@ export function ChannelMenuButton({
         hasUnread &&
           "font-bold text-sidebar-foreground hover:text-sidebar-foreground data-[active=true]:font-bold",
       )}
+      aria-describedby={unreadBadge ? unreadDescriptionId : undefined}
       data-channel-id={channel.id}
       data-testid={`channel-${channel.name}`}
       isActive={isActive}
@@ -368,7 +435,22 @@ export function ChannelMenuButton({
           )}
         />
       ) : null}
-      {hasThreadUnread ? (
+      {unreadBadge ? (
+        <SidebarUnreadBadge
+          badge={unreadBadge}
+          descriptionId={unreadDescriptionId}
+          isMention={hasMention}
+          testId={
+            isDm
+              ? `channel-unread-${channel.name}`
+              : hasThreadUnread
+                ? `channel-unread-dot-${channel.name}`
+                : `channel-unread-badge-${channel.name}`
+          }
+          hasDmCloseAction={hasDmCloseAction}
+        />
+      ) : null}
+      {!sidebarUnreadBadgeState && hasThreadUnread ? (
         <UnreadDotBadge channelName={channel.name} className="ml-auto" />
       ) : null}
     </SidebarMenuButton>
@@ -455,6 +537,7 @@ export function SidebarSection({
   onUnassignChannel?: (channelId: string) => void;
   onCreateSectionForChannel?: (channelId: string) => void;
 }) {
+  const { sidebarUnreadBadgeState } = useAppShell();
   if (items.length === 0 && !action && !emptyState) {
     return null;
   }
@@ -516,8 +599,12 @@ export function SidebarSection({
                       label={channelLabels?.[channel.id] ?? channel.name}
                       presenceStatus={presenceByChannelId?.[channel.id]}
                       onSelectChannel={onSelectChannel}
+                      hasDmCloseAction={
+                        channel.channelType === "dm" && Boolean(onHideDm)
+                      }
                     />
-                    {channel.channelType === "dm" &&
+                    {!sidebarUnreadBadgeState &&
+                    channel.channelType === "dm" &&
                     unreadChannelIds.has(channel.id) &&
                     !(isActiveChannel && selectedChannelId === channel.id) ? (
                       <UnreadCountBadge
