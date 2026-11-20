@@ -2,7 +2,6 @@
 /target/
 /dist/
 /admin-web/dist/
-/desktop/dist-auto-route-demo/
 
 # Python cache
 __pycache__/
