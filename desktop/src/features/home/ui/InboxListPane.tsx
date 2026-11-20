@@ -15,6 +15,8 @@ import {
   type InboxItem,
   type InboxTypeLabel,
 } from "@/features/home/lib/inbox";
+import type { InboxStatusCard } from "@/features/home/lib/inboxStatusCards";
+import { formatItemTimestamp } from "@/shared/lib/datetime";
 import { buildInboxListRows } from "@/features/home/lib/inboxListRows";
 import type { InboxFilterCounts } from "@/features/home/lib/inboxViewHelpers";
 import { hasRenderedVideoAttachment } from "@/features/messages/lib/videoReviewContext";
@@ -55,6 +57,8 @@ import { VirtualizedList } from "@/shared/ui/VirtualizedList";
 
 const INBOX_EMPTY_STATE_TITLES: Record<InboxFilter, string> = {
   all: "No activity yet",
+  needs_you: "No items need your attention in the loaded inbox",
+  answers: "No unread answers in the loaded inbox",
   project: "No project work found",
   mention: "No mentions found",
   thread: "No threads found",
@@ -66,6 +70,8 @@ const INBOX_EMPTY_STATE_TITLES: Record<InboxFilter, string> = {
 
 const INBOX_UNREAD_EMPTY_STATE_TITLES: Record<InboxFilter, string> = {
   all: "No unread activity",
+  needs_you: "No unread items need your attention in the loaded inbox",
+  answers: "No unread answers in the loaded inbox",
   project: "No unread project work",
   mention: "No unread mentions",
   thread: "No unread threads",
@@ -216,6 +222,8 @@ type InboxListPaneProps = {
   agentPubkeys?: ReadonlySet<string>;
   activeDraftCount: number;
   countsByFilter: InboxFilterCounts;
+  attentionCoverage?: "confirmed" | "syncing" | "unavailable";
+  statusByConversation?: ReadonlyMap<string, InboxStatusCard>;
   draftItems: DraftViewItem[];
   doneSet: ReadonlySet<string>;
   filter: InboxFilter;
@@ -247,6 +255,8 @@ export function InboxListPane({
   agentPubkeys,
   activeDraftCount,
   countsByFilter,
+  attentionCoverage,
+  statusByConversation,
   draftItems,
   doneSet,
   filter,
@@ -275,19 +285,22 @@ export function InboxListPane({
   const [showActivityCounts, setShowActivityCounts] = React.useState(false);
   const isReminders = filter === "reminders";
   const isDrafts = filter === "drafts";
-  const isMixedInboxView = filter === "all";
+  const needsYou = filter === "needs_you";
+  const isMixedInboxView = filter === "all" || needsYou;
   const scrollRef = React.useRef<HTMLDivElement>(null);
   const inboxRows = React.useMemo(
     () =>
       buildInboxListRows({
         items,
-        reminders: unreadOnly
-          ? []
-          : reminders.filter((reminder) =>
-              isDue(reminder, Math.floor(Date.now() / 1_000)),
-            ),
+        reminders: needsYou
+          ? reminders
+          : unreadOnly
+            ? []
+            : reminders.filter((reminder) =>
+                isDue(reminder, Math.floor(Date.now() / 1_000)),
+              ),
       }),
-    [items, reminders, unreadOnly],
+    [items, needsYou, reminders, unreadOnly],
   );
   const visibleInboxRows = React.useMemo(
     () =>
@@ -311,6 +324,7 @@ export function InboxListPane({
   }, [doneSet, items, onMarkRead]);
 
   const renderItem = (item: InboxItem, dueReminder?: Reminder) => {
+    const status = statusByConversation?.get(item.conversationId);
     const isSelected = item.conversationId === selectedConversationId;
     const isDone = doneSet.has(item.id);
     const hasActiveReminder =
@@ -461,6 +475,18 @@ export function InboxListPane({
                 isDone={isDone}
                 label={typeLabel}
               />
+              {status ? (
+                <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                  <span className="rounded-md bg-muted px-1.5 font-medium">
+                    {status.state === "waiting"
+                      ? "Reported waiting"
+                      : "Reported done"}
+                  </span>
+                  <span>
+                    {status.title} · {formatItemTimestamp(status.revisionAt)}
+                  </span>
+                </div>
+              ) : null}
               {dueReminder ? (
                 <div
                   className="mt-1 flex items-center gap-1 text-2xs font-medium text-amber-600/80 dark:text-amber-300/80"
@@ -522,7 +548,9 @@ export function InboxListPane({
               >
                 <VideoReviewCommentMarkdown
                   className="inbox-preview-markdown text-inherit"
-                  content={item.preview}
+                  content={
+                    status?.state === "done" ? status.preview : item.preview
+                  }
                   interactive={false}
                   mentionNames={item.mentionNames}
                   videoReviewCommentRootId={videoReviewCommentRootId}
@@ -734,6 +762,16 @@ export function InboxListPane({
           data-testid="home-inbox-list"
           ref={scrollRef}
         >
+          {attentionCoverage && attentionCoverage !== "confirmed" ? (
+            <p
+              className="px-4 py-2 text-xs text-muted-foreground"
+              role="status"
+            >
+              {attentionCoverage === "syncing"
+                ? "Syncing status reports…"
+                : "Some status reports could not be loaded."}
+            </p>
+          ) : null}
           {visibleInboxRows.length > 0 ? (
             <VirtualizedList
               estimateSize={96}
@@ -773,7 +811,7 @@ export function InboxListPane({
               }}
               scrollRef={scrollRef}
             />
-          ) : (
+          ) : attentionCoverage && attentionCoverage !== "confirmed" ? null : (
             <div className="flex h-full min-h-64 items-center justify-center px-6 text-center">
               <div>
                 <p className="text-sm font-medium text-foreground">
@@ -782,7 +820,7 @@ export function InboxListPane({
                     : INBOX_EMPTY_STATE_TITLES[filter]}
                 </p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  {unreadOnly
+                  {unreadOnly && filter !== "answers"
                     ? "Turn off Show unread only to see read activity."
                     : filter === "all"
                       ? "New activity will appear here."
