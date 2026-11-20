@@ -388,7 +388,7 @@ export function useChannelPaneHandlers({
     ) => {
       if (!channelId || !context?.parentEventId)
         throw new Error("Inline reply target unavailable");
-      await sendMutateRef.current({
+      return await sendMutateRef.current({
         content,
         mentionPubkeys,
         mediaTags,
@@ -411,6 +411,7 @@ export function useChannelPaneHandlers({
       threadContext?: {
         parentEventId: string | null;
         threadHeadId: string | null;
+        preserveReadingPosition?: boolean;
       } | null,
       forceRest?: boolean,
       outbox?: import("@/features/messages/outbox/types").OutboxSubmission,
@@ -457,10 +458,15 @@ export function useChannelPaneHandlers({
       // the thread they are currently viewing.
       if (!outbox && openThreadHeadIdRef.current === activeThreadHeadId) {
         setThreadReplyTargetId(activeThreadHeadId);
-        if (activeThreadHeadId && parentEventId !== activeThreadHeadId) {
+        if (
+          !threadContext?.preserveReadingPosition &&
+          activeThreadHeadId &&
+          parentEventId !== activeThreadHeadId
+        ) {
           setThreadScrollTargetId(sentMessage.id);
         }
       }
+      return sentMessage;
     },
     [
       setExpandedThreadReplyIds,

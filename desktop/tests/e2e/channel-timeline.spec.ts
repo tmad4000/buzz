@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { installMockBridge, TEST_IDENTITIES } from "../helpers/bridge";
 import { waitForMockChannelHeadReady } from "../helpers/channelHeadReady";
+import { openSettings } from "../helpers/settings";
 
 test("Timeline flattens replies chronologically, receives live events, sends top-level, and opens exact thread replies", async ({
   page,
@@ -487,4 +488,327 @@ test.describe("message disclosure on touch", () => {
     await expect(reply).toHaveClass(/route-target-highlight-fade/);
     await expect(editor).toHaveText("Keep this sidebar draft");
   });
+});
+
+async function seedReadingConversation(page: Page, thread: boolean) {
+  const rootId = await page.evaluate(
+    ({ thread, pubkey }) => {
+      const emit = window.__BUZZ_E2E_EMIT_MOCK_MESSAGE__;
+      if (!emit) throw new Error("Missing mock messages");
+      const createdAt = Math.floor(Date.now() / 1000) - 600;
+      const root = emit({
+        channelName: "general",
+        pubkey,
+        createdAt,
+        content: "Reading return root",
+      });
+      for (let index = 1; index <= 65; index++) {
+        emit({
+          channelName: "general",
+          pubkey,
+          createdAt: createdAt + index,
+          parentEventId: thread ? root.id : undefined,
+          content: `Reading sample ${index}\n\nA separate paragraph keeps the scroll test measurable.\n\nLast line of sample ${index}.`,
+        });
+      }
+      return root.id;
+    },
+    { thread, pubkey: TEST_IDENTITIES.bob.pubkey },
+  );
+  if (!thread) return page.getByTestId("message-timeline");
+  await page
+    .locator(
+      `[data-testid="open-thread-side-panel"][data-thread-head-id="${rootId}"]`,
+    )
+    .click();
+  await expect(page.getByTestId("message-thread-panel")).toBeVisible();
+  return page.getByTestId("message-thread-body");
+}
+
+async function scrollReadingDistance(scroller: Locator, viewports: number) {
+  await expect
+    .poll(() =>
+      scroller.evaluate(
+        (node) => (node.scrollHeight - node.clientHeight) / node.clientHeight,
+      ),
+    )
+    .toBeGreaterThan(viewports);
+  await scroller.evaluate((node, distance) => {
+    node.scrollTop = node.scrollHeight - node.clientHeight * (1 + distance);
+  }, viewports);
+  await expect
+    .poll(() =>
+      scroller.evaluate((node) =>
+        Math.abs(
+          (node.scrollHeight - node.clientHeight - node.scrollTop) /
+            node.clientHeight -
+            viewports,
+        ),
+      ),
+    )
+    .toBeLessThan(0.08);
+}
+
+async function currentReadingAnchor(scroller: Locator) {
+  return scroller.evaluate((node) => {
+    const { top, bottom } = node.getBoundingClientRect();
+    for (const row of node.querySelectorAll<HTMLElement>("[data-message-id]")) {
+      const bounds = row.getBoundingClientRect();
+      if (bounds.bottom > top && bounds.top < bottom)
+        return { id: row.dataset.messageId ?? "", offset: bounds.top - top };
+    }
+    return null;
+  });
+}
+
+async function expectReadingAnchor(
+  scroller: Locator,
+  anchor: Awaited<ReturnType<typeof currentReadingAnchor>>,
+) {
+  if (!anchor) throw new Error("Expected a visible reading anchor");
+  await expect
+    .poll(async () => {
+      const current = await currentReadingAnchor(scroller);
+      return current?.id === anchor.id
+        ? Math.abs(current.offset - anchor.offset)
+        : Infinity;
+    })
+    .toBeLessThan(2);
+}
+
+async function sendReadingMessage(surface: Locator, text: string) {
+  const input = surface.getByTestId("message-input");
+  await input.fill(text);
+  await input.press("Enter");
+}
+
+async function openReadingChannel(page: Page) {
+  await page.goto("/");
+  await page.getByTestId("channel-general").click();
+  await waitForMockChannelHeadReady(page, "general", GENERAL_ID);
+}
+
+test("Timeline confirmed sends return to the exact row and offset by pill, browser Back, and Cmd-[", async ({
+  page,
+}) => {
+  await page.addInitScript(() =>
+    Object.defineProperty(navigator, "platform", { value: "MacIntel" }),
+  );
+  await installMockBridge(page);
+  await openReadingChannel(page);
+  const scroller = await seedReadingConversation(page, false);
+  const surface = page.getByTestId("channel-composer-overlay");
+  const originIndex = await page.evaluate(() => history.state.__TSR_index);
+  const back = surface.getByTestId("send-scroll-back");
+  for (const method of ["pill", "browser", "keyboard"]) {
+    await scrollReadingDistance(scroller, 1.7);
+    const anchor = await currentReadingAnchor(scroller);
+    const message = `Confirmed Timeline send using ${method}`;
+    await sendReadingMessage(surface, message);
+    await expect(back).toBeVisible();
+    await expect(scroller.getByText(message, { exact: true })).toBeInViewport();
+    if (method === "pill") await back.click();
+    else if (method === "browser") await page.evaluate(() => history.back());
+    else await page.keyboard.press("Meta+[");
+    await expect(back).toHaveCount(0);
+    await expectReadingAnchor(scroller, anchor);
+    await expect
+      .poll(() => page.evaluate(() => history.state.__TSR_index))
+      .toBe(originIndex);
+  }
+  await page.evaluate(() => history.back());
+  await expect
+    .poll(() => page.evaluate(() => history.state.__TSR_index))
+    .toBe(originIndex - 1);
+});
+
+test("Timeline return pill dismisses after manual scroll or 30 seconds but Back still restores", async ({
+  page,
+}) => {
+  await page.clock.install();
+  await installMockBridge(page);
+  await openReadingChannel(page);
+  const scroller = await seedReadingConversation(page, false);
+  const surface = page.getByTestId("channel-composer-overlay");
+  const back = surface.getByTestId("send-scroll-back");
+  await scrollReadingDistance(scroller, 0.55);
+  await sendReadingMessage(surface, "Confirmed within one viewport");
+  await expect(
+    scroller.getByText("Confirmed within one viewport", { exact: true }),
+  ).toBeInViewport();
+  await expect(back).toHaveCount(0);
+  for (const cause of ["manual", "timeout"]) {
+    await scrollReadingDistance(scroller, 1.7);
+    const anchor = await currentReadingAnchor(scroller);
+    await sendReadingMessage(surface, `Confirmed before ${cause} dismissal`);
+    await expect(back).toBeVisible();
+    if (cause === "manual") {
+      await scroller.hover({ position: { x: 80, y: 90 } });
+      await page.mouse.wheel(0, -120);
+    } else {
+      await page.clock.fastForward(30_100);
+    }
+    await expect(back).toHaveCount(0);
+    await page.evaluate(() => history.back());
+    await expectReadingAnchor(scroller, anchor);
+  }
+});
+
+for (const thread of [false, true]) {
+  test(`Stay where I am when sending keeps the ${thread ? "thread" : "Timeline"} anchor`, async ({
+    page,
+  }) => {
+    await page.addInitScript(() =>
+      localStorage.setItem("buzz.channels.threadViewMode", "focus"),
+    );
+    await installMockBridge(page);
+    await openReadingChannel(page);
+    await openSettings(page, "appearance");
+    const preference = page.getByRole("switch", {
+      name: "Stay where I am when sending",
+    });
+    await expect(preference).not.toBeChecked();
+    await preference.click();
+    await expect(preference).toBeChecked();
+    await page.getByTestId("settings-back-to-app").click();
+    await expect(page.getByTestId("settings-view")).toHaveCount(0);
+    const scroller = await seedReadingConversation(page, thread);
+    const surface = page.getByTestId(
+      thread ? "message-thread-panel" : "channel-composer-overlay",
+    );
+    await scrollReadingDistance(scroller, 1.55);
+    const anchor = await currentReadingAnchor(scroller);
+    const message = thread
+      ? "Confirmed thread reply while staying"
+      : "Confirmed Timeline send while staying";
+    await sendReadingMessage(surface, message);
+    const sent = surface.getByTestId("send-scroll-sent");
+    await expect(sent).toHaveText("Sent ↓");
+    await expectReadingAnchor(scroller, anchor);
+    await sent.click();
+    const back = surface.getByTestId("send-scroll-back");
+    await expect(back).toBeVisible();
+    await expect(scroller.getByText(message, { exact: true })).toBeInViewport();
+    if (thread) await page.evaluate(() => history.back());
+    else await back.click();
+    await expectReadingAnchor(scroller, anchor);
+  });
+}
+
+test("an expanded thread jumps to its confirmed reply and restores the original offset", async ({
+  page,
+}) => {
+  await page.addInitScript(() =>
+    localStorage.setItem("buzz.channels.threadViewMode", "focus"),
+  );
+  await installMockBridge(page);
+  await openReadingChannel(page);
+  const scroller = await seedReadingConversation(page, true);
+  const panel = page.getByTestId("message-thread-panel");
+  await scrollReadingDistance(scroller, 1.55);
+  const anchor = await currentReadingAnchor(scroller);
+  const message = "Confirmed expanded thread reply";
+  await sendReadingMessage(panel, message);
+  const back = panel.getByTestId("send-scroll-back");
+  await expect(back).toBeVisible();
+  await expect(scroller.getByText(message, { exact: true })).toBeInViewport();
+  await back.click();
+  await expectReadingAnchor(scroller, anchor);
+});
+
+test("a failed Timeline send creates no receipt and leaves the draft and reading anchor", async ({
+  page,
+}) => {
+  await installMockBridge(
+    page,
+    { sendMessageErrors: ["Synthetic send rejected"] },
+    { seedPreviewFeatures: false },
+  );
+  await openReadingChannel(page);
+  const scroller = await seedReadingConversation(page, false);
+  const surface = page.getByTestId("channel-composer-overlay");
+  await scrollReadingDistance(scroller, 1.55);
+  const anchor = await currentReadingAnchor(scroller);
+  await sendReadingMessage(surface, "This synthetic draft must stay");
+  await expect(
+    page.getByText("Synthetic send rejected", { exact: false }),
+  ).toBeVisible();
+  await expect(surface.getByTestId("message-input")).toHaveText(
+    "This synthetic draft must stay",
+  );
+  await expect(surface.getByTestId("send-scroll-back")).toHaveCount(0);
+  await expect(surface.getByTestId("send-scroll-sent")).toHaveCount(0);
+  await expectReadingAnchor(scroller, anchor);
+});
+
+test("an inline reply waits for ACK and returns through the containing Timeline", async ({
+  page,
+}) => {
+  await installMockBridge(page);
+  await openReadingChannel(page);
+  const scroller = await seedReadingConversation(page, false);
+  const root = await page.evaluate((pubkey) => {
+    const emit = window.__BUZZ_E2E_EMIT_MOCK_MESSAGE__;
+    if (!emit) throw new Error("Missing mock messages");
+    const createdAt = Math.floor(Date.now() / 1000) - 950;
+    const root = emit({
+      channelName: "general",
+      pubkey,
+      createdAt,
+      content: "Inline return root",
+    });
+    emit({
+      channelName: "general",
+      pubkey,
+      createdAt: createdAt + 1,
+      parentEventId: root.id,
+      content: "Earlier inline reply",
+    });
+    return root.id;
+  }, TEST_IDENTITIES.bob.pubkey);
+  await scroller.evaluate((node) => {
+    node.scrollTop = 0;
+  });
+  const summary = scroller.locator(
+    `[data-testid="message-thread-summary"][data-thread-head-id="${root}"]`,
+  );
+  await expect(summary).toBeVisible();
+  if ((await summary.getAttribute("aria-expanded")) !== "true")
+    await summary.click();
+  const inline = scroller.locator(
+    `[data-testid="inline-thread"][data-thread-head-id="${root}"]`,
+  );
+  const editor = inline.getByTestId("message-input");
+  const back = page
+    .getByTestId("channel-composer-overlay")
+    .getByTestId("send-scroll-back");
+  await editor.fill("Confirmed inline reply");
+  await expect
+    .poll(() =>
+      scroller.evaluate(
+        (node) =>
+          (node.scrollHeight - node.clientHeight - node.scrollTop) /
+          node.clientHeight,
+      ),
+    )
+    .toBeGreaterThan(1);
+  const anchor = await currentReadingAnchor(scroller);
+  await page.evaluate(() => window.__BUZZ_E2E_HOLD_OUTBOX_PUBLISH__?.(true));
+  try {
+    await editor.press("Enter");
+    await expect
+      .poll(() =>
+        page.evaluate(() => window.__BUZZ_E2E_HELD_OUTBOX_PUBLISHES__?.()),
+      )
+      .toBe(1);
+    await expect(back).toHaveCount(0);
+  } finally {
+    await page.evaluate(() => window.__BUZZ_E2E_HOLD_OUTBOX_PUBLISH__?.(false));
+  }
+  await expect(back).toBeVisible();
+  await expect(
+    inline.getByText("Confirmed inline reply", { exact: true }),
+  ).toBeInViewport();
+  await back.click();
+  await expectReadingAnchor(scroller, anchor);
 });

@@ -4,6 +4,7 @@ export type TimelineReadingPosition = {
   offset: number;
   pixel: number;
   neighbors: string[];
+  inlineRootId?: string;
 };
 
 /** Capture a message anchor inside the actual virtualizer scroller. */
@@ -17,7 +18,10 @@ export function captureReadingPosition(
   ];
   const row = rows.find((node) => node.getBoundingClientRect().bottom > top);
   const id = row?.dataset.messageId ?? null;
-  const index = id ? ids.indexOf(id) : -1;
+  const inlineRootId = row?.closest<HTMLElement>(
+    '[data-testid="inline-thread"]',
+  )?.dataset.threadHeadId;
+  const index = ids.indexOf(inlineRootId ?? id ?? "");
   const neighbors =
     index < 0
       ? []
@@ -29,6 +33,7 @@ export function captureReadingPosition(
     offset: row ? row.getBoundingClientRect().top - top : 0,
     pixel: container.scrollTop,
     neighbors,
+    ...(inlineRootId ? { inlineRootId } : {}),
   };
 }
 

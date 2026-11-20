@@ -53,3 +53,25 @@ test("Back anchor enumerates prior neighbors at the end and falls back when real
     container.remove();
   }
 });
+
+test("an inline reply keeps its own exact offset and records the virtualized root for realization", () => {
+  const container = document.createElement("div");
+  container.innerHTML =
+    '<section data-testid="inline-thread" data-thread-head-id="root"><div data-message-id="reply"></div></section>';
+  container.getBoundingClientRect = () => ({ top: 100 });
+  container.querySelector("[data-message-id]").getBoundingClientRect = () => ({
+    top: 88,
+    bottom: 125,
+  });
+  container.scrollTop = 220;
+  assert.deepEqual(
+    captureReadingPosition(container, ["older", "root", "newer"]),
+    {
+      id: "reply",
+      offset: -12,
+      pixel: 220,
+      inlineRootId: "root",
+      neighbors: ["newer", "older"],
+    },
+  );
+});

@@ -97,6 +97,7 @@ export type MessageComposerProps = {
     threadContext?: {
       parentEventId: string | null;
       threadHeadId: string | null;
+      preserveReadingPosition?: boolean;
       localSendOrigin?: Omit<
         import("@/shared/api/types").LocalSendIntent,
         "id"

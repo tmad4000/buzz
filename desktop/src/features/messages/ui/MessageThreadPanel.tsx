@@ -57,6 +57,7 @@ import { TypingIndicatorRow } from "./TypingIndicatorRow";
 import { UnreadDivider } from "./UnreadDivider";
 import { useComposerHeightPadding } from "./useComposerHeightPadding";
 import { useStableSendToChannel } from "./useStableSendToChannel";
+import { useThreadSendScrollReturn } from "./useThreadSendScrollReturn";
 import { useAnchoredScroll } from "./useAnchoredScroll";
 import { selectDeferredListRenderState } from "@/features/messages/lib/timelineSnapshot";
 import { selectThreadRowHighlight } from "@/features/messages/lib/threadReplyHighlight";
@@ -105,6 +106,7 @@ export function MessageThreadPanel({
   onScrollTargetSettled,
   onSelectReplyTarget,
   onSend,
+  sendScrollHistory,
   onSendToChannel,
   onToggleReaction,
   onUnfollowThread,
@@ -310,6 +312,25 @@ export function MessageThreadPanel({
     ? runProjection.entries
     : threadReplies;
   const initialPositionTarget = scrollTargetId ?? opening.openingTarget;
+  const sendScope =
+    channelId && currentPubkey && threadHeadId && !isHuddleTranscript
+      ? JSON.stringify([currentPubkey, channelId, threadHeadId])
+      : null;
+  const sendScroll = useThreadSendScrollReturn({
+    history: sendScrollHistory,
+    scope: sendScope,
+    channelId,
+    onSend,
+    getThread: () => ({
+      container: threadBodyRef.current,
+      ids: [
+        threadHeadId ?? "",
+        ...effectiveReplies.map((entry) => entry.message.id),
+      ],
+      reveal: sidebar.reveal,
+      jump: (id) => scrollToMessage(id, { highlight: true }),
+    }),
+  });
   const rowWindow = useThreadRowWindow(
     effectiveReplies,
     `${channelId}:${currentPubkey}:${threadHeadId}`,
@@ -318,7 +339,10 @@ export function MessageThreadPanel({
     opening.firstUnseen ?? sidebar.firstNewId,
     pendingJump?.root === threadHeadId
       ? pendingJump.id
-      : (initialPositionTarget ?? sidebar.ownSendTargetId ?? null),
+      : (sendScroll.target ??
+          initialPositionTarget ??
+          (sendScroll.holdsPosition ? null : sidebar.ownSendTargetId) ??
+          null),
   );
 
   const deferredThreadReplies = React.useDeferredValue(
@@ -418,6 +442,7 @@ export function MessageThreadPanel({
     });
 
   const {
+    scrollToMessage,
     highlightedMessageId,
     isAtBottom,
     newMessageCount,
@@ -1012,6 +1037,7 @@ export function MessageThreadPanel({
             )}
           >
             <ComposerDockBackdrop gutterClassName="inset-x-5" />
+            {sendScroll.notice}
             <MessageComposer
               compactWhenEmpty={
                 hasStoredDisclosure && sidebarMessages.length <= 1
@@ -1047,7 +1073,7 @@ export function MessageThreadPanel({
               }}
               onEditLastOwnMessage={onEditLastOwnMessage}
               onEditSave={onEditSave}
-              onSend={onSend}
+              onSend={sendScroll.send}
               placeholder={
                 isHuddleTranscript
                   ? "Message the huddle"

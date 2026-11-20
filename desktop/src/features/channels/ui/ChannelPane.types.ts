@@ -158,16 +158,7 @@ export type ChannelPaneProps = {
   ) => Promise<void>;
   onSendInlineThreadReply: MessageComposerProps["onSend"];
   respondToLookup?: Map<string, RespondToMode>;
-  onSendThreadReply: (
-    content: string,
-    mentionPubkeys: string[],
-    mediaTags?: string[][],
-    channelId?: string | null,
-    threadContext?: {
-      parentEventId: string | null;
-      threadHeadId: string | null;
-    } | null,
-  ) => Promise<void>;
+  onSendThreadReply: MessageComposerProps["onSend"];
   onTargetReached?: (messageId: string) => void;
   onToggleReaction?: (
     message: TimelineMessage,

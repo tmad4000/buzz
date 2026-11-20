@@ -468,7 +468,9 @@ export function useAnchoredScroll({
           const isInViewport =
             rect.top >= containerRect.top &&
             rect.bottom <= containerRect.bottom;
-          if (!isInViewport) {
+          // Inline replies are children of a virtualized root item and
+          // have no index of their own. Once mounted, use the exact DOM row.
+          if (!isInViewport && !el.closest('[data-testid="inline-thread"]')) {
             if (!virtualScrollToMessage(messageId, { behavior: "auto" })) {
               return false;
             }

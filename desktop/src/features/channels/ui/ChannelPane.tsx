@@ -2,6 +2,7 @@ import { OpenThreadsBar } from "./OpenThreadsBar";
 import { openThreadPinsKey } from "../lib/openThreadPins";
 import { useCommunities } from "@/features/communities/useCommunities";
 import { useDeviceOffline } from "@/shared/api/offlineConnection";
+import { useChannelMessageSend } from "./useChannelMessageSend";
 import { useRoutedSendReturn } from "./useRoutedSendReturn";
 import { useTimelineView } from "./TimelineViewContext";
 import { filterTimelineInitiator } from "@/features/timeline-initiator/model";
@@ -57,13 +58,9 @@ import { useChannelWorkingAgentPubkeys } from "@/features/agents/agentWorkingSig
 import { useCardMintJobs } from "@/features/agents/cardMintStore";
 import { BotActivityComposerAction } from "@/features/channels/ui/BotActivityBar";
 import { ChannelComposerActivityAccessory } from "@/features/channels/ui/ChannelComposerActivityAccessory";
-import {
-  containsWelcomePersonaMention,
-  WelcomeComposerGuidanceLayer,
-} from "@/features/channels/ui/WelcomeComposerBanner";
+import { WelcomeComposerGuidanceLayer } from "@/features/channels/ui/WelcomeComposerBanner";
 import { useWelcomeComposerBanner } from "@/features/channels/ui/useWelcomeComposerBanner";
 import {
-  mentionsKnownAgent,
   selectThreadComposerBotTypingPubkeys,
   shouldPrioritizeIdleAuxiliary,
   shouldUseFocusIdleDrawer,
@@ -289,6 +286,33 @@ export const ChannelPane = React.memo(function ChannelPane({
     timeoutActive ||
     isModerationDmChannel ||
     isSending;
+  const knownAgentPubkeys = React.useMemo(() => {
+    const pubkeys = new Set<string>();
+    for (const pubkey of agentPubkeys ?? []) {
+      pubkeys.add(pubkey.toLowerCase());
+    }
+    for (const agent of agentSessionAgents) {
+      pubkeys.add(agent.pubkey.toLowerCase());
+    }
+    for (const agent of activityAgents) {
+      pubkeys.add(agent.pubkey.toLowerCase());
+    }
+    return pubkeys;
+  }, [activityAgents, agentPubkeys, agentSessionAgents]);
+  const { history, handleSendMessage, handleInlineSend, scrollSendNotice } =
+    useChannelMessageSend({
+      activeChannelId,
+      activeChannelIdRef,
+      channelPaneMountedRef,
+      completeWelcomeComposerBanner,
+      currentPubkey: isHuddleTranscript ? undefined : currentPubkey,
+      goChannel,
+      isActiveWelcomeChannel,
+      knownAgentPubkeys,
+      messageTimelineRef,
+      onSendMessage,
+      onSendInlineThreadReply,
+    });
   const renderThreadSummary = React.useCallback<ThreadSummaryRenderer>(
     (root, summary) =>
       activeChannel ? (
@@ -305,7 +329,7 @@ export const ChannelPane = React.memo(function ChannelPane({
           isSending={isSending}
           onOpenThread={onOpenThread}
           onJumpToThreadMessage={onJumpToThreadMessage}
-          onSend={onSendInlineThreadReply}
+          onSend={handleInlineSend}
           onToggleReaction={onToggleReaction}
           onRepliesRevealed={onSidebarRepliesRevealed}
           unreadCount={threadUnreadCounts?.get(root.id)}
@@ -323,74 +347,11 @@ export const ChannelPane = React.memo(function ChannelPane({
       isSending,
       onOpenThread,
       onJumpToThreadMessage,
-      onSendInlineThreadReply,
+      handleInlineSend,
       onToggleReaction,
       onSidebarRepliesRevealed,
       threadUnreadCounts,
       isMessageUnreadById,
-    ],
-  );
-  const knownAgentPubkeys = React.useMemo(() => {
-    const pubkeys = new Set<string>();
-    for (const pubkey of agentPubkeys ?? []) {
-      pubkeys.add(pubkey.toLowerCase());
-    }
-    for (const agent of agentSessionAgents) {
-      pubkeys.add(agent.pubkey.toLowerCase());
-    }
-    for (const agent of activityAgents) {
-      pubkeys.add(agent.pubkey.toLowerCase());
-    }
-    return pubkeys;
-  }, [activityAgents, agentPubkeys, agentSessionAgents]);
-  const handleSendMessage = React.useCallback(
-    async (
-      content: string,
-      mentionPubkeys: string[],
-      mediaTags?: string[][],
-      channelId?: string | null,
-      threadContext?: {
-        parentEventId: string | null;
-        threadHeadId: string | null;
-      } | null,
-      forceRest?: boolean,
-      outbox?: import("@/features/messages/outbox/types").OutboxSubmission,
-    ) => {
-      const shouldCompleteWelcomeBanner =
-        isActiveWelcomeChannel &&
-        (containsWelcomePersonaMention(content) ||
-          mentionsKnownAgent(mentionPubkeys, knownAgentPubkeys));
-      if (!threadContext?.parentEventId)
-        messageTimelineRef.current?.scrollToBottomOnNextUpdate();
-      const published = await onSendMessage(
-        content,
-        mentionPubkeys,
-        mediaTags,
-        channelId,
-        threadContext,
-        forceRest,
-        outbox,
-      );
-      if (
-        channelId &&
-        channelId !== activeChannelId &&
-        channelPaneMountedRef.current &&
-        activeChannelIdRef.current === activeChannelId
-      ) {
-        await goChannel(channelId, { replace: true });
-      }
-      if (shouldCompleteWelcomeBanner) {
-        completeWelcomeComposerBanner();
-      }
-      return published;
-    },
-    [
-      activeChannelId,
-      completeWelcomeComposerBanner,
-      goChannel,
-      isActiveWelcomeChannel,
-      knownAgentPubkeys,
-      onSendMessage,
     ],
   );
   const canDropInMainColumn =
@@ -928,6 +889,7 @@ export const ChannelPane = React.memo(function ChannelPane({
                   ) : null}
                   {timeoutActive ? <ComposerTimeoutBanner /> : null}
                   <ComposerDockBackdrop gutterClassName="inset-x-5" />
+                  {scrollSendNotice}
                   {routedSend.notice ? (
                     <div className="relative z-10 px-5">
                       {routedSend.notice}
@@ -1033,6 +995,7 @@ export const ChannelPane = React.memo(function ChannelPane({
             const panel = (
               <MessageThreadPanel
                 channel={activeChannel}
+                sendScrollHistory={history}
                 channelId={activeChannel?.id ?? null}
                 channelName={activeChannel?.name ?? "channel"}
                 currentPubkey={currentPubkey}

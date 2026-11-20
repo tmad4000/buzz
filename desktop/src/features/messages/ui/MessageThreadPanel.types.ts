@@ -1,9 +1,13 @@
+import type { RouterHistory } from "@tanstack/react-router";
 import type * as React from "react";
 import type { ThreadPanelLayoutProps } from "@/features/channels/lib/threadPanelLayout";
 import type { MainTimelineEntry } from "@/features/messages/lib/threadPanel";
 import type { VideoReviewPresentation } from "@/features/messages/lib/videoReviewContext";
 import type { TimelineMessage } from "@/features/messages/types";
-import type { MessageComposerEditTarget } from "@/features/messages/ui/MessageComposer.types";
+import type {
+  MessageComposerEditTarget,
+  MessageComposerProps,
+} from "@/features/messages/ui/MessageComposer.types";
 import type { UserProfileLookup } from "@/features/profile/lib/identity";
 import type { Channel } from "@/shared/api/types";
 
@@ -41,17 +45,8 @@ export type MessageThreadPanelProps = ThreadPanelLayoutProps & {
   searchMessageId?: string | null;
   searchQuery?: string;
   onSelectReplyTarget: (message: TimelineMessage) => void;
-  onSend: (
-    content: string,
-    mentionPubkeys: string[],
-    mediaTags?: string[][],
-    channelId?: string | null,
-    threadContext?: {
-      parentEventId: string | null;
-      threadHeadId: string | null;
-    } | null,
-    forceRest?: boolean,
-  ) => Promise<void>;
+  onSend: MessageComposerProps["onSend"];
+  sendScrollHistory?: RouterHistory;
   onSendToChannel?: (
     message: TimelineMessage,
     threadRoot: TimelineMessage,

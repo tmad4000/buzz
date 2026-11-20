@@ -41,6 +41,9 @@ import { useSettleGatedPrependMessages } from "./useSettleGatedPrependMessages";
 
 export type MessageTimelineHandle = {
   captureReadingPosition: () => TimelineReadingPosition | null;
+  getReadingContainer: () => HTMLElement | null;
+  prepareSentJump: (id: string | null) => void;
+  jumpToSentMessage: (id: string) => boolean;
   restoreReadingPosition: (
     snapshot: TimelineReadingPosition,
   ) => (() => void) | undefined;
@@ -334,10 +337,12 @@ const MessageTimelineBase = React.forwardRef<
   // "new messages" affordance instead of changing Virtua's item model under
   // the reading position. Prepends still flow through immediately and Virtua's
   // `shift` transaction preserves the stable keyed row.
+  const [sentJumpId, setSentJumpId] = React.useState<string | null>(null);
   const bufferedTimeline = useBufferedTimelineMessages({
     channelId,
     isAtBottom:
       isSemanticallyAtBottom ||
+      sentJumpId !== null ||
       targetMessageId !== null ||
       searchActiveMessageId !== null,
     messages: deferredMessages,
@@ -489,6 +494,9 @@ const MessageTimelineBase = React.forwardRef<
   React.useImperativeHandle(
     ref,
     () => ({
+      getReadingContainer: () => activeScrollContainerRef.current,
+      prepareSentJump: setSentJumpId,
+      jumpToSentMessage: (id) => scrollToMessage(id, { highlight: true }),
       captureReadingPosition: () =>
         activeScrollContainerRef.current
           ? captureReadingPosition(
@@ -502,11 +510,23 @@ const MessageTimelineBase = React.forwardRef<
         // Restoring a mounted row bypasses scrollToMessage's cancellation.
         // Reading restoration owns the viewport before any physical movement.
         timelineVirtualizerApi?.cancelBottomIntent();
+        const ids = messages.map((message) => message.id);
+        const inlineRoot = snapshot.inlineRootId;
+        if (
+          inlineRoot &&
+          ids.includes(inlineRoot) &&
+          snapshot.id &&
+          !ids.includes(snapshot.id)
+        )
+          ids.push(snapshot.id);
         return restoreReadingPosition(
           container,
           snapshot,
-          messages.map((m) => m.id),
-          (id) => timelineVirtualizerApi?.scrollToMessage(id) ?? false,
+          ids,
+          (id) =>
+            timelineVirtualizerApi?.scrollToMessage(
+              id === snapshot.id && inlineRoot ? inlineRoot : id,
+            ) ?? false,
         );
       },
       scrollToBottomOnNextUpdate: prepareForOwnMessage,
@@ -515,6 +535,7 @@ const MessageTimelineBase = React.forwardRef<
     [
       prepareForOwnMessage,
       settleAtBottomAfterLayout,
+      scrollToMessage,
       timelineVirtualizerApi,
       activeScrollContainerRef,
       messages,

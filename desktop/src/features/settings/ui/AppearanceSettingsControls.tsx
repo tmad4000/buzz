@@ -1,3 +1,7 @@
+import {
+  setStayWhenSending,
+  useStayWhenSending,
+} from "@/features/messages/ui/sendScrollPreference";
 import * as React from "react";
 import type { ReactNode } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
@@ -201,6 +205,7 @@ function ConversationPreview() {
 
 /** App-wide type sizing and conversation-specific spacing controls. */
 export function ConversationDisplaySettings() {
+  const stayWhenSending = useStayWhenSending();
   const density = useConversationDensity();
   const fontSize = useFontSize();
 
@@ -246,6 +251,19 @@ export function ConversationDisplaySettings() {
           options={CONVERSATION_DENSITY_OPTIONS}
           testId="conversation-density-control"
           value={density}
+        />
+      </SettingsOptionRow>
+      <SettingsOptionRow>
+        <label
+          className="min-w-0 text-sm font-medium"
+          htmlFor="stay-when-sending"
+        >
+          Stay where I am when sending
+        </label>
+        <Switch
+          id="stay-when-sending"
+          checked={stayWhenSending}
+          onCheckedChange={setStayWhenSending}
         />
       </SettingsOptionRow>
       <ConversationPreview />

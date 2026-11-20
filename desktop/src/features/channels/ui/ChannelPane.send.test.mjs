@@ -6,8 +6,11 @@ import ts from "typescript";
 // Execute the production host callback without mounting unrelated channel chrome.
 function host(onSendMessage, overrides = {}) {
   const source = ts.createSourceFile(
-    "ChannelPane.tsx",
-    readFileSync(new URL("./ChannelPane.tsx", import.meta.url), "utf8"),
+    "useChannelMessageSend.ts",
+    readFileSync(
+      new URL("./useChannelMessageSend.ts", import.meta.url),
+      "utf8",
+    ),
     ts.ScriptTarget.Latest,
     true,
     ts.ScriptKind.TSX,
@@ -25,6 +28,7 @@ function host(onSendMessage, overrides = {}) {
   assert.ok(callback, "production main host send callback exists");
   const environment = {
     onSendMessage,
+    captureScrollSend: () => undefined,
     isActiveWelcomeChannel: false,
     containsWelcomePersonaMention: () => false,
     mentionsKnownAgent: () => false,

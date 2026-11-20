@@ -94,6 +94,8 @@ const useTimelineHandle = new Function(
   "timelineVirtualizerApi",
   "prepareForOwnMessage",
   "settleAtBottomAfterLayout",
+  "setSentJumpId",
+  "scrollToMessage",
   "captureReadingPosition",
   "restoreReadingPosition",
   ts.transpile(binding, { target: ts.ScriptTarget.ES2022 }),
@@ -265,6 +267,8 @@ async function mount({ targetMessageId } = {}) {
       api,
       anchored.scrollToBottomOnNextUpdate,
       anchored.settleAtBottomAfterLayout,
+      () => {},
+      anchored.scrollToMessage,
       captureReadingPosition,
       restoreReadingPosition,
     );
