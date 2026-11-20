@@ -1,6 +1,8 @@
 export const ROOT = "Paseo root";
 export const INSTANT_MODEL = "Celeris-1";
 export const INSTANT_HOST = "Celeris (simulated)";
+export const LUNA_MODEL = "GPT-6 Luna";
+export const LUNA_HOST = "OpenAI Decisions (simulated)";
 
 export type ModelChoice = "auto" | "instant" | "gpt" | "claude" | "agent";
 
@@ -34,6 +36,7 @@ export type PromptFixture = {
   localReason?: string;
   decision?: DecisionFixture;
   reply?: ReplyFixture;
+  quickDecision?: { value: boolean; latencyMs: number };
 };
 
 export const prompts: PromptFixture[] = [
@@ -46,6 +49,10 @@ export const prompts: PromptFixture[] = [
       visibleTokens: 19,
       latencyMs: 285,
     },
+  },
+  {
+    prompt: "Is 17 a prime number?",
+    quickDecision: { value: true, latencyMs: 300 },
   },
   {
     prompt: "Which build is on M3?",
@@ -70,6 +77,12 @@ export const prompts: PromptFixture[] = [
   {
     prompt: "What is an ABI?",
     decision: { route: "answer", confidence: 0.91, latencyMs: 36 },
+    reply: {
+      status: "complete",
+      text: "An ABI defines how compiled software components call each other and exchange data.",
+      visibleTokens: 16,
+      latencyMs: 340,
+    },
   },
   {
     prompt: "What is a feature flag?",

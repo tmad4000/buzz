@@ -14,9 +14,29 @@ const patches = {
       ],
     ],
   },
+  "/features/sidebar/ui/AppSidebar.tsx": {
+    imports:
+      'import { FixtureQuickLine } from "@/testing/autoRouteDemo/AutoRouteThread";',
+    edits: [
+      [
+        "          suggestionChannels={channels}\n        />",
+        "          suggestionChannels={channels}\n        />\n        <FixtureQuickLine />",
+      ],
+    ],
+  },
+  "/features/messages/ui/MessageComposer.tsx": {
+    imports:
+      'import { FixtureComposerControls, isAutoRouteFixtureThread } from "@/testing/autoRouteDemo/AutoRouteThread";',
+    edits: [
+      [
+        "{toolbarExtraActions}",
+        "{toolbarExtraActions}{!editTarget && isAutoRouteFixtureThread(channelId ?? null, typingParentEventId) && <FixtureComposerControls draft={contentRef.current} />}",
+      ],
+    ],
+  },
   "/features/messages/ui/MessageThreadPanel.tsx": {
     imports:
-      'import { prepareFixtureSend, sendFixtureMessage, isAutoRouteFixtureThread, FixtureMessageModelChip, FixtureThreadModelChip, FixtureTurns } from "@/testing/autoRouteDemo/AutoRouteThread";',
+      'import { prepareFixtureSend, sendFixtureMessage, isAutoRouteFixtureThread, FixtureThreadModelChip, FixtureTurns } from "@/testing/autoRouteDemo/AutoRouteThread";',
     edits: [
       [
         "const threadHeadId = threadHead?.id ?? null;",
@@ -32,7 +52,7 @@ const patches = {
       ],
       [
         "onSend={onSend}",
-        "toolbarExtraActions={fixtureRoute ? <FixtureMessageModelChip /> : undefined}\n              onPreparingMentionSendChange={fixtureRoute ? prepareFixtureSend : undefined}\n              onSend={fixtureRoute ? sendFixtureMessage : onSend}",
+        "onPreparingMentionSendChange={fixtureRoute ? prepareFixtureSend : undefined}\n              onSend={fixtureRoute ? sendFixtureMessage : onSend}",
       ],
       [
         "hasStoredDisclosure && sidebarMessages.length <= 1",

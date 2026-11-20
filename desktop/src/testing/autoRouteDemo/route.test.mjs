@@ -113,3 +113,93 @@ test("unknown thread settings reject before accepting text", async () => {
   );
   assert.equal(session.getSnapshot().turns.length, 0);
 });
+
+test("Quick goes directly to the attributed answer with no triage delay", async () => {
+  const prose = await withClock("What is an ABI?", {
+    quick: true,
+    model: "gpt",
+  });
+  assert.equal(prose.kind, "instant");
+  assert.equal(prose.model, "Celeris-1");
+  assert.equal(prose.elapsedMs, 340);
+  const typed = await withClock("Is 17 a prime number?", { quick: true });
+  assert.deepEqual(typed, {
+    kind: "instant",
+    text: "Yes.",
+    model: "GPT-6 Luna",
+    host: "OpenAI Decisions (simulated)",
+    elapsedMs: 300,
+  });
+});
+
+test("Quick keeps eligibility and budget gates and never automatically routes to root", async () => {
+  for (const [text, reason] of [
+    ["Deploy it", "Requires action and deployment approval"],
+    ["What did I write in my private notes yesterday?", "Needs private recall"],
+    ["What is a feature flag?", "No complete instant answer"],
+    ["What is a checksum?", "Instant deadline exceeded"],
+  ]) {
+    assert.deepEqual(await withClock(text, { quick: true }), {
+      kind: "needs-root",
+      reason,
+    });
+  }
+  for (const [changes, reason] of [
+    [{ budgetAvailable: false }, "Instant budget reached"],
+    [{ attachments: true }, "Includes attachments or mentions"],
+  ]) {
+    assert.deepEqual(
+      await withClock("What’s a release candidate?", {
+        quick: true,
+        ...changes,
+      }),
+      { kind: "needs-root", reason },
+    );
+  }
+  const session = createFixtureSession("default");
+  await session.send("? Deploy it", false);
+  assert.equal(session.getSnapshot().turns[0].handoff, undefined);
+});
+
+test("Quick accepts both prefixes, keeps a prefix-only draft, and links explicit escalation", async (t) => {
+  const session = createFixtureSession("default");
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  session.setQuick(true);
+  session.prepare(true);
+  await assert.rejects(session.send("q:", false), /Draft kept/);
+  assert.equal(session.getSnapshot().quick, true);
+  const first = session.send("? What is an ABI?", false);
+  t.mock.timers.tick(340);
+  await first;
+  session.prepare(false);
+  assert.equal(session.getSnapshot().quick, false);
+  const line = session.send("q: Is 17 a prime number?", false, undefined, {
+    quick: false,
+  });
+  t.mock.timers.tick(300);
+  await line;
+  const [prose, typed] = session.getSnapshot().turns;
+  assert.equal(prose.text, "What is an ABI?");
+  assert.equal(prose.quickLine, false);
+  assert.equal(typed.text, "Is 17 a prime number?");
+  assert.equal(typed.quickLine, true);
+  assert.equal(typed.handoff, undefined);
+  session.escalate(typed.id);
+  session.escalate(typed.id);
+  t.mock.timers.tick(260);
+  assert.equal(session.getSnapshot().turns.length, 2);
+  assert.equal(session.getSnapshot().turns[1].handoff.status, "received");
+});
+
+test("Quick-line shares the thread without consuming its separate draft choice", async () => {
+  const session = createFixtureSession("pinned");
+  session.setOverride("claude");
+  session.setQuick(true);
+  session.prepare(true);
+  await session.send("Deploy it", false, undefined, { quick: true });
+  assert.equal(session.getSnapshot().override, "claude");
+  assert.equal(session.getSnapshot().quick, true);
+  assert.equal(session.getSnapshot().turns[0].quickLine, true);
+  assert.equal(session.getSnapshot().turns[0].handoff, undefined);
+  session.prepare(false);
+});
