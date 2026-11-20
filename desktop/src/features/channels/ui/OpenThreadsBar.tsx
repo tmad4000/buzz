@@ -1,11 +1,13 @@
-import { BusyThreadSuggestions } from "./BusyThreadSuggestions";
+import { ActiveThreadsPhase0List } from "./ActiveThreadsPhase0List";
+import { ActiveThreadSettings } from "./ActiveThreadSettings";
+import { activeThreadRows } from "../lib/activeThreadsPhase0";
+import { useNow } from "@/shared/lib/useNow";
 import type { ChannelWindowThreadSummary } from "@/features/messages/lib/channelWindowStore";
 import { useOpenThreadPins } from "../lib/openThreadPinStore";
 import * as React from "react";
 import type { MainTimelineEntry } from "@/features/messages/lib/threadPanel";
 import type { TimelineMessage } from "@/features/messages/types";
 import {
-  filterOpenThreadPins,
   MAX_OPEN_THREAD_PINS,
   type OpenThreadPin,
 } from "../lib/openThreadPins";
@@ -17,7 +19,7 @@ type Props = {
   currentThread: TimelineMessage | null;
   onOpen: (message: TimelineMessage) => void;
 };
-/** Manual first slice; automatic membership awaits a trusted work adapter. */
+/** Phase0: device-local manual pins plus read-only automatic membership. */
 export function OpenThreadsBar({
   storageKey,
   threadSummaries,
@@ -27,6 +29,10 @@ export function OpenThreadsBar({
 }: Props) {
   const {
     pins,
+    activePreferences,
+    setActivePreferences,
+    dismissedSuggestions,
+    dismissSuggestion,
     addPin,
     removePin,
     sessionOnly: pinsSessionOnly,
@@ -63,7 +69,28 @@ export function OpenThreadsBar({
     (!currentThread.rootId || currentThread.rootId === currentThread.id)
   )
     byId.set(currentThread.id, currentThread);
-  const matches = filterOpenThreadPins(pins, query);
+  const activeEntries = [...entries];
+  if (
+    currentThread &&
+    byId.has(currentThread.id) &&
+    !entries.some((entry) => entry.message.id === currentThread.id)
+  ) {
+    activeEntries.push({ message: currentThread, summary: null });
+  }
+  const now = useNow(60_000);
+  const rows = activeThreadRows(
+    activeEntries,
+    pins,
+    dismissedSuggestions,
+    activePreferences,
+    now,
+    threadSummaries,
+  );
+  const matches = rows.filter((row) =>
+    row.title.toLocaleLowerCase().includes(query.toLocaleLowerCase()),
+  );
+  const todayCount = rows.filter((row) => row.band === "Today").length;
+  const recentCount = rows.filter((row) => row.band === "Last 2 days").length;
   return (
     <section
       className="relative mx-5 mb-1 rounded-lg border border-border bg-background text-xs"
@@ -83,29 +110,30 @@ export function OpenThreadsBar({
           }
         }}
       >
-        Open threads · {pins.length} pinned · This chat {expanded ? "▴" : "▾"}
+        Open threads · {todayCount} today · {recentCount} recent · {pins.length}{" "}
+        pinned · This chat {expanded ? "▴" : "▾"}
       </button>
       {expanded ? (
         <div id={regionId} className="space-y-2 border-t border-border p-2">
           <p className="text-muted-foreground">
-            Automatic tracking unavailable. Pinned references only; removing one
-            does not finish work or mark it read.
+            Automatic rows use loaded message counts, not agent work status.
+            Removing or dismissing a reference does not finish work or mark it
+            read.
           </p>
           {sessionOnly || pinsSessionOnly ? (
             <p role="status">
               Changes are session-only; storage is unavailable.
             </p>
           ) : null}
-          <BusyThreadSuggestions
-            storageKey={storageKey}
-            entries={entries}
-            threadSummaries={threadSummaries}
+          <ActiveThreadSettings
+            preferences={activePreferences}
+            onChange={setActivePreferences}
           />
           <div className="flex gap-2">
             <input
               aria-label="Search open threads"
               className="min-w-0 flex-1 rounded border border-border bg-background px-2 py-1"
-              placeholder="Search pinned threads"
+              placeholder="Search open threads"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
             />
@@ -117,47 +145,31 @@ export function OpenThreadsBar({
           </div>
           {query ? (
             <p>
-              {matches.length} matches of {pins.length}
+              {matches.length} matches of {rows.length}
             </p>
           ) : null}
-          <ul className="max-h-40 space-y-1 overflow-auto">
-            {matches.map((pin) => (
-              <li key={pin.id} className="flex items-center gap-2">
-                <button
-                  type="button"
-                  disabled={!byId.has(pin.id)}
-                  className="min-w-0 flex-1 truncate rounded px-1 py-1 text-left disabled:opacity-60"
-                  onClick={() => {
-                    const message = byId.get(pin.id);
-                    if (message && currentThread?.id !== message.id)
-                      onOpen(message);
-                  }}
-                >
-                  {pin.title || "Untitled thread"}
-                  {!byId.has(pin.id) ? " · Outside loaded history" : ""}
-                </button>
-                <button
-                  type="button"
-                  className="px-2 py-1"
-                  aria-label={`Remove ${pin.title} from bar`}
-                  onClick={() => {
-                    setUndo({
-                      pin,
-                      index: pins.findIndex((item) => item.id === pin.id),
-                    });
-                    removePin(pin.id);
-                  }}
-                >
-                  Remove
-                </button>
-              </li>
-            ))}
-          </ul>
+          <ActiveThreadsPhase0List
+            rows={matches}
+            pinnedCount={pins.length}
+            onOpen={(id) => {
+              const message = byId.get(id);
+              if (message && currentThread?.id !== message.id) onOpen(message);
+            }}
+            onKeep={addPin}
+            onDismiss={dismissSuggestion}
+            onRemove={(pin) => {
+              setUndo({
+                pin,
+                index: pins.findIndex((item) => item.id === pin.id),
+              });
+              removePin(pin.id);
+            }}
+          />
           {matches.length === 0 ? (
             <p className="text-muted-foreground">
               {query
                 ? "No matching open threads."
-                : "Pin a thread to keep it here."}
+                : "No automatic threads in loaded history. Pin a thread to keep it here."}
             </p>
           ) : null}
           <div className="flex gap-2">
@@ -210,7 +222,8 @@ export function OpenThreadsBar({
             <p>100 pinned references. Remove one to add another.</p>
           ) : null}
           <p className="text-muted-foreground">
-            Thread picker covers loaded history. Pins stay on this device.
+            Thread picker covers loaded history. Pins and dismissals stay on
+            this device.
           </p>
         </div>
       ) : null}

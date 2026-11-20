@@ -6,11 +6,18 @@ import {
   type OpenThreadPin,
 } from "./openThreadPins";
 
+import {
+  DEFAULT_ACTIVE_THREAD_PREFERENCES,
+  parseActiveThreadPreferences,
+  type ActiveThreadPreferences,
+} from "./activeThreadsPhase0";
+
 type Register = { pin: OpenThreadPin | null; rank: number };
 type Snapshot = {
   pins: OpenThreadPin[];
   sessionOnly: boolean;
   dismissedSuggestions: ReadonlySet<string>;
+  activePreferences: ActiveThreadPreferences;
 };
 const owners = new Map<string, PinStore>();
 const MAX_REGISTERS = 1000;
@@ -28,9 +35,11 @@ class PinStore {
   private durableReady = false;
   private readonly volatileDismissals = new Set<string>();
   private readonly key: string;
+  private volatilePreferences: ActiveThreadPreferences | null = null;
   private readonly listeners = new Set<() => void>();
   private readonly volatile = new Map<string, Register>();
   private snapshot: Snapshot = {
+    activePreferences: DEFAULT_ACTIVE_THREAD_PREFERENCES,
     pins: [],
     sessionOnly: false,
     dismissedSuggestions: new Set(),
@@ -49,6 +58,7 @@ class PinStore {
     if (
       event.key === null ||
       event.key === this.key ||
+      event.key === `${this.key}:busySuggestions.v1` ||
       event.key.startsWith(this.prefix) ||
       event.key.startsWith(this.dismissPrefix)
     )
@@ -125,8 +135,16 @@ class PinStore {
     let sessionOnly =
       this.volatile.size > 0 ||
       this.volatileDismissals.size > 0 ||
-      this.capacityFailure;
+      this.capacityFailure ||
+      this.volatilePreferences !== null;
+    let activePreferences =
+      this.volatilePreferences ?? this.snapshot.activePreferences;
     try {
+      activePreferences =
+        this.volatilePreferences ??
+        parseActiveThreadPreferences(
+          localStorage.getItem(`${this.key}:busySuggestions.v1`),
+        );
       this.registers = this.read();
       this.durableReady = true;
     } catch {
@@ -147,13 +165,32 @@ class PinStore {
     ]);
     const signature = JSON.stringify([
       pins,
+      activePreferences,
       sessionOnly,
       [...dismissedSuggestions].sort(),
     ]);
     if (signature === this.signature) return;
     this.signature = signature;
-    this.snapshot = { pins, sessionOnly, dismissedSuggestions };
+    this.snapshot = {
+      pins,
+      sessionOnly,
+      dismissedSuggestions,
+      activePreferences,
+    };
     for (const listener of this.listeners) listener();
+  };
+  setActivePreferences = (preferences: ActiveThreadPreferences) => {
+    const next = parseActiveThreadPreferences(JSON.stringify(preferences));
+    try {
+      localStorage.setItem(
+        `${this.key}:busySuggestions.v1`,
+        JSON.stringify(next),
+      );
+      this.volatilePreferences = null;
+    } catch {
+      this.volatilePreferences = next;
+    }
+    this.refresh();
   };
   private write(id: string, record: Register) {
     try {
@@ -248,6 +285,7 @@ export function useOpenThreadPins(key: string) {
   );
   return {
     ...snapshot,
+    setActivePreferences: store.setActivePreferences,
     addPin: store.add,
     removePin: store.remove,
     dismissSuggestion: store.dismissSuggestion,
