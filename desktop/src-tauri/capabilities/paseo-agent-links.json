@@ -2,9 +2,7 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "paseo-agent-links",
   "description": "Open agent sessions on the established GCP, M4 and M5 Paseo hosts",
-  "windows": [
-    "main"
-  ],
+  "windows": ["main"],
   "permissions": [
     {
       "identifier": "opener:allow-open-url",

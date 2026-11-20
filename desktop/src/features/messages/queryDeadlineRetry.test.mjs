@@ -33,6 +33,12 @@ registerHooks({
         source: `export async function getThreadReplies(...args) {
   return globalThis.__tauriGetThreadReplies(...args);
 }
+// The real query dependency graph also imports the transport facade. Keep
+// those bindings available, but reject any unexpected native side effect.
+export async function invokeTauri(command) {
+  throw new Error("Unexpected native command in deadline fixture: " + command);
+}
+export function toTauriError(error) { return error; }
 export default {};`,
       };
     }

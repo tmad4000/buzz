@@ -121,6 +121,7 @@
    * progressive enhancement.
    */
   .avatar-sdr-clamp {
+    /* biome-ignore lint/correctness/noUnknownProperty: CSS Color HDR dynamic-range-limit is an intentional progressive enhancement; retain the SDR avatar clamp. */
     dynamic-range-limit: standard;
   }
 }
