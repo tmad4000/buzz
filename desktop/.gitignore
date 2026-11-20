@@ -10,6 +10,7 @@ lerna-debug.log*
 node_modules
 .pnpm-store
 dist
+/dist-auto-route-demo/
 dist-ssr
 playwright-report
 playwright-report.json
