@@ -1,6 +1,8 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Locator } from "@playwright/test";
 
 import { installMockBridge } from "../helpers/bridge";
+import { waitForMockChannelHeadReady } from "../helpers/channelHeadReady";
+import { syntheticComposerPaste } from "../helpers/syntheticComposerPaste";
 
 async function seedLongThread(page: import("@playwright/test").Page) {
   await expect
@@ -294,3 +296,188 @@ test("narrow threads do not offer an unavailable layout switch", async ({
   await expect(page.getByTestId("message-thread-panel")).toBeVisible();
   await expect(page.getByTestId("thread-view-mode-toggle")).toHaveCount(0);
 });
+
+const PASTE_PREFIX = "draft-before:";
+const PASTE_SUFFIX = `:draft-after${"s".repeat(8_000)}`;
+const PASTE_REPLY = "Reply target for large synthetic drafts";
+
+async function exerciseComposerPaste(
+  editor: Locator,
+  text: string,
+  html: string,
+  suffix: string,
+) {
+  await editor.fill(PASTE_PREFIX + suffix);
+  const inserted = text.replaceAll("\n", "");
+  const result = await editor.evaluate(
+    async (node, fixture) => {
+      const input = node as HTMLElement;
+      const viewport = input.closest<HTMLElement>(
+        '[data-testid="message-input-scroll"]',
+      );
+      const selection = document.getSelection();
+      const start = document
+        .createTreeWalker(input, NodeFilter.SHOW_TEXT)
+        .nextNode();
+      if (!viewport || !selection || !start) {
+        throw new Error("Expanded reply composer has no selectable draft");
+      }
+
+      selection.collapse(start, fixture.prefix.length);
+      // Let ProseMirror observe the real DOM selection before pasting, then
+      // wait past the old deferred-scroll frame before measuring the result.
+      const frame = () =>
+        new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      await frame();
+      await frame();
+      const data = new DataTransfer();
+      data.setData("text/plain", fixture.text);
+      if (fixture.html) data.setData("text/html", fixture.html);
+      const consumed = !input.dispatchEvent(
+        new ClipboardEvent("paste", {
+          bubbles: true,
+          cancelable: true,
+          clipboardData: data,
+        }),
+      );
+      await frame();
+      await frame();
+
+      const sameInput =
+        input.isConnected &&
+        viewport.querySelector('[data-testid="message-input"]') === input;
+      const anchored =
+        selection.anchorNode !== null && input.contains(selection.anchorNode);
+      const range = document.createRange();
+      range.selectNodeContents(input);
+      if (anchored && selection.anchorNode)
+        range.setEnd(selection.anchorNode, selection.anchorOffset);
+      const expectedBeforeCaret = fixture.prefix + fixture.inserted;
+      const insertionEndsAtCaret =
+        anchored &&
+        selection.isCollapsed &&
+        range.toString() === expectedBeforeCaret;
+      range.collapse(false);
+      let caret = range.getBoundingClientRect();
+      if (insertionEndsAtCaret && !caret.height) {
+        // At a mark boundary Chromium can expose an element-level caret.
+        // Measure the last inserted glyph without moving the live selection.
+        const textNodes = document.createTreeWalker(
+          input,
+          NodeFilter.SHOW_TEXT,
+        );
+        let remaining = expectedBeforeCaret.length;
+        for (
+          let leaf = textNodes.nextNode();
+          leaf;
+          leaf = textNodes.nextNode()
+        ) {
+          const length = leaf.textContent?.length ?? 0;
+          if (remaining <= length) {
+            range.setStart(leaf, remaining - 1);
+            range.setEnd(leaf, remaining);
+            caret = range.getBoundingClientRect();
+            break;
+          }
+          remaining -= length;
+        }
+      }
+      const bounds = viewport.getBoundingClientRect();
+      const visible =
+        caret.height > 0 &&
+        caret.top >= bounds.top - 1 &&
+        caret.bottom <= bounds.bottom + 1;
+      return {
+        consumed,
+        sameInput,
+        focused: document.activeElement === input,
+        exactContent:
+          input.textContent ===
+          fixture.prefix + fixture.inserted + fixture.suffix,
+        insertionEndsAtCaret,
+        visible,
+        scrolled: viewport.scrollTop > 0,
+        hasRichMark: Boolean(input.querySelector("strong")),
+      };
+    },
+    { text, html, suffix, inserted, prefix: PASTE_PREFIX },
+  );
+  expect(result).toEqual({
+    consumed: true,
+    sameInput: true,
+    focused: true,
+    exactContent: true,
+    insertionEndsAtCaret: true,
+    visible: true,
+    scrolled: true,
+    hasRichMark: Boolean(html),
+  });
+  await editor.page().keyboard.insertText("!");
+  expect(
+    await editor.evaluate(
+      (input, expected) => input.textContent === expected,
+      `${PASTE_PREFIX}${inserted}!${suffix}`,
+    ),
+  ).toBe(true);
+}
+
+for (const bytes of [20_000, 100_000]) {
+  for (const flavor of ["plain", "rich"] as const) {
+    test(`expanded thread reply keeps the caret after a ${bytes}-byte ${flavor} paste`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 1280, height: 720 });
+      await page.addInitScript(() => {
+        localStorage.setItem("buzz.channels.threadViewMode", "focus");
+      });
+      await installMockBridge(page);
+      await page.goto("/");
+      await page.getByTestId("channel-general").click();
+      await waitForMockChannelHeadReady(
+        page,
+        "general",
+        "9a1657ac-f7aa-5db0-b632-d8bbeb6dfb50",
+      );
+
+      const { rootId, replyId } = await page.evaluate((replyText) => {
+        const emit = window.__BUZZ_E2E_EMIT_MOCK_MESSAGE__;
+        if (!emit) throw new Error("Missing mock message emitter");
+        const createdAt = Math.floor(Date.now() / 1000) + 10;
+        const thread = emit({
+          channelName: "general",
+          content: "Large paste test thread",
+          createdAt,
+        });
+        const reply = emit({
+          channelName: "general",
+          content: replyText,
+          parentEventId: thread.id,
+          createdAt: createdAt + 1,
+        });
+        return { rootId: thread.id, replyId: reply.id };
+      }, PASTE_REPLY);
+
+      await page
+        .locator(
+          `[data-testid="message-thread-summary"][data-thread-head-id="${rootId}"]`,
+        )
+        .click();
+      const drawer = page.getByTestId("focus-thread-drawer");
+      await expect(drawer).toBeVisible();
+      const reply = drawer.locator(
+        `[data-message-id="${replyId}"][data-testid="message-row"]`,
+      );
+      await reply.hover();
+      await reply.getByTestId(`reply-message-${replyId}`).click();
+      const replyTarget = drawer.getByTestId("reply-target");
+      await expect(replyTarget).toContainText(PASTE_REPLY);
+
+      const editor = drawer.getByTestId("message-input");
+      const fixture = syntheticComposerPaste(bytes);
+      const html = flavor === "rich" ? fixture.html : "";
+      await exerciseComposerPaste(editor, fixture.text, html, "");
+      await exerciseComposerPaste(editor, fixture.text, html, PASTE_SUFFIX);
+      await expect(replyTarget).toContainText(PASTE_REPLY);
+    });
+  }
+}

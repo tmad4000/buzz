@@ -289,13 +289,6 @@ function MessageComposerImpl({
     ((info: LinkSelectionInfo | null) => void) | null
   >(null);
   const onLinkShortcutRef = React.useRef<(() => boolean) | null>(null);
-  const scrollComposerToBottom = React.useCallback(() => {
-    window.requestAnimationFrame(() => {
-      const scrollElement = composerScrollRef.current;
-      if (!scrollElement) return;
-      scrollElement.scrollTop = scrollElement.scrollHeight;
-    });
-  }, []);
   const computedPlaceholder = editTarget
     ? "Edit your message"
     : (placeholder ??
@@ -906,7 +899,6 @@ function MessageComposerImpl({
   useComposerPasteHandler({
     editor: richText.editor,
     bindMentionIdentities: mentions.bindPastedMentionIdentities,
-    scrollToBottom: scrollComposerToBottom,
     setPendingImeta: voiceNote.setPendingImetaWhenIdle,
     uploadFile: voiceNote.uploadFileWhenIdle,
   });

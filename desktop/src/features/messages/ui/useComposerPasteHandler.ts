@@ -14,7 +14,6 @@ export function useComposerPasteHandler(options: {
    * trusted state vouches for it. Without it, a paste binds nothing.
    */
   bindMentionIdentities?: BindPastedMentionIdentities;
-  scrollToBottom: () => void;
   setPendingImeta: (
     update: (current: BlobDescriptor[]) => BlobDescriptor[],
   ) => void;
@@ -57,8 +56,8 @@ export function useComposerPasteHandler(options: {
                 },
                 { type: "paragraph" },
               ])
+              .scrollIntoView()
               .run();
-            options.scrollToBottom();
             return true;
           }
           if (handleAgentSnapshotPaste(event, options.setPendingImeta))
@@ -66,9 +65,6 @@ export function useComposerPasteHandler(options: {
           const clipboardData = event.clipboardData;
           const html = clipboardData?.getData("text/html");
           if (clipboardData && html && hasMentionClipboardHtml(html)) {
-            if (clipboardData.getData("text/plain").includes("\n")) {
-              options.scrollToBottom();
-            }
             return handleMentionClipboardPaste({
               bindMentionIdentities: bindMentionIdentitiesRef.current,
               clipboardData,
@@ -76,11 +72,11 @@ export function useComposerPasteHandler(options: {
               view,
             });
           }
-          if ((clipboardData?.getData("text/plain") ?? "").includes("\n"))
-            options.scrollToBottom();
+          // ProseMirror scrolls to the insertion caret in its paste
+          // transaction. The composer can have draft text below that caret.
           return false;
         },
       },
     });
-  }, [options.editor, options.scrollToBottom, options.setPendingImeta]);
+  }, [options.editor, options.setPendingImeta]);
 }
