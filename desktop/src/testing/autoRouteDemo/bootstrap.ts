@@ -6,7 +6,7 @@ const relayUrl = "wss://buzz-auto-route.invalid";
 const communityId = "buzz-auto-route-fixture";
 
 // This offline fixture also runs over the private HTTP preview origin.
-function installHttpFixturePrimitives() {
+function installFixturePrimitives() {
   if (!crypto.randomUUID) {
     const randomUUID = () => {
       const bytes = crypto.getRandomValues(new Uint8Array(16));
@@ -19,24 +19,26 @@ function installHttpFixturePrimitives() {
     };
     Object.defineProperty(crypto, "randomUUID", { value: randomUUID });
   }
-  if (!navigator.mediaDevices) {
-    Object.defineProperty(navigator, "mediaDevices", {
-      value: Object.assign(new EventTarget(), {
-        enumerateDevices: async () => [],
-        getUserMedia: async () => {
-          throw new DOMException(
-            "The fixture has no capture devices",
-            "NotFoundError",
-          );
-        },
-      }),
-    });
-  }
+  // Fence the real composer and huddle controls on every origin, including
+  // HTTPS, where the browser would otherwise expose real capture devices.
+  const denyCapture = async () => {
+    throw new DOMException(
+      "The fixture has no capture devices",
+      "NotFoundError",
+    );
+  };
+  Object.defineProperty(navigator, "mediaDevices", {
+    value: Object.assign(new EventTarget(), {
+      enumerateDevices: async () => [],
+      getUserMedia: denyCapture,
+      getDisplayMedia: denyCapture,
+    }),
+  });
 }
 
 async function bootstrap() {
   installMockupNavigationGuard();
-  installHttpFixturePrimitives();
+  installFixturePrimitives();
   const theme =
     new URLSearchParams(location.search).get("theme") === "dark"
       ? "buzz-dark"
