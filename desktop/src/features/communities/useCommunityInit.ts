@@ -25,6 +25,7 @@ import {
   clearAllDrafts,
   initDraftStore,
 } from "@/features/messages/lib/useDrafts";
+import { resetMessageBodyMemoryPreferences } from "@/features/messages/lib/messageBodyCollapse";
 import { resetRenderScopedReactionHydration } from "@/features/messages/lib/renderScopedReactions";
 import { resetAudioMediaLoadScheduler } from "@/features/messages/lib/audioMediaLoadScheduler";
 import { resetBackgroundMediaUploads } from "@/features/messages/lib/backgroundMediaUploadStore";
@@ -71,6 +72,7 @@ async function resetCommunityState({
   await resetNavigationDeepLinkDrain();
   resetRateLimitGate();
   clearAllDrafts();
+  resetMessageBodyMemoryPreferences();
   resetAgentObserverStore();
   resetActiveAgentTurnsStore();
   resetAgentWorkingSignal();

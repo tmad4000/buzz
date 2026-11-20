@@ -3,7 +3,10 @@ import { afterEach, test } from "node:test";
 import { act, createElement as h } from "react";
 import { cleanup, fireEvent, render, within } from "@testing-library/react";
 
-import { messageBodyPreferenceKey } from "../lib/messageBodyCollapse.ts";
+import {
+  messageBodyPreferenceKey,
+  resetMessageBodyMemoryPreferences,
+} from "../lib/messageBodyCollapse.ts";
 import {
   MessageBodyDisclosure,
   useMessageBodyDisclosure,
@@ -26,7 +29,7 @@ function BodyFixture({ body, account = viewer, label = "fixture", children }) {
   const disclosure = useMessageBodyDisclosure({
     body,
     communityId,
-    viewer: account,
+    viewer: account ?? undefined,
     channelId,
     messageId,
   });
@@ -56,6 +59,7 @@ function controlledBody(button) {
 
 afterEach(() => {
   cleanup();
+  resetMessageBodyMemoryPreferences();
   window.localStorage.clear();
 });
 
@@ -146,7 +150,25 @@ test("manual short collapse syncs both surfaces, survives remount, and stays per
   assert.equal(window.localStorage.getItem(storageKey), "expanded");
 });
 
-test("storage-denied preference is scoped to the current viewer", () => {
+function copies(account) {
+  return h(
+    "main",
+    {},
+    h(BodyFixture, { body: "Short body", account, label: "timeline" }),
+    h(BodyFixture, { body: "Short body", account, label: "thread" }),
+  );
+}
+
+function assertSharedMemoryPreference(fixture) {
+  const timeline = within(fixture.getByRole("region", { name: "timeline" }));
+  const thread = within(fixture.getByRole("region", { name: "thread" }));
+  fireEvent.click(timeline.getByRole("button", { name: "Collapse message" }));
+  assert.ok(thread.getByRole("button", { name: "Show more" }));
+  fireEvent.click(thread.getByRole("button", { name: "Expand message" }));
+  assert.ok(timeline.getByRole("button", { name: "Show less" }));
+}
+
+test("storage denial syncs both views and keeps the transient choice scoped across remounts", () => {
   const original = Object.getOwnPropertyDescriptor(window, "localStorage");
   Object.defineProperty(window, "localStorage", {
     configurable: true,
@@ -155,16 +177,32 @@ test("storage-denied preference is scoped to the current viewer", () => {
     },
   });
   try {
-    const fixture = render(h(BodyFixture, { body: "Short body" }));
-    fireEvent.click(fixture.getByRole("button", { name: "Collapse message" }));
-    assert.ok(fixture.getByRole("button", { name: "Show more" }));
-    fixture.rerender(
-      h(BodyFixture, { body: "Short body", account: otherViewer }),
+    const fixture = render(copies(viewer));
+    assertSharedMemoryPreference(fixture);
+    fireEvent.click(
+      fixture.getAllByRole("button", { name: "Collapse message" })[0],
     );
+    fixture.rerender(copies(otherViewer));
     assert.equal(fixture.queryByRole("button", { name: "Show more" }), null);
+    fixture.unmount();
+    const reloaded = render(copies(viewer));
+    assert.equal(
+      reloaded.getAllByRole("button", { name: "Show more" }).length,
+      2,
+    );
+    act(() => resetMessageBodyMemoryPreferences());
+    assert.equal(reloaded.queryByRole("button", { name: "Show more" }), null);
   } finally {
     Object.defineProperty(window, "localStorage", original);
   }
+});
+
+test("anonymous duplicate views sync for the session without writing a preference", () => {
+  const fixture = render(copies(null));
+  assertSharedMemoryPreference(fixture);
+  assert.equal(window.localStorage.length, 0);
+  fixture.rerender(copies(viewer));
+  assert.equal(fixture.queryByRole("button", { name: "Show less" }), null);
 });
 
 test("a taller wrapped text body reclamps on resize, while a short link preview keeps its own UI", () => {
@@ -207,5 +245,52 @@ test("a taller wrapped text body reclamps on resize, while a short link preview 
     globalThis.ResizeObserver = oldObserver;
     window.HTMLElement.prototype.getBoundingClientRect = oldRect;
     globalThis.getComputedStyle = oldStyle;
+  }
+});
+
+test("wrapped text with an embed clamps while a tall preview alone does not", () => {
+  const getRect = window.HTMLElement.prototype.getBoundingClientRect;
+  const getRects = window.Range.prototype.getClientRects;
+  const getStyle = globalThis.getComputedStyle;
+  const wrapped = "Text near a tall preview in the thread. ".repeat(16).trim();
+  const short = "One short line";
+  // The embed itself deliberately has many text rectangles. Only the actual
+  // message fragments should contribute, and same-line mark fragments count once.
+  const preview = h(
+    "div",
+    { "data-link-preview-list": "" },
+    "Tall card controls",
+  );
+  window.HTMLElement.prototype.getBoundingClientRect = () => ({ height: 900 });
+  globalThis.getComputedStyle = () => ({ lineHeight: "20px" });
+  window.Range.prototype.getClientRects = function getSyntheticTextRects() {
+    const value = this.startContainer.textContent;
+    const lines = value === wrapped ? 13 : value === short ? 1 : 20;
+    return Array.from({ length: lines }, (_, i) => {
+      const top = i * 20;
+      return { top, bottom: top + 20, height: 20, width: 40 };
+    }).flatMap((rect) => [
+      rect,
+      { ...rect, top: rect.top + 2, bottom: rect.bottom + 2 },
+    ]);
+  };
+  try {
+    const fixture = render(
+      h(BodyFixture, { body: wrapped }, h("p", {}, wrapped), preview),
+    );
+    assert.equal(
+      fixture
+        .getByRole("button", { name: "Show more" })
+        .getAttribute("aria-expanded"),
+      "false",
+    );
+    fixture.rerender(
+      h(BodyFixture, { body: short }, h("p", {}, short), preview),
+    );
+    assert.equal(fixture.queryByRole("button", { name: "Show more" }), null);
+  } finally {
+    window.HTMLElement.prototype.getBoundingClientRect = getRect;
+    globalThis.getComputedStyle = getStyle;
+    window.Range.prototype.getClientRects = getRects;
   }
 });

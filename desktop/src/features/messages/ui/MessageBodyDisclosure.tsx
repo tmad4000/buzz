@@ -11,16 +11,50 @@ import {
 import {
   isLongMessageBody,
   MESSAGE_BODY_LINE_LIMIT,
-  type MessageBodyPreference,
+  MESSAGE_BODY_PREFERENCE_CHANGED,
   messageBodyPreferenceKey,
   readMessageBodyPreference,
   saveMessageBodyPreference,
 } from "@/features/messages/lib/messageBodyCollapse";
 import { cn } from "@/shared/lib/cn";
 
-const PREFERENCE_CHANGED = "buzz:message-body-preference-changed";
 const EMBED_SELECTOR =
   "[data-link-preview-list], [data-config-nudge], img:not([data-custom-emoji]), video, audio, iframe";
+
+/** Estimate text lines from layout fragments while ignoring embedded widgets. */
+function wrappedTextExceedsLimit(
+  content: HTMLElement,
+  lineHeight: number,
+): boolean {
+  const walker = content.ownerDocument.createTreeWalker(
+    content,
+    NodeFilter.SHOW_TEXT,
+  );
+  const range = content.ownerDocument.createRange();
+  const lineCenters: number[] = [];
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    if (
+      !node.textContent?.trim() ||
+      node.parentElement?.closest(EMBED_SELECTOR)
+    )
+      continue;
+    range.selectNodeContents(node);
+    for (const rect of range.getClientRects?.() ?? []) {
+      if (rect.width <= 0 || rect.height <= 0) continue;
+      const center = (rect.top + rect.bottom) / 2;
+      // Inline marks and links can split the same line into multiple rects.
+      if (
+        lineCenters.some(
+          (previous) => Math.abs(previous - center) < lineHeight * 0.45,
+        )
+      )
+        continue;
+      lineCenters.push(center);
+      if (lineCenters.length > MESSAGE_BODY_LINE_LIMIT) return true;
+    }
+  }
+  return false;
+}
 
 export type MessageBodyAction = {
   bodyId: string;
@@ -48,40 +82,43 @@ export function useMessageBodyDisclosure({
       ? null
       : messageBodyPreferenceKey(communityId, viewer, channelId, messageId);
   const scope =
-    key ?? JSON.stringify([communityId, viewer, channelId, messageId]);
-  const [temporary, setTemporary] = useState<{
-    scope: string;
-    value: MessageBodyPreference;
-  } | null>(null);
+    key ??
+    (communityId && channelId
+      ? JSON.stringify([communityId, viewer, channelId, messageId])
+      : JSON.stringify([bodyId, communityId, viewer, channelId, messageId]));
   const [measurement, setMeasurement] = useState<{
     body: string;
     exceedsLines: boolean;
     previewHeight: number;
   } | null>(null);
+  const hasBody = body !== null;
   const subscribe = useCallback(
     (update: () => void) => {
-      if (!key) return () => {};
+      if (!hasBody) return () => {};
       const onLocalChange = (event: Event) => {
-        if ((event as CustomEvent<string>).detail === key) update();
+        const changed = (event as CustomEvent<string | null>).detail;
+        if (changed == null || changed === scope) update();
       };
       const onStorage = (event: StorageEvent) => {
         if (event.key === key || event.key === null) update();
       };
-      window.addEventListener(PREFERENCE_CHANGED, onLocalChange);
+      window.addEventListener(MESSAGE_BODY_PREFERENCE_CHANGED, onLocalChange);
       window.addEventListener("storage", onStorage);
       return () => {
-        window.removeEventListener(PREFERENCE_CHANGED, onLocalChange);
+        window.removeEventListener(
+          MESSAGE_BODY_PREFERENCE_CHANGED,
+          onLocalChange,
+        );
         window.removeEventListener("storage", onStorage);
       };
     },
-    [key],
+    [hasBody, key, scope],
   );
   const getPreference = useCallback(
-    () => readMessageBodyPreference(key),
-    [key],
+    () => readMessageBodyPreference(key, scope),
+    [key, scope],
   );
-  const stored = useSyncExternalStore(subscribe, getPreference, () => null);
-  const preference = temporary?.scope === scope ? temporary.value : stored;
+  const preference = useSyncExternalStore(subscribe, getPreference, () => null);
   const currentMeasurement = measurement?.body === body ? measurement : null;
   const longByText = body !== null && isLongMessageBody(body);
   const long = longByText || currentMeasurement?.exceedsLines === true;
@@ -99,11 +136,13 @@ export function useMessageBodyDisclosure({
       );
       if (!(height > 0 && lineHeight > 0)) return;
 
-      // Media and rich previews have their own controls. Their height alone
-      // does not turn a short message into a long text disclosure.
+      // For mixed content use the text fragments instead of the height of
+      // inline images, previews and their own disclosure controls.
       const exceedsLines =
+        !longByText &&
         height > lineHeight * MESSAGE_BODY_LINE_LIMIT + 1 &&
-        !content.querySelector(EMBED_SELECTOR);
+        (!content.querySelector(EMBED_SELECTOR) ||
+          wrappedTextExceedsLimit(content, lineHeight));
       if (!longByText && !exceedsLines) {
         setMeasurement(null);
         return;
@@ -126,17 +165,7 @@ export function useMessageBodyDisclosure({
   }, [body, longByText]);
 
   const toggle = () => {
-    const value = collapsed ? "expanded" : "collapsed";
-    if (saveMessageBodyPreference(key, value)) {
-      // The storage event only reaches other windows. Update copies of the
-      // same message in this window as well (e.g. timeline and thread).
-      setTemporary(null);
-      window.dispatchEvent(
-        new CustomEvent(PREFERENCE_CHANGED, { detail: key }),
-      );
-    } else {
-      setTemporary({ scope, value });
-    }
+    saveMessageBodyPreference(key, scope, collapsed ? "expanded" : "collapsed");
   };
 
   return {
