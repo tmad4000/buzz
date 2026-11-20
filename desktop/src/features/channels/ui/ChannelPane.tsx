@@ -99,6 +99,8 @@ export const ChannelPane = React.memo(function ChannelPane({
   editTarget = null,
   fetchOlder,
   header,
+  resultsContent,
+  resultsSwitch,
   idleAuxiliaryPanel = null,
   idleAuxiliaryHeaderActions,
   idleAuxiliaryOverridesThread = false,
@@ -707,6 +709,11 @@ export const ChannelPane = React.memo(function ChannelPane({
           }
         >
           {isHuddleTranscript ? null : header}
+          {resultsSwitch ? (
+            <div className="relative z-30 flex shrink-0 flex-wrap items-center px-5 pb-2">
+              {resultsSwitch}
+            </div>
+          ) : null}
           {activeChannel && currentPubkey ? (
             <PinnedBar
               key={activeChannel.id}
@@ -720,12 +727,12 @@ export const ChannelPane = React.memo(function ChannelPane({
               }}
             />
           ) : null}
-          {(isHuddleTranscript || flatTimeline) && huddleThreadRepliesError ? (
+          {!resultsContent && (isHuddleTranscript || flatTimeline) && huddleThreadRepliesError ? (
             <div className="px-5 pt-3">
               <ThreadRepliesErrorCard onRetry={onRetryHuddleThreadReplies} />
             </div>
           ) : null}
-          {flatTimeline && timelineView.loadingReplies ? (
+          {!resultsContent && flatTimeline && timelineView.loadingReplies ? (
             <div
               role="status"
               className="px-5 py-2 text-xs text-muted-foreground"
@@ -735,8 +742,14 @@ export const ChannelPane = React.memo(function ChannelPane({
             </div>
           ) : null}
           <div className="relative isolate flex min-h-0 min-w-0 flex-1 flex-col">
+            {resultsContent ? (
+              <div className="flex min-h-0 min-w-0 flex-1 pb-[var(--composer-overlay-height,6rem)]">
+                {resultsContent}
+              </div>
+            ) : null}
             <ChannelTimelineProviders
               key={`${activeChannel?.id}:${currentPubkey}`}
+              hidden={Boolean(resultsContent)}
               onRepliesRevealed={onSidebarRepliesRevealed}
               scope={`${activeChannel?.id}:${currentPubkey}`}
               currentPubkey={currentPubkey}

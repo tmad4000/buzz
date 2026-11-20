@@ -31,3 +31,10 @@ test("existing Projects and Workflows experiments remain unchanged", () => {
     },
   });
 });
+
+test("Results and Lanes share one opt-in desktop feature entry", () => {
+  const entries = manifest.features.filter(({ id }) => id === "lanes");
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].defaultEnabled, false);
+  assert.deepEqual(entries[0].platforms, ["desktop"]);
+});

@@ -1,3 +1,4 @@
+import { overlayBridgeResultTags } from "./bridgeResultTags";
 import {
   BRIDGE_STATUS_SIGNER,
   overlayBridgeStatusTags,
@@ -272,6 +273,7 @@ export function formatTimelineMessages(
       createdAt: number;
       eventId: string;
       signerPubkey: string;
+      event: RelayEvent;
     }
   >();
   for (const event of events) {
@@ -310,6 +312,7 @@ export function formatTimelineMessages(
         eventId: event.id,
         signerPubkey: normalizePubkey(event.pubkey),
         tags: event.tags,
+        event,
         createdAt: event.created_at,
       });
     }
@@ -548,7 +551,11 @@ export function formatTimelineMessages(
           edit?.signerPubkey === BRIDGE_STATUS_SIGNER
             ? overlayBridgeStatusTags(event.tags, edit.tags)
             : event.tags;
-        const effectiveTags = applyEditTagOverlay(baseTags, edit?.tags);
+        const effectiveTags = overlayBridgeResultTags(
+          applyEditTagOverlay(baseTags, edit?.tags),
+          event,
+          edit?.event,
+        );
         if (
           hasLinkPreviewSuppression(event.tags) ||
           previewSuppressedTargetIds.has(event.id)

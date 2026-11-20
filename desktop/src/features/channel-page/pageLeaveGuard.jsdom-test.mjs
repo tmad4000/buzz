@@ -70,11 +70,20 @@ test("background Page veto targets only its own view, protects saves, and unregi
   };
   const registrations = { a: register("a"), b: register("b") };
   const channel = { id: "same-channel", isMember: true };
+  const originalResult = {
+    channelId: channel.id,
+    messageId: "result-message",
+    sectionId: "result-first",
+    title: "First result",
+  };
+  let currentResult = originalResult;
   function View({ id }) {
     const surface = useChannelPageSurface(
       channel,
       React.createElement("span", null, `Pane controls ${id}`),
       registrations[id],
+      (messageId) =>
+        messageId === currentResult?.messageId ? currentResult : undefined,
     );
     surfaces.set(id, surface);
     return React.createElement(
@@ -149,6 +158,10 @@ test("background Page veto targets only its own view, protects saves, and unregi
     scope("a").querySelector("textarea"),
     "Page header cannot discard dirty editor",
   );
+  await act(async () => surfaces.get("a").openPageSection(originalResult));
+  assert.equal(surfaces.get("a").pageTitle, "Page");
+  assert.equal(scope("a").querySelector("textarea").value, "<h1>Draft A</h1>");
+
   let release;
   globalThis.leaveFixture.gate = new Promise((resolve) => {
     release = resolve;
@@ -197,6 +210,16 @@ test("background Page veto targets only its own view, protects saves, and unregi
     true,
     "explicit cancel releases target guard",
   );
+  await act(async () => surfaces.get("a").openPageSection(originalResult));
+  assert.equal(surfaces.get("a").pageTitle, "First result");
+  currentResult = { ...originalResult, title: "Refreshed title" };
+  await render();
+  assert.equal(surfaces.get("a").pageTitle, "Refreshed title");
+  currentResult = { ...originalResult, sectionId: "result-replaced" };
+  await render();
+  assert.equal(surfaces.get("a").pageOpen, false);
+  await act(async () => surfaces.get("a").openPageSection(originalResult));
+  assert.equal(surfaces.get("a").pageOpen, false, "old pointer cannot reopen");
   await render(false);
   assert.equal(guards.has("a"), false);
   assert.equal(guards.get("b")(), true, "A cleanup preserves B registration");

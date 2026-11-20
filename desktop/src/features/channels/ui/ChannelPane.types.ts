@@ -43,6 +43,8 @@ export type ChannelPaneProps = {
   editTarget?: MessageComposerEditTarget | null;
   fetchOlder?: () => Promise<void>;
   header?: React.ReactNode;
+  resultsContent?: React.ReactNode;
+  resultsSwitch?: React.ReactNode;
   /**
    * Idle-state body for the right auxiliary pane (project extras, etc.).
    * Uses the same slot as thread, profile, agent-session, and management panels.

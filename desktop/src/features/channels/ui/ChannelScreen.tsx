@@ -3,6 +3,14 @@ import { useUnseenReplyEvidence } from "./useUnseenReplyEvidence";
 import { useUnseenThreadReplies } from "./useUnseenThreadReplies";
 import { UnseenRepliesButton } from "./UnseenRepliesButton";
 import { useChannelPageSurface } from "@/features/channel-page/useChannelPageSurface";
+import { ChannelPage } from "@/features/channel-page/ChannelPage";
+import { ResultActionsContext } from "@/features/results/ResultActions";
+import { ResultsBoard } from "@/features/results/ResultsBoard";
+import { collectResultCards, type ResultCard } from "@/features/results/resultCards";
+import { useResultsPresentation } from "@/features/results/useResultsPresentation";
+import { useLoadedResultEvents } from "@/features/results/useLoadedResultEvents";
+import { sortMessages } from "@/features/messages/lib/messageQueryKeys";
+import { ChannelPresentationSwitch } from "./ChannelPresentationSwitch";
 import * as React from "react";
 import { TimelineViewContext, useChannelViewMode, type ChannelViewMode } from "./TimelineViewContext";
 import { buildContextParents } from "@/features/channels/readState/contextParentRegistry";
@@ -103,7 +111,6 @@ export function ChannelScreen({
   targetMessageEvents, targetMessageId,
   ...searchTarget
 }: ChannelScreenProps) {
-  const { pageOpen, closePage, pageHeaderActions, pagePanel, requirePageEditResolution } = useChannelPageSurface(activeChannel, headerEndActions, registerPageLeaveGuard);
   const queryClient = useQueryClient();
   const { goHome } = useAppNavigation();
   const { activeCommunity } = useCommunities();
@@ -176,6 +183,8 @@ export function ChannelScreen({
   const currentPubkey = currentIdentity?.pubkey;
   const activeChannelId = activeChannel?.id ?? null;
   const isHuddleTranscript = useIsHuddleTranscript(activeChannelId);
+  const resultsScope = JSON.stringify([activeCommunity?.relayUrl, currentPubkey, activeChannelId]);
+  const resultsView = useResultsPresentation(currentPubkey ? activeChannel : null, isHuddleTranscript, resultsScope);
   const view = useChannelViewMode(activeCommunity?.relayUrl ?? "", activeChannelId);
   const flatTimeline = view.mode === "timeline" && !isHuddleTranscript && activeChannel?.channelType !== "forum";
   const relaySelfPubkey = useRelaySelfQuery(activeChannel !== null).data;
@@ -403,10 +412,10 @@ export function ChannelScreen({
     }
     return { personaLookup: pLookup, respondToLookup: rLookup };
   }, [managedAgentsQuery.data, personasQuery.data]);
-  const timelineMessages = React.useMemo(
-    () =>
+  const projectTimeline = React.useCallback(
+    (events: RelayEvent[]) =>
       formatTimelineMessages(
-        resolvedMessages,
+        events,
         activeChannel,
         currentPubkey,
         currentProfile?.avatarUrl ?? null,
@@ -427,9 +436,9 @@ export function ChannelScreen({
       personaLookup,
       relaySelfPubkey,
       respondToLookup,
-      resolvedMessages,
     ],
   );
+  const timelineMessages = React.useMemo(() => projectTimeline(resolvedMessages), [projectTimeline, resolvedMessages]);
   const threadPanelData = useIndependentThreadPanel({
     activeChannel,
     channelEvents: resolvedMessages,
@@ -446,6 +455,19 @@ export function ChannelScreen({
     respondToLookup,
     relaySelfPubkey,
   });
+  const resultsAvailable = resultsView.available !== null;
+  const loadedResultEvents = useLoadedResultEvents(resultsAvailable ? activeChannelId : null, currentPubkey);
+  const resultMessages = React.useMemo(() => loadedResultEvents.length
+    ? projectTimeline(sortMessages([...loadedResultEvents.flat(), ...resolvedMessages]))
+    : timelineMessages, [loadedResultEvents, projectTimeline, resolvedMessages, timelineMessages]);
+  const results = React.useMemo(() => resultsAvailable && activeChannelId
+    ? collectResultCards(resultMessages, activeChannelId) : [], [resultsAvailable, activeChannelId, resultMessages]);
+  const resolveResult = React.useCallback(
+    (messageId: string) => results.find((result) => result.messageId === messageId),
+    [results],
+  );
+  const { pageOpen, pageTitle, closePage, pageHeaderActions, pagePanel, openPageSection, requirePageEditResolution } =
+    useChannelPageSurface(activeChannel, headerEndActions, registerPageLeaveGuard, resolveResult);
   const {
     firstUnreadMessageId,
     getFirstReplyIdForMessage,
@@ -695,6 +717,18 @@ export function ChannelScreen({
     targetMessageId,
     timelineMessages,
   });
+  const { selectResults } = resultsView;
+  const showResults = resultsView.active && !mainTimelineTargetMessageId;
+  React.useEffect(() => {
+    if (mainTimelineTargetMessageId) selectResults(false);
+  }, [mainTimelineTargetMessageId, selectResults]);
+  const openResult = React.useCallback((result: ResultCard) => {
+    if (requireThreadEditResolution()) openPageSection(result);
+  }, [openPageSection, requireThreadEditResolution]);
+  const resultActions = React.useMemo(
+    () => resultsAvailable && activeChannelId ? { channelId: activeChannelId, resolve: resolveResult, open: openResult } : null,
+    [resultsAvailable, activeChannelId, resolveResult, openResult],
+  );
   useThreadTargetSync({
     clearOptimisticThreadOverride,
     editTargetId,
@@ -774,6 +808,13 @@ export function ChannelScreen({
     () => setIsMembersSidebarOpen((prev) => !prev),
     [],
   );
+  const presentationSwitch = React.useMemo(() => resultsView.available ? (
+    <ChannelPresentationSwitch available={resultsView.available} selected={showResults ? "results" : "timeline"}
+      compact={channelContentWidthPx === 0 || channelContentWidthPx < 880} resultCount={results.length}
+      onSelect={(presentation) => {
+        if (requirePageEditResolution() && requireThreadEditResolution()) selectResults(presentation === "results");
+      }} />
+  ) : null, [resultsView.available, showResults, channelContentWidthPx, results.length, requirePageEditResolution, requireThreadEditResolution, selectResults]);
   const channelHeader = React.useMemo(
     () => (
       <ChannelScreenHeader
@@ -849,9 +890,9 @@ export function ChannelScreen({
     if (mode === "timeline") handleCloseThread();
     view.changeMode(mode);
   }, [handleCloseThread, requireThreadEditResolution, view.changeMode]);
-  const openTimelineReply = React.useCallback((message: TimelineMessage) => {
+  const openTimelineReply = React.useCallback((message: TimelineMessage, preserveOrder = false) => {
     if (!requireThreadEditResolution()) return;
-    view.changeMode("threads");
+    if (!preserveOrder) view.changeMode("threads");
     handleCloseAgentSession();
     setChannelManagementOpen(false);
     setProfilePanelPubkey(null);
@@ -865,6 +906,7 @@ export function ChannelScreen({
   const timelineView = React.useMemo(() => ({ mode: view.mode, changeMode: changeChannelView, messagesById: timelineMessageById, loadingReplies: threadRepliesLoading, openReply: openTimelineReply }), [view.mode, changeChannelView, timelineMessageById, threadRepliesLoading, openTimelineReply]);
   return (
     <TimelineViewContext.Provider value={timelineView}>
+    <ResultActionsContext.Provider value={resultActions}>
     <AgentSessionProvider onOpenAgentSession={handleOpenAgentSession}>
       <ProfilePanelProvider onOpenProfilePanel={handleOpenProfilePanel}>
         <WelcomeAgentCreateDialog
@@ -941,7 +983,22 @@ export function ChannelScreen({
                   idleAuxiliaryHeaderActions={pageOpen ? undefined : idleAuxiliaryHeaderActions}
                   idleAuxiliaryOverridesThread={pageOpen || idleAuxiliaryOverridesThread}
                   idleAuxiliaryPanel={pageOpen ? pagePanel : idleAuxiliaryPanel}
-                  idleAuxiliaryTitle={pageOpen ? "Page" : idleAuxiliaryTitle}
+                  idleAuxiliaryTitle={pageOpen ? pageTitle : idleAuxiliaryTitle}
+                  resultsSwitch={presentationSwitch}
+                  resultsContent={showResults ? (
+                    <ResultsBoard key={resultsScope} cards={results} loading={isTimelineLoading}
+                      error={messagesQuery.isError} hasOlder={hasOlderMessages} loadingOlder={isFetchingOlder}
+                      onLoadOlder={() => void fetchOlder()} onRetry={() => void messagesQuery.refetch()} onOpen={openResult}
+                      onReply={activeChannel?.archivedAt ? undefined : (result) => {
+                        if (!requirePageEditResolution() || !requireThreadEditResolution()) return;
+                        const message = resultMessages.find((entry) => entry.id === result.messageId);
+                        if (!message) return;
+                        if (pageOpen) closePage();
+                        openTimelineReply(message, true);
+                      }}
+                      renderPage={(result) => <ChannelPage key={JSON.stringify([resultsScope, result.sectionId])}
+                        canEdit={false} channelId={result.channelId} sectionId={result.sectionId} sectionTitle={result.title} />} />
+                  ) : undefined}
                   {...{ onAddFiles }}
                   onAddAgent={handleOpenAddBot}
                   onBrowseChannels={openBrowseChannels}
@@ -1107,6 +1164,6 @@ export function ChannelScreen({
           relayUrl={activeCommunity?.relayUrl}
         />
       </ProfilePanelProvider>
-    </AgentSessionProvider></TimelineViewContext.Provider>
+    </AgentSessionProvider></ResultActionsContext.Provider></TimelineViewContext.Provider>
   );
 }

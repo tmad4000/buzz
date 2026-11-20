@@ -219,6 +219,77 @@ test("production Page merges live edits over late history, isolates scope, sandb
     "<h1>Unsaved typed draft</h1>",
     "removed-author head is hidden without deleting the draft",
   );
+  globalThis.pageMembers = [{ pubkey: "alice" }];
+  await act(async () => {
+    root.render(
+      React.createElement(ChannelPage, {
+        key: "result",
+        channelId: "b",
+        canEdit: true,
+        sectionId: "result-findings",
+        sectionTitle: "Research findings",
+      }),
+    );
+  });
+  assert.equal(document.querySelector("iframe"), null);
+  assert.match(
+    document.body.textContent,
+    /unavailable in the current channel Page/,
+  );
+  await act(async () =>
+    receives.get("b")(
+      event(
+        "b",
+        "with-result",
+        1000,
+        '<h1>Project summary</h1><section id="result-findings"><p>Finding</p></section>',
+      ),
+    ),
+  );
+  frame = document.querySelector("iframe");
+  assert.equal(frame.title, "Research findings");
+  assert.equal(frame.getAttribute("sandbox"), "allow-scripts");
+  assert.match(frame.srcdoc, /<p>Finding<\/p>/);
+  assert.doesNotMatch(frame.srcdoc, /Project summary/);
+  assert.ok(
+    [...document.querySelectorAll("button")].every(
+      (button) => button.textContent !== "Edit HTML",
+    ),
+  );
+  assert.match(document.body.textContent, /From the current channel Page/);
+  for (const [id, stamp, html, expected] of [
+    [
+      "newer-same-slug",
+      1001,
+      '<section id="result-findings"><p>Current text</p></section>',
+      /Current text/,
+    ],
+    [
+      "ambiguous-current",
+      1002,
+      '<section id="result-findings">A</section><p id="result-findings">B</p>',
+      null,
+    ],
+    [
+      "missing-current",
+      1003,
+      '<section id="other">Different section</section>',
+      null,
+    ],
+  ]) {
+    await act(async () => receives.get("b")(event("b", id, stamp, html)));
+    frame = document.querySelector("iframe");
+    if (expected) {
+      assert.match(frame.srcdoc, expected);
+      assert.doesNotMatch(frame.srcdoc, /<p>Finding<\/p>/);
+    } else {
+      assert.equal(frame, null);
+      assert.match(
+        document.body.textContent,
+        /unavailable in the current channel Page/,
+      );
+    }
+  }
   await act(async () => root.unmount());
   dom.window.close();
   delete globalThis.pageRelay;

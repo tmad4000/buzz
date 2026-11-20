@@ -1,3 +1,4 @@
+import { useResultAction } from "@/features/results/ResultActions";
 import { useFeatureEnabled } from "@/shared/features";
 import { parseBridgeStatusCard } from "@/features/messages/lib/bridgeStatusCard";
 import { AgentStatusChip } from "./AgentStatusChip";
@@ -386,6 +387,7 @@ export const MessageRow = React.memo(
       message.tags?.find((tag) => tag[0] === name)?.[1];
 
     const agentReplyUx = useFeatureEnabled("agentReplyUx");
+    const resultCard = useResultAction(message, channelId);
     const statusCard = agentReplyUx ? parseBridgeStatusCard(message) : null;
     const renderBody = () => {
       if (statusCard) {
@@ -704,6 +706,7 @@ export const MessageRow = React.memo(
         <SentFromThreadLine channelId={channelId} tags={message.tags} />
         <ForwardedToAgentLine channelId={channelId} messageId={message.id} />
         {renderBody()}
+        {resultCard ? <div className="mt-2 min-w-0">{resultCard}</div> : null}
         {continuationMetadataNode}
         <MessageReactions
           messageId={message.id}

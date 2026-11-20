@@ -51,6 +51,13 @@
       "description": "Needs you and Answers filters in Inbox",
       "platforms": ["desktop"],
       "defaultEnabled": false
+    },
+    {
+      "id": "lanes",
+      "name": "Experimental channel views",
+      "description": "Try alternate channel views, including the Results board",
+      "platforms": ["desktop"],
+      "defaultEnabled": false
     }
   ]
 }

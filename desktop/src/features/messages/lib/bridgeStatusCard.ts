@@ -28,7 +28,7 @@ const LABELS: Readonly<Record<string, string>> = {
 const PRODUCER_ESCAPES = new Set("\\`*_{}[]()<>#!|");
 // JS/browser Unicode versions differ from the producer's Python database.
 // Pin the producer's excluded categories rather than trusting host regex tables.
-function producerExcludes(char: string): boolean {
+export function producerExcludes(char: string): boolean {
   const codepoint = char.codePointAt(0)!;
   let low = 0,
     high = producerUnicode.ranges.length - 1;

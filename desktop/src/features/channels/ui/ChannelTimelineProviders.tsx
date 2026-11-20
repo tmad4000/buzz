@@ -6,11 +6,13 @@ import { TimelineViewContext, useTimelineView } from "./TimelineViewContext";
 /** Forward the shared reply-observation callback to each mounted Timeline row. */
 export function ChannelTimelineProviders({
   children,
+  hidden,
   scope,
   currentPubkey,
   onRepliesRevealed,
 }: {
   children: React.ReactNode;
+  hidden?: boolean;
   scope: string;
   currentPubkey?: string;
   onRepliesRevealed?: (messages: TimelineMessage[], rootId?: string) => void;
@@ -23,7 +25,7 @@ export function ChannelTimelineProviders({
   return (
     <TimelineViewContext.Provider value={value}>
       <InlineAutoExpansionProvider scope={scope} currentPubkey={currentPubkey}>
-        {children}
+        <div className={hidden ? "hidden" : "contents"}>{children}</div>
       </InlineAutoExpansionProvider>
     </TimelineViewContext.Provider>
   );

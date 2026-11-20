@@ -10,22 +10,34 @@ import { Button } from "@/shared/ui/button";
 import { pageHead, validatePage } from "./model";
 import { pageFilter, setPage, getPageHtml } from "./service";
 import { pageDocument, pageExternalLink } from "./sandbox";
+import { pageSection } from "./pageSection";
 
 /** Pane-ready content: scope and lifetime belong to the containing view instance. */
 export function ChannelPage({
   channelId,
   canEdit,
+  sectionId,
+  sectionTitle,
   onClose,
   registerLeaveGuard,
 }: {
   channelId: string;
   canEdit: boolean;
+  /** Read-only projection of one uniquely anchored section of the channel Page. */
+  sectionId?: string;
+  sectionTitle?: string;
   onClose?: () => void;
   registerLeaveGuard?: PageLeaveGuardRegistrar;
 }) {
+  const editable = canEdit && sectionId === undefined;
   const editorId = React.useId();
   const [head, setHead] = React.useState<RelayEvent | null>(null);
-  const [html, setHtml] = React.useState<string | null>(null);
+  const [loadedHtml, setLoadedHtml] = React.useState<{
+    headId: string;
+    html: string;
+  } | null>(null);
+  const html =
+    loadedHtml && loadedHtml.headId === head?.id ? loadedHtml.html : null;
   const [loadAttempt, setLoadAttempt] = React.useState(0);
   const { authors, refresh, membershipError } = usePageAuthors(
     channelId,
@@ -146,12 +158,13 @@ export function ChannelPage({
   }, [channelId, authors, refresh]);
   React.useEffect(() => {
     let disposed = false;
-    setHtml(null);
+    setLoadedHtml(null);
+    setExternal(null);
     if (head)
       void getPageHtml(head, channelId)
         .then((value) => {
           if (!disposed) {
-            setHtml(value);
+            setLoadedHtml({ headId: head.id, html: value });
             setError("");
           }
         })
@@ -179,7 +192,7 @@ export function ChannelPage({
     if (
       draftRef.current === null ||
       savingVersion.current === version ||
-      !canEdit
+      !editable
     )
       return;
     savingVersion.current = version;
@@ -208,18 +221,29 @@ export function ChannelPage({
     ? Math.max(0, Math.floor((Date.now() / 1000 - head.created_at) / 60))
     : 0;
   void tick;
+  const resultAllowed =
+    !error &&
+    !membershipError &&
+    head !== null &&
+    authors?.includes(head.pubkey);
+  const viewHtml = React.useMemo(() => {
+    if (sectionId === undefined) return html;
+    return resultAllowed && html !== null ? pageSection(html, sectionId) : null;
+  }, [html, resultAllowed, sectionId]);
   return (
     <section
-      className="flex h-full min-h-0 flex-col gap-3"
-      aria-label="Channel Page"
+      className="flex h-full min-h-0 min-w-0 flex-col gap-3"
+      aria-label={sectionTitle ?? "Channel Page"}
     >
       <div className="flex items-center justify-between gap-2">
         <span className="min-w-0 flex-1 break-all text-xs text-muted-foreground">
-          {head
-            ? `Updated ${age < 1 ? "just now" : age < 60 ? `${age}m ago` : age < 1440 ? `${Math.floor(age / 60)}h ago` : `${Math.floor(age / 1440)}d ago`} by ${profile?.displayName || head.pubkey}`
-            : "One shared HTML Page for this conversation"}
+          {sectionId !== undefined
+            ? "From the current channel Page"
+            : head
+              ? `Updated ${age < 1 ? "just now" : age < 60 ? `${age}m ago` : age < 1440 ? `${Math.floor(age / 60)}h ago` : `${Math.floor(age / 1440)}d ago`} by ${profile?.displayName || head.pubkey}`
+              : "One shared HTML Page for this conversation"}
         </span>
-        {canEdit && loaded && (!head || html !== null) && draft === null ? (
+        {editable && loaded && (!head || html !== null) && draft === null ? (
           <Button
             size="sm"
             variant="outline"
@@ -290,26 +314,30 @@ export function ChannelPage({
             </Button>
           </div>
         </>
-      ) : head && html !== null ? (
+      ) : head && viewHtml !== null ? (
         <iframe
           ref={frame}
-          title="Channel Page HTML"
+          title={sectionTitle ?? "Channel Page HTML"}
           sandbox="allow-scripts"
           referrerPolicy="no-referrer"
-          srcDoc={pageDocument(html ?? "")}
-          className="min-h-0 w-full flex-1 border-0 bg-white"
+          srcDoc={pageDocument(viewHtml)}
+          className="min-h-0 w-full min-w-0 flex-1 border-0 bg-white"
         />
       ) : (
         <p className="text-sm text-muted-foreground">
-          {head
-            ? "Loading Page content…"
-            : loaded
-              ? "No Page yet. Publish one here or with buzz page set."
-              : "Loading Page…"}
+          {head && html !== null && sectionId !== undefined
+            ? "This result section is unavailable in the current channel Page."
+            : head
+              ? "Loading Page content…"
+              : loaded
+                ? sectionId === undefined
+                  ? "No Page yet. Publish one here or with buzz page set."
+                  : "No channel Page is available for this result."
+                : "Loading Page…"}
         </p>
       )}
-      {external ? (
-        <div className="flex items-center gap-2 text-sm">
+      {external && (sectionId === undefined || viewHtml !== null) ? (
+        <div className="flex flex-wrap items-center gap-2 text-sm">
           <span className="min-w-0 flex-1 break-all">{external}</span>
           <Button
             size="sm"
