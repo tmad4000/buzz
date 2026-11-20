@@ -20,7 +20,7 @@ const patches = {
     edits: [
       [
         "const threadHeadId = threadHead?.id ?? null;",
-        'const threadHeadId = threadHead?.id ?? null;\n  const fixtureRoute = isAutoRouteFixtureThread(threadHeadId ?? "");',
+        "const threadHeadId = threadHead?.id ?? null;\n  const fixtureRoute = isAutoRouteFixtureThread(channelId, threadHeadId);",
       ],
       [
         "<ThreadReplyRegion",
@@ -33,6 +33,10 @@ const patches = {
       [
         "onSend={onSend}",
         "toolbarExtraActions={fixtureRoute ? <FixtureMessageModelChip /> : undefined}\n              onPreparingMentionSendChange={fixtureRoute ? prepareFixtureSend : undefined}\n              onSend={fixtureRoute ? sendFixtureMessage : onSend}",
+      ],
+      [
+        "hasStoredDisclosure && sidebarMessages.length <= 1",
+        "!fixtureRoute && hasStoredDisclosure && sidebarMessages.length <= 1",
       ],
       [
         "isHuddleTranscript ? undefined : nestedRoutingEntries",
@@ -62,7 +66,7 @@ const patches = {
   },
   "/testing/e2eBridge.ts": {
     imports:
-      'import { CHANNEL_ID, seedAutoRouteThread } from "@/testing/autoRouteDemo/bootstrap";',
+      'import { CHANNEL_ID, seedAutoRouteThread } from "@/testing/autoRouteDemo/threadFixture";',
     edits: [
       [
         "return mockChannels.map((channel)",

@@ -25,7 +25,7 @@ import {
   type FixtureCase,
 } from "./session";
 
-export const FIXTURE_THREAD = "1".padStart(64, "0");
+import { CHANNEL_ID, FIXTURE_THREAD } from "./threadFixture";
 
 const params = new URLSearchParams(location.search);
 const caseName = params.get("case");
@@ -57,8 +57,15 @@ export const sendFixtureMessage: MessageComposerProps["onSend"] = (
     outbox?.onQueued,
   );
 
-export function isAutoRouteFixtureThread(id: string) {
-  return params.get("autoRoute") === "1" && id === FIXTURE_THREAD;
+export function isAutoRouteFixtureThread(
+  channelId: string | null,
+  id: string | null,
+) {
+  return (
+    params.get("autoRoute") === "1" &&
+    channelId === CHANNEL_ID &&
+    id === FIXTURE_THREAD
+  );
 }
 
 function useFixture() {
