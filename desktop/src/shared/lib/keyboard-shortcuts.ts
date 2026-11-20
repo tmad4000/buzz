@@ -80,6 +80,14 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
     category: "Navigation",
   },
   {
+    id: "cycle-timeline-initiator",
+    label: "Cycle Timeline initiator",
+    description: "Cycle All, Mine and Agents in the focused channel timeline",
+    keys: "⇧⌘Y",
+    keysWindows: "Ctrl+Shift+Y",
+    category: "Navigation",
+  },
+  {
     id: "find-in-channel",
     label: "Find in channel",
     description: "Search messages in current channel",

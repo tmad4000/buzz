@@ -9,6 +9,9 @@ import { ResultsBoard } from "@/features/results/ResultsBoard";
 import { collectResultCards, type ResultCard } from "@/features/results/resultCards";
 import { useResultsPresentation } from "@/features/results/useResultsPresentation";
 import { useLoadedResultEvents } from "@/features/results/useLoadedResultEvents";
+import { useTimelineInitiator } from "@/features/timeline-initiator/useTimelineInitiator";
+import { INITIATOR_FEATURE } from "@/features/timeline-initiator/model";
+import { useFeatureEnabled } from "@/shared/features";
 import { sortMessages } from "@/features/messages/lib/messageQueryKeys";
 import { ChannelPresentationSwitch } from "./ChannelPresentationSwitch";
 import * as React from "react";
@@ -36,7 +39,7 @@ import {
   usePersonasQuery,
   useRelayAgentsQuery,
 } from "@/features/agents/hooks";
-import { mergeChannelKnownAgentPubkeys } from "@/features/agents/knownAgentPubkeys";
+import { mergeChannelKnownAgentPubkeys, mergeKnownAgentPubkeys } from "@/features/agents/knownAgentPubkeys";
 import { useKnownAgentPubkeys } from "@/features/agents/useKnownAgentPubkeys";
 import { pickWelcomeGuideAgent } from "@/features/onboarding/welcomeGuide";
 import { useWelcomeKickoffEntrance } from "@/features/onboarding/useWelcomeKickoffEntrance";
@@ -456,10 +459,15 @@ export function ChannelScreen({
     relaySelfPubkey,
   });
   const resultsAvailable = resultsView.available !== null;
-  const loadedResultEvents = useLoadedResultEvents(resultsAvailable ? activeChannelId : null, currentPubkey);
-  const resultMessages = React.useMemo(() => loadedResultEvents.length
-    ? projectTimeline(sortMessages([...loadedResultEvents.flat(), ...resolvedMessages]))
-    : timelineMessages, [loadedResultEvents, projectTimeline, resolvedMessages, timelineMessages]);
+  const initiatorFlag = useFeatureEnabled(INITIATOR_FEATURE);
+  const initiatorScope = initiatorFlag && !isHuddleTranscript && currentPubkey && activeChannel?.isMember && activeChannel.channelType === "stream" ? resultsScope : null;
+  const loadedResultEvents = useLoadedResultEvents(resultsAvailable || initiatorScope ? activeChannelId : null, currentPubkey);
+  const loadedViewEvents = React.useMemo(() => loadedResultEvents.length
+    ? sortMessages([...loadedResultEvents.flat(), ...resolvedMessages]) : resolvedMessages, [loadedResultEvents, resolvedMessages]);
+  const resultMessages = React.useMemo(() => loadedViewEvents === resolvedMessages
+    ? timelineMessages : projectTimeline(loadedViewEvents), [loadedViewEvents, resolvedMessages, projectTimeline, timelineMessages]);
+  const initiatorAgentKeys = React.useMemo(() => mergeKnownAgentPubkeys(managedAgentsQuery.data, relayAgentsQuery.data), [managedAgentsQuery.data, relayAgentsQuery.data]);
+  const initiator = useTimelineInitiator(initiatorScope, activeChannelId, currentPubkey, initiatorAgentKeys, loadedViewEvents, resultMessages);
   const results = React.useMemo(() => resultsAvailable && activeChannelId
     ? collectResultCards(resultMessages, activeChannelId) : [], [resultsAvailable, activeChannelId, resultMessages]);
   const resolveResult = React.useCallback(
@@ -719,9 +727,12 @@ export function ChannelScreen({
   });
   const { selectResults } = resultsView;
   const showResults = resultsView.active && !mainTimelineTargetMessageId;
+  const setInitiatorFilter = initiator?.setFilter;
   React.useEffect(() => {
-    if (mainTimelineTargetMessageId) selectResults(false);
-  }, [mainTimelineTargetMessageId, selectResults]);
+    if (!mainTimelineTargetMessageId) return;
+    selectResults(false);
+    setInitiatorFilter?.("all");
+  }, [mainTimelineTargetMessageId, selectResults, setInitiatorFilter]);
   const openResult = React.useCallback((result: ResultCard) => {
     if (requireThreadEditResolution()) openPageSection(result);
   }, [openPageSection, requireThreadEditResolution]);
@@ -903,7 +914,7 @@ export function ChannelScreen({
     setThreadScrollTargetId(message.id);
     setExpandedThreadReplyIds(getThreadRouteTarget(message, timelineMessageById)?.expandedReplyIds ?? new Set());
   }, [handleCloseAgentSession, requireThreadEditResolution, setChannelManagementOpen, setOpenThreadHeadId, setProfilePanelPubkey, timelineMessageById, view.changeMode]);
-  const timelineView = React.useMemo(() => ({ mode: view.mode, changeMode: changeChannelView, messagesById: timelineMessageById, loadingReplies: threadRepliesLoading, openReply: openTimelineReply }), [view.mode, changeChannelView, timelineMessageById, threadRepliesLoading, openTimelineReply]);
+  const timelineView = React.useMemo(() => ({ initiator: showResults ? undefined : mainTimelineTargetMessageId && initiator ? { ...initiator, filter: "all" as const } : initiator, mode: view.mode, changeMode: changeChannelView, messagesById: timelineMessageById, loadingReplies: threadRepliesLoading, openReply: openTimelineReply }), [initiator, showResults, mainTimelineTargetMessageId, view.mode, changeChannelView, timelineMessageById, threadRepliesLoading, openTimelineReply]);
   return (
     <TimelineViewContext.Provider value={timelineView}>
     <ResultActionsContext.Provider value={resultActions}>

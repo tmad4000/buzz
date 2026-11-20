@@ -92,6 +92,8 @@ export const MessageRow = React.memo(
     collapseDescendantsLabel,
     isFollowingThread,
     isContinuation = false,
+    startedByAgent,
+    loadedAgentReplyCount,
     isUnread,
     layoutVariant = "default",
     message,
@@ -133,6 +135,8 @@ export const MessageRow = React.memo(
     collapseDescendantsLabel?: string;
     isFollowingThread?: boolean;
     isContinuation?: boolean;
+    startedByAgent?: boolean;
+    loadedAgentReplyCount?: number;
     isUnread?: boolean;
     layoutVariant?: "default" | "thread-reply";
     message: TimelineMessage;
@@ -169,7 +173,11 @@ export const MessageRow = React.memo(
   }) {
     // Keep the transient send state with its timestamp rather than collapsing
     // it into a grouped message row with no header.
-    const isDisplayedAsContinuation = isContinuation && !message.pending;
+    const isDisplayedAsContinuation =
+      isContinuation &&
+      !message.pending &&
+      !startedByAgent &&
+      !loadedAgentReplyCount;
     const [expandedDiffId, setExpandedDiffId] = React.useState<string | null>(
       null,
     );
@@ -693,6 +701,19 @@ export const MessageRow = React.memo(
             { key: "owner", node: agentOwnerNode },
             { key: "timestamp", node: inlineMetadataNode },
             { key: "persona", node: personaNode },
+            {
+              key: "initiator",
+              node: startedByAgent ? (
+                <span className="text-xs text-muted-foreground">
+                  Started by agent
+                </span>
+              ) : loadedAgentReplyCount ? (
+                <span className="text-xs text-muted-foreground">
+                  {loadedAgentReplyCount} loaded agent{" "}
+                  {loadedAgentReplyCount === 1 ? "reply" : "replies"}
+                </span>
+              ) : null,
+            },
           ]}
         />
       </MessageHeaderRow>
@@ -1009,6 +1030,8 @@ export const MessageRow = React.memo(
     prev.huddleMemberPubkeysPending === next.huddleMemberPubkeysPending &&
     prev.hideAgentAccessBadge === next.hideAgentAccessBadge &&
     prev.isContinuation === next.isContinuation &&
+    prev.startedByAgent === next.startedByAgent &&
+    prev.loadedAgentReplyCount === next.loadedAgentReplyCount &&
     prev.isFollowingThread === next.isFollowingThread &&
     prev.isUnread === next.isUnread &&
     prev.layoutVariant === next.layoutVariant &&

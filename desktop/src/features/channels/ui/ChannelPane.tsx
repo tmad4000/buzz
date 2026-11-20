@@ -4,6 +4,8 @@ import { useCommunities } from "@/features/communities/useCommunities";
 import { useDeviceOffline } from "@/shared/api/offlineConnection";
 import { useRoutedSendReturn } from "./useRoutedSendReturn";
 import { useTimelineView } from "./TimelineViewContext";
+import { filterTimelineInitiator } from "@/features/timeline-initiator/model";
+import { useInitiatorKeyDown } from "@/features/timeline-initiator/useInitiatorKeyDown";
 import { ChannelTimelineProviders } from "./ChannelTimelineProviders";
 import { InlineChannelThread } from "./InlineChannelThread";
 import type { ThreadSummaryRenderer } from "@/features/messages/ui/TimelineMessageRow";
@@ -663,6 +665,30 @@ export const ChannelPane = React.memo(function ChannelPane({
     activeChannelId ?? "",
   );
   const timelineView = useTimelineView();
+  const initiator = timelineView.initiator;
+  const onInitiatorKeyDown = useInitiatorKeyDown(initiator);
+  const initiatorFilter = initiator?.filter ?? "all";
+  const initiatorEvidence = initiator?.evidence;
+  const shownEntries = React.useMemo(
+    () =>
+      filterTimelineInitiator(
+        mainTimelineEntries,
+        (entry) => entry.message,
+        initiatorFilter,
+        initiatorEvidence,
+      ),
+    [mainTimelineEntries, initiatorFilter, initiatorEvidence],
+  );
+  const shownMessages = React.useMemo(
+    () =>
+      filterTimelineInitiator(
+        visibleMessages,
+        (message) => message,
+        initiatorFilter,
+        initiatorEvidence,
+      ),
+    [visibleMessages, initiatorFilter, initiatorEvidence],
+  );
   const flatTimeline = timelineView.mode === "timeline" && !isHuddleTranscript;
   const timelineReplyHandler =
     activeChannel?.archivedAt || isHuddleTranscript
@@ -691,6 +717,7 @@ export const ChannelPane = React.memo(function ChannelPane({
           className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
           inert={channelIsCovered ? true : undefined}
           data-testid="channel-drop-zone"
+          onKeyDown={onInitiatorKeyDown}
           onDragEnter={
             canDropInMainColumn ? mainComposerMedia.handleDragEnter : undefined
           }
@@ -727,7 +754,9 @@ export const ChannelPane = React.memo(function ChannelPane({
               }}
             />
           ) : null}
-          {!resultsContent && (isHuddleTranscript || flatTimeline) && huddleThreadRepliesError ? (
+          {!resultsContent &&
+          (isHuddleTranscript || flatTimeline) &&
+          huddleThreadRepliesError ? (
             <div className="px-5 pt-3">
               <ThreadRepliesErrorCard onRetry={onRetryHuddleThreadReplies} />
             </div>
@@ -782,29 +811,33 @@ export const ChannelPane = React.memo(function ChannelPane({
                 ownerProfiles={ownerProfiles}
                 unfollowThreadById={unfollowThreadById}
                 emptyDescription={
-                  offline
-                    ? "Connect to load this conversation. Cached messages are shown when available."
-                    : activeChannel?.channelType === "forum"
-                      ? "Select a stream or DM to load real message history in this first integration pass."
-                      : "Messages and sub-replies will appear here once the relay has history for this channel."
+                  initiatorFilter !== "all"
+                    ? "Choose All to see every loaded thread."
+                    : offline
+                      ? "Connect to load this conversation. Cached messages are shown when available."
+                      : activeChannel?.channelType === "forum"
+                        ? "Select a stream or DM to load real message history in this first integration pass."
+                        : "Messages and sub-replies will appear here once the relay has history for this channel."
                 }
                 emptyTitle={
-                  offline
-                    ? "Not available offline"
-                    : activeChannel
-                      ? activeChannel.channelType === "forum"
-                        ? "Forum channels are next"
-                        : "No messages yet"
-                      : "No channel selected"
+                  initiatorFilter !== "all"
+                    ? "No matching starts in loaded messages"
+                    : offline
+                      ? "Not available offline"
+                      : activeChannel
+                        ? activeChannel.channelType === "forum"
+                          ? "Forum channels are next"
+                          : "No messages yet"
+                        : "No channel selected"
                 }
                 isError={isTimelineError}
                 isLoading={isHuddleTranscript ? false : isTimelineLoading}
                 onRetry={onRetryTimeline}
                 entranceMessageId={entranceMessageId}
                 onEntranceMessageComplete={onEntranceMessageComplete}
-                mainEntries={mainTimelineEntries}
+                mainEntries={shownEntries}
                 threadSummaries={threadSummaries}
-                messages={visibleMessages}
+                messages={shownMessages}
                 firstUnreadMessageId={firstUnreadMessageId}
                 unreadCount={unreadCount}
                 onDelete={onDelete}

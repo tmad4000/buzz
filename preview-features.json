@@ -58,6 +58,13 @@
       "description": "Try alternate channel views, including the Results board",
       "platforms": ["desktop"],
       "defaultEnabled": false
+    },
+    {
+      "id": "timelineInitiator",
+      "name": "Timeline initiator filter",
+      "description": "Filter channel threads by who started them",
+      "platforms": ["desktop"],
+      "defaultEnabled": true
     }
   ]
 }

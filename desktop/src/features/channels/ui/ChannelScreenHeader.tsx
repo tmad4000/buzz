@@ -1,7 +1,8 @@
 import { LogIn, SquareTerminal } from "lucide-react";
 import type * as React from "react";
 
-import { ChannelOrderSetting } from "./TimelineViewContext";
+import { ChannelOrderSetting, useTimelineView } from "./TimelineViewContext";
+import { InitiatorFilterControl } from "@/features/timeline-initiator/InitiatorFilterControl";
 import { ChatHeader } from "@/features/chat/ui/ChatHeader";
 import type { EphemeralChannelDisplay } from "@/features/channels/lib/ephemeralChannel";
 import type { ActiveDmHeaderParticipant } from "@/features/channels/useActiveChannelHeader";
@@ -85,6 +86,7 @@ export function ChannelScreenHeader({
     onJoinChannel;
 
   const terminalPanel = useTerminalPanel();
+  const { initiator } = useTimelineView();
   const terminalButton = activeChannel ? (
     <Button
       aria-label={
@@ -148,6 +150,14 @@ export function ChannelScreenHeader({
       belowSystemChrome
       chromeWrapperRef={chromeWrapperRef}
       actions={actions}
+      secondaryActions={
+        initiator ? (
+          <InitiatorFilterControl
+            value={initiator.filter}
+            onChange={initiator.setFilter}
+          />
+        ) : undefined
+      }
       channelType={activeChannel?.channelType}
       description={getChannelDescription(activeChannel)}
       leadingContent={

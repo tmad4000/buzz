@@ -1,4 +1,5 @@
 import * as React from "react";
+import type { TimelineInitiatorView } from "@/features/timeline-initiator/useTimelineInitiator";
 import type { TimelineMessage } from "@/features/messages/types";
 
 /** Stable per-channel order setting identities. */
@@ -49,6 +50,7 @@ export function useChannelViewMode(scope: string, channelId: string | null) {
 }
 
 type TimelineView = {
+  initiator?: TimelineInitiatorView;
   mode: ChannelViewMode;
   changeMode: (mode: ChannelViewMode) => void;
   messagesById?: ReadonlyMap<string, TimelineMessage>;

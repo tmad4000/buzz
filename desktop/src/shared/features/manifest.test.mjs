@@ -38,3 +38,15 @@ test("Results and Lanes share one opt-in desktop feature entry", () => {
   assert.equal(entries[0].defaultEnabled, false);
   assert.deepEqual(entries[0].platforms, ["desktop"]);
 });
+
+test("Timeline initiator is a desktop default-on preference independent of Results", () => {
+  const initiator = manifest.features.find(
+    ({ id }) => id === "timelineInitiator",
+  );
+  assert.equal(initiator?.defaultEnabled, true);
+  assert.deepEqual(initiator?.platforms, ["desktop"]);
+  assert.equal(
+    manifest.features.find(({ id }) => id === "lanes")?.defaultEnabled,
+    false,
+  );
+});

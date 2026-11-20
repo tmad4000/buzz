@@ -138,6 +138,12 @@ export function MessageRowItem({
   const { message } = entry;
   const rowRef = React.useRef<HTMLDivElement>(null);
   const timelineView = useTimelineView();
+  const startedByAgent =
+    timelineView.initiator?.evidence.roots.get(message.id) === "agents";
+  const loadedAgentReplyCount =
+    timelineView.initiator?.filter === "mine"
+      ? timelineView.initiator.evidence.loadedAgentReplies.get(message.id)
+      : undefined;
   const readRows = React.useMemo(() => [message], [message]);
   useVisibleThreadReplies(
     rowRef,
@@ -196,6 +202,8 @@ export function MessageRowItem({
           }
           isUnread={isUnread}
           isContinuation={isContinuation}
+          startedByAgent={startedByAgent}
+          loadedAgentReplyCount={loadedAgentReplyCount}
           playEntrance={playEntrance}
           onEntranceComplete={onEntranceComplete}
           message={message}
@@ -255,6 +263,8 @@ export function MessageRowItem({
         huddleMemberPubkeysPending={huddleMemberPubkeysPending}
         hideAgentAccessBadge={hideAgentAccessBadges}
         isContinuation={isContinuation}
+        startedByAgent={startedByAgent}
+        loadedAgentReplyCount={loadedAgentReplyCount}
         isFollowingThread={
           !message.pending && isFollowingThreadById
             ? isFollowingThreadById(effectiveThreadRootId)
