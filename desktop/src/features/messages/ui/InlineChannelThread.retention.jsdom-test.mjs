@@ -3,6 +3,7 @@ import { registerHooks } from "node:module";
 import { test } from "node:test";
 import React, { act } from "react";
 import { createRoot } from "react-dom/client";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 const reactURL = new URL(
   "../../../../node_modules/react/index.js",
   import.meta.url,
@@ -124,29 +125,41 @@ test("a mounted inline answer retains its granted ancestry after edits/count cha
   const node = document.createElement("div");
   document.body.append(node);
   const root = createRoot(node);
+  // The production inline data hook reads committed local events from this cache.
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
   const render = async (entry = "one", shown = true) =>
     act(() =>
       root.render(
         React.createElement(
-          InlineAutoExpansionProvider,
-          { key: entry, scope: entry, currentPubkey: viewer },
-          shown
-            ? React.createElement(InlineChannelThread, {
-                channel: { id: "channel", name: "test", channelType: "stream" },
-                currentPubkey: viewer,
-                root: rootMessage,
-                summary: {
-                  replyCount: events.length,
-                  lastReplyAt: 110,
-                  participants: [],
-                },
-                profiles,
-                disabled: false,
-                isSending: false,
-                onOpenThread: () => {},
-                onSend: async () => {},
-              })
-            : null,
+          QueryClientProvider,
+          { client },
+          React.createElement(
+            InlineAutoExpansionProvider,
+            { key: entry, scope: entry, currentPubkey: viewer },
+            shown
+              ? React.createElement(InlineChannelThread, {
+                  channel: {
+                    id: "channel",
+                    name: "test",
+                    channelType: "stream",
+                  },
+                  currentPubkey: viewer,
+                  root: rootMessage,
+                  summary: {
+                    replyCount: events.length,
+                    lastReplyAt: 110,
+                    participants: [],
+                  },
+                  profiles,
+                  disabled: false,
+                  isSending: false,
+                  onOpenThread: () => {},
+                  onSend: async () => {},
+                })
+              : null,
+          ),
         ),
       ),
     );
@@ -236,6 +249,7 @@ test("a mounted inline answer retains its granted ancestry after edits/count cha
     );
   } finally {
     await act(() => root.unmount());
+    client.clear();
     node.remove();
     delete globalThis.__threadRetention;
   }

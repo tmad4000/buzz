@@ -140,6 +140,7 @@ export function projectInboxStatusCards(
     const revision = message.bodyRevision;
     if (
       !parsed ||
+      !("originEventId" in parsed) ||
       !parsed.originEventId ||
       !revision ||
       parsed.source !== "root"

@@ -395,7 +395,7 @@ export const MessageRow = React.memo(
       message.tags?.find((tag) => tag[0] === name)?.[1];
 
     const agentReplyUx = useFeatureEnabled("agentReplyUx");
-    const resultCard = useResultAction(message, channelId);
+    const resultCard = useResultAction(message, channelId ?? undefined);
     const statusCard = agentReplyUx ? parseBridgeStatusCard(message) : null;
     const renderBody = () => {
       if (statusCard) {
