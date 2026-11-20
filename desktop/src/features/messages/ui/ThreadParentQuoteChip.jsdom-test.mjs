@@ -197,3 +197,85 @@ test("quote presentation remains off when experiment is disabled", async () => {
     globalThis.__quoteFeatureEnabled = true;
   }
 });
+
+test("an open thread keeps the exact guarded parent cue when the experiment is off", async () => {
+  const dom = new JSDOM('<div id="root"></div>');
+  Object.assign(globalThis, {
+    window: dom.window,
+    document: dom.window.document,
+    IS_REACT_ACT_ENVIRONMENT: true,
+    __quoteFeatureEnabled: false,
+  });
+  const root = createRoot(document.getElementById("root"));
+  const parent = {
+    id: "parent",
+    author: "Paseo",
+    body: "Original prompt\nHidden second line",
+    tags: [["h", "channel"]],
+  };
+  const message = {
+    id: "child",
+    body: "Answer",
+    tags: [
+      ["h", "channel"],
+      ["e", "root", "", "root"],
+      ["e", "parent", "", "reply"],
+    ],
+  };
+  const localJumps = [];
+  const onJumpToThreadMessage = (...args) => localJumps.push(args);
+  const render = (
+    child = message,
+    loadedParent = parent,
+    jump = onJumpToThreadMessage,
+  ) =>
+    act(() =>
+      root.render(
+        React.createElement(MessageThreadRow, {
+          channelId: "channel",
+          inThreadPanel: true,
+          message: child,
+          parentMessages: new Map([["parent", loadedParent]]),
+          onJumpToThreadMessage: jump,
+        }),
+      ),
+    );
+  try {
+    await render();
+    const chip = document.querySelector("button");
+    assert.equal(chip.textContent, "↳ Replying to Paseo: Original prompt");
+    assert.equal(
+      chip.getAttribute("aria-label"),
+      "Jump to parent: Paseo: Original prompt",
+    );
+    await act(() => chip.click());
+    assert.deepEqual(localJumps, [["root", "parent"]]);
+    await render(message, parent, null);
+    assert.equal(
+      document.querySelector("button"),
+      null,
+      "unguarded panel keeps the flag",
+    );
+    await render(message, { ...parent, tags: [["h", "foreign"]] });
+    assert.equal(document.querySelector("button"), null);
+    assert.doesNotMatch(document.body.textContent, /Paseo|Original prompt/);
+    assert.match(document.body.textContent, /reply to earlier message/);
+    await render({
+      ...message,
+      tags: [
+        ["h", "channel"],
+        ["e", "root", "", "reply"],
+      ],
+    });
+    assert.equal(
+      document.querySelector('[data-testid="thread-parent-stub"]'),
+      null,
+    );
+    assert.equal(document.querySelector("button"), null);
+    assert.match(document.body.textContent, /Answer/);
+  } finally {
+    await act(() => root.unmount());
+    dom.window.close();
+    globalThis.__quoteFeatureEnabled = true;
+  }
+});

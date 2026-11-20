@@ -8,12 +8,14 @@ type MessageThreadRowProps = Omit<
   React.ComponentProps<typeof MessageRow>,
   "layoutVariant"
 > & {
+  inThreadPanel?: boolean;
   parentMessages?: ReadonlyMap<string, TimelineMessage>;
   onJumpToThreadMessage?: (rootId: string, messageId: string) => void;
 };
 
 /** The canonical message-row presentation used inside channel threads. */
 export function MessageThreadRow({
+  inThreadPanel,
   parentMessages,
   onJumpToThreadMessage,
   ...props
@@ -26,6 +28,7 @@ export function MessageThreadRow({
           channelId={props.channelId}
           message={props.message}
           messages={parentMessages}
+          inThreadPanel={inThreadPanel}
           onJumpToThreadMessage={onJumpToThreadMessage}
         />
       ) : null}

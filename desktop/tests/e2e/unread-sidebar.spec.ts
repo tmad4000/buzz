@@ -108,9 +108,11 @@ test("unread sidebar branches and bounded nesting", async ({ page }) => {
     await expect(panel.getByTestId("sidebar-new-marker")).toContainText(
       "1 new",
     );
-    await expect(panel.getByTestId("sidebar-reply-context")).toContainText(
-      "Replying to",
+    const parentCue = panel.locator(
+      `[data-testid="thread-parent-quote"][data-parent-message-id="${middle.id}"]`,
     );
+    await expect(parentCue).toContainText("Replying to");
+    await expect(parentCue).toContainText("Build notes and verification.");
     await panel.getByRole("button", { name: "Jump to first unread" }).click();
     await page.mouse.move(5, 5);
     await panel.screenshot({

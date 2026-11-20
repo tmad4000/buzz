@@ -1,5 +1,6 @@
 import type { MessageThreadPanelProps } from "./MessageThreadPanel.types";
 import { useFeatureEnabled } from "@/shared/features";
+import { threadParentQuote } from "../lib/threadParentQuote";
 import { buildThreadRoutingEntries } from "../lib/threadRouting";
 import { useThreadReplyRenderItems } from "./useThreadReplyRenderItems";
 import { useAppShell } from "@/app/AppShellContext";
@@ -771,7 +772,16 @@ export function MessageThreadPanel({
                         {showUnreadDivider ? <UnreadDivider /> : null}
                         {isSidebar &&
                         !agentReplyUx &&
-                        entry.message.depth > 2 ? (
+                        entry.message.depth > 2 &&
+                        !(
+                          channelId &&
+                          onJumpToThreadMessage &&
+                          threadParentQuote(
+                            entry.message,
+                            sidebar.index.messageById,
+                            channelId,
+                          )
+                        ) ? (
                           <div
                             className="min-w-0 pt-2 text-xs text-muted-foreground"
                             style={{
@@ -788,6 +798,7 @@ export function MessageThreadPanel({
                           </div>
                         ) : null}
                         <MessageThreadRow
+                          inThreadPanel
                           parentMessages={sidebar.index.messageById}
                           onJumpToThreadMessage={onJumpToThreadMessage}
                           highlighted={

@@ -43,6 +43,7 @@ export function threadParentQuote(
     parentId,
     rootId,
     parentLoaded: parent !== undefined,
+    parentAuthor: parent?.author?.trim() || undefined,
     excerpt:
       firstLine ||
       (parent ? "Message without text" : "reply to earlier message"),

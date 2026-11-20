@@ -113,3 +113,92 @@ test("native parent quote survives folds and jumps to the highlighted parent in 
   );
   expect(page.url()).toBe(routeBeforeJump);
 });
+
+test("an open thread shows the exact replying-to cue with the experiment off", async ({
+  page,
+}) => {
+  await installMockBridge(
+    page,
+    {
+      searchProfiles: [
+        {
+          pubkey: TEST_IDENTITIES.bob.pubkey,
+          displayName: "Paseo Test",
+          isAgent: true,
+        },
+      ],
+    },
+    { seedPreviewFeatures: false },
+  );
+  await page.goto("/");
+  await page.getByTestId("channel-general").click();
+  await waitForMockChannelHeadReady(
+    page,
+    "general",
+    "9a1657ac-f7aa-5db0-b632-d8bbeb6dfb50",
+  );
+  const rootId = "b1".repeat(32);
+  const parentId = "b2".repeat(32);
+  const childId = "b3".repeat(32);
+  await page.evaluate(
+    ({ rootId, parentId, childId, parentPubkey, childPubkey }) => {
+      const emit = window.__BUZZ_E2E_EMIT_MOCK_MESSAGE__;
+      if (!emit) throw new Error("Missing mock message emitter");
+      const createdAt = Math.floor(Date.now() / 1000) + 30;
+      emit({
+        channelName: "general",
+        id: rootId,
+        content: "Open-thread cue root",
+        pubkey: childPubkey,
+        createdAt,
+      });
+      emit({
+        channelName: "general",
+        id: parentId,
+        parentEventId: rootId,
+        content: "Exact earlier message\nSecond line excluded",
+        pubkey: parentPubkey,
+        createdAt: createdAt + 1,
+      });
+      emit({
+        channelName: "general",
+        id: childId,
+        parentEventId: parentId,
+        content: "Nested follow-up",
+        pubkey: childPubkey,
+        createdAt: createdAt + 2,
+      });
+    },
+    {
+      rootId,
+      parentId,
+      childId,
+      parentPubkey: TEST_IDENTITIES.bob.pubkey,
+      childPubkey: TEST_IDENTITIES.alice.pubkey,
+    },
+  );
+  await page
+    .locator(
+      `[data-testid="open-thread-side-panel"][data-thread-head-id="${rootId}"]`,
+    )
+    .click();
+  const panel = page.getByTestId("message-thread-panel");
+  const parent = panel.locator(`[data-message-id="${parentId}"]`);
+  const chip = panel.getByTestId("thread-parent-quote");
+  await expect(chip).toHaveCount(1);
+  await expect(chip).toHaveAttribute("data-parent-message-id", parentId);
+  await expect(chip).toHaveText(
+    "↳ Replying to Paseo Test: Exact earlier message",
+  );
+  await expect(chip).toHaveAccessibleName(
+    "Jump to parent: Paseo Test: Exact earlier message",
+  );
+  await expect(panel.getByTestId("sidebar-reply-context")).toHaveCount(0);
+  await expect(panel.locator(`[data-message-id="${childId}"]`)).toBeVisible();
+  const route = page.url();
+  await chip.focus();
+  await page.keyboard.press("Enter");
+  await expect(parent).toBeInViewport();
+  await expect(parent).toHaveClass(/route-target-highlight-fade/);
+  expect(page.url()).toBe(route);
+});

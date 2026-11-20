@@ -6,6 +6,7 @@ const parent = {
   id: "parent",
   tags: [["h", "channel"]],
   body: "Latest edited first line\nPrivate second line",
+  author: "Paseo",
 };
 const messages = new Map([[parent.id, parent]]);
 const reply = {
@@ -23,6 +24,7 @@ test("native nested reply quotes only the parent's current first line, independe
     parentId: "parent",
     rootId: "root",
     parentLoaded: true,
+    parentAuthor: "Paseo",
     excerpt: "Latest edited first line",
   });
 });
@@ -96,6 +98,7 @@ test("conflicting or duplicate ancestry never asserts a jump; out-of-scope loade
       "channel",
     );
     assert.equal(quote.parentLoaded, false);
+    assert.equal(quote.parentAuthor, undefined);
     assert.equal(quote.excerpt, "reply to earlier message");
   }
 });
