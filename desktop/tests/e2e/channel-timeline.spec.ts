@@ -565,27 +565,45 @@ async function seedReadingConversation(page: Page, thread: boolean) {
   return scroller;
 }
 
-async function beginReadingWithWheel(scroller: Locator) {
+async function wheelToReadingPosition(
+  scroller: Locator,
+  viewports: number | "start",
+) {
   await expect(scroller).toHaveCSS("overflow-y", /auto|scroll/);
-  const viewport = await scroller.evaluate((node) => node.clientHeight);
-  expect(viewport).toBeGreaterThan(0);
   await scroller.hover();
-  // Bottom-follow ownership retires on reader input, not a programmatic offset.
-  await scroller.page().mouse.wheel(0, -viewport);
-  await expect
-    .poll(() =>
-      scroller.evaluate(async (node) => {
-        const top = node.scrollTop;
-        await new Promise<void>((resolve) => {
-          requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
-        });
-        return (
-          node.scrollTop === top &&
-          node.scrollHeight - node.clientHeight - node.scrollTop > 0
-        );
-      }),
-    )
-    .toBe(true);
+  // Re-measure after each real gesture; never compete with the reader anchor
+  // by assigning scrollTop between gestures. Corrections are fixture setup,
+  // bounded independently of the unchanged final position assertions.
+  for (let correction = 0; correction < 4; correction++) {
+    const metrics = await scroller.evaluate((node) => ({
+      top: node.scrollTop,
+      height: node.clientHeight,
+      total: node.scrollHeight,
+    }));
+    expect(metrics.height).toBeGreaterThan(0);
+    const target =
+      viewports === "start"
+        ? 0
+        : metrics.total - metrics.height * (1 + viewports);
+    const delta = target - metrics.top;
+    const aligned =
+      viewports === "start"
+        ? metrics.top === 0
+        : Math.abs(delta) / metrics.height < 0.08;
+    if (correction > 0 && aligned) return;
+    await scroller.page().mouse.wheel(0, delta);
+    await expect
+      .poll(() =>
+        scroller.evaluate(async (node) => {
+          const top = node.scrollTop;
+          await new Promise<void>((resolve) => {
+            requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+          });
+          return node.scrollTop === top;
+        }),
+      )
+      .toBe(true);
+  }
 }
 
 async function scrollReadingDistance(scroller: Locator, viewports: number) {
@@ -596,10 +614,7 @@ async function scrollReadingDistance(scroller: Locator, viewports: number) {
       ),
     )
     .toBeGreaterThan(viewports);
-  await beginReadingWithWheel(scroller);
-  await scroller.evaluate((node, distance) => {
-    node.scrollTop = node.scrollHeight - node.clientHeight * (1 + distance);
-  }, viewports);
+  await wheelToReadingPosition(scroller, viewports);
   await expect
     .poll(() =>
       scroller.evaluate(
@@ -833,10 +848,8 @@ test("an inline reply waits for ACK and returns through the containing Timeline"
     });
     return root.id;
   }, TEST_IDENTITIES.bob.pubkey);
-  await beginReadingWithWheel(scroller);
-  await scroller.evaluate((node) => {
-    node.scrollTop = 0;
-  });
+  await wheelToReadingPosition(scroller, "start");
+  await expect.poll(() => scroller.evaluate((node) => node.scrollTop)).toBe(0);
   await expect(
     scroller.locator(`[data-testid="message-row"][data-message-id="${root}"]`),
   ).toBeInViewport();
