@@ -797,29 +797,94 @@ test("an expanded thread jumps to its confirmed reply and restores the original 
   await expectReadingAnchor(scroller, anchor);
 });
 
+async function failNextReadingAdmission(page: Page) {
+  await page.evaluate(() => {
+    const original = IDBDatabase.prototype.transaction;
+    const probe = {
+      count: 0,
+      restore() {
+        if (IDBDatabase.prototype.transaction === wrapped)
+          IDBDatabase.prototype.transaction = original;
+      },
+    };
+    const wrapped: IDBDatabase["transaction"] = function (
+      this: IDBDatabase,
+      ...args
+    ) {
+      const [names, mode] = args;
+      if (
+        this.name === "buzz-message-outbox-v1" &&
+        mode === "readwrite" &&
+        Array.isArray(names) &&
+        names.length === 2 &&
+        [...names].sort().join(",") === "messages,metadata"
+      ) {
+        probe.count++;
+        IDBDatabase.prototype.transaction = original;
+        throw new Error("Synthetic send rejected");
+      }
+      return Reflect.apply(original, this, args);
+    };
+    IDBDatabase.prototype.transaction = wrapped;
+    (
+      window as Window & { __readingAdmission?: typeof probe }
+    ).__readingAdmission = probe;
+  });
+  return {
+    count: () =>
+      page.evaluate(
+        () =>
+          (window as Window & { __readingAdmission?: { count: number } })
+            .__readingAdmission?.count,
+      ),
+    restore: () =>
+      page.evaluate(() => {
+        const current = window as Window & {
+          __readingAdmission?: { restore(): void };
+        };
+        current.__readingAdmission?.restore();
+        delete current.__readingAdmission;
+      }),
+  };
+}
+
 test("a failed Timeline send creates no receipt and leaves the draft and reading anchor", async ({
   page,
 }) => {
-  await installMockBridge(
-    page,
-    { sendMessageErrors: ["Synthetic send rejected"] },
-    { seedPreviewFeatures: false },
-  );
+  await installMockBridge(page, {}, { seedPreviewFeatures: false });
   await openReadingChannel(page);
   const scroller = await seedReadingConversation(page, false);
   const surface = page.getByTestId("channel-composer-overlay");
   await scrollReadingDistance(scroller, 1.55);
   const anchor = await currentReadingAnchor(scroller);
-  await sendReadingMessage(surface, "This synthetic draft must stay");
-  await expect(
-    page.getByText("Synthetic send rejected", { exact: false }),
-  ).toBeVisible();
-  await expect(surface.getByTestId("message-input")).toHaveText(
-    "This synthetic draft must stay",
+  const publishCountBefore = await page.evaluate(() =>
+    (window.__BUZZ_E2E_COMMAND_PAYLOADS__ ?? []).filter(
+      (call) => call.command === "publish_queued_message",
+    ).length,
   );
-  await expect(surface.getByTestId("send-scroll-back")).toHaveCount(0);
-  await expect(surface.getByTestId("send-scroll-sent")).toHaveCount(0);
-  await expectReadingAnchor(scroller, anchor);
+  const admission = await failNextReadingAdmission(page);
+  try {
+    await sendReadingMessage(surface, "This synthetic draft must stay");
+    await expect(
+      page.getByText("Synthetic send rejected", { exact: false }),
+    ).toBeVisible();
+    await expect(surface.getByTestId("message-input")).toHaveText(
+      "This synthetic draft must stay",
+    );
+    await expect(surface.getByTestId("send-scroll-back")).toHaveCount(0);
+    await expect(surface.getByTestId("send-scroll-sent")).toHaveCount(0);
+    expect(await admission.count()).toBe(1);
+    expect(
+      await page.evaluate(() =>
+        (window.__BUZZ_E2E_COMMAND_PAYLOADS__ ?? []).filter(
+          (call) => call.command === "publish_queued_message",
+        ).length,
+      ),
+    ).toBe(publishCountBefore);
+    await expectReadingAnchor(scroller, anchor);
+  } finally {
+    await admission.restore();
+  }
 });
 
 test("an inline reply waits for ACK and returns through the containing Timeline", async ({
@@ -890,9 +955,12 @@ test("an inline reply waits for ACK and returns through the containing Timeline"
     await page.evaluate(() => window.__BUZZ_E2E_HOLD_OUTBOX_PUBLISH__?.(false));
   }
   await expect(back).toBeVisible();
-  await expect(
-    inline.getByText("Confirmed inline reply", { exact: true }),
-  ).toBeInViewport();
+  const delivered = inline
+    .getByTestId("inline-thread-replies")
+    .locator('article[data-message-id]:not([data-message-id^="pending-"])')
+    .filter({ has: page.getByText("Confirmed inline reply", { exact: true }) });
+  await expect(delivered).toHaveCount(1);
+  await expect(delivered).toBeInViewport();
   await back.click();
   await expectReadingAnchor(scroller, anchor);
 });
