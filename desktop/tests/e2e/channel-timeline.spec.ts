@@ -495,7 +495,9 @@ async function seedReadingConversation(page: Page, thread: boolean) {
     ({ thread, pubkey }) => {
       const emit = window.__BUZZ_E2E_EMIT_MOCK_MESSAGE__;
       if (!emit) throw new Error("Missing mock messages");
-      const createdAt = Math.floor(Date.now() / 1000) - 600;
+      // These are live emissions after channel opening, so keep them inside
+      // the loaded mock window (whose oldest initial row is now - 120).
+      const createdAt = Math.floor(Date.now() / 1000) - 100;
       const root = emit({
         channelName: "general",
         pubkey,
@@ -752,7 +754,8 @@ test("an inline reply waits for ACK and returns through the containing Timeline"
   const root = await page.evaluate((pubkey) => {
     const emit = window.__BUZZ_E2E_EMIT_MOCK_MESSAGE__;
     if (!emit) throw new Error("Missing mock messages");
-    const createdAt = Math.floor(Date.now() / 1000) - 950;
+    // Precede the reading samples while remaining inside the live window.
+    const createdAt = Math.floor(Date.now() / 1000) - 110;
     const root = emit({
       channelName: "general",
       pubkey,
