@@ -100,19 +100,32 @@ test("unseen summary survives channel opening and clears only on visible reply b
   await expect(summary.getByTestId("thread-unread-badge")).toHaveCount(0);
   // Keep an already-open thread scrolled away from a new body: the header
   // must jump within it rather than toggling the thread closed.
-  for (let index = 0; index < 12; index++)
-    await emit(
+  const spacerIds: string[] = [];
+  for (let index = 0; index < 12; index++) {
+    const spacer = await emit(
       `Long observation spacer ${index}: ${"visible body ".repeat(200)}`,
       root.id,
     );
+    spacerIds.push(spacer.id);
+  }
+  const panel = page.getByTestId("message-thread-panel");
+  // Establish that the later named target, not an unread spacer, is next.
+  // Use the actual visible-body observation path rather than writing markers.
+  for (const id of spacerIds) {
+    const spacer = panel.locator(`[data-message-id="${id}"]`);
+    await spacer.scrollIntoViewIfNeeded();
+    await expect(spacer).toBeInViewport();
+  }
+  await expect(summary.getByTestId("thread-unread-badge")).toHaveCount(0);
   const body = page.getByTestId("message-thread-body");
   await body.evaluate((element) => {
     element.scrollTop = 0;
     element.dispatchEvent(new Event("scroll", { bubbles: true }));
   });
-  await emit("Already open thread jump target", root.id);
-  await expect(summary.getByTestId("thread-unread-badge")).toBeVisible();
-  const panel = page.getByTestId("message-thread-panel");
+  const target = await emit("Already open thread jump target", root.id);
+  await expect(summary.getByTestId("thread-unread-badge")).toHaveText("1 new");
+  const targetRow = panel.locator(`[data-message-id="${target.id}"]`);
+  await expect(targetRow).not.toBeInViewport();
   const savedCollapse = await page.evaluate(
     (rootId) =>
       Object.entries(localStorage).filter(
@@ -137,6 +150,7 @@ test("unseen summary survives channel opening and clears only on visible reply b
       .getByTestId("message-body")
       .filter({ hasText: "Already open thread jump target" }),
   ).toBeVisible();
+  await expect(targetRow).toHaveClass(/route-target-highlight-fade/);
   await expect
     .poll(() =>
       page.evaluate(
