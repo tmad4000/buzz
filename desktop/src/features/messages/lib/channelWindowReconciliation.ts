@@ -41,9 +41,15 @@ export function reconcileChannelWindowMessages(
     return [...merged].sort((left, right) => compareRelayOrder(right, left));
   }
   const authoritativeIds = new Set(windowEvents.map((event) => event.id));
-  const retained = retainRefetchReconciliationEvents(messages).filter(
-    (event) => !authoritativeIds.has(event.id),
-  );
+  // The live overlay can contain both a local outbox row and its relay echo
+  // before the outbox acceptance callback removes the placeholder. Reconcile
+  // that pending row with the echo just like a placeholder in the render cache.
+  const retained = [
+    ...retainRefetchReconciliationEvents(messages).filter(
+      (event) => !authoritativeIds.has(event.id),
+    ),
+    ...windowEvents.filter((event) => event.pending),
+  ];
 
   // Reconcile acknowledgements against cache-only rows without changing the
   // authoritative window's order. The render key moves from an optimistic row
@@ -55,7 +61,9 @@ export function reconcileChannelWindowMessages(
       .filter((event) => event.localKey || event.localSendIntent)
       .map((event) => [event.id, event]),
   );
-  const authoritative = windowEvents.map((event) => {
+  const authoritative: RelayEvent[] = [];
+  for (const event of windowEvents) {
+    if (event.pending) continue;
     const local = presentationById.get(event.id);
     const canonical =
       local && local.pubkey.toLowerCase() === event.pubkey.toLowerCase()
@@ -73,8 +81,8 @@ export function reconcileChannelWindowMessages(
     const reconciled = reconcileIncomingMessage(cacheOnly, canonical);
     const incoming = reconciled.at(-1);
     cacheOnly = reconciled.slice(0, -1);
-    return incoming ?? event;
-  });
+    authoritative.push(incoming ?? event);
+  }
 
   return mergeChronologicalMessages(cacheOnly, authoritative);
 }

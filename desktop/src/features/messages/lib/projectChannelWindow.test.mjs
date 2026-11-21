@@ -16,6 +16,10 @@ import {
   refreshChannelWindowMessages,
 } from "./projectChannelWindow.ts";
 import { reconcileChannelWindowMessages } from "./channelWindowReconciliation.ts";
+import {
+  pendingOutboxEvent,
+  projectPendingOutboxRows,
+} from "../outbox/projection.ts";
 
 function event(id, createdAt) {
   return {
@@ -184,6 +188,55 @@ test("test_projection_replaces_pending_send_with_authoritative_event", () => {
   );
   assert.equal(projected[1]?.id, accepted.id);
   assert.equal(projected[1]?.localKey, pending.id);
+});
+
+test("a live relay echo replaces its outbox overlay before the acceptance callback", () => {
+  const harness = createHarness();
+  const first = {
+    id: "first",
+    intendedAt: 110,
+    message: {
+      channelId: harness.channelId,
+      content: "identical text",
+      signerPubkey: "a".repeat(64),
+      tags: [],
+      mentionPubkeys: [],
+    },
+  };
+  const second = { ...first, id: "second", intendedAt: 111 };
+  projectPendingOutboxRows(harness.client, [first, second]);
+  const pending = pendingOutboxEvent(first);
+  const accepted = {
+    ...event("a", 113),
+    content: pending.content,
+    tags: pending.tags,
+  };
+  const foreign = { ...accepted, id: "f".repeat(64), pubkey: "c".repeat(64) };
+
+  appendLiveEvent(harness, foreign);
+  assert.ok(
+    harness.client
+      .getQueryData(harness.messagesKey)
+      .some((message) => message.id === pending.id),
+  );
+  appendLiveEvent(harness, accepted);
+
+  const projected = harness.client.getQueryData(harness.messagesKey);
+  assert.deepEqual(
+    projected.map((message) => message.id),
+    [
+      event("initial", 100).id,
+      pendingOutboxEvent(second).id,
+      foreign.id,
+      accepted.id,
+    ],
+  );
+  assert.equal(projected.at(-1).localKey, pending.localKey);
+  assert.ok(
+    flattenChannelWindowEvents(
+      harness.client.getQueryData(harness.windowKey),
+    ).some((message) => message.id === pending.id),
+  );
 });
 
 test("test_reconciliation_preserves_dense_second_window_order", () => {
