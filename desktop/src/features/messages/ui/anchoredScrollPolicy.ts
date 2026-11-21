@@ -27,19 +27,23 @@ export function shouldIgnorePinnedCenterScroll({
 // UI at-bottom threshold used for unread affordances.
 const TRUE_BOTTOM_THRESHOLD_PX = 1;
 
-type BottomSettleContainer = Pick<
+type BottomGeometry = Pick<
   HTMLDivElement,
-  "scrollHeight" | "clientHeight" | "scrollTop" | "scrollTo"
+  "scrollHeight" | "clientHeight" | "scrollTop"
 >;
 
-export function settleProgrammaticBottomPin(
-  container: BottomSettleContainer,
-): boolean {
-  container.scrollTo({ top: container.scrollHeight, behavior: "auto" });
+export function isAtPhysicalBottom(container: BottomGeometry): boolean {
   return (
     container.scrollHeight - container.clientHeight - container.scrollTop <=
     TRUE_BOTTOM_THRESHOLD_PX
   );
+}
+
+export function settleProgrammaticBottomPin(
+  container: BottomGeometry & Pick<HTMLDivElement, "scrollTo">,
+): boolean {
+  container.scrollTo({ top: container.scrollHeight, behavior: "auto" });
+  return isAtPhysicalBottom(container);
 }
 
 export function shouldSettleForSplitPanel({

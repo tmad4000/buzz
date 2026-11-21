@@ -3,6 +3,7 @@ import * as React from "react";
 import { classifyTimelineMessageDelta } from "@/features/messages/lib/timelineSnapshot";
 import {
   getPinnedCenterDrift,
+  isAtPhysicalBottom,
   settleProgrammaticBottomPin,
   shouldIgnorePinnedCenterScroll,
   shouldSettleForSplitPanel,
@@ -372,7 +373,13 @@ export function useAnchoredScroll({
       if (virtualizerOwnsPrependAnchoring && virtualScrollToBottom) {
         virtualScrollToBottom(behavior);
       } else {
+        const before = container.scrollTop;
         container.scrollTo({ top: container.scrollHeight, behavior });
+        // A repeated mount pin at the floor has no scroll event to settle it.
+        // Leave the next reader scroll free to establish a reading anchor.
+        if (container.scrollTop === before && isAtPhysicalBottom(container)) {
+          settlingRef.current = false;
+        }
       }
       setIsAtBottom(true);
       setNewMessageCount(0);

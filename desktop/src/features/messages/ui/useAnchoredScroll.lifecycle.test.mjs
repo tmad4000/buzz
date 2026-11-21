@@ -336,6 +336,46 @@ test("channel change attaches pinned-center observers after refs mount", async (
   });
 });
 
+test("a no-op mount pin at the physical floor leaves the first reading scroll alone", async () => {
+  const { container, content } = makePinnedCenterNodes();
+  const physicalBottom = container.scrollHeight - container.clientHeight;
+  container.scrollTo = ({ top }) => {
+    container.scrollTop = Math.min(top, physicalBottom);
+  };
+  const root = createRoot(document.createElement("div"));
+  let state;
+  try {
+    await act(async () => {
+      root.render(
+        React.createElement(BottomStateHarness, {
+          messages: [{ id: "selected" }],
+          onState: (current) => {
+            state = current;
+          },
+          refs: {
+            container: { current: container },
+            content: { current: content },
+          },
+        }),
+      );
+    });
+    // The mount's second pin is a no-op. No synthetic scroll event clears it.
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 0)));
+    assert.equal(container.scrollTop, physicalBottom);
+    assert.equal(state.isAtBottom, true);
+    const readerOffset = physicalBottom - container.clientHeight;
+    await act(async () => {
+      // Model the viewport after the browser's default wheel movement.
+      container.scrollTop = readerOffset;
+      state.onScroll();
+    });
+    assert.equal(container.scrollTop, readerOffset);
+    assert.equal(state.isAtBottom, false);
+  } finally {
+    await act(async () => root.unmount());
+  }
+});
+
 test("arrival at the physical floor does not preserve a stale unread state", async () => {
   const refs = {
     container: { current: null },
