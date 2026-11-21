@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import React, { act } from "react";
 import { createRoot } from "react-dom/client";
-import { useThreadRowWindow } from "./useThreadRowWindow.ts";
+import {
+  useThreadReplyRenderWindow,
+  useThreadRowWindow,
+} from "./useThreadRowWindow.ts";
 test("focused row windows stay bounded, retain their anchor, and honor explicit targets across scopes", async () => {
   const entries = Array.from({ length: 10000 }, (_, i) => ({
     message: { id: `m${i}` },
@@ -60,5 +63,46 @@ test("focused row windows stay bounded, retain their anchor, and honor explicit 
   } finally {
     await act(() => root.unmount());
     node.remove();
+  }
+});
+
+test("the first committed Back window contains the exact previous reading row", async () => {
+  const entries = Array.from({ length: 66 }, (_, index) => ({
+    message: { id: `m${index}` },
+    summary: null,
+  }));
+  const root = createRoot(document.createElement("div"));
+  const committed = [];
+  function Harness({ target }) {
+    const rowWindow = useThreadRowWindow(
+      entries,
+      "a",
+      true,
+      false,
+      undefined,
+      target,
+    );
+    const replies = useThreadReplyRenderWindow(rowWindow.entries, target);
+    React.useLayoutEffect(() => {
+      committed.push({ target, ids: replies.map((entry) => entry.message.id) });
+    }, [replies, target]);
+    return null;
+  }
+  const render = (target) =>
+    act(() => root.render(React.createElement(Harness, { target })));
+  try {
+    await render(null);
+    assert.ok(committed.at(-1).ids.includes("m13"));
+    await render("m65");
+    assert.ok(committed.at(-1).ids.includes("m65"));
+    assert.ok(!committed.at(-1).ids.includes("m13"));
+    committed.length = 0;
+    await render("m13");
+    assert.equal(committed[0].target, "m13");
+    assert.equal(committed[0].ids.length, 40);
+    assert.ok(committed[0].ids.includes("m13"));
+    assert.ok(!committed[0].ids.includes("m65"));
+  } finally {
+    await act(() => root.unmount());
   }
 });

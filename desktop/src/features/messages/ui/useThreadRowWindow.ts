@@ -1,6 +1,26 @@
 import * as React from "react";
 import type { MainTimelineEntry } from "../lib/threadPanel";
 const SIZE = 40;
+const EMPTY_WINDOW: MainTimelineEntry[] = [];
+
+export function useThreadReplyRenderWindow(
+  entries: MainTimelineEntry[],
+  sendScrollTargetId: string | null,
+) {
+  const deferred = React.useDeferredValue(entries, EMPTY_WINDOW);
+  // A guarded send jump or Back restore needs its exact loaded row before
+  // it can measure geometry. Keep unrelated live window updates deferred.
+  if (
+    sendScrollTargetId &&
+    deferred !== entries &&
+    entries.some((entry) => entry.message.id === sendScrollTargetId) &&
+    !deferred.some((entry) => entry.message.id === sendScrollTargetId)
+  ) {
+    return entries;
+  }
+  return deferred;
+}
+
 /** Bound focused-thread DOM while keeping complete ancestry metadata elsewhere. */
 export function useThreadRowWindow(
   entries: MainTimelineEntry[],

@@ -6,7 +6,10 @@ import { useThreadReplyRenderItems } from "./useThreadReplyRenderItems";
 import { useAppShell } from "@/app/AppShellContext";
 import { useSidebarOpening } from "./useSidebarOpening";
 import type { EarlierReplyRun } from "./sidebarOpeningPolicy";
-import { useThreadRowWindow } from "./useThreadRowWindow";
+import {
+  useThreadReplyRenderWindow,
+  useThreadRowWindow,
+} from "./useThreadRowWindow";
 import { useVisibleThreadReplies } from "./useVisibleThreadReplies";
 import { ThreadWindowRange } from "./ThreadWindowRange";
 import { useThreadDisplayPolicy } from "./useThreadDisplayPolicy";
@@ -331,10 +334,11 @@ export function MessageThreadPanel({
       jump: (id) => scrollToMessage(id, { highlight: true }),
     }),
   });
+  const useBoundedReplyWindow = hasStoredDisclosure && !useOpeningDefaults;
   const rowWindow = useThreadRowWindow(
     effectiveReplies,
     `${channelId}:${currentPubkey}:${threadHeadId}`,
-    hasStoredDisclosure && !useOpeningDefaults,
+    useBoundedReplyWindow,
     threadRepliesPending,
     opening.firstUnseen ?? sidebar.firstNewId,
     pendingJump?.root === threadHeadId
@@ -345,9 +349,9 @@ export function MessageThreadPanel({
           null),
   );
 
-  const deferredThreadReplies = React.useDeferredValue(
+  const deferredThreadReplies = useThreadReplyRenderWindow(
     rowWindow.entries,
-    EMPTY_THREAD_REPLIES,
+    useBoundedReplyWindow ? sendScroll.target : null,
   );
   const isRepliesPending = deferredThreadReplies !== rowWindow.entries;
   const scrollTargetIsVisibleReply = React.useMemo(

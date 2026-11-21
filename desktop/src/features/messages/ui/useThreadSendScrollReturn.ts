@@ -30,6 +30,11 @@ export function useThreadSendScrollReturn({
     scope: string | null;
     id: string;
   } | null>(null);
+  const requestTarget = (id: string) => {
+    setTarget((current) =>
+      current?.id === id && current.scope === scope ? current : { scope, id },
+    );
+  };
   const scroll = useSendScrollReturn({
     history,
     scope,
@@ -41,15 +46,15 @@ export function useThreadSendScrollReturn({
           container ? captureReadingPosition(container, ids) : null,
         prepare: (id) => {
           if (!id) return;
-          setTarget({ scope, id });
+          requestTarget(id);
           reveal(id);
         },
         jump,
         restore: (position) => {
           if (!container) return;
-          if (position.id) setTarget({ scope, id: position.id });
+          if (position.id) requestTarget(position.id);
           return restoreReadingPosition(container, position, ids, (id) => {
-            setTarget({ scope, id });
+            requestTarget(id);
             return true;
           });
         },
