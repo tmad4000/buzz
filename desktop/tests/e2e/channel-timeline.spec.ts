@@ -538,12 +538,14 @@ async function scrollReadingDistance(scroller: Locator, viewports: number) {
   }, viewports);
   await expect
     .poll(() =>
-      scroller.evaluate((node) =>
-        Math.abs(
-          (node.scrollHeight - node.clientHeight - node.scrollTop) /
-            node.clientHeight -
-            viewports,
-        ),
+      scroller.evaluate(
+        (node, distance) =>
+          Math.abs(
+            (node.scrollHeight - node.clientHeight - node.scrollTop) /
+              node.clientHeight -
+              distance,
+          ),
+        viewports,
       ),
     )
     .toBeLessThan(0.08);
