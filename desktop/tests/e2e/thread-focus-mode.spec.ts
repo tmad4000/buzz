@@ -330,6 +330,16 @@ async function exerciseComposerPaste(
         new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
       await frame();
       await frame();
+      const expectedBeforeCaret = fixture.prefix + fixture.inserted;
+      const selectionRangeAtInsertion = () => {
+        const anchor = selection.anchorNode;
+        if (!selection.isCollapsed || !anchor || !input.contains(anchor))
+          return null;
+        const range = document.createRange();
+        range.selectNodeContents(input);
+        range.setEnd(anchor, selection.anchorOffset);
+        return range.toString() === expectedBeforeCaret ? range : null;
+      };
       const data = new DataTransfer();
       data.setData("text/plain", fixture.text);
       if (fixture.html) data.setData("text/html", fixture.html);
@@ -340,26 +350,18 @@ async function exerciseComposerPaste(
           clipboardData: data,
         }),
       );
+      const immediateCaret = selectionRangeAtInsertion() !== null;
+      const immediateFocus = document.activeElement === input;
       await frame();
       await frame();
 
       const sameInput =
         input.isConnected &&
         viewport.querySelector('[data-testid="message-input"]') === input;
-      const anchored =
-        selection.anchorNode !== null && input.contains(selection.anchorNode);
-      const range = document.createRange();
-      range.selectNodeContents(input);
-      if (anchored && selection.anchorNode)
-        range.setEnd(selection.anchorNode, selection.anchorOffset);
-      const expectedBeforeCaret = fixture.prefix + fixture.inserted;
-      const insertionEndsAtCaret =
-        anchored &&
-        selection.isCollapsed &&
-        range.toString() === expectedBeforeCaret;
-      range.collapse(false);
-      let caret = range.getBoundingClientRect();
-      if (insertionEndsAtCaret && !caret.height) {
+      const range = selectionRangeAtInsertion();
+      range?.collapse(false);
+      let caret = range?.getBoundingClientRect();
+      if (range && !caret?.height) {
         // At a mark boundary Chromium can expose an element-level caret.
         // Measure the last inserted glyph without moving the live selection.
         const textNodes = document.createTreeWalker(
@@ -383,18 +385,22 @@ async function exerciseComposerPaste(
         }
       }
       const bounds = viewport.getBoundingClientRect();
-      const visible =
-        caret.height > 0 &&
-        caret.top >= bounds.top - 1 &&
-        caret.bottom <= bounds.bottom + 1;
+      const visible = Boolean(
+        caret &&
+          caret.height > 0 &&
+          caret.top >= bounds.top - 1 &&
+          caret.bottom <= bounds.bottom + 1,
+      );
       return {
         consumed,
+        immediateCaret,
+        immediateFocus,
         sameInput,
         focused: document.activeElement === input,
         exactContent:
           input.textContent ===
           fixture.prefix + fixture.inserted + fixture.suffix,
-        insertionEndsAtCaret,
+        insertionEndsAtCaret: range !== null,
         visible,
         scrolled: viewport.scrollTop > 0,
         hasRichMark: Boolean(input.querySelector("strong")),
@@ -404,6 +410,8 @@ async function exerciseComposerPaste(
   );
   expect(result).toEqual({
     consumed: true,
+    immediateCaret: true,
+    immediateFocus: true,
     sameInput: true,
     focused: true,
     exactContent: true,
@@ -426,6 +434,9 @@ for (const bytes of [20_000, 100_000]) {
     test(`expanded thread reply keeps the caret after a ${bytes}-byte ${flavor} paste`, async ({
       page,
     }) => {
+      // Allow cold app startup and two complete 100 KB pastes on slower hosts.
+      // The immediate and next-frame caret assertions still have no retry.
+      test.setTimeout(60_000);
       await page.setViewportSize({ width: 1280, height: 720 });
       await page.addInitScript(() => {
         localStorage.setItem("buzz.channels.threadViewMode", "focus");
@@ -459,7 +470,7 @@ for (const bytes of [20_000, 100_000]) {
 
       await page
         .locator(
-          `[data-testid="message-thread-summary"][data-thread-head-id="${rootId}"]`,
+          `[data-testid="open-thread-side-panel"][data-thread-head-id="${rootId}"]`,
         )
         .click();
       const drawer = page.getByTestId("focus-thread-drawer");
