@@ -39,7 +39,7 @@ registerHooks({
       return {
         shortCircuit: true,
         format: "module",
-        source: `import React from ${JSON.stringify(new URL("../../../../node_modules/react/index.js", import.meta.url).href)}; export const MessageRow=({message})=>React.createElement('article',{'data-message-id':message.id},message.body);`,
+        source: `import React from ${JSON.stringify(new URL("../../../../node_modules/react/index.js", import.meta.url).href)}; export const MessageRow=({message,actionBarPlacement='floating'})=>React.createElement('article',{'data-message-id':message.id,'data-action-bar-placement':actionBarPlacement},message.body);`,
       };
     return next(url, context);
   },
@@ -242,7 +242,9 @@ test("an open thread keeps the exact guarded parent cue when the experiment is o
     );
   try {
     await render();
+    const row = document.querySelector("article");
     const chip = document.querySelector("button");
+    assert.equal(row.dataset.actionBarPlacement, "inside");
     assert.equal(chip.textContent, "↳ Replying to Paseo: Original prompt");
     assert.equal(
       chip.getAttribute("aria-label"),
@@ -251,12 +253,14 @@ test("an open thread keeps the exact guarded parent cue when the experiment is o
     await act(() => chip.click());
     assert.deepEqual(localJumps, [["root", "parent"]]);
     await render(message, parent, null);
+    assert.equal(row.dataset.actionBarPlacement, "floating");
     assert.equal(
       document.querySelector("button"),
       null,
       "unguarded panel keeps the flag",
     );
     await render(message, { ...parent, tags: [["h", "foreign"]] });
+    assert.equal(row.dataset.actionBarPlacement, "floating");
     assert.equal(document.querySelector("button"), null);
     assert.doesNotMatch(document.body.textContent, /Paseo|Original prompt/);
     assert.match(document.body.textContent, /reply to earlier message/);

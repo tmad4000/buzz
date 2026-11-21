@@ -1062,6 +1062,7 @@ export const MessageRow = React.memo(
     prev.loadedAgentReplyCount === next.loadedAgentReplyCount &&
     prev.isFollowingThread === next.isFollowingThread &&
     prev.isUnread === next.isUnread &&
+    prev.actionBarPlacement === next.actionBarPlacement &&
     prev.layoutVariant === next.layoutVariant &&
     prev.onCollapseDepthGuide === next.onCollapseDepthGuide &&
     prev.onCollapseDepthGuideHoverChange ===

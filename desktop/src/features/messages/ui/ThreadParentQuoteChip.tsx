@@ -1,28 +1,24 @@
 import { useFeatureEnabled } from "@/shared/features";
 import { useAppNavigation } from "@/app/navigation/useAppNavigation";
-import { threadParentQuote } from "@/features/messages/lib/threadParentQuote";
-import type { TimelineMessage } from "@/features/messages/types";
+import type { threadParentQuote } from "@/features/messages/lib/threadParentQuote";
 
 export function ThreadParentQuoteChip({
   channelId,
-  message,
-  messages,
+  quote,
   onJumpToThreadMessage,
   inThreadPanel = false,
 }: {
   channelId: string;
-  message: TimelineMessage;
-  messages: ReadonlyMap<string, TimelineMessage>;
+  quote: NonNullable<ReturnType<typeof threadParentQuote>>;
   inThreadPanel?: boolean;
   onJumpToThreadMessage?: (rootId: string, messageId: string) => void;
 }) {
   const { goChannel } = useAppNavigation();
   const enabled = useFeatureEnabled("agentReplyUx");
-  const quote = threadParentQuote(message, messages, channelId);
   // The standard thread panel only opts in with its local guarded jump.
   // Inline previews and route-based fallbacks keep the existing experiment.
   const panelCue = inThreadPanel && Boolean(onJumpToThreadMessage);
-  if ((!enabled && !panelCue) || !quote) return null;
+  if (!enabled && !panelCue) return null;
   const parentLabel =
     panelCue && quote.parentAuthor
       ? `${quote.parentAuthor}: ${quote.excerpt}`

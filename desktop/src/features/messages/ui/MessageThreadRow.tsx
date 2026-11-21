@@ -1,5 +1,6 @@
 import type * as React from "react";
 
+import { threadParentQuote } from "@/features/messages/lib/threadParentQuote";
 import type { TimelineMessage } from "@/features/messages/types";
 import { ThreadParentQuoteChip } from "./ThreadParentQuoteChip";
 import { MessageRow } from "./MessageRow";
@@ -20,19 +21,31 @@ export function MessageThreadRow({
   onJumpToThreadMessage,
   ...props
 }: MessageThreadRowProps) {
+  const quote =
+    parentMessages && props.channelId
+      ? threadParentQuote(props.message, parentMessages, props.channelId)
+      : null;
+  // A floating rail can extend above the row and cover its parent quote.
+  const hasPanelJump =
+    inThreadPanel && onJumpToThreadMessage && quote?.parentLoaded;
+
   return (
     <>
-      {parentMessages && props.channelId ? (
+      {quote && props.channelId ? (
         <ThreadParentQuoteChip
           key="parent-quote"
           channelId={props.channelId}
-          message={props.message}
-          messages={parentMessages}
+          quote={quote}
           inThreadPanel={inThreadPanel}
           onJumpToThreadMessage={onJumpToThreadMessage}
         />
       ) : null}
-      <MessageRow key="message" {...props} layoutVariant="thread-reply" />
+      <MessageRow
+        key="message"
+        {...props}
+        layoutVariant="thread-reply"
+        actionBarPlacement={hasPanelJump ? "inside" : props.actionBarPlacement}
+      />
     </>
   );
 }
