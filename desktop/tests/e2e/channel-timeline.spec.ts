@@ -544,6 +544,29 @@ async function seedReadingConversation(page: Page, thread: boolean) {
   return page.getByTestId("message-thread-body");
 }
 
+async function beginReadingWithWheel(scroller: Locator) {
+  await expect(scroller).toHaveCSS("overflow-y", /auto|scroll/);
+  const viewport = await scroller.evaluate((node) => node.clientHeight);
+  expect(viewport).toBeGreaterThan(0);
+  await scroller.hover();
+  // Bottom-follow ownership retires on reader input, not a programmatic offset.
+  await scroller.page().mouse.wheel(0, -viewport);
+  await expect
+    .poll(() =>
+      scroller.evaluate(async (node) => {
+        const top = node.scrollTop;
+        await new Promise<void>((resolve) => {
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+        });
+        return (
+          node.scrollTop === top &&
+          node.scrollHeight - node.clientHeight - node.scrollTop > 0
+        );
+      }),
+    )
+    .toBe(true);
+}
+
 async function scrollReadingDistance(scroller: Locator, viewports: number) {
   await expect
     .poll(() =>
@@ -552,6 +575,7 @@ async function scrollReadingDistance(scroller: Locator, viewports: number) {
       ),
     )
     .toBeGreaterThan(viewports);
+  await beginReadingWithWheel(scroller);
   await scroller.evaluate((node, distance) => {
     node.scrollTop = node.scrollHeight - node.clientHeight * (1 + distance);
   }, viewports);
@@ -788,6 +812,7 @@ test("an inline reply waits for ACK and returns through the containing Timeline"
     });
     return root.id;
   }, TEST_IDENTITIES.bob.pubkey);
+  await beginReadingWithWheel(scroller);
   await scroller.evaluate((node) => {
     node.scrollTop = 0;
   });
