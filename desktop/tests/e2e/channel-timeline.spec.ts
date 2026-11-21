@@ -414,10 +414,27 @@ test("Timeline clamps a long message, restores expanded state, and copies the ex
     .poll(() => page.evaluate(() => window.__BUZZ_E2E_LAST_CLIPBOARD__?.text))
     .toBe(COLLAPSE_FIXTURE.longBody);
 
+  // The copy menu restores its trigger focus asynchronously on close.
+  // Let that handoff finish before assigning keyboard ownership to disclosure.
+  await expect(page.getByRole("menu")).toHaveCount(0);
+  await expect(actions).toHaveAttribute("aria-expanded", "false");
+  await expect(actions).toBeFocused();
   await showMore.focus();
+  await expect(showMore).toBeFocused();
+  const disclosureButton = await showMore.elementHandle();
+  const controlledBodyId = await showMore.getAttribute("aria-controls");
+  if (!disclosureButton || !controlledBodyId)
+    throw new Error("Missing disclosure button or controlled body");
   await page.keyboard.press("Enter");
   const showLess = reply.getByRole("button", { name: "Show less" });
   await expect(showLess).toBeFocused();
+  expect(
+    await showLess.evaluate(
+      (node, original) => node === original,
+      disclosureButton,
+    ),
+  ).toBe(true);
+  await expect(showLess).toHaveAttribute("aria-controls", controlledBodyId);
   await expect(showLess).toHaveAttribute("aria-expanded", "true");
   await expect(content).toHaveJSProperty("inert", false);
   await expect(
