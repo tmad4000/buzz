@@ -508,7 +508,7 @@ test.describe("message disclosure on touch", () => {
 });
 
 async function seedReadingConversation(page: Page, thread: boolean) {
-  const rootId = await page.evaluate(
+  const seeded = await page.evaluate(
     ({ thread, pubkey }) => {
       const emit = window.__BUZZ_E2E_EMIT_MOCK_MESSAGE__;
       if (!emit) throw new Error("Missing mock messages");
@@ -521,27 +521,43 @@ async function seedReadingConversation(page: Page, thread: boolean) {
         createdAt,
         content: "Reading return root",
       });
+      let timelineTailId = "";
+      let panelWindowTailId = "";
       for (let index = 1; index <= 65; index++) {
-        emit({
+        const sample = emit({
           channelName: "general",
           pubkey,
           createdAt: createdAt + index,
           parentEventId: thread ? root.id : undefined,
           content: `Reading sample ${index}\n\nA separate paragraph keeps the scroll test measurable.\n\nLast line of sample ${index}.`,
         });
+        timelineTailId = sample.id;
+        if (index === 40) panelWindowTailId = sample.id;
       }
-      return root.id;
+      return { rootId: root.id, timelineTailId, panelWindowTailId };
     },
     { thread, pubkey: TEST_IDENTITIES.bob.pubkey },
   );
-  if (!thread) return page.getByTestId("message-timeline");
+  if (!thread) {
+    const scroller = page.getByTestId("message-timeline");
+    // Emission is not proof the deferred virtualized surface has admitted it.
+    await expect(
+      scroller.locator(`[data-testid="message-row"][data-message-id="${seeded.timelineTailId}"]`),
+    ).toBeInViewport();
+    return scroller;
+  }
   await page
     .locator(
-      `[data-testid="open-thread-side-panel"][data-thread-head-id="${rootId}"]`,
+      `[data-testid="open-thread-side-panel"][data-thread-head-id="${seeded.rootId}"]`,
     )
     .click();
   await expect(page.getByTestId("message-thread-panel")).toBeVisible();
-  return page.getByTestId("message-thread-body");
+  const scroller = page.getByTestId("message-thread-body");
+  // The existing bounded panel initially admits 40 replies, not all 65.
+  await expect(
+    scroller.locator(`[data-testid="message-row"][data-message-id="${seeded.panelWindowTailId}"]`),
+  ).toBeVisible();
+  return scroller;
 }
 
 async function beginReadingWithWheel(scroller: Locator) {
@@ -816,6 +832,9 @@ test("an inline reply waits for ACK and returns through the containing Timeline"
   await scroller.evaluate((node) => {
     node.scrollTop = 0;
   });
+  await expect(
+    scroller.locator(`[data-testid="message-row"][data-message-id="${root}"]`),
+  ).toBeInViewport();
   const summary = scroller.locator(
     `[data-testid="message-thread-summary"][data-thread-head-id="${root}"]`,
   );
