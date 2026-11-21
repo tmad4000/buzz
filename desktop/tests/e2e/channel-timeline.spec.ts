@@ -557,6 +557,11 @@ async function seedReadingConversation(page: Page, thread: boolean) {
   await expect(
     scroller.locator(`[data-testid="message-row"][data-message-id="${seeded.panelWindowTailId}"]`),
   ).toBeVisible();
+  await expect(
+    scroller
+      .getByTestId("message-thread-replies")
+      .locator('[data-render-pending="true"]'),
+  ).toHaveCount(0);
   return scroller;
 }
 
