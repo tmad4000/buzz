@@ -39,6 +39,17 @@ export async function invokeTauri(command) {
   throw new Error("Unexpected native command in deadline fixture: " + command);
 }
 export function toTauriError(error) { return error; }
+// Relay-session bindings are linked transitively; this read-only fixture must
+// never authenticate, resolve a live relay, or sign an event.
+export async function createAuthEvent() {
+  throw new Error("Unexpected authentication in deadline fixture");
+}
+export async function getRelayWsUrl() {
+  throw new Error("Unexpected relay lookup in deadline fixture");
+}
+export async function signRelayEvent() {
+  throw new Error("Unexpected signing in deadline fixture");
+}
 export default {};`,
       };
     }
