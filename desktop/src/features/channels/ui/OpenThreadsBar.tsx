@@ -18,6 +18,7 @@ type Props = {
   entries: readonly MainTimelineEntry[];
   currentThread: TimelineMessage | null;
   onOpen: (message: TimelineMessage) => void;
+  headerTrailing?: React.ReactNode;
 };
 /** Phase0: device-local manual pins plus read-only automatic membership. */
 export function OpenThreadsBar({
@@ -26,6 +27,7 @@ export function OpenThreadsBar({
   entries,
   currentThread,
   onOpen,
+  headerTrailing,
 }: Props) {
   const {
     pins,
@@ -93,26 +95,29 @@ export function OpenThreadsBar({
   const recentCount = rows.filter((row) => row.band === "Last 2 days").length;
   return (
     <section
-      className="relative mx-5 mb-1 rounded-lg border border-border bg-background text-xs"
+      className="pointer-events-auto relative mx-5 mb-1 rounded-lg border border-border bg-background text-xs"
       aria-label="Open threads"
     >
-      <button
-        type="button"
-        className="w-full px-3 py-2 text-left font-medium"
-        aria-expanded={expanded}
-        aria-controls={regionId}
-        onClick={() => {
-          setExpanded(!expanded);
-          try {
-            localStorage.setItem(`${storageKey}:expanded`, String(!expanded));
-          } catch {
-            setSessionOnly(true);
-          }
-        }}
-      >
-        Open threads · {todayCount} today · {recentCount} recent · {pins.length}{" "}
-        pinned · This chat {expanded ? "▴" : "▾"}
-      </button>
+      <div className="flex min-w-0 items-center">
+        <button
+          type="button"
+          className="min-w-0 flex-1 px-3 py-2 text-left font-medium"
+          aria-expanded={expanded}
+          aria-controls={regionId}
+          onClick={() => {
+            setExpanded(!expanded);
+            try {
+              localStorage.setItem(`${storageKey}:expanded`, String(!expanded));
+            } catch {
+              setSessionOnly(true);
+            }
+          }}
+        >
+          Open threads · {todayCount} today · {recentCount} recent ·{" "}
+          {pins.length} pinned · This chat {expanded ? "▴" : "▾"}
+        </button>
+        {headerTrailing}
+      </div>
       {expanded ? (
         <div id={regionId} className="space-y-2 border-t border-border p-2">
           <p className="text-muted-foreground">

@@ -208,6 +208,8 @@ export const ChannelPane = React.memo(function ChannelPane({
   const timelineScrollRef = React.useRef<HTMLDivElement>(null);
   const messageTimelineRef = React.useRef<MessageTimelineHandle>(null);
   const composerWrapperRef = React.useRef<HTMLDivElement>(null);
+  const [latestControlHost, setLatestControlHost] =
+    React.useState<HTMLDivElement | null>(null);
   const { goChannel } = useAppNavigation();
   const prepareDmSendChannel = usePrepareDmSendChannel(
     activeChannel,
@@ -754,6 +756,13 @@ export const ChannelPane = React.memo(function ChannelPane({
                 fetchOlder={fetchOlder}
                 followThreadById={followThreadById}
                 hasComposerOverlay={hasMainComposerOverlay}
+                latestControlHost={
+                  hasMainComposerOverlay
+                    ? resultsContent
+                      ? null
+                      : latestControlHost
+                    : undefined
+                }
                 hasOlderMessages={hasOlderMessages}
                 historyExhausted={historyExhausted}
                 hideDayDividers={isHuddleTranscript}
@@ -871,6 +880,30 @@ export const ChannelPane = React.memo(function ChannelPane({
                 data-testid="channel-composer-overlay"
                 ref={composerWrapperRef}
               >
+                {/* Keep the latest control in dock layout, above upload progress. */}
+                {!isHuddleTranscript && activeChannel && currentPubkey ? (
+                  <OpenThreadsBar
+                    key={barKey}
+                    storageKey={barKey}
+                    threadSummaries={threadSummaries}
+                    entries={mainTimelineEntries}
+                    currentThread={threadHeadMessage}
+                    onOpen={onOpenThread}
+                    headerTrailing={
+                      resultsContent ? null : (
+                        <div
+                          className="mr-1.5 flex max-w-[46%] shrink-0 items-center empty:hidden"
+                          ref={setLatestControlHost}
+                        />
+                      )
+                    }
+                  />
+                ) : !resultsContent ? (
+                  <div
+                    className="relative mb-1 flex justify-end px-5 empty:hidden"
+                    ref={setLatestControlHost}
+                  />
+                ) : null}
                 <ComposerUploadProgressOverlay />
                 <div
                   className={cn(
@@ -894,16 +927,6 @@ export const ChannelPane = React.memo(function ChannelPane({
                     <div className="relative z-10 px-5">
                       {routedSend.notice}
                     </div>
-                  ) : null}
-                  {!isHuddleTranscript && activeChannel && currentPubkey ? (
-                    <OpenThreadsBar
-                      key={barKey}
-                      storageKey={barKey}
-                      threadSummaries={threadSummaries}
-                      entries={mainTimelineEntries}
-                      currentThread={threadHeadMessage}
-                      onOpen={onOpenThread}
-                    />
                   ) : null}
                   <MessageComposer
                     channelId={activeChannel?.id ?? null}

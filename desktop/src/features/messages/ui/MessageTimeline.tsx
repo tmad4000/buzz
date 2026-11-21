@@ -5,6 +5,7 @@ import {
 } from "./timelineReadingPosition";
 import type { ThreadSummaryRenderer } from "./TimelineMessageRow";
 import * as React from "react";
+import { createPortal } from "react-dom";
 
 import {
   isDeferredTimelineSnapshotStale,
@@ -88,6 +89,8 @@ type MessageTimelineProps = {
   scrollContainerRef?: React.RefObject<HTMLDivElement | null>;
   /** True when the timeline has the composer overlay below it. */
   hasComposerOverlay?: boolean;
+  /** Composer dock target, or null while its slot is absent. */
+  latestControlHost?: HTMLElement | null;
   /** Companion huddle transcripts are live conversations, not channel history. */
   hideDayDividers?: boolean;
   /** Show speaker identity on every row instead of grouping consecutive messages. */
@@ -191,6 +194,7 @@ const MessageTimelineBase = React.forwardRef<
     currentPubkey,
     fetchOlder,
     hasComposerOverlay = true,
+    latestControlHost,
     hideDayDividers = false,
     alwaysShowMessageIdentity = false,
     hideAgentAccessBadges = false,
@@ -763,6 +767,27 @@ const MessageTimelineBase = React.forwardRef<
     />
   ) : null;
 
+  // A frozen tail can still have buffered live rows when physically at bottom.
+  const latestControl =
+    !isAtBottom || bufferedTimeline.pendingCount > 0 ? (
+      <UnreadPill
+        className="max-w-full"
+        direction="down"
+        label={
+          bufferedTimeline.pendingCount > 0
+            ? unreadCountLabel(bufferedTimeline.pendingCount)
+            : newMessageCount > 0
+              ? unreadCountLabel(newMessageCount)
+              : "Jump to latest"
+        }
+        onClick={() => {
+          setIsSemanticallyAtBottom(true);
+          window.requestAnimationFrame(() => scrollToBottom("auto"));
+        }}
+        testId="message-scroll-to-latest"
+      />
+    ) : null;
+
   return (
     <TooltipProvider>
       <div
@@ -941,37 +966,14 @@ const MessageTimelineBase = React.forwardRef<
           )}
         </div>
 
-        {/* A frozen tail can be physically at bottom while live rows are still
-            buffered. Keep the release action reachable in that state. */}
-        {!isAtBottom || bufferedTimeline.pendingCount > 0 ? (
-          <div
-            className={cn(
-              "pointer-events-none absolute inset-x-0 bottom-4 z-50 flex justify-center px-4",
-              // Position the pill with layout rather than a transform. WebKit
-              // can keep an inherited custom property stale on a promoted
-              // transform layer when the composer grows, leaving the pill
-              // stranded inside the dock.
-              hasComposerOverlay &&
-                "bottom-[calc(1rem+var(--composer-overlay-height,8rem))] transition-[bottom] duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] motion-reduce:transition-none",
-            )}
-          >
-            <UnreadPill
-              direction="down"
-              label={
-                bufferedTimeline.pendingCount > 0
-                  ? unreadCountLabel(bufferedTimeline.pendingCount)
-                  : newMessageCount > 0
-                    ? unreadCountLabel(newMessageCount)
-                    : "Jump to latest"
-              }
-              onClick={() => {
-                setIsSemanticallyAtBottom(true);
-                window.requestAnimationFrame(() => scrollToBottom("auto"));
-              }}
-              testId="message-scroll-to-latest"
-            />
-          </div>
-        ) : null}
+        {latestControl &&
+          (latestControlHost ? (
+            createPortal(latestControl, latestControlHost)
+          ) : latestControlHost === undefined ? (
+            <div className="pointer-events-none absolute inset-x-0 bottom-4 z-50 flex justify-center px-4">
+              {latestControl}
+            </div>
+          ) : null)}
       </div>
     </TooltipProvider>
   );
