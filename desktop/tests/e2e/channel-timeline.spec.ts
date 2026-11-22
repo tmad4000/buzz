@@ -763,6 +763,44 @@ for (const thread of [false, true]) {
       ? "Confirmed thread reply while staying"
       : "Confirmed Timeline send while staying";
     await sendReadingMessage(surface, message);
+    if (thread) {
+      // The mock records a published event only after its acceptance path.
+      // Wait for that exact event before testing the strict Sent UI contract.
+      await expect
+        .poll(() =>
+          page.evaluate(async ({ content, channelId }) => {
+            const call = (window.__BUZZ_E2E_COMMAND_PAYLOADS__ ?? []).find(
+              (entry) => {
+                if (entry.command !== "publish_queued_message") return false;
+                const event = (entry.payload as {
+                  event?: { content: string; kind: number; tags: string[][] };
+                }).event;
+                return (
+                  event?.kind === 9 &&
+                  event.content === content &&
+                  event.tags.some((tag) => tag[0] === "h" && tag[1] === channelId)
+                );
+              },
+            );
+            if (!call) return false;
+            const event = (call.payload as { event: { id: string } }).event;
+            const read = window.__BUZZ_E2E_INVOKE_MOCK_COMMAND__;
+            if (!read) throw new Error("Missing mock event reader");
+            let raw: unknown;
+            try {
+              raw = await read("get_event", { eventId: event.id });
+            } catch (error) {
+              if (String(error).includes(`Event not found: ${event.id}`))
+                return false;
+              throw error;
+            }
+            if (typeof raw !== "string") return false;
+            const accepted = JSON.parse(raw) as { id: string; content: string };
+            return accepted.id === event.id && accepted.content === content;
+          }, { content: message, channelId: GENERAL_ID }),
+        )
+        .toBe(true);
+    }
     const sent = surface.getByTestId("send-scroll-sent");
     await expect(sent).toHaveText("Sent ↓");
     await expectReadingAnchor(scroller, anchor);
