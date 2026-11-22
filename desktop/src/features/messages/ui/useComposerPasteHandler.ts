@@ -30,12 +30,12 @@ export function useComposerPasteHandler(options: {
       editorProps: {
         ...editor.options.editorProps,
         handlePaste: (view, event) => {
-          const mediaItem = Array.from(event.clipboardData?.items ?? []).find(
-            (item) => item.kind === "file",
-          );
-          if (mediaItem) {
-            const file = mediaItem.getAsFile();
-            if (file) void uploadFileRef.current(file);
+          for (const item of Array.from(event.clipboardData?.items ?? [])) {
+            if (item.kind !== "file") continue;
+            const file = item.getAsFile();
+            // A file item without a readable File must not consume other flavors.
+            if (!file) continue;
+            void uploadFileRef.current(file);
             return true;
           }
           const codeBlockText = getBuzzCodeBlockClipboardText(
