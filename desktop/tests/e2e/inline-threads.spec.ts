@@ -980,16 +980,29 @@ test("inline replies, scoped sends, saved expansion and side panel coexist", asy
   );
   const restart = async () => {
     await page.reload();
-    await ready();
-    await page.evaluate((fixtures) => {
-      if (!window.__BUZZ_E2E_EMIT_MOCK_MESSAGE__)
-        throw new Error("Missing emitter after reload");
-      for (const input of fixtures)
-        window.__BUZZ_E2E_EMIT_MOCK_MESSAGE__({
-          ...input,
-          channelName: "general",
-        });
+    await page.waitForFunction(
+      () =>
+        typeof window.__BUZZ_E2E_EMIT_MOCK_MESSAGE__ === "function" &&
+        Boolean(window.__BUZZ_E2E_QUERY_CLIENT__),
+    );
+    await page.evaluate(async (fixtures) => {
+      const emit = window.__BUZZ_E2E_EMIT_MOCK_MESSAGE__;
+      const client = window.__BUZZ_E2E_QUERY_CLIENT__;
+      if (!emit || !client) throw new Error("Missing mock history after reload");
+      for (const input of fixtures) emit({ ...input, channelName: "general" });
+      // Re-read the primed mock history rather than requiring a live echo to
+      // arrive after the new channel listener has attached.
+      await client.invalidateQueries({
+        queryKey: ["channel-messages", "9a1657ac-f7aa-5db0-b632-d8bbeb6dfb50"],
+        exact: true,
+      });
     }, fixtures);
+    await ready();
+    await expect(
+      page.locator(
+        `article[data-testid="message-row"][data-message-id="${root.id}"]`,
+      ),
+    ).toHaveCount(1);
   };
   await restart();
   await expect(toggle(root.id)).toHaveAttribute("aria-expanded", "true");
