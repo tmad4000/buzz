@@ -134,26 +134,120 @@ test("Timeline flattens replies chronologically, receives live events, sends top
   ).toHaveCount(0);
   const input = page.getByTestId("message-input").first();
   await input.fill("Timeline composer top-level");
+  await expect(input).toHaveText("Timeline composer top-level");
+  const commandStart = await page.evaluate(
+    () => (window.__BUZZ_E2E_COMMAND_PAYLOADS__ ?? []).length,
+  );
   await input.press("Enter");
+  // Draft clearing proves admission, not mock publication/readback or rendering.
+  let acceptedEventId = "";
+  await expect
+    .poll(async () => {
+      acceptedEventId = await page.evaluate(
+        async ({ content, channelId, start }) => {
+          const call = (window.__BUZZ_E2E_COMMAND_PAYLOADS__ ?? []).slice(start).find(
+            (entry) => {
+              if (entry.command !== "publish_queued_message") return false;
+              const event = (entry.payload as {
+                event?: { content: string; kind: number; tags: string[][] };
+              }).event;
+              return (
+                event?.kind === 9 &&
+                event.content === content &&
+                event.tags.some((tag) => tag[0] === "h" && tag[1] === channelId)
+              );
+            },
+          );
+          if (!call) return "";
+          const payload = call.payload as {
+            event: { id: string; pubkey: string };
+            expectedSignerPubkey: string;
+          };
+          const published = payload.event;
+          if (
+            !/^[a-f0-9]{64}$/.test(published.id) ||
+            !/^[a-f0-9]{64}$/.test(payload.expectedSignerPubkey) ||
+            published.pubkey !== payload.expectedSignerPubkey
+          ) {
+            return "";
+          }
+          const read = window.__BUZZ_E2E_INVOKE_MOCK_COMMAND__;
+          if (!read) throw new Error("Missing mock event reader");
+          let raw: unknown;
+          try {
+            raw = await read("get_event", { eventId: published.id });
+          } catch (error) {
+            if (String(error).includes(`Event not found: ${published.id}`))
+              return "";
+            throw error;
+          }
+          if (typeof raw !== "string") return "";
+          const recorded = JSON.parse(raw) as {
+            pubkey: string;
+            id: string;
+            content: string;
+            kind: number;
+            tags: string[][];
+          };
+          return recorded.id === published.id &&
+            recorded.pubkey === published.pubkey &&
+            recorded.content === content &&
+            recorded.kind === 9 &&
+            recorded.tags.some((tag) => tag[0] === "h" && tag[1] === channelId)
+            ? recorded.id
+            : "";
+        },
+        {
+          content: "Timeline composer top-level",
+          channelId: GENERAL_ID,
+          start: commandStart,
+        },
+      );
+      return acceptedEventId;
+    }, {
+      message:
+        "Current send must reach exact mock-store event readback before row assertions",
+    })
+    .toMatch(/^[a-f0-9]{64}$/);
+  await testInfo.attach("timeline-mock-recorded-event", {
+    body: JSON.stringify({
+      eventId: acceptedEventId,
+      commandStart,
+      boundary: "mock-store readback; not durable checkpoint or native proof",
+    }),
+    contentType: "application/json",
+  });
+  await expect(
+    timeline.locator(
+      `[data-testid="message-row"][data-message-id="${acceptedEventId}"]`,
+    ),
+  ).toBeVisible();
   await expect(
     timeline.getByText("Timeline composer top-level", { exact: true }),
   ).toBeVisible();
   await expect
     .poll(() =>
-      page.evaluate(() => {
+      page.evaluate((eventId) => {
         const client = window.__BUZZ_E2E_QUERY_CLIENT__ as unknown as {
           getQueriesData: (
             filter: unknown,
           ) => Array<
-            [unknown, Array<{ content: string; tags: string[][] }> | undefined]
+            [
+              unknown,
+              Array<{ id: string; content: string; tags: string[][] }> | undefined,
+            ]
           >;
         };
         const event = client
           .getQueriesData({ queryKey: ["channel-messages"] })
           .flatMap(([, events]) => events ?? [])
-          .find((event) => event.content === "Timeline composer top-level");
+          .find(
+            (event) =>
+              event.id === eventId &&
+              event.content === "Timeline composer top-level",
+          );
         return event?.tags.filter((tag) => tag[0] === "e").length;
-      }),
+      }, acceptedEventId),
     )
     .toBe(0);
   await page.getByTestId("channel-management-trigger").click();
