@@ -511,9 +511,6 @@ const MessageTimelineBase = React.forwardRef<
       restoreReadingPosition: (snapshot) => {
         const container = activeScrollContainerRef.current;
         if (!container) return;
-        // Restoring a mounted row bypasses scrollToMessage's cancellation.
-        // Reading restoration owns the viewport before any physical movement.
-        timelineVirtualizerApi?.cancelBottomIntent();
         const ids = messages.map((message) => message.id);
         const inlineRoot = snapshot.inlineRootId;
         if (
@@ -523,6 +520,10 @@ const MessageTimelineBase = React.forwardRef<
           !ids.includes(snapshot.id)
         )
           ids.push(snapshot.id);
+        // A focus or measurement update can otherwise reanchor the editor
+        // while the exact pre-send row and offset are being restored.
+        const finishRestoration =
+          timelineVirtualizerApi?.beginReadingRestoration();
         return restoreReadingPosition(
           container,
           snapshot,
@@ -531,6 +532,7 @@ const MessageTimelineBase = React.forwardRef<
             timelineVirtualizerApi?.scrollToMessage(
               id === snapshot.id && inlineRoot ? inlineRoot : id,
             ) ?? false,
+          finishRestoration,
         );
       },
       scrollToBottomOnNextUpdate: prepareForOwnMessage,

@@ -41,6 +41,7 @@ export function useVirtualizedBottomSettle(
   const hoveredRowRef = React.useRef<HTMLElement | null>(null);
   const anchorRef = React.useRef<VirtualizedReadingAnchor | null>(null);
   const navigationOwnsPositionRef = React.useRef(false);
+  const readingRestorationRef = React.useRef<symbol | null>(null);
   const correctedScrollTopRef = React.useRef<number | null>(null);
   const readerScrollPendingRef = React.useRef(false);
   const getScroller = React.useCallback(() => {
@@ -64,8 +65,20 @@ export function useVirtualizedBottomSettle(
     anchorRef.current = null;
     cancelFrame();
   }, [cancelFrame]);
+  const beginReadingRestoration = React.useCallback(() => {
+    cancel();
+    const restoration = Symbol();
+    readingRestorationRef.current = restoration;
+    return () => {
+      if (readingRestorationRef.current !== restoration) return;
+      readingRestorationRef.current = null;
+      // A focus or pointer event may have sampled the old viewport mid-return.
+      anchorRef.current = null;
+    };
+  }, [cancel]);
 
   const preserveReadingPosition = React.useCallback((): boolean => {
+    if (readingRestorationRef.current !== null) return true;
     const scroller = getScroller();
     if (!scroller) return false;
     const reading = hasReadingInteraction(scroller);
@@ -308,6 +321,7 @@ export function useVirtualizedBottomSettle(
   }, [getScroller, scheduleCorrection]);
   React.useEffect(() => cancelFrame, [cancelFrame]);
   return {
+    beginReadingRestoration,
     cancel,
     settle,
     settleAfterLayout,

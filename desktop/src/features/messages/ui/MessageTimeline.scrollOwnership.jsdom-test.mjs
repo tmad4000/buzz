@@ -77,6 +77,7 @@ function visitList(node) {
 visitList(listSource);
 assert.ok(listApi);
 const createListApi = new Function(
+  "beginReadingRestoration",
   "cancelBottomSettle",
   "jumpToBottom",
   "settleAtBottom",
@@ -227,6 +228,7 @@ async function mount({ targetMessageId } = {}) {
     const api = React.useMemo(
       () =>
         createListApi(
+          ownership.beginReadingRestoration,
           ownership.cancel,
           ownership.settle,
           ownership.settleAfterLayout,
@@ -236,6 +238,7 @@ async function mount({ targetMessageId } = {}) {
           listRef,
         ),
       [
+        ownership.beginReadingRestoration,
         ownership.cancel,
         ownership.settle,
         ownership.settleAfterLayout,
@@ -467,6 +470,39 @@ test("selected-message navigation preserves its reading position without a botto
     assert.equal(result, false);
     assert.equal(row.getBoundingClientRect().top, top);
     assert.equal(h.model.pins, pins);
+  } finally {
+    await h.close();
+  }
+});
+
+test("Back restores the saved row and offset through inline editor refocus and measurement", async () => {
+  const h = await mount();
+  const inline = document.createElement("section");
+  inline.dataset.testid = "inline-thread";
+  const editor = document.createElement("textarea");
+  editor.value = "Preserve the inline draft";
+  inline.append(editor);
+  h.rows[24].append(inline);
+  editor.getBoundingClientRect = () => rect(970 - h.model.top, 28);
+  try {
+    h.scroller.scrollTop = 417;
+    await h.event(h.scroller, "wheel");
+    await h.event(h.scroller, "scroll");
+    const snapshot = h.timelineRef.current.captureReadingPosition();
+    assert.equal(snapshot.id, "row-10");
+    assert.equal(snapshot.offset, -17);
+
+    h.scroller.scrollTop = 620;
+    const stop = h.timelineRef.current.restoreReadingPosition(snapshot);
+    editor.focus({ preventScroll: true });
+    // The focused editor is visible in the outgoing viewport. The observer
+    // may deliver a correction between restoring and verifying the saved row.
+    await h.resize();
+    assert.equal(h.model.top, 417);
+    assert.equal(h.rows[10].getBoundingClientRect().top, snapshot.offset);
+    assert.equal(document.activeElement, editor);
+    assert.equal(editor.value, "Preserve the inline draft");
+    stop();
   } finally {
     await h.close();
   }

@@ -412,7 +412,7 @@ test("public mounted-row restoration retires bottom intent before measurement ch
     const restorePublic = bind(
       { current: scroller },
       {
-        cancelBottomIntent: refs.api.current.cancel,
+        beginReadingRestoration: refs.api.current.beginReadingRestoration,
         scrollToMessage() {
           throw new Error("mounted row must not require index realization");
         },

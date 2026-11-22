@@ -42,6 +42,7 @@ import { useUpwardPaginationWheel } from "./useUpwardPaginationWheel";
 import { useVirtualizedBottomSettle } from "./useVirtualizedBottomSettle";
 
 export type TimelineVirtualizerApi = {
+  beginReadingRestoration: () => () => void;
   cancelBottomIntent: () => void;
   scrollToBottom: (behavior?: ScrollBehavior) => void;
   settleAtBottom: () => boolean;
@@ -555,6 +556,7 @@ function VirtualizedTimelineRows({
     0,
   );
   const {
+    beginReadingRestoration,
     cancel: cancelBottomSettle,
     settle: jumpToBottom,
     settleAfterLayout: settleAtBottom,
@@ -749,6 +751,7 @@ function VirtualizedTimelineRows({
   React.useLayoutEffect(() => {
     if (!onVirtualizerApiChange) return;
     const api: TimelineVirtualizerApi = {
+      beginReadingRestoration,
       cancelBottomIntent: cancelBottomSettle,
       scrollToBottom() {
         jumpToBottom();
@@ -767,6 +770,7 @@ function VirtualizedTimelineRows({
     onVirtualizerApiChange(api);
     return () => onVirtualizerApiChange(null);
   }, [
+    beginReadingRestoration,
     cancelBottomSettle,
     onVirtualizerApiChange,
     jumpToBottom,

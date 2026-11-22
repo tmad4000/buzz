@@ -44,6 +44,7 @@ export function restoreReadingPosition(
   snapshot: TimelineReadingPosition,
   ids: string[],
   realize: (id: string) => boolean,
+  onFinish?: () => void,
 ) {
   const id = [snapshot.id, ...snapshot.neighbors].find(
     (candidate) => candidate && ids.includes(candidate),
@@ -51,11 +52,15 @@ export function restoreReadingPosition(
   let frame = 0;
   let tries = 0;
   let stable = 0;
+  let stopped = false;
   const stop = () => {
+    if (stopped) return;
+    stopped = true;
     cancelAnimationFrame(frame);
     container.removeEventListener("wheel", stop);
     container.removeEventListener("touchstart", stop);
     container.removeEventListener("keydown", stop);
+    onFinish?.();
   };
   const restore = () => {
     if (!container.isConnected || ++tries > 30) {
