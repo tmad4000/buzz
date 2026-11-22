@@ -546,12 +546,27 @@ async function seedReadingConversation(page: Page, thread: boolean) {
     ).toBeInViewport();
     return scroller;
   }
-  await page
-    .locator(
-      `[data-testid="open-thread-side-panel"][data-thread-head-id="${seeded.rootId}"]`,
-    )
-    .click();
-  await expect(page.getByTestId("message-thread-panel")).toBeVisible();
+  const rootRow = page
+    .getByTestId("message-timeline")
+    .locator(`[data-testid="message-row"][data-message-id="${seeded.rootId}"]`);
+  await expect(rootRow).toHaveCount(1);
+  await rootRow.scrollIntoViewIfNeeded();
+  await expect(rootRow).toBeInViewport();
+  const opener = page.locator(
+    `[data-testid="open-thread-side-panel"][data-thread-head-id="${seeded.rootId}"]`,
+  );
+  await expect(opener).toHaveCount(1);
+  await expect(opener).toBeVisible();
+  await expect(opener).toBeEnabled();
+  // Test this exact control's normal keyboard activation after realization.
+  await opener.focus();
+  await expect(opener).toBeFocused();
+  await page.keyboard.press("Enter");
+  const panel = page.getByTestId("message-thread-panel");
+  await expect(panel).toBeVisible();
+  await expect(
+    panel.locator(`[data-testid="message-row"][data-message-id="${seeded.rootId}"]`),
+  ).toBeVisible();
   const scroller = page.getByTestId("message-thread-body");
   // The existing bounded panel initially admits 40 replies, not all 65.
   await expect(
