@@ -129,14 +129,20 @@ class SettingsPage extends HookConsumerWidget {
             ),
             ListTile(
               title: const Text('Send feedback'),
-              subtitle: const Text('Feedback is public'),
+              subtitle: const Text(
+                bool.fromEnvironment('WIT_PRODUCT_FEEDBACK')
+                    ? 'Feedback may be published'
+                    : 'Feedback is public',
+              ),
               trailing: const _RowChevron(),
               onTap: () async {
                 var opened = false;
                 try {
                   opened = await launchUrl(
                     Uri.parse(
-                      'https://worldissuetracker.com/buzz-ideaflow',
+                      const bool.fromEnvironment('WIT_PRODUCT_FEEDBACK')
+                          ? 'https://worldissuetracker.com/feedback/send/buzz'
+                          : 'https://worldissuetracker.com/buzz-ideaflow',
                     ),
                     mode: LaunchMode.externalApplication,
                   );
