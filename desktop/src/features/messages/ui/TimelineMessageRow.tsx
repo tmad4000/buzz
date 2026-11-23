@@ -1,5 +1,4 @@
 import { useTimelineView } from "@/features/channels/ui/TimelineViewContext";
-import { useVisibleThreadReplies } from "./useVisibleThreadReplies";
 import { TimelineReplyChip } from "@/features/channels/ui/TimelineReplyChip";
 import * as React from "react";
 
@@ -136,7 +135,6 @@ export function MessageRowItem({
   videoReviewContext,
 }: MessageRowItemProps) {
   const { message } = entry;
-  const rowRef = React.useRef<HTMLDivElement>(null);
   const timelineView = useTimelineView();
   const startedByAgent =
     timelineView.initiator?.evidence.roots.get(message.id) === "agents";
@@ -144,16 +142,6 @@ export function MessageRowItem({
     timelineView.initiator?.filter === "mine"
       ? timelineView.initiator.evidence.loadedAgentReplies.get(message.id)
       : undefined;
-  const readRows = React.useMemo(() => [message], [message]);
-  useVisibleThreadReplies(
-    rowRef,
-    readRows,
-    timelineView.mode === "timeline" && message.parentId
-      ? timelineView.onRepliesRevealed
-      : undefined,
-    message.rootId ?? message.parentId ?? "",
-    `${channelId}:${currentPubkey}:${message.id}`,
-  );
   const summary =
     entry.summary ??
     (renderThreadSummary && !message.pending
@@ -249,7 +237,6 @@ export function MessageRowItem({
 
   return (
     <div
-      ref={rowRef}
       className={cn(
         "flex flex-col gap-1",
         isFollowedByContinuation ? "pb-0" : "pb-2.5",

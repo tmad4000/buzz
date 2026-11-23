@@ -901,9 +901,8 @@ export function ChannelScreen({
     if (mode === "timeline") handleCloseThread();
     view.changeMode(mode);
   }, [handleCloseThread, requireThreadEditResolution, view.changeMode]);
-  const openTimelineReply = React.useCallback((message: TimelineMessage, preserveOrder = false) => {
+  const openTimelineReply = React.useCallback((message: TimelineMessage) => {
     if (!requireThreadEditResolution()) return;
-    if (!preserveOrder) view.changeMode("threads");
     handleCloseAgentSession();
     setChannelManagementOpen(false);
     setProfilePanelPubkey(null);
@@ -913,7 +912,7 @@ export function ChannelScreen({
     setThreadReplyTargetId(message.id);
     setThreadScrollTargetId(message.id);
     setExpandedThreadReplyIds(getThreadRouteTarget(message, timelineMessageById)?.expandedReplyIds ?? new Set());
-  }, [handleCloseAgentSession, requireThreadEditResolution, setChannelManagementOpen, setOpenThreadHeadId, setProfilePanelPubkey, timelineMessageById, view.changeMode]);
+  }, [handleCloseAgentSession, requireThreadEditResolution, setChannelManagementOpen, setOpenThreadHeadId, setProfilePanelPubkey, timelineMessageById]);
   const timelineView = React.useMemo(() => ({ initiator: showResults ? undefined : mainTimelineTargetMessageId && initiator ? { ...initiator, filter: "all" as const } : initiator, mode: view.mode, changeMode: changeChannelView, messagesById: timelineMessageById, loadingReplies: threadRepliesLoading, openReply: openTimelineReply }), [initiator, showResults, mainTimelineTargetMessageId, view.mode, changeChannelView, timelineMessageById, threadRepliesLoading, openTimelineReply]);
   return (
     <TimelineViewContext.Provider value={timelineView}>
@@ -1005,7 +1004,7 @@ export function ChannelScreen({
                         const message = resultMessages.find((entry) => entry.id === result.messageId);
                         if (!message) return;
                         if (pageOpen) closePage();
-                        openTimelineReply(message, true);
+                        openTimelineReply(message);
                       }}
                       renderPage={(result) => <ChannelPage key={JSON.stringify([resultsScope, result.sectionId])}
                         canEdit={false} channelId={result.channelId} sectionId={result.sectionId} sectionTitle={result.title} />} />

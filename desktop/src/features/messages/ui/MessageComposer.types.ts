@@ -119,6 +119,8 @@ export type MessageComposerProps = {
     author: string;
     body: string;
     id: string;
+    /** Reveal the quoted message from the reply banner. */
+    onOpen?: () => void;
   } | null;
   showTopBorder?: boolean;
   /** Render the app-wide upload queue above this composer dock. */

@@ -23,6 +23,7 @@ import '../../shared/widgets/keyboard_dismiss_on_drag.dart';
 import '../../shared/widgets/message_author_meta.dart';
 import '../../shared/profile/user_cache_provider.dart';
 import '../../shared/profile/user_profile.dart';
+import '../activity/compose_drafts_provider.dart' show composeDraftKey;
 import 'android_ime_lift.dart';
 import 'channel.dart';
 import 'channel_identity_names_provider.dart';
@@ -44,6 +45,8 @@ import 'jump_to_latest_button.dart';
 import 'jump_to_latest_switcher.dart';
 import 'local_message_send_animation_provider.dart';
 import 'local_message_send_transition.dart';
+import 'reply_quote.dart';
+import 'reply_view.dart';
 import '../profile/user_profile_sheet.dart';
 import 'message_actions.dart';
 import 'message_action_backdrop_state.dart';
@@ -249,7 +252,28 @@ class ThreadDetailPage extends HookConsumerWidget {
       childrenByParent.putIfAbsent(pid, () => []).add(msg);
     }
 
-    final replies = childrenByParent[threadHead.id] ?? const [];
+    final directReplies = childrenByParent[threadHead.id] ?? const [];
+    final isFlat = ref.watch(flatThreadProvider(threadHead.id));
+    final replies = isFlat
+        ? flatThreadReplies(threadHead.id, allMsgs)
+        : directReplies;
+    final canToggleFlat =
+        isFlat ||
+        directReplies.any((reply) => childrenByParent.containsKey(reply.id));
+    final replyDraftKey = composeDraftKey(
+      channelId,
+      threadHeadId: threadHead.id,
+    );
+    final replyTarget = ref.watch(replyTargetProvider(replyDraftKey));
+    final replyTargetNotifier = ref.read(
+      replyTargetProvider(replyDraftKey).notifier,
+    );
+    final jumpHighlightTimer = useRef<Timer?>(null);
+    useEffect(
+      () =>
+          () => jumpHighlightTimer.value?.cancel(),
+      const [],
+    );
     final liveHead =
         allMsgs.where((m) => m.id == threadHead.id).firstOrNull ?? threadHead;
     final itemScrollController = useMemoized(ItemScrollController.new);
@@ -304,6 +328,35 @@ class ThreadDetailPage extends HookConsumerWidget {
     const headIndex = 0;
     int indexForReply(int chronologicalIndex) => chronologicalIndex + 1;
     final tailAnchorIndex = replies.length + 1;
+
+    void jumpToOriginal(String messageId) {
+      final replyIndex = replies.indexWhere((reply) => reply.id == messageId);
+      final index = messageId == threadHead.id
+          ? headIndex
+          : replyIndex < 0
+          ? null
+          : indexForReply(replyIndex);
+      if (index == null || !itemScrollController.isAttached) return;
+      initialTailSettle.abandon();
+      tailIntent.detach();
+      userOptedOutOfTailFollow.value = true;
+      followsThreadTail.value = false;
+      isAtThreadTail.value = false;
+      unawaited(
+        itemScrollController.scrollTo(
+          index: index,
+          alignment: 0.35,
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+        ),
+      );
+      highlightedMessageId.value = messageId;
+      jumpHighlightTimer.value?.cancel();
+      jumpHighlightTimer.value = Timer(const Duration(seconds: 2), () {
+        if (context.mounted) highlightedMessageId.value = null;
+      });
+    }
+
     final stickyDateIndex = _ThreadStickyDateIndex(
       head: liveHead,
       replies: replies,
@@ -705,7 +758,9 @@ class ThreadDetailPage extends HookConsumerWidget {
       );
       return null;
     }, [hasFetchedReplies, replies.length, settleGeometry, headHeight.value]);
-    _useThreadReplyReadState(ref, threadHead.id, replies);
+    // A flat list shows nested replies nobody opened, so only the direct
+    // replies this page has always marked are marked read.
+    _useThreadReplyReadState(ref, threadHead.id, directReplies);
 
     // Thread-scoped typing indicators (exclude self).
     final allTyping = ref.watch(channelTypingProvider(channelId));
@@ -902,7 +957,22 @@ class ThreadDetailPage extends HookConsumerWidget {
                   composerFocusNode: composerFocusNode,
                   restoreComposerFocus: () =>
                       restoreComposerFocus.value?.call(),
-                  childrenByParent: childrenByParent,
+                  childrenByParent: isFlat ? const {} : childrenByParent,
+                  isFlat: isFlat,
+                  onFlatChanged: canToggleFlat
+                      ? ref.read(flatThreadProvider(threadHead.id).notifier).set
+                      : null,
+                  onJump: jumpToOriginal,
+                  onReplyInPlace: isFlat && isMember && !isArchived
+                      ? (message) {
+                          replyTargetNotifier.set(
+                            message.id == threadHead.id
+                                ? null
+                                : ReplyTarget.of(message),
+                          );
+                          restoreComposerFocus.value?.call();
+                        }
+                      : null,
                 ),
               ),
               if (!isMember || isArchived)
@@ -937,6 +1007,13 @@ class ThreadDetailPage extends HookConsumerWidget {
                         channelId: channelId,
                         entries: threadTyping,
                       ),
+                      if (replyTarget != null)
+                        ReplyTargetBar(
+                          channelId: channelId,
+                          target: replyTarget,
+                          onCancel: () => replyTargetNotifier.set(null),
+                          onTap: () => jumpToOriginal(replyTarget.id),
+                        ),
                       ComposeBar(
                         channelId: channelId,
                         focusNode: composerFocusNode,
@@ -951,15 +1028,23 @@ class ThreadDetailPage extends HookConsumerWidget {
                               content,
                               mentionPubkeys, {
                               mediaTags = const <List<String>>[],
-                            }) => sendMessage.call(
-                              channelId: channelId,
-                              content: content,
-                              mentionPubkeys: mentionPubkeys,
-                              channel: channel,
-                              parentEventId: threadHead.id,
-                              rootEventId: effectiveRootId,
-                              mediaTags: mediaTags,
-                            ),
+                            }) {
+                              final target = ref.read(
+                                replyTargetProvider(replyDraftKey),
+                              );
+                              Future<void> send() => sendMessage.call(
+                                channelId: channelId,
+                                content: content,
+                                mentionPubkeys: mentionPubkeys,
+                                channel: channel,
+                                parentEventId: target?.id ?? threadHead.id,
+                                rootEventId: effectiveRootId,
+                                mediaTags: mediaTags,
+                              );
+                              return target == null
+                                  ? send()
+                                  : replyTargetNotifier.sendWith(target, send);
+                            },
                       ),
                     ],
                   ),

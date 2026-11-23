@@ -21,7 +21,12 @@ export function ComposerReplyEditBanner({
 }: {
   isEditing: boolean;
   isEditCancelDisabled?: boolean;
-  replyTarget?: { author: string; body: string; id: string } | null;
+  replyTarget?: {
+    author: string;
+    body: string;
+    id: string;
+    onOpen?: () => void;
+  } | null;
   onCancelEdit?: () => void;
   onCancelReply?: () => void;
 }) {
@@ -55,22 +60,37 @@ export function ComposerReplyEditBanner({
   }
 
   if (replyTarget) {
+    const quote = (
+      <>
+        <span className="block truncate font-medium text-foreground">
+          Replying to {replyTarget.author}
+        </span>
+        {replyTarget.body ? (
+          <span className="block truncate text-muted-foreground/80">
+            {replyTarget.body}
+          </span>
+        ) : null}
+      </>
+    );
     return (
       <div
         className={cn(BANNER_CLASS, "items-start")}
         data-testid="reply-target"
       >
         <CornerUpLeft aria-hidden className="mt-0.5 h-4 w-4 shrink-0" />
-        <div className="min-w-0 flex-1">
-          <p className="truncate font-medium text-foreground">
-            Replying to {replyTarget.author}
-          </p>
-          {replyTarget.body ? (
-            <p className="truncate text-muted-foreground/80">
-              {replyTarget.body}
-            </p>
-          ) : null}
-        </div>
+        {replyTarget.onOpen ? (
+          <button
+            type="button"
+            aria-label={`Jump to original from ${replyTarget.author}`}
+            className="min-w-0 flex-1 rounded-sm text-left hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            data-testid="reply-target-open"
+            onClick={replyTarget.onOpen}
+          >
+            {quote}
+          </button>
+        ) : (
+          <div className="min-w-0 flex-1">{quote}</div>
+        )}
         {onCancelReply ? (
           <Button
             aria-label="Cancel reply"

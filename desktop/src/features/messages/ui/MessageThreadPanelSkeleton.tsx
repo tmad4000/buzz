@@ -20,6 +20,7 @@ import { Skeleton } from "@/shared/ui/skeleton";
 /** Shared title row so the skeleton and loaded panel keep the same chrome. */
 export function MessageThreadPanelHeader({
   headerLeading,
+  headerTrailing,
   headerTitle = "Thread",
   headerTitleAriaLabel,
   isFocusMode,
@@ -29,6 +30,7 @@ export function MessageThreadPanelHeader({
   showBackButton,
 }: {
   headerLeading?: React.ReactNode;
+  headerTrailing?: React.ReactNode;
   headerTitle?: string;
   headerTitleAriaLabel?: string;
   isFocusMode: boolean;
@@ -68,6 +70,7 @@ export function MessageThreadPanelHeader({
       >
         <AuxiliaryPanelTitle>{title}</AuxiliaryPanelTitle>
       </AuxiliaryPanelHeaderGroup>
+      {headerTrailing}
     </AuxiliaryPanelHeader>
   );
 }

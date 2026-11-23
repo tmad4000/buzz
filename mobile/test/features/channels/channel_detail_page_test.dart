@@ -14,6 +14,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart'
     show
         MatrixUtils,
+        OffsetLayer,
         RenderParagraph,
         RenderRepaintBoundary,
         ScrollDirection,
@@ -49,6 +50,12 @@ import 'package:buzz/features/channels/message_actions.dart';
 import 'package:buzz/features/channels/message_content.dart';
 import 'package:buzz/features/channels/mobile_huddle_controller.dart';
 import 'package:buzz/features/channels/reaction_row.dart';
+import 'package:buzz/features/channels/compose_bar.dart';
+import 'package:buzz/features/channels/pending_local_messages_provider.dart';
+import 'package:buzz/features/channels/reply_quote.dart';
+import 'package:buzz/features/channels/reply_view.dart';
+import 'package:buzz/features/channels/send_message_provider.dart';
+import 'package:buzz/features/channels/timeline_replies_provider.dart';
 import 'package:buzz/features/channels/message_mention_pill.dart';
 import 'package:buzz/features/channels/thread_detail_page.dart';
 import 'package:buzz/features/channels/thread_replies_provider.dart';
@@ -57,6 +64,7 @@ import 'package:buzz/features/channels/channels_provider.dart';
 import 'package:buzz/shared/read_state/read_state_provider.dart';
 import 'package:buzz/features/channels/unread_badge/observed_unread_event.dart';
 import 'package:buzz/features/channels/small_avatar.dart';
+import 'package:buzz/features/activity/compose_drafts_provider.dart';
 import 'package:buzz/features/profile/profile_provider.dart';
 import 'package:buzz/features/profile/presence_cache_provider.dart';
 import 'package:buzz/shared/profile/user_cache_provider.dart';
@@ -84,6 +92,7 @@ part 'thread_title_capsule_cases.dart';
 part 'channel_detail_page_test/loading_review_tests.dart';
 part 'channel_detail_page_test/presence_tests.dart';
 part 'channel_detail_page_test/action_row_tests.dart';
+part 'channel_detail_page_test/reply_view_tests.dart';
 
 const _channelId = '11111111-2222-4333-8444-555555555555';
 const _huddleChannelId = '8d764100-fd8f-44cf-9c98-6d8fbd739b8c';
@@ -506,6 +515,7 @@ void main() {
   threadTitleCapsuleTests();
   presenceTests();
   actionRowTests();
+  replyViewTests();
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
     _testPrefs = await SharedPreferences.getInstance();

@@ -477,6 +477,8 @@ class ChannelDetailsPage extends HookConsumerWidget {
             key: const ValueKey('channel-details-channel-card'),
             verticalPadding: _channelDetailsSectionPadding,
             children: [
+              if (!resolvedChannel.isForum)
+                _channelOrderRow(context, ref, resolvedChannel.id),
               AppListRow(
                 icon: BuzzIcons.folderInput,
                 title: 'Move to section…',
@@ -781,5 +783,46 @@ class _ChannelDetailsChevron extends StatelessWidget {
     BuzzIcons.chevronRight,
     size: 18,
     color: context.colors.onSurfaceVariant,
+  );
+}
+
+/// The channel's Order choice; Timeline shows replies in one flat list.
+Widget _channelOrderRow(BuildContext context, WidgetRef ref, String channelId) {
+  final timeline = ref.watch(channelTimelineOrderProvider(channelId));
+  void choose(bool value) =>
+      ref.read(channelTimelineOrderProvider(channelId).notifier).set(value);
+  return AppListRow(
+    key: const ValueKey('channel-details-order'),
+    icon: BuzzIcons.arrowUpDown,
+    title: 'Order',
+    value: timeline ? 'Timeline' : 'Threads',
+    trailing: const _ChannelDetailsChevron(),
+    onTap: () => showBuzzModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      title: 'Order',
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final (label, detail, value) in const [
+              ('Threads', 'Replies stay inside their thread', false),
+              ('Timeline', 'One list, with quoted replies', true),
+            ])
+              AppListRow(
+                title: label,
+                subtitle: detail,
+                trailing: value == timeline
+                    ? const Icon(BuzzIcons.check, size: 18)
+                    : null,
+                onTap: () {
+                  Navigator.of(sheetContext).pop();
+                  choose(value);
+                },
+              ),
+          ],
+        ),
+      ),
+    ),
   );
 }

@@ -1,4 +1,5 @@
 import * as React from "react";
+import { ChannelOrderSelect } from "./ChannelOrderSelect";
 import type { TimelineInitiatorView } from "@/features/timeline-initiator/useTimelineInitiator";
 import type { TimelineMessage } from "@/features/messages/types";
 
@@ -55,6 +56,8 @@ type TimelineView = {
   changeMode: (mode: ChannelViewMode) => void;
   messagesById?: ReadonlyMap<string, TimelineMessage>;
   openReply?: (message: TimelineMessage) => void;
+  /** Scroll this Timeline to a loaded message and highlight it in place. */
+  jumpToMessage?: (id: string, onUnavailable?: () => void) => void;
   loadingReplies?: boolean;
   onRepliesRevealed?: (messages: TimelineMessage[], rootId?: string) => void;
 };
@@ -68,28 +71,11 @@ export const useTimelineView = () => React.useContext(TimelineViewContext);
 export function ChannelOrderSetting() {
   const { mode, changeMode } = useTimelineView();
   return (
-    <label className="flex shrink-0 items-center gap-2 rounded-lg border border-border bg-background px-2.5 py-1 text-xs">
-      <span className="text-muted-foreground">Order</span>
-      <select
-        aria-label="Order"
-        value={mode}
-        onChange={(event) =>
-          changeMode(
-            event.target.value === "timeline"
-              ? "timeline"
-              : event.target.value === "activity"
-                ? "activity"
-                : "threads",
-          )
-        }
-        className="min-w-0 max-w-48 bg-transparent font-medium text-foreground focus-visible:outline-2 focus-visible:outline-primary"
-      >
-        {CHANNEL_ORDER_OPTIONS.map(({ value, label, available }) => (
-          <option key={value} value={value} disabled={!available}>
-            {label}
-          </option>
-        ))}
-      </select>
-    </label>
+    <ChannelOrderSelect
+      label="Order"
+      onChange={changeMode}
+      options={CHANNEL_ORDER_OPTIONS}
+      value={mode}
+    />
   );
 }

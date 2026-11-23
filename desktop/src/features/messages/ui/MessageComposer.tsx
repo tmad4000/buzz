@@ -820,7 +820,7 @@ function MessageComposerImpl({
   // Tiptap handles formatting shortcuts (⌘B, ⌘I, etc.) natively.
   // Plain Enter → submit is now handled inside the Tiptap `submitOnEnter`
   // extension (fires before ProseMirror's splitBlock). This wrapper only
-  // handles autocomplete arrow/enter keys and Escape for edit mode.
+  // handles autocomplete arrow/enter keys and Escape for edit and reply.
   const handleEditorKeyDown = React.useCallback(
     (event: React.KeyboardEvent<HTMLDivElement>) => {
       if (handleAlwaysAddressShortcut(event)) return;
@@ -879,6 +879,10 @@ function MessageComposerImpl({
         onCancelEdit();
         return;
       }
+      if (event.key === "Escape" && replyTarget && !editTargetRef.current) {
+        event.preventDefault();
+        onCancelReply?.();
+      }
     },
     [
       handleAlwaysAddressShortcut,
@@ -894,6 +898,8 @@ function MessageComposerImpl({
       linkEditor.focusCardFirstControl,
       isDeferredEditPending,
       onCancelEdit,
+      onCancelReply,
+      replyTarget,
     ],
   );
   useComposerPasteHandler({
