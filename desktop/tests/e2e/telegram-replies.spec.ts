@@ -13,20 +13,23 @@ const shots =
   process.env.BUZZ_TELEGRAM_REPLY_SCREENSHOTS ??
   "test-results/telegram-replies";
 
-async function setup(page: Page, filler = 0) {
+async function setup(page: Page, filler = 0, timelineFirst = false) {
   await installMockBridge(page);
   await page.goto("/");
-  await page.getByTestId("channel-general").click();
-  await expect
-    .poll(() =>
-      page.evaluate(() =>
-        window.__BUZZ_E2E_HAS_MOCK_LIVE_SUBSCRIPTION__?.({
-          channelName: "general",
-        }),
-      ),
-    )
-    .toBe(true);
+  await page.waitForFunction(
+    () => typeof window.__BUZZ_E2E_EMIT_MOCK_MESSAGE__ === "function",
+  );
+  if (timelineFirst) {
+    await page.getByTestId("channel-general").click();
+    await order(page).selectOption("timeline");
+    await page.getByTestId("channel-random").click();
+  }
   await emitThread(page, filler);
+  await page.getByTestId("channel-general").click();
+  await expect(page.getByTestId("message-timeline")).toContainText(
+    "Lunch is at noon",
+    { timeout: 20_000 },
+  );
 }
 async function emitThread(page: Page, filler: number) {
   await page.evaluate(
@@ -141,6 +144,7 @@ test("Timeline reply stays flat, keeps the draft, and publishes ordinary reply t
   await expect
     .poll(
       async () => (await published(page, "Great, I will announce it")).length,
+      { timeout: 15_000 },
     )
     .toBe(1);
   const [event] = await published(page, "Great, I will announce it");
@@ -204,13 +208,17 @@ test("Tapping a Timeline quote jumps to a distant original and highlights it in 
   const latest = page.getByRole("button", {
     name: /Jump to latest|new message/,
   });
-  // Rows that arrived while mounted can leave the reader above the tail.
-  await latest.click({ timeout: 5_000 }).catch(() => {});
+  const toLatest = () =>
+    expect(async () => {
+      if (await latest.isVisible()) await latest.click({ timeout: 1_000 });
+      await expect(row(page, ids.late)).toBeInViewport({ timeout: 1_000 });
+    }).toPass({ timeout: 20_000 });
+  await toLatest();
   await expect(row(page, ids.nested)).toBeInViewport();
   await expect(row(page, ids.reply)).not.toBeInViewport();
-  const quote = row(page, ids.nested)
-    .locator("xpath=..")
-    .getByTestId("timeline-reply-quote");
+  const quote = page
+    .getByTestId("timeline-reply-quote")
+    .filter({ hasText: "Yes, if the import fix lands" });
   await quote.click();
   await expect(row(page, ids.reply)).toBeInViewport();
   await expect(row(page, ids.reply)).toHaveClass(/route-target-highlight/);
@@ -220,8 +228,7 @@ test("Tapping a Timeline quote jumps to a distant original and highlights it in 
 
   // The composer quote uses the same jump.
   await replyTo(page, ids.reply);
-  await latest.click();
-  await expect(row(page, ids.late)).toBeInViewport();
+  await toLatest();
   await page.getByTestId("reply-target-open").click();
   await expect(row(page, ids.reply)).toBeInViewport();
 });
@@ -270,7 +277,9 @@ test("One thread can be flat, is remembered, and leaves other threads nested", a
   await input.fill("Flat thread reply");
   await input.press("Enter");
   await expect
-    .poll(async () => (await published(page, "Flat thread reply")).length)
+    .poll(async () => (await published(page, "Flat thread reply")).length, {
+      timeout: 15_000,
+    })
     .toBe(1);
   const [event] = await published(page, "Flat thread reply");
   expect(event.tags.filter((tag) => tag[0] === "e")).toEqual([
@@ -308,8 +317,9 @@ test("One thread can be flat, is remembered, and leaves other threads nested", a
 test("Showing replies in Timeline or a flat thread does not mark them read", async ({
   page,
 }) => {
-  await setup(page);
-  await order(page).selectOption("timeline");
+  // Threads' own inline preview may mark visible replies, so never show it.
+  await setup(page, 0, true);
+  await expect(order(page)).toHaveValue("timeline");
   await expect(row(page, ids.nested)).toBeInViewport();
   await page.waitForTimeout(1500);
   const markers = await readMarkers(page);

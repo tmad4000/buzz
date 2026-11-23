@@ -22,18 +22,22 @@ export function useFlatThreadView(
 ) {
   const community = React.useMemo(loadActiveCommunityId, []);
   const key = flatThreadViewKey(community, currentPubkey, channelId, root);
-  const [saved, setSaved] = React.useState(() => ({ key, flat: load(key) }));
+  // Every thread's change is kept, so returning to one never shows a stale choice.
+  const [saved, setSaved] = React.useState<Readonly<Record<string, boolean>>>(
+    {},
+  );
   const stored = React.useMemo(() => load(key), [key]);
-  const flat = saved.key === key ? saved.flat : stored;
+  const flat = key !== null && key in saved ? saved[key] : stored;
   React.useEffect(() => {
     const changed = (event: Event) => {
       const detail = (event as CustomEvent<{ key: string; flat: boolean }>)
         .detail;
-      if (detail?.key === key) setSaved(detail);
+      if (detail)
+        setSaved((previous) => ({ ...previous, [detail.key]: detail.flat }));
     };
     window.addEventListener(FLAT_THREAD_VIEW_CHANGED, changed);
     return () => window.removeEventListener(FLAT_THREAD_VIEW_CHANGED, changed);
-  }, [key]);
+  }, []);
   const setFlat = React.useCallback(
     (next: boolean) => {
       if (!key) return;
@@ -64,14 +68,16 @@ const OPTIONS = [
 /** The channel Order control, scoped to one thread. */
 export function ThreadOrderSetting({
   flat,
+  label = "Thread order",
   onChange,
 }: {
   flat: boolean;
+  label?: string;
   onChange: (flat: boolean) => void;
 }) {
   return (
     <ChannelOrderSelect
-      label="Thread order"
+      label={label}
       onChange={(value) => onChange(value === "flat")}
       options={OPTIONS}
       value={flat ? "flat" : "nested"}

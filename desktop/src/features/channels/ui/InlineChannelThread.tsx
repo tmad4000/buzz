@@ -292,17 +292,20 @@ function InlineThreadContent({
     const timer = window.setTimeout(() => setJumped(null), 2_000);
     return () => window.clearTimeout(timer);
   }, [jumped]);
-  const jumpInFlat = (rootId: string, messageId: string) => {
-    const row = region.current?.querySelector(
-      `[data-message-id="${CSS.escape(messageId)}"]`,
-    );
-    if (!row) {
-      onJumpToThreadMessage?.(rootId, messageId);
-      return;
-    }
-    row.scrollIntoView({ block: "center" });
-    setJumped(messageId);
-  };
+  const jumpInFlat = React.useCallback(
+    (rootId: string, messageId: string) => {
+      const row = region.current?.querySelector(
+        `[data-message-id="${CSS.escape(messageId)}"]`,
+      );
+      if (!row) {
+        onJumpToThreadMessage?.(rootId, messageId);
+        return;
+      }
+      row.scrollIntoView({ block: "center" });
+      setJumped(messageId);
+    },
+    [onJumpToThreadMessage],
+  );
   const rootOpen = flat || thread.expanded.has(root.id);
   const available = React.useMemo(
     () =>
@@ -368,7 +371,11 @@ function InlineThreadContent({
       ) : null}
       {flat || hasNestedReplies(thread.index, root.id) ? (
         <div className="mb-1 flex justify-end px-3">
-          <ThreadOrderSetting flat={flat} onChange={setFlat} />
+          <ThreadOrderSetting
+            flat={flat}
+            label={`Order of replies to ${root.author}`}
+            onChange={setFlat}
+          />
         </div>
       ) : null}
       <div

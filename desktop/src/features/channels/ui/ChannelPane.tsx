@@ -656,7 +656,7 @@ export const ChannelPane = React.memo(function ChannelPane({
   const flatTimeline = timelineView.mode === "timeline" && !isHuddleTranscript;
   const inPlaceReply = useTimelineInPlaceReply({
     channelId: activeChannelId,
-    escapeEnabled: !channelIsCovered && !isSinglePanelView && !mainEditTarget,
+    flatTimeline,
     onSend: handleSendMessage,
     scope:
       currentPubkey && activeChannelId && !isHuddleTranscript ? barKey : null,

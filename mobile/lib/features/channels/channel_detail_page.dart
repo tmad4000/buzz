@@ -902,8 +902,19 @@ class ChannelDetailPage extends HookConsumerWidget {
                           channelId: channel.id,
                           target: replyTarget,
                           onCancel: () => replyTargetNotifier.set(null),
-                          onTap: () =>
-                              jumpToMessage.value?.call(replyTarget.id),
+                          onTap: () {
+                            if (jumpToMessage.value?.call(replyTarget.id) ??
+                                false) {
+                              return;
+                            }
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Original isn\u2019t loaded here',
+                                ),
+                              ),
+                            );
+                          },
                         ),
                       ComposeBar(
                         channelId: channel.id,

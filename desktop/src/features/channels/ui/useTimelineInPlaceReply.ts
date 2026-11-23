@@ -2,7 +2,6 @@ import * as React from "react";
 import type { TimelineMessage } from "@/features/messages/types";
 import type { MessageComposerProps } from "@/features/messages/ui/MessageComposer.types";
 import type { MessageTimelineHandle } from "@/features/messages/ui/MessageTimeline";
-import { useEscapeKey } from "@/shared/hooks/useEscapeKey";
 
 export type TimelineReplyTarget = {
   id: string;
@@ -12,6 +11,8 @@ export type TimelineReplyTarget = {
 };
 
 const MAX_JUMP_FRAMES = 90;
+/** Rows measured after arrival can shift the target, so hold it briefly. */
+const SETTLED_JUMP_FRAMES = 12;
 
 /** The scope names one community, identity and channel, like the draft it belongs to. */
 export const timelineReplyKey = (scope: string) =>
@@ -71,35 +72,35 @@ function saveTimelineReply(key: string, target: TimelineReplyTarget | null) {
  */
 export function useTimelineInPlaceReply({
   channelId,
-  escapeEnabled,
+  flatTimeline,
   onSend,
   scope,
   timelineRef,
 }: {
   channelId: string | null;
-  escapeEnabled: boolean;
+  flatTimeline: boolean;
   onSend: MessageComposerProps["onSend"];
   scope: string | null;
   timelineRef: React.RefObject<MessageTimelineHandle | null>;
 }) {
   const storageKey = scope === null ? null : timelineReplyKey(scope);
-  const [saved, setSaved] = React.useState<{
-    key: string | null;
-    target: TimelineReplyTarget | null;
-  }>({ key: null, target: null });
+  // Keyed so a send that fails after a channel switch restores its own channel.
+  const [saved, setSaved] = React.useState<
+    Readonly<Record<string, TimelineReplyTarget | null>>
+  >({});
   const stored = React.useMemo(
     () => (storageKey ? loadTimelineReply(storageKey) : null),
     [storageKey],
   );
-  const target = saved.key === storageKey ? saved.target : stored;
+  const target =
+    storageKey !== null && storageKey in saved ? saved[storageKey] : stored;
   const current = React.useRef({ key: storageKey, target });
   current.current = { key: storageKey, target };
   const setFor = React.useCallback(
     (key: string, next: TimelineReplyTarget | null) => {
       saveTimelineReply(key, next);
-      if (current.current.key !== key) return;
-      current.current = { key, target: next };
-      setSaved({ key, target: next });
+      setSaved((previous) => ({ ...previous, [key]: next }));
+      if (current.current.key === key) current.current = { key, target: next };
     },
     [],
   );
@@ -129,10 +130,16 @@ export function useTimelineInPlaceReply({
       stopJump();
       timelineRef.current?.prepareSentJump(id);
       let frames = 0;
+      let held = 0;
       const step = () => {
         const timeline = timelineRef.current;
         const reached = timeline?.jumpToSentMessage(id) ?? false;
-        if (!reached && timeline && ++frames < MAX_JUMP_FRAMES) {
+        held = reached ? held + 1 : 0;
+        if (
+          timeline &&
+          held < SETTLED_JUMP_FRAMES &&
+          ++frames < MAX_JUMP_FRAMES
+        ) {
           jumpFrame.current = requestAnimationFrame(step);
           return;
         }
@@ -181,7 +188,7 @@ export function useTimelineInPlaceReply({
           "This reply belongs to the current conversation. Cancel the reply to message the new group.",
         );
       setFor(key, null);
-      const reading = { ...context, inTimeline: true };
+      const reading = { ...context, inTimeline: flatTimeline };
       try {
         return await onSend(
           content,
@@ -199,10 +206,9 @@ export function useTimelineInPlaceReply({
         throw error;
       }
     },
-    [channelId, onSend, setFor],
+    [channelId, flatTimeline, onSend, setFor],
   );
 
-  useEscapeKey(cancel, target !== null && escapeEnabled);
   const composerTarget = React.useMemo(
     () => (target ? { ...target, onOpen: () => jump(target.id) } : null),
     [target, jump],

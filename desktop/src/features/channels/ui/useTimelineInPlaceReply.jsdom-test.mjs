@@ -46,6 +46,7 @@ async function mounted(run) {
   };
   const onSend = async (...args) => {
     state.sends.push(args);
+    if (state.gate) await state.gate;
     if (state.reject) throw state.reject;
     return { id: "sent" };
   };
@@ -53,7 +54,7 @@ async function mounted(run) {
   function Probe({ channelId }) {
     hook = useTimelineInPlaceReply({
       channelId,
-      escapeEnabled: true,
+      flatTimeline: true,
       onSend,
       scope: `relay:me:${channelId}`,
       timelineRef,
@@ -150,18 +151,38 @@ test("a reply cannot leave its conversation and stays available after refusal", 
     assert.equal(t.hook.composerProps.replyTarget.id, "root");
   }));
 
-test("Escape and the cancel control clear the target; pending rows cannot become one", () =>
+test("a send failing after a channel switch restores only its own channel", () =>
+  mounted(async (t) => {
+    await act(() => t.hook.start(message("first")));
+    const context = t.hook.composerProps.onCaptureSendContext();
+    let fail;
+    t.state.gate = new Promise((_, reject) => {
+      fail = reject;
+    });
+    let settled;
+    await act(() => {
+      settled = assert.rejects(
+        t.hook.composerProps.onSend("hi", [], undefined, "general", context),
+        /offline/,
+      );
+    });
+    await t.render("random", "a");
+    await act(() => t.hook.start(message("other")));
+    await act(async () => {
+      fail(new Error("offline"));
+      await settled;
+    });
+    assert.equal(t.hook.composerProps.replyTarget.id, "other");
+    await t.render("general", "a");
+    assert.equal(t.hook.composerProps.replyTarget.id, "first");
+    await t.render("random", "a");
+    assert.equal(t.hook.composerProps.replyTarget.id, "other");
+  }));
+
+test("the cancel control clears the target; pending rows cannot become one", () =>
   mounted(async (t) => {
     await act(() => t.hook.start(message("root", { pending: true })));
     await act(() => t.hook.start(message("outbox-local:1")));
-    assert.equal(t.hook.composerProps.replyTarget, null);
-    await act(() => t.hook.start(message("root")));
-    const event = new t.win.KeyboardEvent("keydown", {
-      key: "Escape",
-      cancelable: true,
-    });
-    await act(() => t.win.dispatchEvent(event));
-    assert.equal(event.defaultPrevented, true, "Escape never marks read");
     assert.equal(t.hook.composerProps.replyTarget, null);
     await act(() => t.hook.start(message("root")));
     await act(() => t.hook.composerProps.onCancelReply());
@@ -172,8 +193,10 @@ test("quote jump retries until the row is realized, and reports an absent row", 
   mounted(async (t) => {
     t.state.reached = 3;
     await act(() => t.hook.jump("root"));
-    for (let i = 0; i < 5; i++) await t.frame();
-    assert.deepEqual(t.state.jumps, ["root", "root", "root"]);
+    for (let i = 0; i < 40; i++) await t.frame();
+    // Two misses, then held while late row measurements settle.
+    assert.equal(t.state.jumps.length, 14);
+    assert.ok(t.state.jumps.every((id) => id === "root"));
     assert.deepEqual(t.state.prepared, ["root", null]);
     t.state.reached = 0;
     t.state.jumps.length = 0;
