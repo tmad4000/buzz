@@ -2,11 +2,15 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  formatOperatorValue,
   isChannelUuid,
   isHexPubkey,
   normalizeFromHandle,
   normalizeInChannel,
   parseSearchOperators,
+  setSearchOperator,
+  shiftDay,
+  toOperatorDay,
 } from "./parseSearchOperators.ts";
 
 test("leaves plain text unchanged", () => {
@@ -115,4 +119,48 @@ test("helpers recognize hex pubkeys and channel uuids", () => {
   assert.equal(isChannelUuid("11111111-1111-1111-1111-111111111111"), true);
   assert.equal(normalizeFromHandle("@alice"), "alice");
   assert.equal(normalizeInChannel("#general"), "general");
+});
+
+test("quoted operator values keep spaces and punctuation", () => {
+  const parsed = parseSearchOperators(
+    'from:"@Will Pfleger" deploy in:"#Paseo P2?"',
+  );
+  assert.equal(parsed.from, "@Will Pfleger");
+  assert.equal(parsed.in, "#Paseo P2?");
+  assert.equal(parsed.text, "deploy");
+});
+
+test("an unquotable operator stays present instead of widening", () => {
+  assert.equal(parseSearchOperators('deploy from:""').from, '""');
+});
+
+test("written operators read back exactly", () => {
+  for (const value of ["@Will Pfleger", "#general", "what?", "a:b", "日本"]) {
+    const query = setSearchOperator("deploy status", "from", value);
+    const parsed = parseSearchOperators(query);
+    assert.equal(parsed.from, value);
+    assert.equal(parsed.text, "deploy status");
+  }
+  assert.equal(formatOperatorValue('say "hi"'), null);
+});
+
+test("setting replaces every earlier operator of that kind only", () => {
+  const query = setSearchOperator(
+    'from:a deploy in:#x from:"b c" built-in:react',
+    "from",
+    "@d",
+  );
+  assert.equal(query, "deploy in:#x built-in:react from:@d ");
+  assert.equal(
+    setSearchOperator(query, "in", null),
+    "deploy built-in:react from:@d",
+  );
+});
+
+test("date helpers stay on local calendar days", () => {
+  assert.equal(toOperatorDay(new Date(2026, 0, 5, 23, 59)), "2026-01-05");
+  assert.equal(
+    toOperatorDay(shiftDay(new Date(2026, 11, 31), 1)),
+    "2027-01-01",
+  );
 });

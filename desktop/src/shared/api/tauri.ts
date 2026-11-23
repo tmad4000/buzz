@@ -446,6 +446,7 @@ export async function searchMessages(
     authors: input.authors,
     since: input.since,
     until: input.until,
+    sort: input.sort,
   });
 
   return {

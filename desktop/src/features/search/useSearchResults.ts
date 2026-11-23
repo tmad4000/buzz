@@ -27,7 +27,13 @@ import {
   normalizeInChannel,
   parseSearchOperators,
   type OperatorResolveResult,
+  setSearchOperator,
 } from "@/features/search/lib/parseSearchOperators";
+import {
+  readSearchSort,
+  type SearchSort,
+  writeSearchSort,
+} from "@/features/search/lib/searchSort";
 import type { SearchResult } from "@/features/search/ui/SearchResultItem";
 import type { Channel, SearchHit, UserSearchResult } from "@/shared/api/types";
 import { normalizePubkey } from "@/shared/lib/pubkey";
@@ -49,13 +55,26 @@ function dedupeSearchHits(hits: SearchHit[]) {
   });
 }
 
+/**
+ * The exact identity behind a picked `from:` / `in:` name. Names are not
+ * unique, so a pick must keep meaning what was picked; editing the operator's
+ * text drops back to resolving it by name.
+ */
+export type PickedOperatorValue = { written: string; id: string };
+
+const MESSAGE_LIMIT_MAX = 200;
+
 function resolveChannelIdFromOperator(
   raw: string | null,
   channels: Channel[],
   channelLabels?: Record<string, string>,
+  picked?: PickedOperatorValue | null,
 ): OperatorResolveResult<string> {
   if (!raw) {
     return { status: "none" };
+  }
+  if (picked?.written === raw) {
+    return { status: "resolved", value: picked.id };
   }
   const value = normalizeInChannel(raw);
   if (!value) {
@@ -79,9 +98,13 @@ function resolveChannelIdFromOperator(
 function resolveAuthorFromOperator(
   raw: string | null,
   candidates: Array<{ pubkey: string; displayName?: string | null }>,
+  picked?: PickedOperatorValue | null,
 ): OperatorResolveResult<string> {
   if (!raw) {
     return { status: "none" };
+  }
+  if (picked?.written === raw) {
+    return { status: "resolved", value: picked.id };
   }
   if (isHexPubkey(raw)) {
     return { status: "resolved", value: normalizePubkey(raw) };
@@ -115,6 +138,24 @@ export function useSearchResults({
   const [query, setQuery] = React.useState("");
   const [debouncedQuery, setDebouncedQuery] = React.useState("");
   const [selectedIndex, setSelectedIndex] = React.useState(0);
+  const [sort, setSortState] = React.useState<SearchSort>(readSearchSort);
+  const setSort = React.useCallback((next: SearchSort) => {
+    setSortState(next);
+    writeSearchSort(next);
+  }, []);
+  const [picked, setPicked] = React.useState<{
+    from: PickedOperatorValue | null;
+    in: PickedOperatorValue | null;
+  }>({ from: null, in: null });
+  const pickOperator = React.useCallback(
+    (kind: "from" | "in", value: PickedOperatorValue | null) => {
+      setPicked((current) => ({ ...current, [kind]: value }));
+      setQuery((current) =>
+        setSearchOperator(current, kind, value?.written ?? null),
+      );
+    },
+    [],
+  );
   const isArchivedDiscovery = useIsArchivedPredicate();
   const parsedQuery = React.useMemo(
     () => parseSearchOperators(debouncedQuery),
@@ -150,8 +191,13 @@ export function useSearchResults({
     () =>
       scopeChannelId
         ? { status: "resolved", value: scopeChannelId }
-        : resolveChannelIdFromOperator(parsedQuery.in, channels, channelLabels),
-    [parsedQuery.in, channels, channelLabels, scopeChannelId],
+        : resolveChannelIdFromOperator(
+            parsedQuery.in,
+            channels,
+            channelLabels,
+            picked.in,
+          ),
+    [parsedQuery.in, channels, channelLabels, picked.in, scopeChannelId],
   );
 
   const ftsQuery = parsedQuery.text;
@@ -220,8 +266,13 @@ export function useSearchResults({
   ]);
 
   const authorResolution = React.useMemo(
-    () => resolveAuthorFromOperator(parsedQuery.from, authorCandidateSeed),
-    [parsedQuery.from, authorCandidateSeed],
+    () =>
+      resolveAuthorFromOperator(
+        parsedQuery.from,
+        authorCandidateSeed,
+        picked.from,
+      ),
+    [parsedQuery.from, authorCandidateSeed, picked.from],
   );
 
   const hasUnresolvedOperator =
@@ -235,13 +286,19 @@ export function useSearchResults({
     fromUserSearchQuery.isLoading &&
     authorResolution.status === "unresolved";
 
+  // "Show more" raises the limit for this exact search only.
+  const searchKey = JSON.stringify([debouncedQuery, scopeChannelId, sort]);
+  const [extended, setExtended] = React.useState({ key: "", limit });
+  const messageLimit = extended.key === searchKey ? extended.limit : limit;
+
   const searchQuery = useSearchMessagesQuery(ftsQuery, {
     enabled:
       enabled &&
       !hasUnresolvedOperator &&
       !waitingOnFromResolution &&
       ftsQuery.length >= minimumQueryLength,
-    limit,
+    limit: messageLimit,
+    sort,
     channelId:
       channelResolution.status === "resolved"
         ? channelResolution.value
@@ -478,7 +535,12 @@ export function useSearchResults({
       setQuery("");
       setDebouncedQuery("");
       setSelectedIndex(0);
+      setPicked({ from: null, in: null });
+      setExtended({ key: "", limit: 0 });
+      return;
     }
+    // Another window may have changed the remembered sort.
+    setSortState(readSearchSort());
   }, [enabled]);
 
   React.useEffect(() => {
@@ -501,6 +563,18 @@ export function useSearchResults({
     resultProfiles: resultProfilesQuery.data?.profiles,
     results,
     searchQuery,
+    canShowMore:
+      searchQuery.data?.hasMore === true && messageLimit < MESSAGE_LIMIT_MAX,
+    hasUnresolvedOperator,
+    needsSearchText: ftsQuery.length < minimumQueryLength,
+    pickOperator,
+    setSort,
+    showMore: () =>
+      setExtended({
+        key: searchKey,
+        limit: Math.min(messageLimit + limit, MESSAGE_LIMIT_MAX),
+      }),
+    sort,
     selectedIndex,
     selectedResult: results[selectedIndex],
     setQuery,

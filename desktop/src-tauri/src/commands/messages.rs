@@ -171,6 +171,7 @@ fn build_search_messages_filter(
     authors: Option<&[String]>,
     since: Option<i64>,
     until: Option<i64>,
+    sort: Option<&str>,
 ) -> serde_json::Value {
     let mut filter = serde_json::Map::new();
     filter.insert(
@@ -205,10 +206,16 @@ fn build_search_messages_filter(
     if let Some(until) = until {
         filter.insert("until".to_string(), serde_json::json!(until));
     }
+    // `buzz-search-sort` bridge extension. The caller gates this on NIP-11;
+    // "newest" is the only order the relay defines besides relevance.
+    if sort == Some("newest") {
+        filter.insert("search_sort".to_string(), serde_json::json!("newest"));
+    }
     serde_json::Value::Object(filter)
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub async fn search_messages(
     q: String,
     limit: Option<u32>,
@@ -216,6 +223,7 @@ pub async fn search_messages(
     authors: Option<Vec<String>>,
     since: Option<i64>,
     until: Option<i64>,
+    sort: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<SearchResponse, String> {
     let cap = search_messages_limit(limit);
@@ -226,6 +234,7 @@ pub async fn search_messages(
         authors.as_deref(),
         since,
         until,
+        sort.as_deref(),
     );
 
     let events = query_relay(&state, &[filter]).await?;
