@@ -5,6 +5,7 @@ import { useDeviceOffline } from "@/shared/api/offlineConnection";
 import { useChannelMessageSend } from "./useChannelMessageSend";
 import { useRoutedSendReturn } from "./useRoutedSendReturn";
 import { useTimelineView } from "./TimelineViewContext";
+import { useTimelineInPlaceReply } from "./useTimelineInPlaceReply";
 import { filterTimelineInitiator } from "@/features/timeline-initiator/model";
 import { useInitiatorKeyDown } from "@/features/timeline-initiator/useInitiatorKeyDown";
 import { ChannelTimelineProviders } from "./ChannelTimelineProviders";
@@ -653,11 +654,19 @@ export const ChannelPane = React.memo(function ChannelPane({
     [visibleMessages, initiatorFilter, initiatorEvidence],
   );
   const flatTimeline = timelineView.mode === "timeline" && !isHuddleTranscript;
+  const inPlaceReply = useTimelineInPlaceReply({
+    channelId: activeChannelId,
+    flatTimeline,
+    onSend: handleSendMessage,
+    scope:
+      currentPubkey && activeChannelId && !isHuddleTranscript ? barKey : null,
+    timelineRef: messageTimelineRef,
+  });
   const timelineReplyHandler =
     activeChannel?.archivedAt || isHuddleTranscript
       ? undefined
       : flatTimeline
-        ? timelineView.openReply
+        ? inPlaceReply.start
         : onOpenThread;
   return (
     <div
@@ -742,6 +751,7 @@ export const ChannelPane = React.memo(function ChannelPane({
             <ChannelTimelineProviders
               key={`${activeChannel?.id}:${currentPubkey}`}
               hidden={Boolean(resultsContent)}
+              onJumpToMessage={inPlaceReply.jump}
               onRepliesRevealed={onSidebarRepliesRevealed}
               scope={`${activeChannel?.id}:${currentPubkey}`}
               currentPubkey={currentPubkey}
@@ -950,8 +960,12 @@ export const ChannelPane = React.memo(function ChannelPane({
                         ? prepareDmSendChannel
                         : undefined
                     }
-                    onSend={handleSendMessage}
-                    threadRoutingEntries={mainTimelineEntries}
+                    {...inPlaceReply.composerProps}
+                    threadRoutingEntries={
+                      inPlaceReply.composerProps.replyTarget
+                        ? undefined
+                        : mainTimelineEntries
+                    }
                     onCaptureRoutedSend={routedSend.captureSend}
                     {...{ profiles, recentMentionPubkeys: recentMentions }}
                     showBackgroundUploadProgress={false}

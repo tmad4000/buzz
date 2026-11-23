@@ -76,6 +76,9 @@ final _messageActionBackdropFilter = ImageFilter.blur(
 /// [restoreComposerFocus] only after a dismissal with no selected action. The
 /// restorer must remain callable for the same lifetime and no-op if its composer
 /// is later disposed or replaced.
+///
+/// [onReply] answers the message in the current view instead of opening its
+/// thread.
 Future<void> showMessageActions({
   required BuildContext context,
   required WidgetRef ref,
@@ -91,6 +94,7 @@ Future<void> showMessageActions({
   VoidCallback? onPopoverDismissed,
   FocusNode? composerFocusNode,
   VoidCallback? restoreComposerFocus,
+  VoidCallback? onReply,
   bool isArchived = false,
   EdgeInsets popoverSpotlightPadding = const EdgeInsets.all(Grid.xxs),
 }) async {
@@ -110,6 +114,7 @@ Future<void> showMessageActions({
         captureAnchorSnapshot: captureAnchorSnapshot,
         composerFocusNode: composerFocusNode,
         restoreComposerFocus: restoreComposerFocus,
+        onReply: onReply,
         onPopoverPreviewVisibilityChanged: onPopoverPreviewVisibilityChanged,
         onPopoverDismissed: onPopoverDismissed,
       )) {
@@ -144,6 +149,7 @@ Future<void> showMessageActions({
     onPopoverDismissed: onPopoverDismissed,
     composerFocusNode: composerFocusNode,
     restoreComposerFocus: restoreComposerFocus,
+    onReply: onReply,
   )) {
     return;
   }
@@ -188,6 +194,7 @@ Future<void> showMessageActions({
                       isMember: isMember,
                       isArchived: isArchived,
                       pageContext: context,
+                      onReply: onReply,
                     ),
                     const SizedBox(height: Grid.xs),
                     // Triage: come back to this message later.
@@ -632,6 +639,9 @@ class _FastActionsRow extends ConsumerWidget {
   /// for the thread push and the copy-link snackbar.
   final BuildContext pageContext;
 
+  /// Replaces opening the thread when the reply starts in place.
+  final VoidCallback? onReply;
+
   const _FastActionsRow({
     required this.message,
     required this.channelId,
@@ -640,11 +650,13 @@ class _FastActionsRow extends ConsumerWidget {
     required this.isMember,
     required this.isArchived,
     required this.pageContext,
+    required this.onReply,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final messages = allMessages;
+    final replyInPlace = onReply;
     final canRemind = ref.watch(reminderServiceProvider) != null;
 
     final tiles = <Widget>[
@@ -654,6 +666,10 @@ class _FastActionsRow extends ConsumerWidget {
           label: 'Reply',
           onTap: () {
             Navigator.of(context).pop();
+            if (replyInPlace != null) {
+              replyInPlace();
+              return;
+            }
             Navigator.of(pageContext).push(
               MaterialPageRoute<void>(
                 builder: (_) => ThreadDetailPage(

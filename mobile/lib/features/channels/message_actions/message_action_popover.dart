@@ -56,6 +56,7 @@ bool _tryShowMessageActionsPopover({
   required VoidCallback? onPopoverDismissed,
   required FocusNode? composerFocusNode,
   required VoidCallback? restoreComposerFocus,
+  required VoidCallback? onReply,
 }) {
   if (anchorRect == null || captureAnchorSnapshot == null) return false;
   final shouldRestoreComposerFocus = composerFocusNode?.hasFocus ?? false;
@@ -76,6 +77,7 @@ bool _tryShowMessageActionsPopover({
       onPopoverDismissed: onPopoverDismissed,
       composerFocusNode: composerFocusNode,
       restoreComposerFocus: restoreComposerFocus,
+      onReply: onReply,
       shouldRestoreComposerFocus: shouldRestoreComposerFocus,
     ).then((shown) {
       if (shown || !context.mounted) return;
@@ -89,6 +91,7 @@ bool _tryShowMessageActionsPopover({
         currentPubkey: currentPubkey,
         isMember: isMember,
         isArchived: isArchived,
+        onReply: onReply,
       );
     }),
   );
@@ -111,6 +114,7 @@ Future<bool> _showMessageActionsPopover({
   required VoidCallback? onPopoverDismissed,
   required FocusNode? composerFocusNode,
   required VoidCallback? restoreComposerFocus,
+  required VoidCallback? onReply,
   required bool shouldRestoreComposerFocus,
 }) async {
   if (_messageActionPresentationInFlight) return true;
@@ -127,6 +131,7 @@ Future<bool> _showMessageActionsPopover({
       currentPubkey: currentPubkey,
       isMember: isMember,
       isArchived: isArchived,
+      onReply: onReply,
     );
     if (actions.isEmpty) return false;
     final nativeActionSurfaceSupport = _supportsIosNativeMessageActionSurface();
@@ -229,6 +234,7 @@ List<_PopoverMessageAction> _buildPopoverMessageActions({
   required String? currentPubkey,
   required bool isMember,
   required bool isArchived,
+  required VoidCallback? onReply,
 }) {
   final actions = <_PopoverMessageAction>[];
   final messages = allMessages;
@@ -244,6 +250,10 @@ List<_PopoverMessageAction> _buildPopoverMessageActions({
           group: _PopoverMessageActionGroup.primary,
           onSelected: () {
             if (!context.mounted) return;
+            if (onReply != null) {
+              onReply();
+              return;
+            }
             Navigator.of(context).push(
               MaterialPageRoute<void>(
                 builder: (_) => ThreadDetailPage(

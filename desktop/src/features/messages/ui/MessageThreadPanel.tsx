@@ -1,6 +1,11 @@
 import type { MessageThreadPanelProps } from "./MessageThreadPanel.types";
 import { useFeatureEnabled } from "@/shared/features";
 import { threadParentQuote } from "../lib/threadParentQuote";
+import {
+  buildFlatThreadEntries,
+  hasNestedReplies,
+} from "../lib/flatThreadView";
+import { ThreadOrderSetting, useFlatThreadView } from "./ThreadOrderSetting";
 import { buildThreadRoutingEntries } from "../lib/threadRouting";
 import { useThreadReplyRenderItems } from "./useThreadReplyRenderItems";
 import { useAppShell } from "@/app/AppShellContext";
@@ -66,6 +71,7 @@ import { selectDeferredListRenderState } from "@/features/messages/lib/timelineS
 import { selectThreadRowHighlight } from "@/features/messages/lib/threadReplyHighlight";
 
 const EMPTY_THREAD_REPLIES: MainTimelineEntry[] = [];
+const NO_REPLY_RUNS: ReadonlyMap<string, EarlierReplyRun> = new Map();
 const THREAD_PANEL_SUMMARY_INDENT_OFFSET_REM = 0;
 
 export function MessageThreadPanel({
@@ -310,7 +316,15 @@ export function MessageThreadPanel({
     ],
   );
 
-  const runProjection = opening.project(sidebar.entries);
+  const flatView = useFlatThreadView(currentPubkey, channelId, threadHeadId);
+  const flat = hasStoredDisclosure && flatView.flat;
+  const flatEntries = React.useMemo(
+    () => (flat ? buildFlatThreadEntries(sidebar.index, threadHeadId) : []),
+    [flat, sidebar.index, threadHeadId],
+  );
+  const runProjection = flat
+    ? { entries: flatEntries, runs: NO_REPLY_RUNS, openStarts: NO_REPLY_RUNS }
+    : opening.project(sidebar.entries);
   const effectiveReplies = hasStoredDisclosure
     ? runProjection.entries
     : threadReplies;
@@ -334,7 +348,8 @@ export function MessageThreadPanel({
       jump: (id) => scrollToMessage(id, { highlight: true }),
     }),
   });
-  const useBoundedReplyWindow = hasStoredDisclosure && !useOpeningDefaults;
+  const useBoundedReplyWindow =
+    hasStoredDisclosure && (flat || !useOpeningDefaults);
   const rowWindow = useThreadRowWindow(
     effectiveReplies,
     `${channelId}:${currentPubkey}:${threadHeadId}`,
@@ -364,7 +379,7 @@ export function MessageThreadPanel({
     [deferredThreadReplies, scrollTargetId, threadHeadId],
   );
   const isThreadHeadRepliesCollapsed = hasStoredDisclosure
-    ? !sidebarExpanded.has(threadHeadId ?? "")
+    ? !flat && !sidebarExpanded.has(threadHeadId ?? "")
     : collapsedThreadHeadId === threadHeadId && !scrollTargetIsVisibleReply;
 
   const visibleReadRows = React.useMemo(
@@ -389,7 +404,8 @@ export function MessageThreadPanel({
   useVisibleThreadReplies(
     threadBodyRef,
     visibleReadRows,
-    onSidebarRepliesRevealed,
+    // Flat shows replies the reader never expanded, so showing is not reading.
+    flat ? undefined : onSidebarRepliesRevealed,
     threadHeadId ?? "",
     `${channelId}:${currentPubkey}:${threadHeadId}`,
   );
@@ -440,7 +456,7 @@ export function MessageThreadPanel({
       firstUnreadReplyId,
       hoveredCollapseBranchId,
       isHuddleTranscript,
-      isSidebar,
+      isSidebar: isSidebar || flat,
       threadHead,
       threadHeadId,
     });
@@ -639,6 +655,7 @@ export function MessageThreadPanel({
         )}
 
         {hasStoredDisclosure &&
+        !flat &&
         sidebarExpanded.has(threadHead.id) &&
         deferredThreadReplies.length > 0 ? (
           <button
@@ -924,6 +941,7 @@ export function MessageThreadPanel({
                           )}
                         />
                         {hasStoredDisclosure &&
+                        !flat &&
                         sidebarExpanded.has(entry.message.id) &&
                         sidebarMessages.some(
                           (m) => m.parentId === entry.message.id,
@@ -1131,6 +1149,12 @@ export function MessageThreadPanel({
           isHuddleTranscript ? undefined : (
             <MessageThreadPanelHeader
               headerLeading={headerLeading}
+              headerTrailing={
+                hasStoredDisclosure &&
+                (flat || hasNestedReplies(sidebar.index, threadHead.id)) ? (
+                  <ThreadOrderSetting flat={flat} onChange={flatView.setFlat} />
+                ) : null
+              }
               headerTitle={headerTitle}
               headerTitleAriaLabel={headerTitleAriaLabel}
               isFocusMode={isFocusMode}

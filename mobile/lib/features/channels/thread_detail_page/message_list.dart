@@ -28,6 +28,12 @@ class _ThreadMessageList extends HookWidget {
   final FocusNode composerFocusNode;
   final VoidCallback restoreComposerFocus;
   final Map<String, List<TimelineMessage>> childrenByParent;
+  final bool isFlat;
+
+  /// Switches this thread's view; null when nesting cannot differ.
+  final ValueChanged<bool>? onFlatChanged;
+  final ValueChanged<String> onJump;
+  final ValueChanged<TimelineMessage>? onReplyInPlace;
 
   const _ThreadMessageList({
     required this.headHeight,
@@ -57,6 +63,10 @@ class _ThreadMessageList extends HookWidget {
     required this.composerFocusNode,
     required this.restoreComposerFocus,
     required this.childrenByParent,
+    required this.isFlat,
+    required this.onFlatChanged,
+    required this.onJump,
+    required this.onReplyInPlace,
   });
 
   String get _replySummary {
@@ -131,6 +141,24 @@ class _ThreadMessageList extends HookWidget {
                     onPressed: onRetryReplies,
                     tooltip: 'Retry',
                     icon: const Icon(BuzzIcons.refreshCcw, size: 16),
+                  ),
+                if (onFlatChanged case final change?)
+                  Semantics(
+                    button: true,
+                    label: isFlat
+                        ? 'Order: Flat. Show nested replies'
+                        : 'Order: Nested. Show one flat list',
+                    excludeSemantics: true,
+                    onTap: () => change(!isFlat),
+                    child: TextButton.icon(
+                      key: const ValueKey('thread-flat-toggle'),
+                      onPressed: () => change(!isFlat),
+                      style: TextButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                      ),
+                      icon: const Icon(BuzzIcons.arrowUpDown, size: 14),
+                      label: Text(isFlat ? 'Flat' : 'Nested'),
+                    ),
                   ),
                 const SizedBox(width: Grid.xxs),
                 Expanded(child: Divider(color: context.colors.outlineVariant)),
@@ -261,6 +289,12 @@ class _ThreadMessageList extends HookWidget {
                                     ),
                                   _ThreadMessage(
                                     message: reply,
+                                    quotedParentId:
+                                        isFlat && reply.parentId != head.id
+                                        ? reply.parentId
+                                        : null,
+                                    onJump: onJump,
+                                    onReplyInPlace: onReplyInPlace,
                                     channelNames: channelNames,
                                     channelId: channelId,
                                     currentPubkey: currentPubkey,

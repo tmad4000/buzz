@@ -21,6 +21,7 @@ export default defineConfig({
       testMatch: [
         "**/smoke.spec.ts",
         "**/channel-timeline.spec.ts",
+        "**/telegram-replies.spec.ts",
         "**/mock-subscription-readiness.spec.ts",
         "**/owned-agent-discovery.spec.ts",
         "**/thread-head-stale-edit.spec.ts",

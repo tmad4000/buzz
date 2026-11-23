@@ -72,7 +72,11 @@ import '../../shared/read_state/read_state_provider.dart';
 import '../../shared/read_state/read_state_time.dart';
 import 'reaction_row.dart';
 import 'recent_emoji_provider.dart';
+import 'pending_local_messages_provider.dart';
+import 'reply_quote.dart';
+import 'reply_view.dart';
 import 'send_message_provider.dart';
+import 'timeline_replies_provider.dart';
 import '../profile/user_profile_sheet.dart';
 import 'small_avatar.dart';
 import 'sticky_date_header.dart';
@@ -81,6 +85,7 @@ import 'thread_replies_provider.dart';
 import 'timeline_message.dart';
 
 part 'channel_detail_page/message_list.dart';
+part 'channel_detail_page/timeline_row.dart';
 part 'channel_detail_page/system_rows.dart';
 part 'channel_detail_page/huddle_sheet.dart';
 part 'channel_detail_page/huddle_call_avatar.dart';
@@ -596,18 +601,58 @@ class ChannelDetailPage extends HookConsumerWidget {
         ? dmHeader?.presenceLabel
         : headerMemberLabel;
 
+    final flatTimeline =
+        !resolvedChannel.isForum &&
+        ref.watch(channelTimelineOrderProvider(channel.id));
+    final timelineReplies = flatTimeline
+        ? ref.watch(timelineRepliesProvider(channel.id))
+        : const TimelineReplies();
     final timelineMessages = resolvedChannel.isForum
         ? <TimelineMessage>[]
         : formatTimeline(
-            messagesState.value ?? const [],
+            flatTimeline
+                ? mergeThreadEvents([
+                    ...timelineReplies.byRoot.values.expand((events) => events),
+                    // An unacknowledged reply lives only in the send overlay.
+                    ...ref
+                        .watch(pendingLocalMessagesProvider(channel.id))
+                        .values,
+                  ], messagesState.value ?? const [])
+                : messagesState.value ?? const [],
             currentPubkey: currentPubkey,
           );
-    final timelineEntries = buildMainTimelineEntries(
+    final threadEntries = buildMainTimelineEntries(
       timelineMessages,
       relaySummaries: ref
           .read(channelMessagesProvider(channel.id).notifier)
           .threadSummaries,
     );
+    final timelineEntries = flatTimeline
+        ? buildFlatTimelineEntries(timelineMessages)
+        : threadEntries;
+    final timelineRootIds = flatTimeline
+        ? [
+            for (final entry in threadEntries)
+              if (entry.summary != null && entry.message.parentId == null)
+                entry.message.id,
+          ]
+        : const <String>[];
+    useEffect(() {
+      if (timelineRootIds.isEmpty) return null;
+      var disposed = false;
+      Future.microtask(() {
+        if (disposed || !context.mounted) return;
+        ref
+            .read(timelineRepliesProvider(channel.id).notifier)
+            .request(timelineRootIds);
+      });
+      return () => disposed = true;
+    }, [channel.id, timelineRootIds.join(',')]);
+    final replyTarget = ref.watch(replyTargetProvider(channel.id));
+    final replyTargetNotifier = ref.read(
+      replyTargetProvider(channel.id).notifier,
+    );
+    final jumpToMessage = useRef<bool Function(String messageId)?>(null);
 
     return FrostedScaffold(
       resizeToAvoidBottomInset:
@@ -780,6 +825,16 @@ class ChannelDetailPage extends HookConsumerWidget {
                               restoreComposerFocus: showsComposer
                                   ? () => restoreComposerFocus.value?.call()
                                   : null,
+                              isFlatTimeline: flatTimeline,
+                              onReplyInPlace: flatTimeline && showsComposer
+                                  ? (message) {
+                                      replyTargetNotifier.set(
+                                        ReplyTarget.of(message),
+                                      );
+                                      restoreComposerFocus.value?.call();
+                                    }
+                                  : null,
+                              onJumpReady: (jump) => jumpToMessage.value = jump,
                             );
                           },
                         ),
@@ -832,6 +887,35 @@ class ChannelDetailPage extends HookConsumerWidget {
                                 entries: typingEntries,
                               ),
                       ),
+                      if (timelineReplies.failed.isNotEmpty ||
+                          timelineReplies.loading)
+                        _TimelineRepliesNotice(
+                          replies: timelineReplies,
+                          onRetry: () => ref
+                              .read(
+                                timelineRepliesProvider(channel.id).notifier,
+                              )
+                              .retry(),
+                        ),
+                      if (replyTarget != null)
+                        ReplyTargetBar(
+                          channelId: channel.id,
+                          target: replyTarget,
+                          onCancel: () => replyTargetNotifier.set(null),
+                          onTap: () {
+                            if (jumpToMessage.value?.call(replyTarget.id) ??
+                                false) {
+                              return;
+                            }
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Original isn\u2019t loaded here',
+                                ),
+                              ),
+                            );
+                          },
+                        ),
                       ComposeBar(
                         channelId: channel.id,
                         focusNode: composerFocusNode,
@@ -845,13 +929,23 @@ class ChannelDetailPage extends HookConsumerWidget {
                               content,
                               mentionPubkeys, {
                               mediaTags = const <List<String>>[],
-                            }) => sendMessage.call(
-                              channelId: channel.id,
-                              content: content,
-                              mentionPubkeys: mentionPubkeys,
-                              channel: resolvedChannel,
-                              mediaTags: mediaTags,
-                            ),
+                            }) {
+                              final target = ref.read(
+                                replyTargetProvider(channel.id),
+                              );
+                              Future<void> send() => sendMessage.call(
+                                channelId: channel.id,
+                                content: content,
+                                mentionPubkeys: mentionPubkeys,
+                                channel: resolvedChannel,
+                                parentEventId: target?.id,
+                                rootEventId: target?.rootId,
+                                mediaTags: mediaTags,
+                              );
+                              return target == null
+                                  ? send()
+                                  : replyTargetNotifier.sendWith(target, send);
+                            },
                       ),
                     ],
                   ),

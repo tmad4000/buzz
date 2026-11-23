@@ -3,7 +3,7 @@ import { installMockBridge, TEST_IDENTITIES } from "../helpers/bridge";
 import { waitForMockChannelHeadReady } from "../helpers/channelHeadReady";
 import { openSettings } from "../helpers/settings";
 
-test("Timeline flattens replies chronologically, receives live events, sends top-level, and opens exact thread replies", async ({
+test("Timeline flattens replies chronologically, receives live events, sends top-level, and keeps quote jumps in place", async ({
   page,
 }, testInfo) => {
   await installMockBridge(page);
@@ -85,7 +85,7 @@ test("Timeline flattens replies chronologically, receives live events, sends top
     .toEqual([ids.root, ids.other, ids.reply, ids.nested]);
   await expect(
     timeline.getByRole("button", {
-      name: /↳ in reply to bob: Timeline first reply/i,
+      name: "Jump to original from bob: Timeline first reply",
     }),
   ).toBeVisible();
   await expect(timeline.getByTestId("message-thread-summary")).toHaveCount(0);
@@ -250,46 +250,15 @@ test("Timeline flattens replies chronologically, receives live events, sends top
       }, acceptedEventId),
     )
     .toBe(0);
-  await page.getByTestId("channel-management-trigger").click();
-  await expect(page.getByTestId("channel-management-sheet")).toBeVisible();
+  // Reply and quote navigation stay in Timeline; telegram-replies.spec.ts
+  // covers the in-place composer, jump and signed tags.
   await timeline
-    .getByRole("button", { name: /↳ in reply to bob: Timeline first reply/i })
+    .getByRole("button", {
+      name: "Jump to original from bob: Timeline first reply",
+    })
     .click();
-  await expect(order).toHaveValue("threads");
-  const panel = page.getByTestId("message-thread-panel");
-  await expect(panel).toContainText("Timeline root topic");
-  await expect(page.getByTestId("channel-management-sheet")).toHaveCount(0);
-  await expect(
-    panel.locator(
-      `[data-testid="message-row"][data-message-id="${ids.nested}"]`,
-    ),
-  ).toBeVisible();
-  await panel
-    .getByTestId("message-input")
-    .fill("Reply from selected timeline item");
-  await panel.getByTestId("message-input").press("Enter");
-  await expect(panel).toContainText("Reply from selected timeline item");
-  await expect
-    .poll(() =>
-      page.evaluate((target) => {
-        const client = window.__BUZZ_E2E_QUERY_CLIENT__ as unknown as {
-          getQueriesData: (
-            filter: unknown,
-          ) => Array<
-            [unknown, Array<{ content: string; tags: string[][] }> | undefined]
-          >;
-        };
-        const event = client
-          .getQueriesData({ queryKey: ["thread-replies"] })
-          .flatMap(([, events]) => events ?? [])
-          .find(
-            (event) => event.content === "Reply from selected timeline item",
-          );
-        return event?.tags.some((tag) => tag[0] === "e" && tag[1] === target);
-      }, ids.nested),
-    )
-    .toBe(true);
-  await order.selectOption("timeline");
+  await expect(order).toHaveValue("timeline");
+  await expect(page.getByTestId("message-thread-panel")).toHaveCount(0);
   await page.getByTestId("channel-random").click();
   await expect(order).toHaveValue("threads");
   await page.getByTestId("channel-general").click();

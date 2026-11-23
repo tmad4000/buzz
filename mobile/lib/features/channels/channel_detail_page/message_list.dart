@@ -18,6 +18,9 @@ class _MessageList extends HookConsumerWidget {
   final double composerBottomInset;
   final FocusNode? composerFocusNode;
   final VoidCallback? restoreComposerFocus;
+  final bool isFlatTimeline;
+  final ValueChanged<TimelineMessage>? onReplyInPlace;
+  final ValueChanged<bool Function(String messageId)>? onJumpReady;
 
   const _MessageList({
     required this.entries,
@@ -37,6 +40,9 @@ class _MessageList extends HookConsumerWidget {
     required this.composerBottomInset,
     this.composerFocusNode,
     this.restoreComposerFocus,
+    this.isFlatTimeline = false,
+    this.onReplyInPlace,
+    this.onJumpReady,
   });
 
   @override
@@ -221,6 +227,40 @@ class _MessageList extends HookConsumerWidget {
           ? null
           : displayEntries.length - 1 - chronologicalIndex;
     }
+
+    final messagesById = isFlatTimeline
+        ? {for (final message in allMessages) message.id: message}
+        : const <String, TimelineMessage>{};
+    final highlightedMessageId = useState<String?>(null);
+    final highlightTimer = useRef<Timer?>(null);
+    useEffect(
+      () =>
+          () => highlightTimer.value?.cancel(),
+      const [],
+    );
+    bool jumpToOriginal(String messageId) {
+      final targetIndex = reversedIndexOf(messageId);
+      if (targetIndex == null || !itemScrollController.isAttached) return false;
+      followsLatest.value = false;
+      hasUserScrolled.value = true;
+      isAtLatest.value = false;
+      unawaited(
+        itemScrollController.scrollTo(
+          index: targetIndex,
+          alignment: 0.35,
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+        ),
+      );
+      highlightedMessageId.value = messageId;
+      highlightTimer.value?.cancel();
+      highlightTimer.value = Timer(const Duration(seconds: 2), () {
+        if (context.mounted) highlightedMessageId.value = null;
+      });
+      return true;
+    }
+
+    onJumpReady?.call(jumpToOriginal);
 
     double latestAlignment() {
       final viewportHeight = timelineViewportHeight.value;
@@ -848,18 +888,47 @@ class _MessageList extends HookConsumerWidget {
                             isArchived: isArchived,
                           )
                         else ...[
-                          _MessageBubble(
+                          _TimelineRow(
                             message: message,
-                            showAuthor: showAuthor,
-                            hasReplies: entry.summary != null,
-                            channelNames: channelNamesMap,
-                            currentChannelId: channelId,
-                            currentPubkey: currentPubkey,
-                            allMessages: allMessages,
-                            isMember: isMember,
-                            isArchived: isArchived,
-                            composerFocusNode: composerFocusNode,
-                            restoreComposerFocus: restoreComposerFocus,
+                            isFlat: isFlatTimeline,
+                            isHighlighted:
+                                message.id == highlightedMessageId.value,
+                            onReply: onReplyInPlace,
+                            child: _MessageBubble(
+                              quote: !isFlatTimeline
+                                  ? null
+                                  : _timelineQuote(
+                                      message: message,
+                                      channelId: channelId,
+                                      messagesById: messagesById,
+                                      onJump: (parentId) {
+                                        if (jumpToOriginal(parentId)) return;
+                                        _openTimelineThread(
+                                          context,
+                                          message: message,
+                                          allMessages: allMessages,
+                                          channelId: channelId,
+                                          currentPubkey: currentPubkey,
+                                          isMember: isMember,
+                                          isArchived: isArchived,
+                                        );
+                                      },
+                                    ),
+                              message: message,
+                              onReply: onReplyInPlace == null
+                                  ? null
+                                  : () => onReplyInPlace!(message),
+                              showAuthor: showAuthor,
+                              hasReplies: entry.summary != null,
+                              channelNames: channelNamesMap,
+                              currentChannelId: channelId,
+                              currentPubkey: currentPubkey,
+                              allMessages: allMessages,
+                              isMember: isMember,
+                              isArchived: isArchived,
+                              composerFocusNode: composerFocusNode,
+                              restoreComposerFocus: restoreComposerFocus,
+                            ),
                           ),
                           if (entry.summary != null)
                             _ThreadSummaryRow(

@@ -1,4 +1,12 @@
 import { buildThreadRoutingEntries } from "@/features/messages/lib/threadRouting";
+import {
+  buildFlatThreadEntries,
+  hasNestedReplies,
+} from "@/features/messages/lib/flatThreadView";
+import {
+  ThreadOrderSetting,
+  useFlatThreadView,
+} from "@/features/messages/ui/ThreadOrderSetting";
 import * as React from "react";
 import { useThreadDisclosureFocus } from "@/features/messages/ui/useThreadDisclosureFocus";
 import { PanelRight, ChevronDown, ChevronRight } from "lucide-react";
@@ -273,7 +281,37 @@ function InlineThreadContent({
   const [extra, setExtra] = React.useState(0);
   const [showAll, setShowAll] = React.useState(false);
   const limit = (mobile ? 4 : 8) + extra;
-  const rootOpen = thread.expanded.has(root.id);
+  const { flat, setFlat } = useFlatThreadView(
+    currentPubkey,
+    channel.id,
+    root.id,
+  );
+  const [jumped, setJumped] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    if (!jumped) return;
+    const timer = window.setTimeout(() => setJumped(null), 2_000);
+    return () => window.clearTimeout(timer);
+  }, [jumped]);
+  const jumpInFlat = React.useCallback(
+    (rootId: string, messageId: string) => {
+      const row = region.current?.querySelector(
+        `[data-message-id="${CSS.escape(messageId)}"]`,
+      );
+      if (!row) {
+        onJumpToThreadMessage?.(rootId, messageId);
+        return;
+      }
+      row.scrollIntoView({ block: "center" });
+      setJumped(messageId);
+    },
+    [onJumpToThreadMessage],
+  );
+  const rootOpen = flat || thread.expanded.has(root.id);
+  const available = React.useMemo(
+    () =>
+      flat ? buildFlatThreadEntries(thread.index, root.id) : thread.entries,
+    [flat, thread.index, thread.entries, root.id],
+  );
   const previewIds = React.useMemo(() => {
     if (!previewTarget || showAll) return null;
     const parents = completeThreadAncestors(
@@ -286,11 +324,11 @@ function InlineThreadContent({
   const entries = React.useMemo(
     () =>
       rootOpen
-        ? thread.entries
+        ? available
             .filter((entry) => !previewIds || previewIds.has(entry.message.id))
             .slice(0, limit)
         : [],
-    [rootOpen, thread.entries, previewIds, limit],
+    [rootOpen, available, previewIds, limit],
   );
   const rows = React.useMemo(
     () => entries.map((entry) => entry.message),
@@ -300,11 +338,12 @@ function InlineThreadContent({
   useVisibleThreadReplies(
     region,
     rows,
-    onRepliesRevealed,
+    // Flat shows replies the reader never expanded, so showing is not reading.
+    flat ? undefined : onRepliesRevealed,
     canonicalRoot,
     `${scope}:${root.id}`,
   );
-  const more = thread.entries.length > entries.length || query.hasNextPage;
+  const more = available.length > entries.length || query.hasNextPage;
   return (
     <>
       {query.isPending ? (
@@ -330,6 +369,15 @@ function InlineThreadContent({
           Show replies
         </button>
       ) : null}
+      {flat || hasNestedReplies(thread.index, root.id) ? (
+        <div className="mb-1 flex justify-end px-3">
+          <ThreadOrderSetting
+            flat={flat}
+            label={`Order of replies to ${root.author}`}
+            onChange={setFlat}
+          />
+        </div>
+      ) : null}
       <div
         ref={region}
         data-testid="inline-thread-replies"
@@ -337,14 +385,20 @@ function InlineThreadContent({
       >
         {entries.map(({ message }) => {
           const stats = thread.index.descendantStatsByMessageId.get(message.id);
-          const hasChildren = (stats?.descendantCount ?? 0) > 0;
+          const hasChildren = !flat && (stats?.descendantCount ?? 0) > 0;
           const open = thread.expanded.has(message.id);
           return (
             <div key={message.renderKey ?? message.id}>
-              <span className="sr-only">Reply depth {message.depth}</span>
+              {flat ? null : (
+                <span className="sr-only">Reply depth {message.depth}</span>
+              )}
               <MessageThreadRow
                 parentMessages={thread.index.messageById}
-                onJumpToThreadMessage={onJumpToThreadMessage}
+                inThreadPanel={flat}
+                highlighted={message.id === jumped}
+                onJumpToThreadMessage={
+                  flat ? jumpInFlat : onJumpToThreadMessage
+                }
                 channelId={channel.id}
                 actionBarPlacement="inside"
                 currentPubkey={currentPubkey}
@@ -388,7 +442,7 @@ function InlineThreadContent({
             setShowAll(true);
             setExtra((value) => value + 20);
             if (
-              thread.entries.length < limit + 20 &&
+              available.length < limit + 20 &&
               query.hasNextPage &&
               !query.isFetchingNextPage
             )
@@ -399,7 +453,7 @@ function InlineThreadContent({
             ? "Loading more replies…"
             : query.hasNextPage
               ? "More replies"
-              : `Show ${Math.min(20, thread.entries.length - entries.length)} more replies`}
+              : `Show ${Math.min(20, available.length - entries.length)} more replies`}
         </button>
       ) : null}
       {data.missingRange && !query.isError ? (
@@ -426,7 +480,7 @@ function InlineThreadContent({
       !query.isError &&
       !data.missingRange &&
       rootOpen &&
-      thread.entries.length === 0 &&
+      available.length === 0 &&
       summary.replyCount > 0 ? (
         <p className="px-3 py-2 text-sm text-muted-foreground">
           {summary.replyCount > 0

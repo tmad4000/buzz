@@ -3,24 +3,26 @@ import { InlineAutoExpansionProvider } from "@/features/messages/ui/InlineAutoEx
 import type { TimelineMessage } from "@/features/messages/types";
 import { TimelineViewContext, useTimelineView } from "./TimelineViewContext";
 
-/** Forward the shared reply-observation callback to each mounted Timeline row. */
+/** Forward the shared reply-observation and in-place jump callbacks to each mounted Timeline row. */
 export function ChannelTimelineProviders({
   children,
   hidden,
   scope,
   currentPubkey,
+  onJumpToMessage,
   onRepliesRevealed,
 }: {
   children: React.ReactNode;
   hidden?: boolean;
   scope: string;
   currentPubkey?: string;
+  onJumpToMessage?: (id: string, onUnavailable?: () => void) => void;
   onRepliesRevealed?: (messages: TimelineMessage[], rootId?: string) => void;
 }) {
   const view = useTimelineView();
   const value = React.useMemo(
-    () => ({ ...view, onRepliesRevealed }),
-    [view, onRepliesRevealed],
+    () => ({ ...view, onRepliesRevealed, jumpToMessage: onJumpToMessage }),
+    [view, onRepliesRevealed, onJumpToMessage],
   );
   return (
     <TimelineViewContext.Provider value={value}>

@@ -13,6 +13,12 @@ class _MessageBubble extends HookConsumerWidget {
   final FocusNode? composerFocusNode;
   final VoidCallback? restoreComposerFocus;
 
+  /// Quoted parent shown above the message in a flat Timeline.
+  final Widget? quote;
+
+  /// Answers in this view instead of opening the message as a thread.
+  final VoidCallback? onReply;
+
   const _MessageBubble({
     required this.message,
     required this.showAuthor,
@@ -25,6 +31,8 @@ class _MessageBubble extends HookConsumerWidget {
     this.isArchived = false,
     this.composerFocusNode,
     this.restoreComposerFocus,
+    this.onReply,
+    this.quote,
   });
 
   @override
@@ -117,6 +125,7 @@ class _MessageBubble extends HookConsumerWidget {
         onPopoverDismissed: () => details.setSourceHidden(false),
         composerFocusNode: composerFocusNode,
         restoreComposerFocus: restoreComposerFocus,
+        onReply: onReply,
       );
     }
 
@@ -159,6 +168,13 @@ class _MessageBubble extends HookConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                if (quote case final quoted?)
+                  Padding(
+                    padding: const EdgeInsets.only(
+                      left: messageAvatarSize + messageAvatarContentGap,
+                    ),
+                    child: quoted,
+                  ),
                 RepaintBoundary(
                   key: messageSnapshotKey,
                   child: Row(
@@ -261,6 +277,10 @@ class _MessageBubble extends HookConsumerWidget {
                                     ? null
                                     : () {
                                         if (!context.mounted) return;
+                                        if (onReply != null) {
+                                          onReply!();
+                                          return;
+                                        }
                                         Navigator.of(context).push(
                                           MaterialPageRoute<void>(
                                             builder: (_) => ThreadDetailPage(

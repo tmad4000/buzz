@@ -14,6 +14,7 @@ Future<bool> _showNativeMessageActions({
   required Future<ui.Image> Function()? captureAnchorSnapshot,
   required FocusNode? composerFocusNode,
   required VoidCallback? restoreComposerFocus,
+  required VoidCallback? onReply,
   required ValueChanged<bool>? onPopoverPreviewVisibilityChanged,
   required VoidCallback? onPopoverDismissed,
 }) async {
@@ -65,6 +66,10 @@ Future<bool> _showNativeMessageActions({
     if (!message.isSystem) {
       if (allMessages != null) {
         action('reply', 'Reply', 'arrowshape.turn.up.left', () {
+          if (onReply != null) {
+            onReply();
+            return;
+          }
           Navigator.of(context).push(
             MaterialPageRoute<void>(
               builder: (_) => ThreadDetailPage(

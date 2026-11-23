@@ -60,6 +60,8 @@ export function useChannelMessageSend({
       threadContext?: {
         parentEventId: string | null;
         threadHeadId: string | null;
+        /** The reply renders in this flat view, so own-send scrolling applies. */
+        inTimeline?: boolean;
       } | null,
       forceRest?: boolean,
       outbox?: import("@/features/messages/outbox/types").OutboxSubmission,
@@ -68,12 +70,13 @@ export function useChannelMessageSend({
         isActiveWelcomeChannel &&
         (containsWelcomePersonaMention(content) ||
           mentionsKnownAgent(mentionPubkeys, knownAgentPubkeys));
+      const rendersHere =
+        !threadContext?.parentEventId || threadContext.inTimeline === true;
       const attempt =
-        !threadContext?.parentEventId &&
-        (!channelId || channelId === activeChannelId)
+        rendersHere && (!channelId || channelId === activeChannelId)
           ? captureScrollSend()
           : undefined;
-      if (!attempt && !threadContext?.parentEventId)
+      if (!attempt && rendersHere)
         messageTimelineRef.current?.scrollToBottomOnNextUpdate();
       const published = await onSendMessage(
         content,
