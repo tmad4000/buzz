@@ -39,4 +39,10 @@ void main() {
       'from:a deploy',
     );
   });
+
+  test('operator text inside a quoted value is never edited', () {
+    const query = 'deploy from:"Ann in:x"';
+    expect(setSearchOperator(query, 'in', null), query);
+    expect(setSearchOperator(query, 'in', '#y'), '$query in:#y ');
+  });
 }

@@ -31,6 +31,8 @@ async function openDeepHistorySearch(page: Page) {
 async function chooseSort(page: Page, sort: "relevance" | "newest" | "oldest") {
   await page.getByTestId("search-sort").click();
   await page.getByTestId(`search-sort-${sort}`).click();
+  // A menu that is still closing consumes the next key.
+  await expect(page.getByTestId(`search-sort-${sort}`)).toHaveCount(0);
 }
 
 test("sorting finds the true newest and oldest matches beyond the first page", async ({
@@ -167,6 +169,9 @@ test("controls work by keyboard", async ({ page }) => {
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("search-sort")).toHaveText("Sort: Newest");
   await expect(messageRows(page).first()).toContainText("#599");
+  // Closing the menu returns focus to its trigger.
+  await expect(page.getByTestId("search-sort-newest")).toHaveCount(0);
+  await expect(page.getByTestId("search-sort")).toBeFocused();
   await page.keyboard.press("Shift+Tab");
   await expect(page.getByTestId("search-filter-date")).toBeFocused();
 });

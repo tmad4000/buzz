@@ -109,9 +109,10 @@ String? formatOperatorValue(String value) {
 /// Replaces every [kind] operator in [raw], or removes it for a null [value].
 String setSearchOperator(String raw, String kind, String? value) {
   final kept = raw
-      .replaceAll(
-        RegExp('(?:^|\\s)$kind:(?:"[^"]+"|\\S+)', caseSensitive: false),
-        '',
+      .replaceAllMapped(
+        // Match every operator so a quoted value is skipped as one token.
+        SearchOperators._operator,
+        (match) => match[1]!.toLowerCase() == kind ? '' : match[0]!,
       )
       .trim();
   final formatted = value == null ? null : formatOperatorValue(value);

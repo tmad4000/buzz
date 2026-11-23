@@ -20,16 +20,13 @@ export function getMinimumSearchQueryLength(channelId?: string | null) {
 async function relaySupportsSearchSort(
   queryClient: QueryClient,
 ): Promise<boolean> {
-  try {
-    const relayUrl = await getRelayHttpUrl();
-    return await queryClient.fetchQuery({
-      queryKey: ["relay-search-sort", relayUrl],
-      queryFn: () => fetchRelaySearchSortSupport(relayUrl),
-      staleTime: 5 * 60 * 1_000,
-    });
-  } catch {
-    return false;
-  }
+  const relayUrl = await getRelayHttpUrl();
+  return queryClient.fetchQuery({
+    queryKey: ["relay-search-sort", relayUrl],
+    // Cached either way, so an unreadable relay is not probed every search.
+    queryFn: () => fetchRelaySearchSortSupport(relayUrl).catch(() => false),
+    staleTime: 5 * 60 * 1_000,
+  });
 }
 
 export function useSearchMessagesQuery(

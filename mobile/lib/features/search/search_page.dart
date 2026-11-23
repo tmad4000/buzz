@@ -625,6 +625,19 @@ class _SearchBody extends ConsumerWidget {
             currentPubkey: currentPubkey,
             onResultSelected: recordResultSelection,
           ),
+        if (showMessages && state.error != null)
+          Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: Grid.gutter,
+              vertical: Grid.xs,
+            ),
+            child: Text(
+              "Couldn't search messages. Check your connection.",
+              style: context.textTheme.bodyMedium?.copyWith(
+                color: context.colors.error,
+              ),
+            ),
+          ),
         if (showMessages && state.hasMoreMessages && !state.isLoading)
           Align(
             alignment: AlignmentDirectional.centerStart,

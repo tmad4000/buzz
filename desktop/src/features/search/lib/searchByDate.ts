@@ -42,7 +42,9 @@ export function compareByDate(order: DateOrder) {
  * date is not "the newest matches". Two exact routes exist:
  *
  * 1. `nativeNewest`: the relay orders by date itself (`buzz-search-sort`).
- * 2. Narrowing. A page shorter than requested holds every match in its window.
+ * 2. Narrowing. A page shorter than requested holds every match in its window:
+ *    the relay truncates after its own scope and visibility predicates, so its
+ *    later per-hit checks are only defence in depth for message kinds.
  *    A full page is only a sample, but the date of its `limit`-th hit in this
  *    order is a proven bound: at least `limit` matches lie within it. Re-query
  *    inside the bound (inclusive, so same-second ties stay in), galloping past

@@ -250,6 +250,8 @@ function DateRange({
   const [draft, setDraft] = React.useState(() => includedDays(query));
   const commit = (next: { first: string; last: string }) => {
     setDraft(next);
+    const isReversed = next.first && next.last && next.first > next.last;
+    if (isReversed) return;
     if ([next.first, next.last].every((day) => !day || day >= "1970-01-02")) {
       onQueryChange(withDays(query, next.first, next.last));
     }

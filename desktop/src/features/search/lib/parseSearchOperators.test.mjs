@@ -164,3 +164,9 @@ test("date helpers stay on local calendar days", () => {
     "2027-01-01",
   );
 });
+
+test("operator text inside a quoted value is never edited", () => {
+  const query = 'deploy from:"Ann in:x"';
+  assert.equal(setSearchOperator(query, "in", null), query);
+  assert.equal(setSearchOperator(query, "in", "#y"), `${query} in:#y `);
+});

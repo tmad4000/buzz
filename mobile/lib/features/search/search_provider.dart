@@ -123,13 +123,14 @@ class SearchState {
     bool? sortIsExact,
     bool? hasMoreMessages,
     String? notice,
+    bool clearError = false,
   }) => SearchState(
     query: query ?? this.query,
     messageResults: messageResults ?? this.messageResults,
     userResults: userResults ?? this.userResults,
     channelResults: channelResults ?? this.channelResults,
     isLoading: isLoading ?? this.isLoading,
-    error: error ?? this.error,
+    error: clearError ? null : error ?? this.error,
     sort: sort,
     sortIsExact: sortIsExact ?? this.sortIsExact,
     hasMoreMessages: hasMoreMessages ?? this.hasMoreMessages,
@@ -217,7 +218,7 @@ class SearchNotifier extends Notifier<SearchState> {
     if (!state.hasMoreMessages || state.isLoading) return;
     _limit = (_limit + _messageLimit).clamp(_messageLimit, _messageLimitMax);
     final generation = ++_generation;
-    state = state.copyWith(isLoading: true);
+    state = state.copyWith(isLoading: true, clearError: true);
     unawaited(_searchMessages(state.query, generation));
   }
 
@@ -254,11 +255,11 @@ class SearchNotifier extends Notifier<SearchState> {
   }
 
   /// Resolves `in:` to a channel id. Null means no channel matched.
-  String? _resolveChannel(String raw) {
+  Future<String?> _resolveChannel(String raw) async {
     final picked = _pickedIn;
     if (picked != null && picked.written == raw) return picked.id;
     final value = (raw.startsWith('#') ? raw.substring(1) : raw).toLowerCase();
-    for (final channel in ref.read(channelsProvider).value ?? <Channel>[]) {
+    for (final channel in await ref.read(channelsProvider.future)) {
       if (channel.id.toLowerCase() == value ||
           channel.name.toLowerCase() == value) {
         return channel.id;
@@ -281,7 +282,7 @@ class SearchNotifier extends Notifier<SearchState> {
       // An unmatched filter must never silently widen the search.
       final channelId = operators.inChannel == null
           ? null
-          : _resolveChannel(operators.inChannel!);
+          : await _resolveChannel(operators.inChannel!);
       final author = operators.from == null
           ? null
           : await _resolveAuthor(operators.from!);

@@ -196,7 +196,10 @@ export function setSearchOperator(
   value: string | null,
 ): string {
   const kept = raw
-    .replace(new RegExp(`(?:^|\\s)${kind}:(?:"[^"]+"|\\S+)`, "gi"), "")
+    // Match every operator so a quoted value is skipped as one token.
+    .replace(OPERATOR_RE, (match, found: string) =>
+      found.toLowerCase() === kind ? "" : match,
+    )
     .trim();
   const formatted = value === null ? null : formatOperatorValue(value);
   if (formatted === null) {
