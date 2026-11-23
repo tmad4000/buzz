@@ -15,6 +15,7 @@ import '../../shared/widgets/frosted_app_bar.dart';
 import '../../shared/widgets/frosted_scaffold.dart';
 import '../../shared/widgets/ios_navigation_metrics.dart';
 import '../../shared/widgets/message_author_meta.dart';
+import '../../shared/widgets/modal_presentation.dart';
 import '../channels/channel.dart';
 import '../channels/channel_detail_page.dart';
 import '../channels/channel_identity_names_provider.dart';
@@ -28,8 +29,10 @@ import '../profile/profile_provider.dart';
 import '../../shared/profile/user_cache_provider.dart';
 import '../../shared/profile/user_profile.dart';
 import 'recent_searches_provider.dart';
+import 'search_operators.dart';
 import 'search_provider.dart';
 
+part 'search_page/filter_bar.dart';
 part 'search_page/message_tile.dart';
 
 enum _SearchFilter { all, messages, channels, people }
@@ -225,6 +228,19 @@ class SearchPage extends HookConsumerWidget {
       ref.read(recentSearchesProvider.notifier).record(query);
       ref.read(searchProvider.notifier).search(query);
     }
+
+    void replaceQuery(String query) {
+      textController.value = TextEditingValue(
+        text: query,
+        selection: TextSelection.collapsed(offset: query.length),
+      );
+      ref.read(searchProvider.notifier).search(query);
+    }
+
+    final showMessageControls =
+        (isSearchEditing.value || searchState.query.isNotEmpty) &&
+        (activeFilter.value == _SearchFilter.all ||
+            activeFilter.value == _SearchFilter.messages);
 
     return FrostedScaffold(
       nativePinnedBody: true,
@@ -470,6 +486,13 @@ class SearchPage extends HookConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    if (showMessageControls)
+                      _SearchFilterBar(
+                        query: textController.text,
+                        sort: searchState.sort,
+                        currentPubkey: currentPubkey,
+                        onQueryChanged: replaceQuery,
+                      ),
                     Expanded(
                       child: _SearchBody(
                         state: searchState,
@@ -562,7 +585,10 @@ class _SearchBody extends ConsumerWidget {
         ),
         child: Center(
           child: Text(
-            "No results for '${state.query}'",
+            state.notice ??
+                (state.error != null
+                    ? "Couldn't search messages. Check your connection."
+                    : "No results for '${state.query}'"),
             style: context.textTheme.bodyMedium?.copyWith(
               color: context.colors.onSurfaceVariant,
             ),
@@ -593,8 +619,36 @@ class _SearchBody extends ConsumerWidget {
         if (showMessages && state.messageResults.isNotEmpty)
           _MessagesSection(
             hits: state.messageResults,
+            title: state.sort == SearchSort.relevance
+                ? 'Messages'
+                : state.sort.heading(exact: state.sortIsExact),
             currentPubkey: currentPubkey,
             onResultSelected: recordResultSelection,
+          ),
+        if (showMessages && state.error != null)
+          Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: Grid.gutter,
+              vertical: Grid.xs,
+            ),
+            child: Text(
+              "Couldn't search messages. Check your connection.",
+              style: context.textTheme.bodyMedium?.copyWith(
+                color: context.colors.error,
+              ),
+            ),
+          ),
+        if (showMessages && state.hasMoreMessages && !state.isLoading)
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: Grid.xs),
+              child: TextButton(
+                key: const Key('search-show-more'),
+                onPressed: ref.read(searchProvider.notifier).showMoreMessages,
+                child: const Text('Show more messages'),
+              ),
+            ),
           ),
         if (state.isLoading)
           const Padding(
@@ -838,11 +892,13 @@ class _PeopleSection extends ConsumerWidget {
 
 class _MessagesSection extends HookConsumerWidget {
   final List<SearchHit> hits;
+  final String title;
   final String? currentPubkey;
   final VoidCallback onResultSelected;
 
   const _MessagesSection({
     required this.hits,
+    required this.title,
     required this.currentPubkey,
     required this.onResultSelected,
   });
@@ -866,7 +922,7 @@ class _MessagesSection extends HookConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _SectionLabel(label: 'Messages'),
+        _SectionLabel(label: title),
         for (final hit in hits)
           _MessageTile(
             hit: hit,

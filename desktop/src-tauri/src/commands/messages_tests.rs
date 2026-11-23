@@ -87,7 +87,8 @@ fn managed_agent_message_builder_rejects_invalid_mentions() {
 }
 #[test]
 fn search_messages_filter_requests_prefix_mode_for_topbar_typeahead() {
-    let filter = build_search_messages_filter("  pro  ", 12, Some("channel-1"), None, None, None);
+    let filter =
+        build_search_messages_filter("  pro  ", 12, Some("channel-1"), None, None, None, None);
 
     assert_eq!(filter["search"], serde_json::json!("pro"));
     assert_eq!(filter["search_mode"], serde_json::json!("prefix"));
@@ -96,6 +97,18 @@ fn search_messages_filter_requests_prefix_mode_for_topbar_typeahead() {
     assert!(filter.get("authors").is_none());
     assert!(filter.get("since").is_none());
     assert!(filter.get("until").is_none());
+}
+
+#[test]
+fn search_messages_filter_sends_only_the_relay_defined_sort() {
+    let sort_of = |sort| {
+        build_search_messages_filter("deploy", 20, None, None, None, None, sort)
+            .get("search_sort")
+            .cloned()
+    };
+    assert_eq!(sort_of(Some("newest")), Some(serde_json::json!("newest")));
+    assert_eq!(sort_of(Some("oldest")), None);
+    assert_eq!(sort_of(None), None);
 }
 
 #[test]
@@ -109,6 +122,7 @@ fn search_messages_filter_emits_operator_fields() {
         Some(&authors),
         Some(1_700_000_000),
         Some(1_700_086_400),
+        None,
     );
 
     assert_eq!(filter["search"], serde_json::json!("deploy"));

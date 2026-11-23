@@ -8,6 +8,11 @@ import { resolveUserLabel } from "@/features/profile/lib/identity";
 import { getMinimumSearchQueryLength } from "@/features/search/hooks";
 import { parseSearchOperators } from "@/features/search/lib/parseSearchOperators";
 import { buildSearchResultPreview } from "@/features/search/lib/searchMatch";
+import {
+  messageSectionTitle,
+  type SearchSort,
+} from "@/features/search/lib/searchSort";
+import { SearchFilterRow } from "@/features/search/ui/SearchFilterRow";
 import { useSearchResults } from "@/features/search/useSearchResults";
 import {
   resultIcon,
@@ -90,10 +95,14 @@ function formatRelativeTime(unixSeconds: number) {
     return `${Math.floor(diff / (60 * 60 * 24))}d ago`;
   }
 
+  const date = new Date(unixSeconds * 1_000);
   return new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
-  }).format(new Date(unixSeconds * 1_000));
+    // Date-ordered results reach back years; a bare "Aug 3" would mislead.
+    year:
+      date.getFullYear() === new Date().getFullYear() ? undefined : "numeric",
+  }).format(date);
 }
 
 function getChannelActivityTime(channel: Channel) {
@@ -219,7 +228,11 @@ function getResultSectionKey(result: SearchResult): SearchResultSectionKey {
   return "messages";
 }
 
-function getSectionTitle(sectionKey: SearchResultSectionKey) {
+function getSectionTitle(
+  sectionKey: SearchResultSectionKey,
+  sort: SearchSort,
+  exact: boolean,
+) {
   switch (sectionKey) {
     case "channels":
       return "Channels";
@@ -230,7 +243,7 @@ function getSectionTitle(sectionKey: SearchResultSectionKey) {
     case "agents":
       return "Agents";
     case "messages":
-      return "Most relevant";
+      return messageSectionTitle(sort, exact);
     case "actions":
       return "Actions";
   }
@@ -260,7 +273,11 @@ function SearchHitContextLine({ label }: { label: SearchHitContextLabel }) {
   );
 }
 
-function groupSearchResults(results: SearchResult[]): SearchResultSection[] {
+function groupSearchResults(
+  results: SearchResult[],
+  sort: SearchSort,
+  exact: boolean,
+): SearchResultSection[] {
   const resultsBySection = new Map<SearchResultSectionKey, SearchResult[]>();
 
   for (const result of results) {
@@ -281,7 +298,7 @@ function groupSearchResults(results: SearchResult[]): SearchResultSection[] {
       {
         key: sectionKey,
         results: sectionResults,
-        title: getSectionTitle(sectionKey),
+        title: getSectionTitle(sectionKey, sort, exact),
       },
     ];
   });
@@ -405,8 +422,15 @@ export function TopbarSearch({
   const { cancelDeferredModalOpen, openAfterExit, openNextFrame } =
     useDeferredModalOpen();
   const {
+    canShowMore,
     channelLookup,
     debouncedQuery,
+    hasUnresolvedOperator,
+    needsSearchText,
+    pickOperator,
+    setSort,
+    showMore,
+    sort,
     fuzzyUserCandidatesQuery,
     isWaitingOnFromResolution,
     query,
@@ -495,10 +519,11 @@ export function TopbarSearch({
       ),
     [currentPubkeyNormalized, results],
   );
+  const sortIsExact = searchQuery.data?.exact !== false;
   const visibleSearchableResults = resultsAreCurrent ? searchableResults : [];
   const searchResultSections = React.useMemo(
-    () => groupSearchResults(visibleSearchableResults),
-    [visibleSearchableResults],
+    () => groupSearchResults(visibleSearchableResults, sort, sortIsExact),
+    [sort, sortIsExact, visibleSearchableResults],
   );
   const groupedSearchResults = React.useMemo(
     () => searchResultSections.flatMap((section) => section.results),
@@ -904,15 +929,23 @@ export function TopbarSearch({
           currentChannelSearchAction ? "pb-5" : "py-5",
         )}
       >
-        No {scopeChannel ? "messages" : "matches"} for{" "}
-        <span className="font-semibold">{trimmedQuery}</span>
-        {scopeLabel ? (
+        {hasUnresolvedOperator ? (
+          "No one or no channel matches that filter."
+        ) : needsSearchText ? (
+          "Add a word to search. Filters narrow matching messages."
+        ) : (
           <>
-            {" "}
-            in <span className="font-semibold">{scopeLabel}</span>
+            No {scopeChannel ? "messages" : "matches"} for{" "}
+            <span className="font-semibold">{trimmedQuery}</span>
+            {scopeLabel ? (
+              <>
+                {" "}
+                in <span className="font-semibold">{scopeLabel}</span>
+              </>
+            ) : null}
+            .
           </>
-        ) : null}
-        .
+        )}
       </p>
     </div>
   ) : (
@@ -924,6 +957,17 @@ export function TopbarSearch({
       {currentChannelSearchAction}
       <div className="p-1.5">
         {renderSearchResultSections(searchResultSections)}
+        {canShowMore ? (
+          <button
+            className="w-full rounded-lg px-2.5 py-2 text-left text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/35 hover:text-foreground focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-60"
+            data-testid="search-show-more"
+            disabled={searchQuery.isFetching}
+            onClick={showMore}
+            type="button"
+          >
+            {searchQuery.isFetching ? "Loading…" : "Show more messages"}
+          </button>
+        ) : null}
       </div>
     </div>
   );
@@ -996,6 +1040,27 @@ export function TopbarSearch({
             onRemoveScope={removeChannelScope}
             query={query}
             scopeLabel={scopeLabel}
+          />
+          <SearchFilterRow
+            channelLabels={channelLabels}
+            channels={channels}
+            currentPubkey={currentPubkey}
+            hideChannel={Boolean(scopeChannel)}
+            onPick={(kind, value) => {
+              pickOperator(kind, value);
+              setSelectedMenuIndex(0);
+              focusDialogInput();
+            }}
+            onQueryChange={(nextQuery) => {
+              setQuery(nextQuery);
+              setSelectedMenuIndex(0);
+            }}
+            onSortChange={(nextSort) => {
+              setSort(nextSort);
+              setSelectedMenuIndex(0);
+            }}
+            query={query}
+            sort={sort}
           />
           {searchResultContent}
         </DialogContent>

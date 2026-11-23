@@ -8,6 +8,8 @@ export type SearchMessagesInput = {
   since?: number;
   /** Unix seconds (`before:YYYY-MM-DD`). */
   until?: number;
+  /** Relay-side ordering; only for relays advertising `buzz-search-sort`. */
+  sort?: "newest";
 };
 
 export type SearchHit = {

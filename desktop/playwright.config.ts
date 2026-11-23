@@ -30,6 +30,7 @@ export default defineConfig({
         "**/sidebar-unread-badges.spec.ts",
         "**/tooltip-semantics.spec.ts",
         "**/search-scope-screenshots.spec.ts",
+        "**/search-sort-filters.spec.ts",
         "**/onboarding-docked-cta-screenshots.spec.ts",
         "**/buzz-setup-smoke.spec.ts",
         "**/inline-threads.spec.ts",

@@ -10031,6 +10031,7 @@ async function handleSearchMessages(
     authors?: string[];
     since?: number;
     until?: number;
+    sort?: "newest";
   },
   config: E2eConfig | undefined,
 ): Promise<RawSearchResponse> {
@@ -10127,6 +10128,9 @@ async function handleSearchMessages(
           until: args.until,
         }),
       )
+      .sort((a, b) =>
+        args.sort === "newest" ? b.created_at - a.created_at : 0,
+      )
       .slice(0, limit);
 
     return {
@@ -10153,6 +10157,9 @@ async function handleSearchMessages(
   }
   if (args.until != null) {
     filter.until = args.until;
+  }
+  if (args.sort) {
+    filter.search_sort = args.sort;
   }
   const events = await relayQuery(config, [filter]);
   const hits = events.map((ev) => ({

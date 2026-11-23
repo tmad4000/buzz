@@ -34,7 +34,7 @@ export type ParsedSearchOperators = {
 };
 
 /** Token-start only — not `\b`, which fires after hyphens and slashes. */
-const OPERATOR_RE = /(?:^|\s)(from|in|after|before):(\S+)/gi;
+const OPERATOR_RE = /(?:^|\s)(from|in|after|before):("[^"]+"|\S+)/gi;
 
 function parseLocalDayStart(value: string): number | null {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
@@ -61,8 +61,15 @@ function parseLocalDayStart(value: string): number | null {
   return Math.floor(date.getTime() / 1000);
 }
 
-/** Drop trailing punctuation so `in:general,` still resolves to `general`. */
+/**
+ * Unquote, or drop trailing punctuation so `in:general,` still resolves to
+ * `general`.
+ */
 function cleanOperatorValue(value: string): string {
+  const quoted = /^"([^"]+)"$/.exec(value);
+  if (quoted) {
+    return quoted[1];
+  }
   return value.replace(/[.,;:!?]+$/g, "");
 }
 
@@ -72,8 +79,7 @@ function cleanOperatorValue(value: string): string {
  * Later occurrences of the same operator win. Date operators that are not
  * `YYYY-MM-DD` stay in the returned `text`.
  *
- * Multi-word handles (`from:@Will Pfleger`) are a known limitation of part 1:
- * only the first whitespace-delimited token is captured.
+ * Values with spaces are quoted: `from:"@Will Pfleger"`.
  */
 export function parseSearchOperators(raw: string): ParsedSearchOperators {
   let from: string | null = null;
@@ -166,3 +172,50 @@ export type OperatorResolveResult<T> =
   | { status: "none" }
   | { status: "resolved"; value: T }
   | { status: "unresolved" };
+
+export type SearchOperatorKind = "from" | "in" | "after" | "before";
+
+/**
+ * Write an operator value so `parseSearchOperators` reads back exactly `value`,
+ * or `null` when it cannot be expressed (it contains a double quote).
+ */
+export function formatOperatorValue(value: string): string | null {
+  if (!value || value.includes('"')) {
+    return null;
+  }
+  return /\s|[.,;:!?]$/.test(value) ? `"${value}"` : value;
+}
+
+/**
+ * Replace every `kind:` operator in `raw` with one carrying `value`, or remove
+ * it when `value` is null. The result ends in a space so typing can continue.
+ */
+export function setSearchOperator(
+  raw: string,
+  kind: SearchOperatorKind,
+  value: string | null,
+): string {
+  const kept = raw
+    // Match every operator so a quoted value is skipped as one token.
+    .replace(OPERATOR_RE, (match, found: string) =>
+      found.toLowerCase() === kind ? "" : match,
+    )
+    .trim();
+  const formatted = value === null ? null : formatOperatorValue(value);
+  if (formatted === null) {
+    return kept;
+  }
+  return `${kept ? `${kept} ` : ""}${kind}:${formatted} `;
+}
+
+/** Local calendar day as the `YYYY-MM-DD` the date operators accept. */
+export function toOperatorDay(date: Date): string {
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+/** `day` moved by whole calendar days (DST-safe). */
+export function shiftDay(date: Date, days: number): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate() + days);
+}
