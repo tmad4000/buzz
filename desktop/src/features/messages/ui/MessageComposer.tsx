@@ -215,6 +215,8 @@ function MessageComposerImpl({
     media.queuedAttachmentsRef.current.length === 0;
   const ownsDropZone = mediaController === undefined;
   const backgroundUpload = useBackgroundMediaUpload();
+  // External address seeds wait until the editor exists (cold mounts).
+  const [isEditorReady, setIsEditorReady] = React.useState(false);
   const { trackAuthoredContent, getComposerRevision, runComposerUpdate } =
     useDraftPersistLifecycle({
       effectiveDraftKey,
@@ -243,6 +245,7 @@ function MessageComposerImpl({
       syncComposerContentFromEditor,
       getImplicitAgentMentionPrefix: implicitAgentMentionProvenance.getPrefix,
       insertLeadingText: (text) => richText.replacePlainTextRange(0, 0, text),
+      addressSeedReady: isEditorReady,
     });
   // biome-ignore lint/correctness/useExhaustiveDependencies: effectiveDraftKey is the sole trigger
   React.useEffect(() => {
@@ -333,6 +336,8 @@ function MessageComposerImpl({
       }
     },
   });
+  const hasEditor = richText.editor != null;
+  React.useEffect(() => setIsEditorReady(hasEditor), [hasEditor]);
   const linkEditor = useLinkEditor(richText);
   syncContentRefFromEditorRef.current = () => {
     const markdown = richText.getMarkdown();

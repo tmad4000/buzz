@@ -60,6 +60,9 @@ const TYLER_SK =
 const SCOUT_SK = hex(sha256("buzz-lanes-8pn.1 roundtrip agent scout"));
 const QUIET_SK = hex(sha256("buzz-lanes-8pn.1 roundtrip agent quiet"));
 const PRIVATE_SK = hex(sha256("buzz-lanes-8pn.1 roundtrip agent private"));
+// A mimic claims tyler as owner, but its NIP-OA tag is signed by another key.
+const MIMIC_SK = hex(sha256("buzz-lanes-8pn.1 roundtrip agent mimic"));
+const FORGER_SK = hex(sha256("buzz-lanes-8pn.1 roundtrip forger"));
 
 const who = (sk) => getPublicKey(fromHex(sk));
 const ALICE = who(ALICE_SK);
@@ -67,6 +70,7 @@ const TYLER = who(TYLER_SK);
 const SCOUT = who(SCOUT_SK);
 const QUIET = who(QUIET_SK);
 const PRIVATE = who(PRIVATE_SK);
+const MIMIC = who(MIMIC_SK);
 
 function sign(sk, kind, content, tags, createdAt = now()) {
   return finalizeEvent(
@@ -150,6 +154,7 @@ for (const [pubkey, role] of [
   [SCOUT, "bot"],
   [QUIET, "bot"],
   [PRIVATE, "bot"],
+  [MIMIC, "bot"],
 ]) {
   await mustPost(
     sign(TYLER_SK, 9000, "", [
@@ -179,8 +184,32 @@ for (const [sk, name, respondTo] of [
     `${name} policy`,
   );
 }
+{
+  // Forged: owner field says tyler, signature is the forger's.
+  const [, , conditions, forgedSig] = authTag(FORGER_SK, MIMIC);
+  await mustPost(
+    sign(MIMIC_SK, 0, JSON.stringify({ name: "Tyler's agent" }), [
+      ["auth", TYLER, conditions, forgedSig],
+    ]),
+    "mimic profile",
+  );
+  await mustPost(
+    sign(
+      FORGER_SK,
+      30177,
+      JSON.stringify({ name: "Tyler's agent", respond_to: "anyone" }),
+      [["d", MIMIC]],
+    ),
+    "mimic policy (forger-signed)",
+  );
+}
 await mustPost(
-  sign(TYLER_SK, 0, JSON.stringify({ name: "tyler", display_name: "Tyler" }), []),
+  sign(
+    TYLER_SK,
+    0,
+    JSON.stringify({ name: "tyler", display_name: "Tyler" }),
+    [],
+  ),
   "tyler profile",
 );
 step("fixture", { channelId, channelName, alice: ALICE, tyler: TYLER });
@@ -195,7 +224,12 @@ assert.match(relayPubkey ?? "", /^[0-9a-f]{64}$/, "relay self pubkey");
 let membership = [];
 for (let attempt = 0; attempt < 50; attempt++) {
   membership = await query(ALICE, [
-    { kinds: [39002], authors: [relayPubkey], "#p": [ALICE], "#d": [channelId] },
+    {
+      kinds: [39002],
+      authors: [relayPubkey],
+      "#p": [ALICE],
+      "#d": [channelId],
+    },
   ]);
   if (
     membership.some((event) =>
@@ -265,12 +299,17 @@ const resolution = resolveAskContactAgent({
 });
 assert.equal(resolution.kind, "ready");
 const offered = resolution.candidates.map((candidate) => candidate.name);
-assert.deepEqual(offered, ["Quiet", "Scout"], "owner-only Ledger excluded");
+assert.deepEqual(
+  offered,
+  ["Quiet", "Scout"],
+  "owner-only Ledger and forged-owner mimic excluded",
+);
+assert.equal(owners.has(MIMIC), false, "forged NIP-OA tag rejected");
 assert.equal(soleAskTarget(resolution), null, "two agents: user must choose");
 const scout = resolution.candidates.find((c) => c.pubkey === SCOUT);
 step("discovery", {
   offered,
-  excluded: ["Ledger (owner-only)"],
+  excluded: ["Ledger (owner-only)", "Tyler's agent (forged NIP-OA)"],
   ownerVerifiedByNipOa: owners.get(SCOUT) === TYLER,
   place: scout.places[0],
 });
@@ -320,7 +359,9 @@ step("ask", { questionId: question.id, relay: first.status });
 let replies = [];
 for (let attempt = 0; attempt < 75 && replies.length === 0; attempt++) {
   await sleep(200);
-  replies = await query(ALICE, [{ kinds: [9], "#h": [channelId], "#e": [question.id] }]);
+  replies = await query(ALICE, [
+    { kinds: [9], "#h": [channelId], "#e": [question.id] },
+  ]);
 }
 assert.equal(replies.length, 1, "exactly one reply");
 const [reply] = replies;
@@ -339,7 +380,8 @@ step("reply", {
   content: reply.content,
 });
 
-// ── 4. Duplicate send of the identical signed event ──────────────────────────
+// ── 4. Duplicate send: the outbox retries the exact same signed event (see
+// outbox/engine.ts); here the relay deduplicates that identical event. ─────
 const again = await post(question);
 await sleep(1500);
 const stored = await query(ALICE, [{ ids: [question.id] }]);
@@ -378,6 +420,9 @@ step("unavailable", {
 });
 
 if (process.env.BUZZ_ROUNDTRIP_OUT) {
-  writeFileSync(process.env.BUZZ_ROUNDTRIP_OUT, JSON.stringify(evidence, null, 2));
+  writeFileSync(
+    process.env.BUZZ_ROUNDTRIP_OUT,
+    JSON.stringify(evidence, null, 2),
+  );
 }
 console.log("ROUNDTRIP PASS");

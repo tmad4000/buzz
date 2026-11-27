@@ -1,9 +1,6 @@
 import type { Channel, RelayAgent } from "@/shared/api/types";
 import { normalizePubkey } from "@/shared/lib/pubkey";
-import {
-  isAgentMentionChannelType,
-  relayAgentCanRespondInChannel,
-} from "./agentAutocompleteEligibility";
+import { relayAgentCanRespondInChannel } from "./agentAutocompleteEligibility";
 
 /**
  * "Ask <name>'s agent": which of a contact's agents the viewer may ask, and
@@ -14,7 +11,9 @@ import {
  *   (NIP-OA attestation), never by a name or profile text match;
  * - the agent's owner-signed respond-to policy admits the viewer in a channel
  *   both of them already belong to (`relayAgentCanRespondInChannel`);
- * - the channel is a stream or forum, where agent mentions are supported.
+ * - the channel is a stream: its main composer is where the question goes.
+ *   (Forums take agent mentions too, but only inside a post, so there is no
+ *   channel composer to pre-address.)
  *
  * The result only chooses a destination. Sending still goes through the
  * composer's publish-time revalidation, which fails closed.
@@ -75,7 +74,7 @@ export function resolveAskContactAgent({
     (channel) =>
       channel.isMember &&
       channel.archivedAt === null &&
-      isAgentMentionChannelType(channel.channelType),
+      channel.channelType === "stream",
   );
 
   const candidates: AskContactAgentCandidate[] = [];

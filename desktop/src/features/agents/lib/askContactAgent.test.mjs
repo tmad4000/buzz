@@ -130,19 +130,16 @@ test("owner-only and allowlists that exclude the viewer are not opted in", () =>
   );
 });
 
-test("only live stream/forum channels the viewer belongs to count", () => {
+test("only live stream channels the viewer belongs to count", () => {
   for (const blocked of [
     channel("shared", { isMember: false }),
     channel("shared", { archivedAt: "2026-11-01T00:00:00Z" }),
     channel("shared", { channelType: "dm" }),
+    // Forum mentions happen inside a post; there is no channel composer.
+    channel("shared", { channelType: "forum" }),
   ]) {
     assert.equal(resolve([agent(AGENT_1)], [blocked]).kind, "not-shared");
   }
-  assert.equal(
-    resolve([agent(AGENT_1)], [channel("shared", { channelType: "forum" })])
-      .kind,
-    "ready",
-  );
 });
 
 test("an agent outside every shared channel is not offered", () => {

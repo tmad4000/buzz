@@ -204,6 +204,49 @@ test("ask a contact's agent from their profile and see its attributed reply in t
   await page.screenshot({ path: "test-results/ask-agent-3-reply.png" });
 });
 
+test("asking from another channel lands in the shared channel already addressed", async ({
+  page,
+}) => {
+  await install(page, [{ pubkey: SCOUT, name: "Scout" }]);
+  // Open Rowan's profile from #random; Scout only answers in #general.
+  await page.getByTestId("channel-random").click();
+  await expect(page.getByTestId("chat-title")).toHaveText("random");
+  const RANDOM_LINE = "Lunch at noon?";
+  await page.evaluate(
+    ({ line, rowan }) =>
+      window.__BUZZ_E2E_EMIT_MOCK_MESSAGE__?.({
+        channelName: "random",
+        content: line,
+        pubkey: rowan,
+      }),
+    { line: RANDOM_LINE, rowan: ROWAN },
+  );
+  await page
+    .getByTestId("message-row")
+    .filter({ hasText: RANDOM_LINE })
+    .locator("button", { hasText: "Rowan" })
+    .first()
+    .click();
+  const panel = page.getByTestId("user-profile-panel");
+  await panel.getByTestId(`ask-contact-agent-${SCOUT}-${GENERAL}`).click();
+
+  await expect(page.getByTestId("chat-title")).toHaveText("general");
+  const input = page.getByTestId("message-input").first();
+  await expect(input).toContainText("Scout");
+  await input.click();
+  await page.keyboard.press("End");
+  await page.keyboard.type("status?");
+  await page.getByTestId("send-message").first().click();
+  await expect
+    .poll(() => sentRecipients(page, "@Scout status?"))
+    .toEqual([expect.arrayContaining([SCOUT])]);
+  // The seed was consumed once; returning to #random leaves it untouched.
+  await page.getByTestId("channel-random").click();
+  await expect(page.getByTestId("message-input").first()).not.toContainText(
+    "Scout",
+  );
+});
+
 test("several agents are offered as explicit choices, never guessed", async ({
   page,
 }) => {

@@ -6,6 +6,7 @@ import { JSDOM } from "jsdom";
 import * as React from "react";
 import ts from "typescript";
 import * as helpers from "./useMentionSendFlow.helpers.ts";
+import * as draftAddressSeeds from "../lib/draftAddressSeeds.ts";
 import * as draftStore from "../lib/useDrafts.ts";
 
 // Execute the product hooks with real React effects/renders; only external
@@ -92,6 +93,7 @@ export async function setup({ lifecycle = false } = {}) {
     "../outbox/errors": { OutboxRemovedError: class extends Error {} },
     react: React,
     "@/features/messages/lib/useDrafts": draftStore,
+    "@/features/messages/lib/draftAddressSeeds": draftAddressSeeds,
     sonner: { toast: { error: (error) => calls.push(["error", error]) } },
     "@/features/agents/hooks": new Proxy(
       {},

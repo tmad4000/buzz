@@ -75,6 +75,12 @@ type UseDraftPersistLifecycleParams = {
    * without it the seed falls back to a markdown `setContent`.
    */
   insertLeadingText?: (text: string) => void;
+  /**
+   * Whether the editor can apply an address seed yet. Seeds are only taken
+   * (and pending ones consumed) once this is true, so a cold mount after
+   * navigation cannot drop one. Defaults to ready.
+   */
+  addressSeedReady?: boolean;
 };
 
 type UseDraftPersistLifecycleResult = {
@@ -136,6 +142,7 @@ export function useDraftPersistLifecycle({
   syncComposerContentFromEditor,
   getImplicitAgentMentionPrefix,
   insertLeadingText,
+  addressSeedReady = true,
 }: UseDraftPersistLifecycleParams): UseDraftPersistLifecycleResult {
   const persistedContent = React.useCallback(
     (content: string) =>
@@ -312,11 +319,11 @@ export function useDraftPersistLifecycle({
     trackAuthoredContent(persistedContent(syncComposerContentFromEditor()));
   };
   React.useEffect(() => {
-    if (!effectiveDraftKey) return;
+    if (!effectiveDraftKey || !addressSeedReady) return;
     return subscribeDraftAddressSeed(effectiveDraftKey, (seed) =>
       applyAddressSeedRef.current?.(seed),
     );
-  }, [effectiveDraftKey]);
+  }, [addressSeedReady, effectiveDraftKey]);
 
   return { trackAuthoredContent, getComposerRevision, runComposerUpdate };
 }
