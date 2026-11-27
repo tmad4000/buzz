@@ -242,6 +242,7 @@ function MessageComposerImpl({
       spoileredAttachmentUrlsRef,
       syncComposerContentFromEditor,
       getImplicitAgentMentionPrefix: implicitAgentMentionProvenance.getPrefix,
+      insertLeadingText: (text) => richText.replacePlainTextRange(0, 0, text),
     });
   // biome-ignore lint/correctness/useExhaustiveDependencies: effectiveDraftKey is the sole trigger
   React.useEffect(() => {

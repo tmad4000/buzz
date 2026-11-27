@@ -5,6 +5,7 @@ import { after, afterEach, before, test } from "node:test";
 import { JSDOM } from "jsdom";
 import * as React from "react";
 import ts from "typescript";
+import * as draftAddressSeeds from "../../messages/lib/draftAddressSeeds.ts";
 import * as draftStore from "../../messages/lib/useDrafts.ts";
 
 const dom = new JSDOM("<!doctype html><html><body></body></html>", {
@@ -106,6 +107,7 @@ async function setup(options = {}) {
       PRIVATE_CHANNEL_ADD_DENIED_MESSAGE: "denied",
     },
     "@/features/messages/lib/useDrafts": draftStore,
+    "@/features/messages/lib/draftAddressSeeds": draftAddressSeeds,
     "@/features/messages/lib/stripImplicitAgentMentions": {
       stripImplicitAgentMentionPrefix: (s) => s,
     },

@@ -36,6 +36,7 @@ import {
   ChannelsFocusedView,
   MemoryFocusedView,
 } from "@/features/profile/ui/UserProfilePanelFocusedViews";
+import { ProfileAskAgentSection } from "@/features/profile/ui/ProfileAskAgentSection";
 import { ProfileAvatar } from "@/features/profile/ui/ProfileAvatar";
 import {
   ProfilePersonaPrimaryActions,
@@ -466,6 +467,12 @@ export function ProfileSummaryView({
           wavePending={isWavePending}
         />
       ) : null}
+
+      <ProfileAskAgentSection
+        contactName={displayName}
+        contactPubkey={pubkey}
+        enabled={!isSelf && !isBot && !canInstantiateAgent && Boolean(pubkey)}
+      />
 
       {/* Tab-independent restart badge — visible on every tab so the user
           sees it on a plain Info-tab open, not only on the Runtime tab.

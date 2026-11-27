@@ -2,6 +2,11 @@ import * as React from "react";
 
 import { stripImplicitAgentMentionPrefix } from "@/features/messages/lib/stripImplicitAgentMentions";
 
+import {
+  addressDraft,
+  type DraftAddressSeed,
+  subscribeDraftAddressSeed,
+} from "@/features/messages/lib/draftAddressSeeds";
 import type { ImetaMedia } from "@/features/messages/lib/imetaMediaMarkdown";
 import type { QueuedMediaAttachment } from "@/features/messages/lib/backgroundMediaUploadStore";
 import {
@@ -64,6 +69,12 @@ type UseDraftPersistLifecycleParams = {
   syncComposerContentFromEditor: () => string;
   /** Exact editor prefix inserted by automatic addressing, including separator. */
   getImplicitAgentMentionPrefix?: () => string;
+  /**
+   * Insert literal text at the start of the live editor (no markdown
+   * re-parse, so a trailing space survives). Used for external address seeds;
+   * without it the seed falls back to a markdown `setContent`.
+   */
+  insertLeadingText?: (text: string) => void;
 };
 
 type UseDraftPersistLifecycleResult = {
@@ -124,6 +135,7 @@ export function useDraftPersistLifecycle({
   spoileredAttachmentUrlsRef,
   syncComposerContentFromEditor,
   getImplicitAgentMentionPrefix,
+  insertLeadingText,
 }: UseDraftPersistLifecycleParams): UseDraftPersistLifecycleResult {
   const persistedContent = React.useCallback(
     (content: string) =>
@@ -281,6 +293,30 @@ export function useDraftPersistLifecycle({
       spoileredAttachmentUrlsRef,
     ],
   );
+
+  // A mounted composer owns its draft, so an external "address this agent"
+  // request (see draftAddressSeeds) edits the live editor instead of storage
+  // that this composer's cleanup would later overwrite.
+  const applyAddressSeedRef = React.useRef<
+    ((seed: DraftAddressSeed) => void) | null
+  >(null);
+  applyAddressSeedRef.current = (seed) => {
+    const live = persistedContent(syncComposerContentFromEditor());
+    const next = addressDraft(live, getMentionRefs(live), seed);
+    if (!next.changed) return;
+    runComposerUpdate(() => {
+      if (insertLeadingText) insertLeadingText(next.leadingText);
+      else setContent(next.content);
+      restoreMentionRefs(next.mentionRefs);
+    });
+    trackAuthoredContent(persistedContent(syncComposerContentFromEditor()));
+  };
+  React.useEffect(() => {
+    if (!effectiveDraftKey) return;
+    return subscribeDraftAddressSeed(effectiveDraftKey, (seed) =>
+      applyAddressSeedRef.current?.(seed),
+    );
+  }, [effectiveDraftKey]);
 
   return { trackAuthoredContent, getComposerRevision, runComposerUpdate };
 }
