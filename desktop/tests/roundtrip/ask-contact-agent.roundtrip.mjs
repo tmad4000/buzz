@@ -419,6 +419,121 @@ step("unavailable", {
   shownAs: "offline (directory status); question remains in channel",
 });
 
+// Optional Phase 2 wire check on the same isolated relay and NIP-OA fixture.
+if (process.env.BUZZ_ROUNDTRIP_WEBSITE === "1") {
+  const { privatePageQuestion, verifyWebsiteContact, websiteMessage } =
+    await import("../../src/features/messages/lib/websiteRecipient.ts");
+
+  async function openWebsiteDm(recipient, createdAt = now()) {
+    const response = await mustPost(
+      sign(ALICE_SK, 41010, "", [["p", recipient]], createdAt),
+      "open exact DM",
+    );
+    const { message } = JSON.parse(response.body);
+    const { channel_id: dm } = JSON.parse(message.replace(/^response:/, ""));
+    const [metadata] = await query(ALICE, [{ kinds: [39000], "#d": [dm] }]);
+    assert.ok(verifyEvent(metadata));
+    assert.deepEqual(
+      metadata.tags
+        .filter(([tag]) => tag === "p")
+        .map(([, key]) => key)
+        .sort(),
+      [ALICE, recipient].sort(),
+    );
+    return dm;
+  }
+
+  const ownedSk = hex(sha256("website roundtrip personal agent"));
+  const owned = who(ownedSk);
+  await mustPost(
+    sign(ownedSk, 0, JSON.stringify({ name: "My research agent" }), [
+      authTag(ALICE_SK, owned),
+    ]),
+    "personal agent profile",
+  );
+  const domain = "airline.example";
+  const contact = verifyWebsiteContact(domain, {
+    names: { _: TYLER, agent: SCOUT },
+  });
+  assert.equal(owners.get(contact.agentPubkey), contact.ownerPubkey);
+  const siteMessages = () =>
+    query(SCOUT, [{ kinds: [9], authors: [ALICE], "#p": [SCOUT] }]);
+  const before = (await siteMessages()).map(({ id }) => id).sort();
+
+  const excerpt = "One checked bag is included.";
+  const personalDm = await openWebsiteDm(owned);
+  const privateAsk = sign(
+    ALICE_SK,
+    9,
+    privatePageQuestion(
+      "What baggage is included?",
+      `https://${domain}/baggage`,
+      excerpt,
+    ),
+    [
+      ["h", personalDm],
+      ["p", owned],
+    ],
+  );
+  await mustPost(privateAsk, "private website question");
+  const [received] = await query(owned, [
+    { kinds: [9], "#h": [personalDm], ids: [privateAsk.id] },
+  ]);
+  assert.ok(verifyEvent(received));
+  assert.equal(received.content, privateAsk.content);
+  assert.deepEqual((await siteMessages()).map(({ id }) => id).sort(), before);
+  const privateReply = sign(ownedSk, 9, `The policy says “${excerpt}”`, [
+    ["h", personalDm],
+    ["e", privateAsk.id, "", "reply"],
+    ["p", ALICE],
+    authTag(ALICE_SK, owned),
+  ]);
+  await mustPost(privateReply, "private agent cited reply");
+  const [readPrivateReply] = await query(ALICE, [
+    { kinds: [9], "#h": [personalDm], ids: [privateReply.id] },
+  ]);
+  assert.equal(verifiedOwner(readPrivateReply), ALICE);
+  assert.ok(readPrivateReply.content.includes(excerpt));
+
+  const siteDm = await openWebsiteDm(contact.agentPubkey);
+  assert.notEqual(siteDm, personalDm);
+  assert.equal(await openWebsiteDm(contact.agentPubkey, now() + 1), siteDm);
+  const officialAsk = sign(
+    ALICE_SK,
+    9,
+    websiteMessage("Please explain your policy.", domain, "/baggage"),
+    [
+      ["h", siteDm],
+      ["p", contact.agentPubkey],
+    ],
+  );
+  await mustPost(officialAsk, "explicit official website question");
+  const officialReply = sign(SCOUT_SK, 9, "Official fixture reply.", [
+    ["h", siteDm],
+    ["e", officialAsk.id, "", "reply"],
+    ["p", ALICE],
+    authTag(TYLER_SK, SCOUT),
+  ]);
+  await mustPost(officialReply, "official agent reply");
+  const [readOfficialReply] = await query(ALICE, [
+    { kinds: [9], "#h": [siteDm], ids: [officialReply.id] },
+  ]);
+  assert.equal(verifiedOwner(readOfficialReply), contact.domainPubkey);
+  assert.equal(readOfficialReply.pubkey, contact.agentPubkey);
+  assert.ok(
+    readOfficialReply.tags.some(
+      ([tag, id]) => tag === "e" && id === officialAsk.id,
+    ),
+  );
+  step("website DMs", {
+    privateDm: personalDm,
+    officialDm: siteDm,
+    privateReply: privateReply.id,
+    officialReply: officialReply.id,
+    siteMessagesDuringPrivateAsk: 0,
+  });
+}
+
 if (process.env.BUZZ_ROUNDTRIP_OUT) {
   writeFileSync(
     process.env.BUZZ_ROUNDTRIP_OUT,

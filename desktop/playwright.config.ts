@@ -23,6 +23,7 @@ export default defineConfig({
         "**/channel-timeline.spec.ts",
         "**/mock-subscription-readiness.spec.ts",
         "**/owned-agent-discovery.spec.ts",
+        "**/website-recipient.spec.ts",
         "**/thread-head-stale-edit.spec.ts",
         "**/thread-follow.spec.ts",
         "**/sidebar-offcanvas-rail.spec.ts",

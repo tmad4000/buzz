@@ -10,6 +10,7 @@
 #   BUZZ_ROUNDTRIP_RELAY_BIN  relay binary (default target/debug/buzz-relay)
 #   BUZZ_ROUNDTRIP_OUT        evidence JSON path (default desktop/test-results/ask-agent-roundtrip.json)
 #   BUZZ_ROUNDTRIP_PG_IMAGE / BUZZ_ROUNDTRIP_REDIS_IMAGE  container images
+#   BUZZ_ROUNDTRIP_WEBSITE=1  also exercise Phase 2 website DMs
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -70,10 +71,10 @@ docker run -d --rm --name "${PG}" -p "127.0.0.1:${PG_PORT}:5432" \
 docker run -d --rm --name "${REDIS}" -p "127.0.0.1:${REDIS_PORT}:6379" \
   "${REDIS_IMAGE}" >/dev/null
 for _ in $(seq 1 60); do
-  docker exec "${PG}" pg_isready -U buzz -d buzz >/dev/null 2>&1 && break
+  docker exec "${PG}" pg_isready -h 127.0.0.1 -U buzz -d buzz >/dev/null 2>&1 && break
   sleep 1
 done
-docker exec "${PG}" pg_isready -U buzz -d buzz >/dev/null
+docker exec "${PG}" pg_isready -h 127.0.0.1 -U buzz -d buzz >/dev/null
 
 cd "${ROOT}"
 export PGHOST=127.0.0.1 PGPORT="${PG_PORT}" PGUSER=buzz PGPASSWORD=buzz_dev PGDATABASE=buzz

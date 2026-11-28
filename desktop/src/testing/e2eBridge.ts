@@ -319,6 +319,8 @@ type E2eConfig = {
       acp?: MockCommandAvailability;
       mcp?: MockCommandAvailability;
     };
+    websiteMetadata?: Record<string, unknown>;
+    websitePages?: Record<string, { url: string; text: string }>;
     managedAgents?: MockManagedAgentSeed[];
     /** Result returned by the mocked `add_agent_to_huddle` command. */
     addAgentToHuddleResult?: {
@@ -4341,6 +4343,7 @@ function syncMockRelayAgentsFromManagedAgents() {
 
       return {
         pubkey: agent.pubkey,
+        owner_pubkey: MOCK_IDENTITY_PUBKEY,
         name: agent.name,
         agent_type: agent.agent_command,
         channels: memberships.channels,
@@ -13753,6 +13756,17 @@ export function maybeInstallE2eTauriMocks() {
           (payload as Parameters<typeof handleGetFeed>[0]) ?? {},
           activeConfig,
         );
+      case "lookup_website_recipient":
+      case "read_website_recipient": {
+        const { url } = payload as { url: string };
+        const value =
+          command === "lookup_website_recipient"
+            ? activeConfig?.mock?.websiteMetadata?.[url]
+            : activeConfig?.mock?.websitePages?.[url];
+        if (value === undefined)
+          throw new Error("Couldn't read this public website.");
+        return value;
+      }
       case "list_relay_agents":
         return handleListRelayAgents(activeConfig);
       case "revalidate_relay_agents": {

@@ -146,6 +146,8 @@ type MockInstallRuntimeResult = {
 };
 
 type MockBridgeOptions = {
+  websiteMetadata?: Record<string, unknown>;
+  websitePages?: Record<string, { url: string; text: string }>;
   /** Tauri window label exposed to the app. Defaults to the main window. */
   windowLabel?: string;
   ttsSettings?: {

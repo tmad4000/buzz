@@ -58,6 +58,7 @@ mod unread_catch_up;
 mod util;
 #[cfg(target_os = "linux")]
 pub mod webkit_rendering;
+mod website_recipient;
 use app_state::{build_app_state, resolve_persisted_identity, AppState};
 use builderlab::*;
 #[doc(hidden)]
@@ -713,6 +714,8 @@ pub fn run() {
             get_relay_self,
             resolve_oa_owner,
             list_relay_agents,
+            website_recipient::read_website_recipient,
+            website_recipient::lookup_website_recipient,
             revalidate_relay_agents,
             list_managed_agents,
             list_managed_agent_runtimes,

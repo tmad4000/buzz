@@ -5,6 +5,7 @@ import {
   useOpenDmMutation,
   useUpsertCachedChannel,
 } from "@/features/channels/hooks";
+import { useCommunities } from "@/features/communities/useCommunities";
 import type { Channel } from "@/shared/api/types";
 import { useSendMessageMutation } from "@/features/messages/hooks";
 import { getKeyboardSearchSelection } from "@/features/profile/lib/userCandidateSearch";
@@ -14,6 +15,9 @@ import { normalizePubkey } from "@/shared/lib/pubkey";
 import { Popover, PopoverAnchor, PopoverContent } from "@/shared/ui/popover";
 import { Skeleton } from "@/shared/ui/skeleton";
 
+import { websiteRecipientDraft } from "../lib/websiteRecipient";
+import { messageMentionPubkeys } from "../lib/messageMentionPubkeys";
+import { WebsiteRecipientDraft } from "./WebsiteRecipientDraft";
 import { MessageComposer } from "./MessageComposer";
 import { NewMessageResultRow } from "./NewMessageResultRow";
 import {
@@ -29,6 +33,10 @@ import {
 export function NewMessageScreen() {
   const identityQuery = useIdentityQuery();
   const currentPubkey = identityQuery.data?.pubkey;
+  const relayUrl = useCommunities().activeCommunity?.relayUrl;
+  const [websiteInput, setWebsiteInput] = React.useState("");
+  const websiteDraft = websiteRecipientDraft(websiteInput);
+  const websiteActive = websiteDraft !== null;
   const openDmMutation = useOpenDmMutation();
   const upsertCachedChannel = useUpsertCachedChannel();
   const sendMessageMutation = useSendMessageMutation(null, identityQuery.data);
@@ -67,12 +75,13 @@ export function NewMessageScreen() {
     selectUser,
     selectedUsers,
     setSearchQuery,
-  } = useNewMessageRecipients({ active: true, currentPubkey });
+  } = useNewMessageRecipients({ active: !websiteActive, currentPubkey });
 
   const isSearchTransitionPending = searchQuery.trim() !== deferredSearchQuery;
   const visibleSearchResults =
     isSearchTransitionPending || isDirectoryLoading ? [] : searchResults;
-  const showRecipientPicker = isRecipientPickerOpen && !isPending;
+  const showRecipientPicker =
+    isRecipientPickerOpen && !isPending && !websiteActive;
   const highlightedRecipientIndex = React.useMemo(() => {
     if (!showRecipientPicker || visibleSearchResults.length === 0) {
       return -1;
@@ -372,34 +381,37 @@ export function NewMessageScreen() {
                 <span className="shrink-0 text-base font-semibold tracking-tight">
                   To:
                 </span>
-                {selectedUsers.map((user) => (
-                  <SelectedRecipientChip
-                    disabled={isPending}
-                    inspectionOpen={inspectedRecipientPubkey === user.pubkey}
-                    key={user.pubkey}
-                    label={formatRecipientName(user)}
-                    onInspectionOpenChange={(inspectionOpen) => {
-                      setInspectedRecipientPubkey(
-                        inspectionOpen ? user.pubkey : null,
-                      );
-                    }}
-                    onRemove={() => handleRemoveUser(user.pubkey)}
-                    testIds={{
-                      chip: `new-dm-selected-${user.pubkey}`,
-                      keyPopover: `new-dm-selected-key-popover-${user.pubkey}`,
-                      name: `new-dm-recipient-name-${user.pubkey}`,
-                      pubkey: `new-dm-selected-pubkey-${user.pubkey}`,
-                    }}
-                    user={user}
-                  />
-                ))}
+                {!websiteActive &&
+                  selectedUsers.map((user) => (
+                    <SelectedRecipientChip
+                      disabled={isPending}
+                      inspectionOpen={inspectedRecipientPubkey === user.pubkey}
+                      key={user.pubkey}
+                      label={formatRecipientName(user)}
+                      onInspectionOpenChange={(inspectionOpen) => {
+                        setInspectedRecipientPubkey(
+                          inspectionOpen ? user.pubkey : null,
+                        );
+                      }}
+                      onRemove={() => handleRemoveUser(user.pubkey)}
+                      testIds={{
+                        chip: `new-dm-selected-${user.pubkey}`,
+                        keyPopover: `new-dm-selected-key-popover-${user.pubkey}`,
+                        name: `new-dm-recipient-name-${user.pubkey}`,
+                        pubkey: `new-dm-selected-pubkey-${user.pubkey}`,
+                      }}
+                      user={user}
+                    />
+                  ))}
                 <input
                   aria-activedescendant={
                     highlightedRecipient
                       ? `new-dm-option-${highlightedRecipient.pubkey}`
                       : undefined
                   }
-                  aria-controls="new-dm-results"
+                  aria-controls={
+                    showRecipientPicker ? "new-dm-results" : undefined
+                  }
                   aria-expanded={showRecipientPicker}
                   aria-label="To"
                   autoComplete="off"
@@ -409,13 +421,35 @@ export function NewMessageScreen() {
                   disabled={isPending}
                   id="new-dm-search"
                   onChange={(event) => {
-                    setSearchQuery(event.target.value);
+                    const input = event.target.value;
+                    const website = websiteRecipientDraft(input);
+                    setWebsiteInput(website ? input : "");
+                    setSearchQuery(website ? "" : input);
                     setHighlightedRecipientPubkey(null);
                     setSubmitErrorMessage(null);
                     setIsRecipientPickerOpen(true);
                   }}
+                  onPaste={(event) => {
+                    const input = event.clipboardData
+                      .getData("text/plain")
+                      .trim();
+                    if (!websiteRecipientDraft(input)) return;
+                    event.preventDefault();
+                    setSearchQuery("");
+                    setWebsiteInput(input);
+                    setIsRecipientPickerOpen(false);
+                    setHighlightedRecipientPubkey(null);
+                    setSubmitErrorMessage(null);
+                  }}
                   onFocus={() => setIsRecipientPickerOpen(true)}
                   onKeyDown={(event) => {
+                    if (websiteActive) {
+                      if (event.key === "Escape") {
+                        event.preventDefault();
+                        setWebsiteInput("");
+                      }
+                      return;
+                    }
                     if (event.key === "Escape") {
                       event.preventDefault();
                       if (inspectedRecipientPubkey) {
@@ -507,7 +541,7 @@ export function NewMessageScreen() {
                   role="combobox"
                   spellCheck={false}
                   type="text"
-                  value={searchQuery}
+                  value={websiteInput || searchQuery}
                 />
               </div>
             </PopoverAnchor>
@@ -605,10 +639,55 @@ export function NewMessageScreen() {
         </div>
       </header>
 
-      <div
-        className="min-h-0 flex-1 bg-background"
-        data-testid="new-message-body"
-      />
+      {websiteDraft && currentPubkey && relayUrl ? (
+        <WebsiteRecipientDraft
+          draft={websiteDraft}
+          key={JSON.stringify([websiteInput, currentPubkey, relayUrl])}
+          relayUrl={relayUrl}
+          sender={currentPubkey}
+          send={async (recipient, content, stillCurrent) => {
+            if (!stillCurrent()) return;
+            const directMessage = await openDmMutation.mutateAsync({
+              pubkeys: [recipient],
+              expectedRelayUrl: relayUrl,
+              expectedSignerPubkey: currentPubkey,
+            });
+            if (!stillCurrent()) return;
+            const recipients = messageMentionPubkeys(
+              directMessage,
+              currentPubkey,
+            );
+            if (
+              directMessage.channelType !== "dm" ||
+              directMessage.visibility !== "private" ||
+              !directMessage.isMember ||
+              recipients.length !== 1 ||
+              recipients[0] !== recipient
+            ) {
+              throw new Error(
+                "Couldn't confirm a direct message to the reviewed recipient.",
+              );
+            }
+            await sendMessageMutation.mutateAsync({
+              content,
+              targetChannel: directMessage,
+              transport: "http",
+              expectedScope: { relayUrl, signerPubkey: currentPubkey },
+            });
+            if (stillCurrent()) {
+              // Clear the draft even if subsequent navigation fails. An
+              // acknowledged message must not be offered for re-send.
+              setWebsiteInput("");
+              await goChannel(directMessage.id, { replace: true });
+            }
+          }}
+        />
+      ) : (
+        <div
+          className="min-h-0 flex-1 bg-background"
+          data-testid="new-message-body"
+        />
+      )}
 
       {hasReachedRecipientLimit ? (
         <p
@@ -629,18 +708,20 @@ export function NewMessageScreen() {
         </p>
       ) : null}
 
-      <MessageComposer
-        channelName="new message"
-        channelType="dm"
-        containerClassName="px-5"
-        disabled={isPending || selectedUsers.length === 0}
-        isSending={isPending}
-        onPrepareSendChannel={prepareSendChannel}
-        onPreparingMentionSendChange={setIsPreparingMentionSend}
-        onSend={sendFirstMessage}
-        placeholder={composerPlaceholder}
-        showBackgroundUploadProgress
-      />
+      <div hidden={websiteActive}>
+        <MessageComposer
+          channelName="new message"
+          channelType="dm"
+          containerClassName="px-5"
+          disabled={isPending || websiteActive || selectedUsers.length === 0}
+          isSending={isPending}
+          onPrepareSendChannel={prepareSendChannel}
+          onPreparingMentionSendChange={setIsPreparingMentionSend}
+          onSend={sendFirstMessage}
+          placeholder={composerPlaceholder}
+          showBackgroundUploadProgress
+        />
+      </div>
       <div aria-hidden="true" className="min-h-8 bg-background px-5 pb-1.5" />
     </div>
   );
